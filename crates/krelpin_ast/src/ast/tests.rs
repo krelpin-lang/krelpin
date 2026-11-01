@@ -82,3 +82,19 @@ fn primitives_round_trip() {
     }
     assert_eq!(PrimitiveTy::from_symbol(Symbol::intern("String")), None);
 }
+
+#[test]
+fn displays_arrays() {
+    let string = path("String", vec![]);
+    let array = |inner| ty(TyKind::Array(Box::new(inner)));
+    assert_eq!(array(string.clone()).to_string(), "String[]");
+    assert_eq!(
+        reference(false, &[], array(string.clone())).to_string(),
+        "&String[]"
+    );
+    assert_eq!(
+        array(reference(false, &[], string.clone())).to_string(),
+        "(&String)[]"
+    );
+    assert_eq!(array(nullable(string)).to_string(), "(String?)[]");
+}

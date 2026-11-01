@@ -1,0 +1,229 @@
+CompilationUnit {
+    docs: [],
+    package: None,
+    imports: [],
+    items: [
+        Item {
+            docs: [],
+            annotations: [],
+            vis: Default,
+            name: "Main" @ 6..10,
+            kind: Class(
+                Class {
+                    generics: Generics {
+                        params: [],
+                        span: 11..11,
+                    },
+                    extends: None,
+                    implements: [],
+                    members: [
+                        Member {
+                            docs: [],
+                            annotations: [],
+                            vis: Default,
+                            kind: Method(
+                                Method {
+                                    generics: Generics {
+                                        params: [],
+                                        span: 0..0,
+                                    },
+                                    ret: Void(
+                                        17..21,
+                                    ),
+                                    name: "main" @ 22..26,
+                                    receiver: None,
+                                    params: [
+                                        Param {
+                                            ty: Ty {
+                                                kind: Array(
+                                                    Ty {
+                                                        kind: Path {
+                                                            path: "String" @ 27..33,
+                                                            args: [],
+                                                        },
+                                                        span: 27..33,
+                                                    },
+                                                ),
+                                                span: 27..35,
+                                            },
+                                            name: "args" @ 36..40,
+                                            variadic: false,
+                                            span: 27..40,
+                                        },
+                                    ],
+                                    throws: [],
+                                    body: Some(
+                                        Unparsed {
+                                            span: 42..44,
+                                        },
+                                    ),
+                                },
+                            ),
+                            span: 17..44,
+                        },
+                        Member {
+                            docs: [],
+                            annotations: [],
+                            vis: Default,
+                            kind: Method(
+                                Method {
+                                    generics: Generics {
+                                        params: [],
+                                        span: 0..0,
+                                    },
+                                    ret: Ty(
+                                        Ty {
+                                            kind: Primitive(
+                                                Int,
+                                            ),
+                                            span: 49..52,
+                                        },
+                                    ),
+                                    name: "sum" @ 53..56,
+                                    receiver: None,
+                                    params: [
+                                        Param {
+                                            ty: Ty {
+                                                kind: Ref {
+                                                    mutable: false,
+                                                    sources: [],
+                                                    ty: Ty {
+                                                        kind: Array(
+                                                            Ty {
+                                                                kind: Primitive(
+                                                                    Int,
+                                                                ),
+                                                                span: 58..61,
+                                                            },
+                                                        ),
+                                                        span: 58..63,
+                                                    },
+                                                },
+                                                span: 57..63,
+                                            },
+                                            name: "values" @ 64..70,
+                                            variadic: false,
+                                            span: 57..70,
+                                        },
+                                    ],
+                                    throws: [],
+                                    body: Some(
+                                        Unparsed {
+                                            span: 72..85,
+                                        },
+                                    ),
+                                },
+                            ),
+                            span: 49..85,
+                        },
+                        Member {
+                            docs: [],
+                            annotations: [],
+                            vis: Default,
+                            kind: Method(
+                                Method {
+                                    generics: Generics {
+                                        params: [],
+                                        span: 0..0,
+                                    },
+                                    ret: Ty(
+                                        Ty {
+                                            kind: Nullable(
+                                                Ty {
+                                                    kind: Ref {
+                                                        mutable: false,
+                                                        sources: [],
+                                                        ty: Ty {
+                                                            kind: Array(
+                                                                Ty {
+                                                                    kind: Path {
+                                                                        path: "String" @ 91..97,
+                                                                        args: [],
+                                                                    },
+                                                                    span: 91..97,
+                                                                },
+                                                            ),
+                                                            span: 91..99,
+                                                        },
+                                                    },
+                                                    span: 90..99,
+                                                },
+                                            ),
+                                            span: 90..100,
+                                        },
+                                    ),
+                                    name: "names" @ 101..106,
+                                    receiver: Some(
+                                        Receiver {
+                                            kind: Ref,
+                                            span: 107..112,
+                                        },
+                                    ),
+                                    params: [],
+                                    throws: [],
+                                    body: Some(
+                                        Unparsed {
+                                            span: 114..130,
+                                        },
+                                    ),
+                                },
+                            ),
+                            span: 90..130,
+                        },
+                        Member {
+                            docs: [],
+                            annotations: [],
+                            vis: Default,
+                            kind: Method(
+                                Method {
+                                    generics: Generics {
+                                        params: [],
+                                        span: 0..0,
+                                    },
+                                    ret: Ty(
+                                        Ty {
+                                            kind: Array(
+                                                Ty {
+                                                    kind: Ref {
+                                                        mutable: false,
+                                                        sources: [],
+                                                        ty: Ty {
+                                                            kind: Path {
+                                                                path: "String" @ 137..143,
+                                                                args: [],
+                                                            },
+                                                            span: 137..143,
+                                                        },
+                                                    },
+                                                    span: 135..144,
+                                                },
+                                            ),
+                                            span: 135..146,
+                                        },
+                                    ),
+                                    name: "borrowed" @ 147..155,
+                                    receiver: Some(
+                                        Receiver {
+                                            kind: Ref,
+                                            span: 156..161,
+                                        },
+                                    ),
+                                    params: [],
+                                    throws: [],
+                                    body: Some(
+                                        Unparsed {
+                                            span: 163..179,
+                                        },
+                                    ),
+                                },
+                            ),
+                            span: 135..179,
+                        },
+                    ],
+                },
+            ),
+            span: 0..181,
+        },
+    ],
+    span: 0..182,
+}

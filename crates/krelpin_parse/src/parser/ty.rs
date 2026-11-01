@@ -40,6 +40,23 @@ impl Parser<'_> {
             });
         }
 
+        let mut ty = self.parse_ty_atom()?;
+        while self.token.kind == TokenKind::OpenBracket
+            && self.look_ahead(1) == TokenKind::CloseBracket
+        {
+            self.bump();
+            self.bump();
+            ty = Ty {
+                kind: TyKind::Array(Box::new(ty)),
+                span: lo.to(self.prev_token.span),
+            };
+        }
+        Ok(ty)
+    }
+
+    fn parse_ty_atom(&mut self) -> PResult<Ty> {
+        let lo = self.token.span;
+
         if self.eat_noexpect(TokenKind::OpenParen) {
             let ty = self.parse_ty()?;
             self.expect(TokenKind::CloseParen)?;

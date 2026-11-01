@@ -202,6 +202,7 @@ pub enum TyKind {
         ty: Box<Ty>,
     },
     Nullable(Box<Ty>),
+    Array(Box<Ty>),
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -301,6 +302,10 @@ impl fmt::Display for Ty {
                 }
             }
             TyKind::Nullable(ty) => write!(f, "{ty}?"),
+            TyKind::Array(ty) => match ty.kind {
+                TyKind::Ref { .. } | TyKind::Nullable(_) => write!(f, "({ty})[]"),
+                _ => write!(f, "{ty}[]"),
+            },
         }
     }
 }

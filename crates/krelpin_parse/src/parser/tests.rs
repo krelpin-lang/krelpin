@@ -1,6 +1,6 @@
 use krelpin_ast::ast::{
     Class, CompilationUnit, FieldStorage, FnRetTy, GenericParamKind, ItemKind, Member, MemberKind,
-    ReceiverKind, Visibility,
+    ReceiverKind, TyKind, Visibility,
 };
 use krelpin_errors::{DiagCtxt, DiagnosticBuffer};
 use krelpin_span::SourceMap;
@@ -198,6 +198,33 @@ fn reference_types() {
     assert_eq!(ret_ty("&String? f() {}"), "&String?");
     assert_eq!(ret_ty("&(String?) f() {}"), "&(String?)");
     assert_eq!(ret_ty("&&String f() {}"), "&&String");
+}
+
+#[test]
+fn array_types() {
+    assert_eq!(ret_ty("String[] f() {}"), "String[]");
+    assert_eq!(ret_ty("int[][] f() {}"), "int[][]");
+    assert_eq!(ret_ty("&int[] f() {}"), "&int[]");
+    assert_eq!(ret_ty("&mut [src] int[] f() {}"), "&mut [src] int[]");
+    assert_eq!(ret_ty("String[]? f() {}"), "String[]?");
+    assert_eq!(ret_ty("&String[]? f() {}"), "&String[]?");
+    assert_eq!(ret_ty("(&String)[] f() {}"), "(&String)[]");
+    assert_eq!(ret_ty("(String?)[] f() {}"), "(String?)[]");
+    assert_eq!(ret_ty("List<String>[] f() {}"), "List<String>[]");
+}
+
+#[test]
+fn reference_binds_to_whole_array() {
+    let MemberKind::Method(method) = only_member("&int[] f() {}") else {
+        panic!("expected a method");
+    };
+    let FnRetTy::Ty(ty) = method.ret else {
+        panic!("expected a return type");
+    };
+    let TyKind::Ref { ty: inner, .. } = ty.kind else {
+        panic!("expected a reference");
+    };
+    assert!(matches!(inner.kind, TyKind::Array(_)));
 }
 
 #[test]

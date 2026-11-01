@@ -1,0 +1,6 @@
+class Main {
+    void main(String[] args) {}
+    int sum(&int[] values) { return 0; }
+    &String[]? names(&this) { return null; }
+    (&String)[] borrowed(&this) { return null; }
+}
