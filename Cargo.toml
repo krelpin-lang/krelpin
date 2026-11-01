@@ -1,9 +1,11 @@
 [workspace]
 resolver = "3"
-members = [
-    "crates/krelpinc",
-]
+members = ["crates/*"]
 
 [workspace.package]
 version = "0.1.0"
 edition = "2024"
+
+[workspace.dependencies]
+clap = { version = "4", features = ["derive"] }
+krelpin_driver = { path = "crates/krelpin_driver" }
