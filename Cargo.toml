@@ -8,4 +8,6 @@ edition = "2024"
 
 [workspace.dependencies]
 clap = { version = "4", features = ["derive"] }
+unicode-ident = "1"
 krelpin_driver = { path = "crates/krelpin_driver" }
+krelpin_lexer = { path = "crates/krelpin_lexer" }

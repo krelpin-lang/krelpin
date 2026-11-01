@@ -118,6 +118,13 @@ dependencies = [
 ]
 
 [[package]]
+name = "krelpin_lexer"
+version = "0.1.0"
+dependencies = [
+ "unicode-ident",
+]
+
+[[package]]
 name = "krelpinc"
 version = "0.1.0"
 dependencies = [
