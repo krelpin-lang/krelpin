@@ -1,6 +1,5 @@
-use std::cell::RefCell;
 use std::io::{self, Write};
-use std::rc::Rc;
+use std::sync::{Arc, Mutex, MutexGuard, PoisonError};
 
 use krelpin_span::{Loc, SourceMap, Span};
 
@@ -16,42 +15,47 @@ pub trait Emitter {
 }
 
 #[derive(Clone, Default)]
-pub struct DiagnosticBuffer(Rc<RefCell<Vec<Diagnostic>>>);
+pub struct DiagnosticBuffer(Arc<Mutex<Vec<Diagnostic>>>);
 
 impl DiagnosticBuffer {
     pub fn diagnostics(&self) -> Vec<Diagnostic> {
-        self.0.borrow().clone()
+        self.lock().clone()
     }
 
     pub fn messages(&self) -> Vec<String> {
-        self.0
-            .borrow()
+        self.lock()
             .iter()
             .map(|diagnostic| diagnostic.message.clone())
             .collect()
     }
 }
 
+impl DiagnosticBuffer {
+    fn lock(&self) -> MutexGuard<'_, Vec<Diagnostic>> {
+        self.0.lock().unwrap_or_else(PoisonError::into_inner)
+    }
+}
+
 impl Emitter for DiagnosticBuffer {
     fn emit(&mut self, diagnostic: &Diagnostic) {
-        self.0.borrow_mut().push(diagnostic.clone());
+        self.lock().push(diagnostic.clone());
     }
 }
 
 pub struct HumanEmitter<W> {
-    source_map: Rc<SourceMap>,
+    source_map: Arc<SourceMap>,
     writer: W,
     color: bool,
 }
 
 impl HumanEmitter<io::Stderr> {
-    pub fn stderr(source_map: Rc<SourceMap>, color: bool) -> Self {
+    pub fn stderr(source_map: Arc<SourceMap>, color: bool) -> Self {
         HumanEmitter::new(source_map, io::stderr(), color)
     }
 }
 
 impl<W: Write> HumanEmitter<W> {
-    pub fn new(source_map: Rc<SourceMap>, writer: W, color: bool) -> Self {
+    pub fn new(source_map: Arc<SourceMap>, writer: W, color: bool) -> Self {
         HumanEmitter {
             source_map,
             writer,

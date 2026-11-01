@@ -3,6 +3,8 @@ use krelpin_ast::ast::{
     ReceiverKind, TyKind, Visibility,
 };
 use krelpin_errors::{DiagCtxt, DiagnosticBuffer};
+use std::thread;
+
 use krelpin_span::SourceMap;
 
 use crate::{lexer, parser};
@@ -415,4 +417,37 @@ fn recovers_inside_class() {
         })
         .collect();
     assert_eq!(names, ["ok"]);
+}
+
+#[test]
+fn files_are_parsed_in_parallel() {
+    let source_map = SourceMap::new();
+    let buffer = DiagnosticBuffer::default();
+    let dcx = DiagCtxt::new(buffer.clone());
+
+    let files: Vec<_> = (0..8)
+        .map(|index| {
+            let src = if index == 3 {
+                "class Broken { foo() {} }".to_owned()
+            } else {
+                format!("class C{index} {{ int value{index}; }}")
+            };
+            source_map.new_source_file(format!("{index}.kr"), src)
+        })
+        .collect();
+
+    let units: Vec<CompilationUnit> = thread::scope(|scope| {
+        let handles: Vec<_> = files
+            .iter()
+            .map(|file| {
+                let dcx = &dcx;
+                scope.spawn(move || parser::parse(lexer::lex(file, dcx), dcx))
+            })
+            .collect();
+        handles.into_iter().map(|h| h.join().unwrap()).collect()
+    });
+
+    assert_eq!(buffer.messages(), ["missing return type for method"]);
+    assert_eq!(units[5].items[0].name.name.as_str(), "C5");
+    assert_eq!(units[0].items[0].name.name.as_str(), "C0");
 }

@@ -1,7 +1,8 @@
 use std::collections::HashSet;
+use std::thread;
 
 use crate::symbol::keyword_texts;
-use crate::{BytePos, SourceMap, Span, Symbol, kw};
+use crate::{BytePos, SourceFile, SourceMap, Span, Symbol, kw};
 
 #[test]
 fn keywords_are_prefilled_in_order() {
@@ -69,4 +70,46 @@ fn span_helpers() {
     assert_eq!(a.subspan(1..2), Span::new(BytePos(3), BytePos(4)));
     assert_eq!(a.len(), 3);
     assert!(a.shrink_to_hi().is_empty());
+}
+
+fn assert_send_sync<T: Send + Sync>() {}
+
+#[test]
+fn shared_types_are_thread_safe() {
+    assert_send_sync::<Symbol>();
+    assert_send_sync::<SourceMap>();
+    assert_send_sync::<SourceFile>();
+}
+
+#[test]
+fn symbols_are_shared_between_threads() {
+    let symbols: Vec<Symbol> = thread::scope(|scope| {
+        let handles: Vec<_> = (0..8)
+            .map(|_| scope.spawn(|| Symbol::intern("sharedAcrossThreads")))
+            .collect();
+        handles.into_iter().map(|h| h.join().unwrap()).collect()
+    });
+
+    assert!(symbols.windows(2).all(|pair| pair[0] == pair[1]));
+
+    let from_other_thread = thread::spawn(|| Symbol::intern("internedElsewhere"))
+        .join()
+        .unwrap();
+    assert_eq!(from_other_thread.as_str(), "internedElsewhere");
+    assert_eq!(Symbol::intern("internedElsewhere"), from_other_thread);
+}
+
+#[test]
+fn source_files_can_be_added_from_many_threads() {
+    let source_map = SourceMap::new();
+    thread::scope(|scope| {
+        for index in 0..8 {
+            let source_map = &source_map;
+            scope.spawn(move || source_map.new_source_file(format!("{index}.kr"), "x".repeat(10)));
+        }
+    });
+
+    for pos in [0, 11, 22, 33, 44, 55, 66, 77] {
+        assert!(source_map.lookup_file(BytePos(pos)).is_some());
+    }
 }

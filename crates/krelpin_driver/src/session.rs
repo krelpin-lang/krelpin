@@ -1,20 +1,20 @@
 use std::io::IsTerminal;
 use std::process::ExitCode;
-use std::rc::Rc;
+use std::sync::Arc;
 
 use krelpin_errors::{DiagCtxt, Diagnostic, HumanEmitter};
 use krelpin_span::SourceMap;
 
 pub struct Session {
-    pub source_map: Rc<SourceMap>,
+    pub source_map: Arc<SourceMap>,
     pub dcx: DiagCtxt,
 }
 
 impl Session {
     pub fn new() -> Session {
-        let source_map = Rc::new(SourceMap::new());
+        let source_map = Arc::new(SourceMap::new());
         let color = std::io::stderr().is_terminal();
-        let emitter = HumanEmitter::stderr(Rc::clone(&source_map), color);
+        let emitter = HumanEmitter::stderr(Arc::clone(&source_map), color);
         Session {
             source_map,
             dcx: DiagCtxt::new(emitter),

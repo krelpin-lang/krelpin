@@ -4,25 +4,25 @@ mod emitter;
 #[cfg(test)]
 mod tests;
 
-use std::cell::RefCell;
+use std::sync::{Mutex, MutexGuard, PoisonError};
 
 pub use crate::diagnostic::{Diagnostic, Level, SubDiagnostic};
 pub use crate::emitter::{DiagnosticBuffer, Emitter, HumanEmitter};
 
 pub struct DiagCtxt {
-    inner: RefCell<DiagCtxtInner>,
+    inner: Mutex<DiagCtxtInner>,
 }
 
 struct DiagCtxtInner {
-    emitter: Box<dyn Emitter>,
+    emitter: Box<dyn Emitter + Send>,
     error_count: usize,
     warning_count: usize,
 }
 
 impl DiagCtxt {
-    pub fn new(emitter: impl Emitter + 'static) -> DiagCtxt {
+    pub fn new(emitter: impl Emitter + Send + 'static) -> DiagCtxt {
         DiagCtxt {
-            inner: RefCell::new(DiagCtxtInner {
+            inner: Mutex::new(DiagCtxtInner {
                 emitter: Box::new(emitter),
                 error_count: 0,
                 warning_count: 0,
@@ -31,7 +31,7 @@ impl DiagCtxt {
     }
 
     pub fn emit(&self, diagnostic: Diagnostic) {
-        let mut inner = self.inner.borrow_mut();
+        let mut inner = self.lock();
         match diagnostic.level {
             Level::Error => inner.error_count += 1,
             Level::Warning => inner.warning_count += 1,
@@ -41,14 +41,18 @@ impl DiagCtxt {
     }
 
     pub fn error_count(&self) -> usize {
-        self.inner.borrow().error_count
+        self.lock().error_count
     }
 
     pub fn warning_count(&self) -> usize {
-        self.inner.borrow().warning_count
+        self.lock().warning_count
     }
 
     pub fn has_errors(&self) -> bool {
         self.error_count() > 0
+    }
+
+    fn lock(&self) -> MutexGuard<'_, DiagCtxtInner> {
+        self.inner.lock().unwrap_or_else(PoisonError::into_inner)
     }
 }

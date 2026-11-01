@@ -1,11 +1,12 @@
-use std::rc::Rc;
+use std::sync::Arc;
+use std::thread;
 
 use krelpin_span::{BytePos, SourceMap, Span};
 
 use crate::{DiagCtxt, Diagnostic, DiagnosticBuffer, HumanEmitter};
 
 fn render(src: &str, diagnostic: Diagnostic) -> String {
-    let source_map = Rc::new(SourceMap::new());
+    let source_map = Arc::new(SourceMap::new());
     source_map.new_source_file("main.kr", src.to_owned());
     HumanEmitter::new(source_map, Vec::new(), false).render(&diagnostic)
 }
@@ -87,4 +88,25 @@ fn context_counts_errors_and_warnings() {
     assert_eq!(dcx.error_count(), 1);
     assert_eq!(dcx.warning_count(), 1);
     assert_eq!(buffer.messages(), ["unused", "broken"]);
+}
+
+#[test]
+fn context_can_be_shared_between_threads() {
+    fn assert_send_sync<T: Send + Sync>() {}
+    assert_send_sync::<DiagCtxt>();
+
+    let buffer = DiagnosticBuffer::default();
+    let dcx = DiagCtxt::new(buffer.clone());
+    thread::scope(|scope| {
+        for _ in 0..8 {
+            scope.spawn(|| {
+                for _ in 0..100 {
+                    dcx.emit(Diagnostic::error("parallel"));
+                }
+            });
+        }
+    });
+
+    assert_eq!(dcx.error_count(), 800);
+    assert_eq!(buffer.diagnostics().len(), 800);
 }

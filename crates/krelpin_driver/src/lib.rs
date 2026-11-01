@@ -143,3 +143,14 @@ fn value_name<T: ValueEnum>(value: T) -> String {
         .to_possible_value()
         .map_or_else(String::new, |value| value.get_name().to_owned())
 }
+
+#[cfg(test)]
+mod tests {
+    use super::Session;
+
+    #[test]
+    fn session_is_thread_safe() {
+        fn assert_send_sync<T: Send + Sync>() {}
+        assert_send_sync::<Session>();
+    }
+}

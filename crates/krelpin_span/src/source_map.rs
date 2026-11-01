@@ -1,8 +1,7 @@
-use std::cell::RefCell;
 use std::fs;
 use std::io;
 use std::path::{Path, PathBuf};
-use std::rc::Rc;
+use std::sync::{Arc, PoisonError, RwLock};
 
 use crate::{BytePos, Span};
 
@@ -72,14 +71,14 @@ impl SourceFile {
 
 #[derive(Clone, Debug)]
 pub struct Loc {
-    pub file: Rc<SourceFile>,
+    pub file: Arc<SourceFile>,
     pub line: usize,
     pub col: usize,
 }
 
 #[derive(Debug, Default)]
 pub struct SourceMap {
-    files: RefCell<Vec<Rc<SourceFile>>>,
+    files: RwLock<Vec<Arc<SourceFile>>>,
 }
 
 impl SourceMap {
@@ -87,26 +86,26 @@ impl SourceMap {
         SourceMap::default()
     }
 
-    pub fn load_file(&self, path: &Path) -> io::Result<Rc<SourceFile>> {
+    pub fn load_file(&self, path: &Path) -> io::Result<Arc<SourceFile>> {
         let src = fs::read_to_string(path)?;
         Ok(self.new_source_file(path, src))
     }
 
-    pub fn new_source_file(&self, name: impl Into<PathBuf>, src: String) -> Rc<SourceFile> {
-        let mut files = self.files.borrow_mut();
+    pub fn new_source_file(&self, name: impl Into<PathBuf>, src: String) -> Arc<SourceFile> {
+        let mut files = self.files.write().unwrap_or_else(PoisonError::into_inner);
         let start_pos = files.last().map_or(BytePos(0), |file| file.end_pos() + 1);
-        let file = Rc::new(SourceFile::new(name.into(), src, start_pos));
-        files.push(Rc::clone(&file));
+        let file = Arc::new(SourceFile::new(name.into(), src, start_pos));
+        files.push(Arc::clone(&file));
         file
     }
 
-    pub fn lookup_file(&self, pos: BytePos) -> Option<Rc<SourceFile>> {
-        let files = self.files.borrow();
+    pub fn lookup_file(&self, pos: BytePos) -> Option<Arc<SourceFile>> {
+        let files = self.files.read().unwrap_or_else(PoisonError::into_inner);
         let index = files
             .partition_point(|file| file.start_pos <= pos)
             .checked_sub(1)?;
         let file = &files[index];
-        file.contains(pos).then(|| Rc::clone(file))
+        file.contains(pos).then(|| Arc::clone(file))
     }
 
     pub fn lookup_char_pos(&self, pos: BytePos) -> Option<Loc> {

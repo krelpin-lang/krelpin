@@ -1,6 +1,6 @@
-use std::cell::RefCell;
 use std::collections::HashMap;
 use std::fmt;
+use std::sync::{LazyLock, PoisonError, RwLock};
 
 #[derive(Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub struct Symbol(u32);
@@ -76,11 +76,23 @@ keywords! {
 
 impl Symbol {
     pub fn intern(string: &str) -> Symbol {
-        INTERNER.with_borrow_mut(|interner| interner.intern(string))
+        let interner = INTERNER.read().unwrap_or_else(PoisonError::into_inner);
+        if let Some(&symbol) = interner.names.get(string) {
+            return symbol;
+        }
+        drop(interner);
+
+        INTERNER
+            .write()
+            .unwrap_or_else(PoisonError::into_inner)
+            .intern(string)
     }
 
     pub fn as_str(self) -> &'static str {
-        INTERNER.with_borrow(|interner| interner.get(self))
+        INTERNER
+            .read()
+            .unwrap_or_else(PoisonError::into_inner)
+            .get(self)
     }
 
     pub fn is_keyword(self) -> bool {
@@ -100,9 +112,8 @@ impl fmt::Display for Symbol {
     }
 }
 
-thread_local! {
-    static INTERNER: RefCell<Interner> = RefCell::new(Interner::prefill(KEYWORDS));
-}
+static INTERNER: LazyLock<RwLock<Interner>> =
+    LazyLock::new(|| RwLock::new(Interner::prefill(KEYWORDS)));
 
 struct Interner {
     names: HashMap<&'static str, Symbol>,
