@@ -1,38 +1,43 @@
 mod args;
 
-pub use args::{Args, CrateType, Edition, Emit, LintLevel, PrintKind, Spec};
-
-use clap::{Parser, ValueEnum};
+use std::fs;
+use std::path::Path;
 use std::process::ExitCode;
 
-pub type Result<T = ()> = std::result::Result<T, Box<dyn std::error::Error>>;
+use clap::{Parser, ValueEnum};
+
+pub use crate::args::{Args, CrateType, Edition, Emit, LintLevel, PrintKind, Spec};
 
 pub fn main() -> ExitCode {
     let args = Args::parse();
     match run(&args) {
         Ok(()) => ExitCode::SUCCESS,
-        Err(e) => {
-            eprintln!("error: {e}");
+        Err(message) => {
+            eprintln!("error: {message}");
             ExitCode::FAILURE
         }
     }
 }
 
-pub fn run(args: &Args) -> Result {
+pub fn run(args: &Args) -> Result<(), String> {
     if let Some(code) = &args.explain {
         println!("no extended information for {code}");
         return Ok(());
     }
 
     if !args.print.is_empty() {
-        for req in &args.print {
-            print_info(args, req)?;
-        }
-        return Ok(());
+        return args
+            .print
+            .iter()
+            .try_for_each(|request| print_info(args, request));
     }
 
-    let input = args.input.as_ref().expect("clap requires INPUT here");
-    let _src = std::fs::read_to_string(input)?;
+    let Some(input) = &args.input else {
+        return Ok(());
+    };
+
+    let _src = fs::read_to_string(input)
+        .map_err(|error| format!("couldn't read `{}`: {error}", input.display()))?;
 
     if args.verbose {
         eprintln!(
@@ -43,21 +48,17 @@ pub fn run(args: &Args) -> Result {
         );
     }
 
-    for emit in args.emits() {
-        match emit.kind {
-            Emit::Tokens => todo!("lexer"),
-            Emit::Ast => todo!("parser"),
-            Emit::Ir => todo!("ir"),
-            Emit::DepInfo | Emit::Metadata => todo!("metadata"),
-            Emit::Asm | Emit::Obj | Emit::Link => todo!("codegen"),
-        }
+    match args.emits().into_iter().next() {
+        Some(emit) => Err(format!(
+            "`--emit={}` is not supported yet",
+            value_name(emit.kind)
+        )),
+        None => Ok(()),
     }
-
-    Ok(())
 }
 
-fn print_info(args: &Args, req: &Spec<PrintKind>) -> Result {
-    let out = match req.kind {
+fn print_info(args: &Args, request: &Spec<PrintKind>) -> Result<(), String> {
+    let output = match request.kind {
         PrintKind::CrateName => args.crate_name(),
         PrintKind::Cfg => args.cfg.join("\n"),
         PrintKind::HostTuple => {
@@ -65,18 +66,32 @@ fn print_info(args: &Args, req: &Spec<PrintKind>) -> Result {
         }
         PrintKind::SupportedCrateTypes => CrateType::value_variants()
             .iter()
-            .filter_map(|v| v.to_possible_value())
-            .map(|v| v.get_name().to_string())
+            .map(|&kind| value_name(kind))
             .collect::<Vec<_>>()
             .join("\n"),
-        PrintKind::FileNames | PrintKind::Sysroot | PrintKind::TargetList => {
-            todo!("{:?}", req.kind)
+        kind => {
+            return Err(format!(
+                "`--print={}` is not supported yet",
+                value_name(kind)
+            ));
         }
     };
 
-    match &req.path {
-        Some(path) => std::fs::write(path, out + "\n")?,
-        None => println!("{out}"),
-    }
-    Ok(())
+    write_output(request.path.as_deref(), &format!("{output}\n"))
+}
+
+fn write_output(path: Option<&Path>, content: &str) -> Result<(), String> {
+    let Some(path) = path else {
+        print!("{content}");
+        return Ok(());
+    };
+
+    fs::write(path, content)
+        .map_err(|error| format!("couldn't write `{}`: {error}", path.display()))
+}
+
+fn value_name<T: ValueEnum>(value: T) -> String {
+    value
+        .to_possible_value()
+        .map_or_else(String::new, |value| value.get_name().to_owned())
 }

@@ -116,7 +116,11 @@ pub struct Args {
     #[arg(short = 'O', help = "Equivalent to -C opt-level=3")]
     pub optimize: bool,
 
-    #[arg(short = 'o', value_name = "FILENAME", help = "Write output to FILENAME")]
+    #[arg(
+        short = 'o',
+        value_name = "FILENAME",
+        help = "Write output to FILENAME"
+    )]
     pub output: Option<PathBuf>,
 
     #[arg(
