@@ -1,0 +1,896 @@
+CompilationUnit {
+    docs: [],
+    package: Some(
+        "shapes" @ 8..14,
+    ),
+    imports: [],
+    items: [
+        Item {
+            docs: [],
+            annotations: [],
+            vis: Default,
+            inheritance: Inheritance {
+                abstract_kw: None,
+                final_kw: None,
+            },
+            name: "Shape" @ 27..32,
+            kind: Interface(
+                Interface {
+                    generics: Generics {
+                        params: [],
+                        span: 33..33,
+                    },
+                    extends: [
+                        Ty {
+                            kind: Path {
+                                path: "Comparable" @ 41..51,
+                                args: [
+                                    Ty {
+                                        kind: Path {
+                                            path: "Shape" @ 52..57,
+                                            args: [],
+                                        },
+                                        span: 52..57,
+                                    },
+                                ],
+                            },
+                            span: 41..58,
+                        },
+                    ],
+                    members: [
+                        Member {
+                            docs: [],
+                            annotations: [],
+                            vis: Default,
+                            inheritance: Inheritance {
+                                abstract_kw: None,
+                                final_kw: None,
+                            },
+                            kind: Field(
+                                Field {
+                                    storage: Const(
+                                        65..70,
+                                    ),
+                                    ty: Ty {
+                                        kind: Primitive(
+                                            Int,
+                                        ),
+                                        span: 71..74,
+                                    },
+                                    name: "MAX_SIDES" @ 75..84,
+                                    init: Some(
+                                        Expr {
+                                            kind: Lit(
+                                                Lit {
+                                                    kind: Integer,
+                                                    symbol: "12",
+                                                    suffix: None,
+                                                },
+                                            ),
+                                            span: 87..89,
+                                        },
+                                    ),
+                                },
+                            ),
+                            span: 65..90,
+                        },
+                        Member {
+                            docs: [],
+                            annotations: [],
+                            vis: Default,
+                            inheritance: Inheritance {
+                                abstract_kw: None,
+                                final_kw: None,
+                            },
+                            kind: Method(
+                                Method {
+                                    generics: Generics {
+                                        params: [],
+                                        span: 0..0,
+                                    },
+                                    ret: Ty(
+                                        Ty {
+                                            kind: Primitive(
+                                                Double,
+                                            ),
+                                            span: 96..102,
+                                        },
+                                    ),
+                                    name: "area" @ 103..107,
+                                    receiver: Some(
+                                        Receiver {
+                                            kind: Ref,
+                                            span: 108..113,
+                                        },
+                                    ),
+                                    params: [],
+                                    throws: [],
+                                    body: None,
+                                },
+                            ),
+                            span: 96..115,
+                        },
+                        Member {
+                            docs: [],
+                            annotations: [],
+                            vis: Default,
+                            inheritance: Inheritance {
+                                abstract_kw: None,
+                                final_kw: None,
+                            },
+                            kind: Method(
+                                Method {
+                                    generics: Generics {
+                                        params: [],
+                                        span: 0..0,
+                                    },
+                                    ret: Ty(
+                                        Ty {
+                                            kind: Path {
+                                                path: "String" @ 121..127,
+                                                args: [],
+                                            },
+                                            span: 121..127,
+                                        },
+                                    ),
+                                    name: "describe" @ 128..136,
+                                    receiver: Some(
+                                        Receiver {
+                                            kind: Ref,
+                                            span: 137..142,
+                                        },
+                                    ),
+                                    params: [],
+                                    throws: [],
+                                    body: Some(
+                                        Block {
+                                            stmts: [
+                                                Stmt {
+                                                    kind: Return(
+                                                        Some(
+                                                            Expr {
+                                                                kind: Switch {
+                                                                    scrutinee: Expr {
+                                                                        kind: MethodCall {
+                                                                            receiver: Some(
+                                                                                Expr {
+                                                                                    kind: This,
+                                                                                    span: 169..173,
+                                                                                },
+                                                                            ),
+                                                                            name: "sides" @ 174..179,
+                                                                            args: [],
+                                                                            safe: false,
+                                                                        },
+                                                                        span: 169..181,
+                                                                    },
+                                                                    arms: [
+                                                                        SwitchExprArm {
+                                                                            labels: Some(
+                                                                                [
+                                                                                    Expr {
+                                                                                        kind: Lit(
+                                                                                            Lit {
+                                                                                                kind: Integer,
+                                                                                                symbol: "3",
+                                                                                                suffix: None,
+                                                                                            },
+                                                                                        ),
+                                                                                        span: 202..203,
+                                                                                    },
+                                                                                ],
+                                                                            ),
+                                                                            body: Expr(
+                                                                                Expr {
+                                                                                    kind: Lit(
+                                                                                        Lit {
+                                                                                            kind: Str,
+                                                                                            symbol: "triangle",
+                                                                                            suffix: None,
+                                                                                        },
+                                                                                    ),
+                                                                                    span: 207..217,
+                                                                                },
+                                                                            ),
+                                                                            span: 197..218,
+                                                                        },
+                                                                        SwitchExprArm {
+                                                                            labels: Some(
+                                                                                [
+                                                                                    Expr {
+                                                                                        kind: Lit(
+                                                                                            Lit {
+                                                                                                kind: Integer,
+                                                                                                symbol: "4",
+                                                                                                suffix: None,
+                                                                                            },
+                                                                                        ),
+                                                                                        span: 236..237,
+                                                                                    },
+                                                                                ],
+                                                                            ),
+                                                                            body: Expr(
+                                                                                Expr {
+                                                                                    kind: Lit(
+                                                                                        Lit {
+                                                                                            kind: Str,
+                                                                                            symbol: "quadrilateral",
+                                                                                            suffix: None,
+                                                                                        },
+                                                                                    ),
+                                                                                    span: 241..256,
+                                                                                },
+                                                                            ),
+                                                                            span: 231..257,
+                                                                        },
+                                                                        SwitchExprArm {
+                                                                            labels: None,
+                                                                            body: Block(
+                                                                                Block {
+                                                                                    stmts: [
+                                                                                        Stmt {
+                                                                                            kind: Yield(
+                                                                                                Expr {
+                                                                                                    kind: Lit(
+                                                                                                        Lit {
+                                                                                                            kind: Str,
+                                                                                                            symbol: "polygon",
+                                                                                                            suffix: None,
+                                                                                                        },
+                                                                                                    ),
+                                                                                                    span: 305..314,
+                                                                                                },
+                                                                                            ),
+                                                                                            span: 299..315,
+                                                                                        },
+                                                                                    ],
+                                                                                    span: 281..329,
+                                                                                },
+                                                                            ),
+                                                                            span: 270..329,
+                                                                        },
+                                                                    ],
+                                                                },
+                                                                span: 161..339,
+                                                            },
+                                                        ),
+                                                    ),
+                                                    span: 154..340,
+                                                },
+                                            ],
+                                            span: 144..346,
+                                        },
+                                    ),
+                                },
+                            ),
+                            span: 121..346,
+                        },
+                        Member {
+                            docs: [],
+                            annotations: [],
+                            vis: Default,
+                            inheritance: Inheritance {
+                                abstract_kw: None,
+                                final_kw: None,
+                            },
+                            kind: Method(
+                                Method {
+                                    generics: Generics {
+                                        params: [],
+                                        span: 0..0,
+                                    },
+                                    ret: Ty(
+                                        Ty {
+                                            kind: Primitive(
+                                                Int,
+                                            ),
+                                            span: 352..355,
+                                        },
+                                    ),
+                                    name: "sides" @ 356..361,
+                                    receiver: Some(
+                                        Receiver {
+                                            kind: Ref,
+                                            span: 362..367,
+                                        },
+                                    ),
+                                    params: [],
+                                    throws: [],
+                                    body: None,
+                                },
+                            ),
+                            span: 352..369,
+                        },
+                    ],
+                },
+            ),
+            span: 17..371,
+        },
+        Item {
+            docs: [],
+            annotations: [],
+            vis: Default,
+            inheritance: Inheritance {
+                abstract_kw: None,
+                final_kw: None,
+            },
+            name: "Point" @ 380..385,
+            kind: Struct(
+                Struct {
+                    generics: Generics {
+                        params: [],
+                        span: 386..386,
+                    },
+                    implements: [],
+                    members: [
+                        Member {
+                            docs: [],
+                            annotations: [],
+                            vis: Default,
+                            inheritance: Inheritance {
+                                abstract_kw: None,
+                                final_kw: None,
+                            },
+                            kind: Field(
+                                Field {
+                                    storage: Instance,
+                                    ty: Ty {
+                                        kind: Primitive(
+                                            Double,
+                                        ),
+                                        span: 392..398,
+                                    },
+                                    name: "x" @ 399..400,
+                                    init: None,
+                                },
+                            ),
+                            span: 392..401,
+                        },
+                        Member {
+                            docs: [],
+                            annotations: [],
+                            vis: Default,
+                            inheritance: Inheritance {
+                                abstract_kw: None,
+                                final_kw: None,
+                            },
+                            kind: Field(
+                                Field {
+                                    storage: Instance,
+                                    ty: Ty {
+                                        kind: Primitive(
+                                            Double,
+                                        ),
+                                        span: 406..412,
+                                    },
+                                    name: "y" @ 413..414,
+                                    init: None,
+                                },
+                            ),
+                            span: 406..415,
+                        },
+                        Member {
+                            docs: [],
+                            annotations: [],
+                            vis: Default,
+                            inheritance: Inheritance {
+                                abstract_kw: None,
+                                final_kw: None,
+                            },
+                            kind: Constructor(
+                                Constructor {
+                                    name: "Point" @ 421..426,
+                                    params: [
+                                        Param {
+                                            ty: Ty {
+                                                kind: Primitive(
+                                                    Double,
+                                                ),
+                                                span: 427..433,
+                                            },
+                                            name: "x" @ 434..435,
+                                            variadic: false,
+                                            span: 427..435,
+                                        },
+                                        Param {
+                                            ty: Ty {
+                                                kind: Primitive(
+                                                    Double,
+                                                ),
+                                                span: 437..443,
+                                            },
+                                            name: "y" @ 444..445,
+                                            variadic: false,
+                                            span: 437..445,
+                                        },
+                                    ],
+                                    throws: [],
+                                    body: Block {
+                                        stmts: [
+                                            Stmt {
+                                                kind: Expr(
+                                                    Expr {
+                                                        kind: Assign {
+                                                            op: None,
+                                                            lhs: Expr {
+                                                                kind: Field {
+                                                                    expr: Expr {
+                                                                        kind: This,
+                                                                        span: 457..461,
+                                                                    },
+                                                                    name: "x" @ 462..463,
+                                                                    safe: false,
+                                                                },
+                                                                span: 457..463,
+                                                            },
+                                                            rhs: Expr {
+                                                                kind: Name(
+                                                                    "x" @ 466..467,
+                                                                ),
+                                                                span: 466..467,
+                                                            },
+                                                        },
+                                                        span: 457..467,
+                                                    },
+                                                ),
+                                                span: 457..468,
+                                            },
+                                            Stmt {
+                                                kind: Expr(
+                                                    Expr {
+                                                        kind: Assign {
+                                                            op: None,
+                                                            lhs: Expr {
+                                                                kind: Field {
+                                                                    expr: Expr {
+                                                                        kind: This,
+                                                                        span: 477..481,
+                                                                    },
+                                                                    name: "y" @ 482..483,
+                                                                    safe: false,
+                                                                },
+                                                                span: 477..483,
+                                                            },
+                                                            rhs: Expr {
+                                                                kind: Name(
+                                                                    "y" @ 486..487,
+                                                                ),
+                                                                span: 486..487,
+                                                            },
+                                                        },
+                                                        span: 477..487,
+                                                    },
+                                                ),
+                                                span: 477..488,
+                                            },
+                                        ],
+                                        span: 447..494,
+                                    },
+                                },
+                            ),
+                            span: 421..494,
+                        },
+                    ],
+                },
+            ),
+            span: 373..496,
+        },
+        Item {
+            docs: [],
+            annotations: [],
+            vis: Default,
+            inheritance: Inheritance {
+                abstract_kw: None,
+                final_kw: None,
+            },
+            name: "Color" @ 503..508,
+            kind: Enum(
+                Enum {
+                    implements: [],
+                    constants: [
+                        EnumConstant {
+                            docs: [],
+                            annotations: [],
+                            name: "RED" @ 515..518,
+                            args: [
+                                Expr {
+                                    kind: Lit(
+                                        Lit {
+                                            kind: Str,
+                                            symbol: "#ff0000",
+                                            suffix: None,
+                                        },
+                                    ),
+                                    span: 519..528,
+                                },
+                            ],
+                            span: 515..529,
+                        },
+                        EnumConstant {
+                            docs: [],
+                            annotations: [],
+                            name: "GREEN" @ 535..540,
+                            args: [
+                                Expr {
+                                    kind: Lit(
+                                        Lit {
+                                            kind: Str,
+                                            symbol: "#00ff00",
+                                            suffix: None,
+                                        },
+                                    ),
+                                    span: 541..550,
+                                },
+                            ],
+                            span: 535..551,
+                        },
+                    ],
+                    members: [
+                        Member {
+                            docs: [],
+                            annotations: [],
+                            vis: Default,
+                            inheritance: Inheritance {
+                                abstract_kw: None,
+                                final_kw: None,
+                            },
+                            kind: Field(
+                                Field {
+                                    storage: Instance,
+                                    ty: Ty {
+                                        kind: Path {
+                                            path: "String" @ 558..564,
+                                            args: [],
+                                        },
+                                        span: 558..564,
+                                    },
+                                    name: "hex" @ 565..568,
+                                    init: None,
+                                },
+                            ),
+                            span: 558..569,
+                        },
+                        Member {
+                            docs: [],
+                            annotations: [],
+                            vis: Default,
+                            inheritance: Inheritance {
+                                abstract_kw: None,
+                                final_kw: None,
+                            },
+                            kind: Constructor(
+                                Constructor {
+                                    name: "Color" @ 575..580,
+                                    params: [
+                                        Param {
+                                            ty: Ty {
+                                                kind: Path {
+                                                    path: "String" @ 581..587,
+                                                    args: [],
+                                                },
+                                                span: 581..587,
+                                            },
+                                            name: "hex" @ 588..591,
+                                            variadic: false,
+                                            span: 581..591,
+                                        },
+                                    ],
+                                    throws: [],
+                                    body: Block {
+                                        stmts: [
+                                            Stmt {
+                                                kind: Expr(
+                                                    Expr {
+                                                        kind: Assign {
+                                                            op: None,
+                                                            lhs: Expr {
+                                                                kind: Field {
+                                                                    expr: Expr {
+                                                                        kind: This,
+                                                                        span: 603..607,
+                                                                    },
+                                                                    name: "hex" @ 608..611,
+                                                                    safe: false,
+                                                                },
+                                                                span: 603..611,
+                                                            },
+                                                            rhs: Expr {
+                                                                kind: Name(
+                                                                    "hex" @ 614..617,
+                                                                ),
+                                                                span: 614..617,
+                                                            },
+                                                        },
+                                                        span: 603..617,
+                                                    },
+                                                ),
+                                                span: 603..618,
+                                            },
+                                        ],
+                                        span: 593..624,
+                                    },
+                                },
+                            ),
+                            span: 575..624,
+                        },
+                    ],
+                },
+            ),
+            span: 498..626,
+        },
+        Item {
+            docs: [],
+            annotations: [],
+            vis: Default,
+            inheritance: Inheritance {
+                abstract_kw: Some(
+                    628..636,
+                ),
+                final_kw: None,
+            },
+            name: "Polygon" @ 643..650,
+            kind: Class(
+                Class {
+                    generics: Generics {
+                        params: [],
+                        span: 651..651,
+                    },
+                    extends: None,
+                    implements: [
+                        Ty {
+                            kind: Path {
+                                path: "Shape" @ 662..667,
+                                args: [],
+                            },
+                            span: 662..667,
+                        },
+                    ],
+                    members: [
+                        Member {
+                            docs: [],
+                            annotations: [],
+                            vis: Default,
+                            inheritance: Inheritance {
+                                abstract_kw: None,
+                                final_kw: None,
+                            },
+                            kind: Field(
+                                Field {
+                                    storage: Shared(
+                                        674..680,
+                                    ),
+                                    ty: Ty {
+                                        kind: Path {
+                                            path: "AtomicInt" @ 681..690,
+                                            args: [],
+                                        },
+                                        span: 681..690,
+                                    },
+                                    name: "created" @ 691..698,
+                                    init: Some(
+                                        Expr {
+                                            kind: New {
+                                                ty: Ty {
+                                                    kind: Path {
+                                                        path: "AtomicInt" @ 705..714,
+                                                        args: [],
+                                                    },
+                                                    span: 705..714,
+                                                },
+                                                args: [
+                                                    Expr {
+                                                        kind: Lit(
+                                                            Lit {
+                                                                kind: Integer,
+                                                                symbol: "0",
+                                                                suffix: None,
+                                                            },
+                                                        ),
+                                                        span: 715..716,
+                                                    },
+                                                ],
+                                            },
+                                            span: 701..717,
+                                        },
+                                    ),
+                                },
+                            ),
+                            span: 674..718,
+                        },
+                        Member {
+                            docs: [],
+                            annotations: [],
+                            vis: Public(
+                                723..729,
+                            ),
+                            inheritance: Inheritance {
+                                abstract_kw: None,
+                                final_kw: None,
+                            },
+                            kind: Field(
+                                Field {
+                                    storage: Shared(
+                                        730..736,
+                                    ),
+                                    ty: Ty {
+                                        kind: Path {
+                                            path: "AtomicInt" @ 737..746,
+                                            args: [],
+                                        },
+                                        span: 737..746,
+                                    },
+                                    name: "drawn" @ 747..752,
+                                    init: Some(
+                                        Expr {
+                                            kind: New {
+                                                ty: Ty {
+                                                    kind: Path {
+                                                        path: "AtomicInt" @ 759..768,
+                                                        args: [],
+                                                    },
+                                                    span: 759..768,
+                                                },
+                                                args: [
+                                                    Expr {
+                                                        kind: Lit(
+                                                            Lit {
+                                                                kind: Integer,
+                                                                symbol: "0",
+                                                                suffix: None,
+                                                            },
+                                                        ),
+                                                        span: 769..770,
+                                                    },
+                                                ],
+                                            },
+                                            span: 755..771,
+                                        },
+                                    ),
+                                },
+                            ),
+                            span: 723..772,
+                        },
+                        Member {
+                            docs: [],
+                            annotations: [],
+                            vis: Default,
+                            inheritance: Inheritance {
+                                abstract_kw: None,
+                                final_kw: None,
+                            },
+                            kind: Field(
+                                Field {
+                                    storage: Instance,
+                                    ty: Ty {
+                                        kind: Array(
+                                            Ty {
+                                                kind: Path {
+                                                    path: "Point" @ 778..783,
+                                                    args: [],
+                                                },
+                                                span: 778..783,
+                                            },
+                                        ),
+                                        span: 778..785,
+                                    },
+                                    name: "points" @ 786..792,
+                                    init: None,
+                                },
+                            ),
+                            span: 778..793,
+                        },
+                        Member {
+                            docs: [],
+                            annotations: [],
+                            vis: Default,
+                            inheritance: Inheritance {
+                                abstract_kw: Some(
+                                    799..807,
+                                ),
+                                final_kw: None,
+                            },
+                            kind: Method(
+                                Method {
+                                    generics: Generics {
+                                        params: [],
+                                        span: 0..0,
+                                    },
+                                    ret: Ty(
+                                        Ty {
+                                            kind: Primitive(
+                                                Double,
+                                            ),
+                                            span: 808..814,
+                                        },
+                                    ),
+                                    name: "area" @ 815..819,
+                                    receiver: Some(
+                                        Receiver {
+                                            kind: Ref,
+                                            span: 820..825,
+                                        },
+                                    ),
+                                    params: [],
+                                    throws: [],
+                                    body: None,
+                                },
+                            ),
+                            span: 799..827,
+                        },
+                        Member {
+                            docs: [],
+                            annotations: [],
+                            vis: Default,
+                            inheritance: Inheritance {
+                                abstract_kw: None,
+                                final_kw: Some(
+                                    833..838,
+                                ),
+                            },
+                            kind: Method(
+                                Method {
+                                    generics: Generics {
+                                        params: [],
+                                        span: 0..0,
+                                    },
+                                    ret: Ty(
+                                        Ty {
+                                            kind: Primitive(
+                                                Int,
+                                            ),
+                                            span: 839..842,
+                                        },
+                                    ),
+                                    name: "sides" @ 843..848,
+                                    receiver: Some(
+                                        Receiver {
+                                            kind: Ref,
+                                            span: 849..854,
+                                        },
+                                    ),
+                                    params: [],
+                                    throws: [],
+                                    body: Some(
+                                        Block {
+                                            stmts: [
+                                                Stmt {
+                                                    kind: Return(
+                                                        Some(
+                                                            Expr {
+                                                                kind: Field {
+                                                                    expr: Expr {
+                                                                        kind: Field {
+                                                                            expr: Expr {
+                                                                                kind: This,
+                                                                                span: 873..877,
+                                                                            },
+                                                                            name: "points" @ 878..884,
+                                                                            safe: false,
+                                                                        },
+                                                                        span: 873..884,
+                                                                    },
+                                                                    name: "length" @ 885..891,
+                                                                    safe: false,
+                                                                },
+                                                                span: 873..891,
+                                                            },
+                                                        ),
+                                                    ),
+                                                    span: 866..892,
+                                                },
+                                            ],
+                                            span: 856..898,
+                                        },
+                                    ),
+                                },
+                            ),
+                            span: 833..898,
+                        },
+                    ],
+                },
+            ),
+            span: 628..900,
+        },
+    ],
+    span: 0..901,
+}

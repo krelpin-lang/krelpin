@@ -223,7 +223,7 @@ fn generic_methods_varargs_throws_and_abstract_methods() {
     };
     assert_eq!(read.throws.len(), 2);
 
-    let MemberKind::Method(run) = only_member("void run(&this);") else {
+    let MemberKind::Method(run) = only_member("abstract void run(&this);") else {
         panic!("expected a method");
     };
     assert!(run.body.is_none());
@@ -282,7 +282,7 @@ fn modifier_errors() {
     );
     assert_eq!(
         errors("shared class A {}"),
-        ["`shared` cannot be used on classes"]
+        ["`shared` cannot be used on type declarations"]
     );
     assert_eq!(
         errors("class A { public private int x; }"),
@@ -332,8 +332,8 @@ fn recovers_at_top_level() {
     assert_eq!(
         parsed.errors,
         [
-            "expected class declaration, found keyword `int`",
-            "expected class declaration, found `42`"
+            "expected type declaration, found keyword `int`",
+            "expected type declaration, found `42`"
         ]
     );
     let names: Vec<&str> = parsed

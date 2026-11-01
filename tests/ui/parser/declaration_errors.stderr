@@ -1,0 +1,66 @@
+error: structs cannot extend other types
+ --> tests/ui/parser/declaration_errors.kr:1:14
+  |
+1 | struct Point extends Base {
+  |              ^^^^^^^^^^^^
+  |
+  = help: structs can implement interfaces with `implements`
+
+error: abstract methods are not allowed in structs
+ --> tests/ui/parser/declaration_errors.kr:2:5
+  |
+2 |     abstract void move(&mut this);
+  |     ^^^^^^^^
+
+error: interfaces cannot implement other interfaces
+ --> tests/ui/parser/declaration_errors.kr:5:17
+  |
+5 | interface Named implements Other {
+  |                 ^^^^^^^^^^
+  |
+  = help: use `extends` to inherit from other interfaces
+
+error: interfaces can only have `const` fields
+ --> tests/ui/parser/declaration_errors.kr:6:12
+  |
+6 |     String name;
+  |            ^^^^
+  |
+  = help: make the field `const`, or move it to a class
+
+error: interfaces cannot have constructors
+ --> tests/ui/parser/declaration_errors.kr:7:5
+  |
+7 |     Named() {}
+  |     ^^^^^
+
+error: a class cannot be both `abstract` and `final`
+  --> tests/ui/parser/declaration_errors.kr:10:10
+   |
+10 | abstract final class Broken {
+   |          ^^^^^
+   |
+   = note: an abstract class must be extended, a final class cannot be
+
+error: missing body for method `missingBody`
+  --> tests/ui/parser/declaration_errors.kr:11:10
+   |
+11 |     void missingBody(&this);
+   |          ^^^^^^^^^^^
+   |
+   = help: add a body, or mark the method `abstract`
+
+error: abstract methods cannot have a body
+  --> tests/ui/parser/declaration_errors.kr:12:5
+   |
+12 |     abstract void withBody(&this) {}
+   |     ^^^^^^^^
+
+error: enums cannot have generic parameters
+  --> tests/ui/parser/declaration_errors.kr:15:11
+   |
+15 | enum Level<T> {
+   |           ^^^
+
+error: aborting due to 9 previous errors
+

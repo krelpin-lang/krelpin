@@ -1,0 +1,17 @@
+struct Point extends Base {
+    abstract void move(&mut this);
+}
+
+interface Named implements Other {
+    String name;
+    Named() {}
+}
+
+abstract final class Broken {
+    void missingBody(&this);
+    abstract void withBody(&this) {}
+}
+
+enum Level<T> {
+    LOW,
+}

@@ -62,6 +62,7 @@ keywords! {
     Return: "return",
     Shared: "shared",
     Short: "short",
+    Struct: "struct",
     Super: "super",
     Switch: "switch",
     This: "this",
@@ -72,6 +73,7 @@ keywords! {
     Var: "var",
     Void: "void",
     While: "while",
+    Yield: "yield",
 }
 
 impl Symbol {

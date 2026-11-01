@@ -6,6 +6,7 @@ use krelpin_span::SourceMap;
 
 use crate::{lexer, parser};
 
+mod decls;
 mod exprs;
 mod items;
 mod stmts;
@@ -45,6 +46,7 @@ pub(super) fn errors(src: &str) -> Vec<String> {
 pub(super) fn class(unit: &CompilationUnit, index: usize) -> &Class {
     match &unit.items[index].kind {
         ItemKind::Class(class) => class,
+        other => panic!("expected a class, found {other:?}"),
     }
 }
 

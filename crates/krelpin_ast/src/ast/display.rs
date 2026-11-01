@@ -2,7 +2,10 @@ use std::fmt;
 
 use crate::token::{Lit, LitKind};
 
-use super::{Expr, ExprKind, Ident, LambdaBody, LambdaParam, Path, Ty, TyKind, UnOp};
+use super::{
+    Expr, ExprKind, Ident, LambdaBody, LambdaParam, Path, SwitchExprArm, SwitchExprBody, Ty,
+    TyKind, UnOp,
+};
 
 impl fmt::Debug for Ident {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
@@ -140,6 +143,24 @@ impl fmt::Display for Expr {
                 }
             }
             ExprKind::MethodRef { expr, name } => write!(f, "{expr}::{}", name.name),
+            ExprKind::Switch { scrutinee, arms } => {
+                let arms: Vec<String> = arms.iter().map(SwitchExprArm::to_string).collect();
+                write!(f, "switch ({scrutinee}) {{ {} }}", arms.join(" "))
+            }
+        }
+    }
+}
+
+impl fmt::Display for SwitchExprArm {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match &self.labels {
+            Some(labels) => write!(f, "case {} -> ", list(labels))?,
+            None => f.write_str("default -> ")?,
+        }
+        match &self.body {
+            SwitchExprBody::Expr(expr) => write!(f, "{expr};"),
+            SwitchExprBody::Block(_) => f.write_str("{ ... }"),
+            SwitchExprBody::Throw(expr) => write!(f, "throw {expr};"),
         }
     }
 }

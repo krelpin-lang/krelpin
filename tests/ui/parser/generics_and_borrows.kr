@@ -1,6 +1,6 @@
-class Parser<&src, T extends Comparable<T> & Cloneable> implements Iterator<T> {
+abstract class Parser<&src, T extends Comparable<T> & Cloneable> implements Iterator<T> {
     &[src] String input;
     Map<String, List<&String>> cache;
 
-    <K> &mut [src] K? lookup(&mut this, K key, String... aliases) throws NotFound;
+    abstract <K> &mut [src] K? lookup(&mut this, K key, String... aliases) throws NotFound;
 }

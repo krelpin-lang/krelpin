@@ -1,4 +1,7 @@
-use krelpin_ast::ast::{BinOp, Expr, ExprKind, Ident, LambdaBody, LambdaParam, TyKind, UnOp};
+use krelpin_ast::ast::{
+    BinOp, Expr, ExprKind, Ident, LambdaBody, LambdaParam, SwitchExprArm, SwitchExprBody, TyKind,
+    UnOp,
+};
 use krelpin_ast::token::TokenKind;
 use krelpin_span::{Span, kw};
 
@@ -214,6 +217,7 @@ impl Parser<'_> {
             TokenKind::Ident(kw::This) => ExprKind::This,
             TokenKind::Ident(kw::Super) => ExprKind::Super,
             TokenKind::Ident(kw::New) => return self.parse_new(),
+            TokenKind::Ident(kw::Switch) => return self.parse_switch_expr(),
             TokenKind::OpenParen => {
                 self.bump();
                 let expr = self.parse_expr()?;
@@ -338,7 +342,7 @@ impl Parser<'_> {
         }
     }
 
-    fn parse_args(&mut self) -> PResult<Vec<Expr>> {
+    pub(crate) fn parse_args(&mut self) -> PResult<Vec<Expr>> {
         self.expect(TokenKind::OpenParen)?;
         let mut args = Vec::new();
         if self.eat(TokenKind::CloseParen) {
@@ -352,6 +356,62 @@ impl Parser<'_> {
             }
             self.expect(TokenKind::Comma)?;
         }
+    }
+
+    fn parse_switch_expr(&mut self) -> PResult<Expr> {
+        let lo = self.token.span;
+        self.bump();
+        let scrutinee = self.parse_paren_expr()?;
+        let open = self.expect(TokenKind::OpenBrace)?;
+        let mut arms = Vec::new();
+
+        loop {
+            if self.eat_noexpect(TokenKind::CloseBrace) {
+                return Ok(self.mk_expr(
+                    lo,
+                    ExprKind::Switch {
+                        scrutinee: Box::new(scrutinee),
+                        arms,
+                    },
+                ));
+            }
+            if self.token.kind == TokenKind::Eof {
+                return Err(self.unclosed_delimiter(open));
+            }
+
+            match self.parse_switch_expr_arm() {
+                Ok(arm) => arms.push(arm),
+                Err(error) => {
+                    self.recover_to_member_end();
+                    if self.token.kind == TokenKind::Eof {
+                        return Err(error);
+                    }
+                }
+            }
+        }
+    }
+
+    fn parse_switch_expr_arm(&mut self) -> PResult<SwitchExprArm> {
+        let lo = self.token.span;
+        let labels = self.parse_switch_labels()?;
+
+        let body = if self.token.kind == TokenKind::OpenBrace {
+            SwitchExprBody::Block(self.parse_block()?)
+        } else if self.eat_keyword_noexpect(kw::Throw) {
+            let expr = self.parse_expr()?;
+            self.expect_semi()?;
+            SwitchExprBody::Throw(expr)
+        } else {
+            let expr = self.parse_expr()?;
+            self.expect_semi()?;
+            SwitchExprBody::Expr(expr)
+        };
+
+        Ok(SwitchExprArm {
+            labels,
+            body,
+            span: lo.to(self.prev_token.span),
+        })
     }
 
     pub(crate) fn parse_initializer(&mut self) -> PResult<Expr> {

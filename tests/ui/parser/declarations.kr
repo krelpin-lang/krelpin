@@ -1,0 +1,53 @@
+package shapes;
+
+interface Shape extends Comparable<Shape> {
+    const int MAX_SIDES = 12;
+
+    double area(&this);
+
+    String describe(&this) {
+        return switch (this.sides()) {
+            case 3 -> "triangle";
+            case 4 -> "quadrilateral";
+            default -> {
+                yield "polygon";
+            }
+        };
+    }
+
+    int sides(&this);
+}
+
+struct Point {
+    double x;
+    double y;
+
+    Point(double x, double y) {
+        this.x = x;
+        this.y = y;
+    }
+}
+
+enum Color {
+    RED("#ff0000"),
+    GREEN("#00ff00");
+
+    String hex;
+
+    Color(String hex) {
+        this.hex = hex;
+    }
+}
+
+abstract class Polygon implements Shape {
+    shared AtomicInt created = new AtomicInt(0);
+    public shared AtomicInt drawn = new AtomicInt(0);
+
+    Point[] points;
+
+    abstract double area(&this);
+
+    final int sides(&this) {
+        return this.points.length;
+    }
+}

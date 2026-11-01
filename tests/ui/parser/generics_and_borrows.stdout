@@ -7,65 +7,71 @@ CompilationUnit {
             docs: [],
             annotations: [],
             vis: Default,
-            name: "Parser" @ 6..12,
+            inheritance: Inheritance {
+                abstract_kw: Some(
+                    0..8,
+                ),
+                final_kw: None,
+            },
+            name: "Parser" @ 15..21,
             kind: Class(
                 Class {
                     generics: Generics {
                         params: [
                             GenericParam {
-                                name: "src" @ 14..17,
+                                name: "src" @ 23..26,
                                 kind: BorrowSource,
-                                span: 13..17,
+                                span: 22..26,
                             },
                             GenericParam {
-                                name: "T" @ 19..20,
+                                name: "T" @ 28..29,
                                 kind: Type {
                                     bounds: [
                                         Ty {
                                             kind: Path {
-                                                path: "Comparable" @ 29..39,
+                                                path: "Comparable" @ 38..48,
                                                 args: [
                                                     Ty {
                                                         kind: Path {
-                                                            path: "T" @ 40..41,
+                                                            path: "T" @ 49..50,
                                                             args: [],
                                                         },
-                                                        span: 40..41,
+                                                        span: 49..50,
                                                     },
                                                 ],
                                             },
-                                            span: 29..42,
+                                            span: 38..51,
                                         },
                                         Ty {
                                             kind: Path {
-                                                path: "Cloneable" @ 45..54,
+                                                path: "Cloneable" @ 54..63,
                                                 args: [],
                                             },
-                                            span: 45..54,
+                                            span: 54..63,
                                         },
                                     ],
                                 },
-                                span: 19..54,
+                                span: 28..63,
                             },
                         ],
-                        span: 12..55,
+                        span: 21..64,
                     },
                     extends: None,
                     implements: [
                         Ty {
                             kind: Path {
-                                path: "Iterator" @ 67..75,
+                                path: "Iterator" @ 76..84,
                                 args: [
                                     Ty {
                                         kind: Path {
-                                            path: "T" @ 76..77,
+                                            path: "T" @ 85..86,
                                             args: [],
                                         },
-                                        span: 76..77,
+                                        span: 85..86,
                                     },
                                 ],
                             },
-                            span: 67..78,
+                            span: 76..87,
                         },
                     ],
                     members: [
@@ -73,6 +79,10 @@ CompilationUnit {
                             docs: [],
                             annotations: [],
                             vis: Default,
+                            inheritance: Inheritance {
+                                abstract_kw: None,
+                                final_kw: None,
+                            },
                             kind: Field(
                                 Field {
                                     storage: Instance,
@@ -80,45 +90,49 @@ CompilationUnit {
                                         kind: Ref {
                                             mutable: false,
                                             sources: [
-                                                "src" @ 87..90,
+                                                "src" @ 96..99,
                                             ],
                                             ty: Ty {
                                                 kind: Path {
-                                                    path: "String" @ 92..98,
+                                                    path: "String" @ 101..107,
                                                     args: [],
                                                 },
-                                                span: 92..98,
+                                                span: 101..107,
                                             },
                                         },
-                                        span: 85..98,
+                                        span: 94..107,
                                     },
-                                    name: "input" @ 99..104,
+                                    name: "input" @ 108..113,
                                     init: None,
                                 },
                             ),
-                            span: 85..105,
+                            span: 94..114,
                         },
                         Member {
                             docs: [],
                             annotations: [],
                             vis: Default,
+                            inheritance: Inheritance {
+                                abstract_kw: None,
+                                final_kw: None,
+                            },
                             kind: Field(
                                 Field {
                                     storage: Instance,
                                     ty: Ty {
                                         kind: Path {
-                                            path: "Map" @ 110..113,
+                                            path: "Map" @ 119..122,
                                             args: [
                                                 Ty {
                                                     kind: Path {
-                                                        path: "String" @ 114..120,
+                                                        path: "String" @ 123..129,
                                                         args: [],
                                                     },
-                                                    span: 114..120,
+                                                    span: 123..129,
                                                 },
                                                 Ty {
                                                     kind: Path {
-                                                        path: "List" @ 122..126,
+                                                        path: "List" @ 131..135,
                                                         args: [
                                                             Ty {
                                                                 kind: Ref {
@@ -126,45 +140,51 @@ CompilationUnit {
                                                                     sources: [],
                                                                     ty: Ty {
                                                                         kind: Path {
-                                                                            path: "String" @ 128..134,
+                                                                            path: "String" @ 137..143,
                                                                             args: [],
                                                                         },
-                                                                        span: 128..134,
+                                                                        span: 137..143,
                                                                     },
                                                                 },
-                                                                span: 127..134,
+                                                                span: 136..143,
                                                             },
                                                         ],
                                                     },
-                                                    span: 122..135,
+                                                    span: 131..144,
                                                 },
                                             ],
                                         },
-                                        span: 110..136,
+                                        span: 119..145,
                                     },
-                                    name: "cache" @ 137..142,
+                                    name: "cache" @ 146..151,
                                     init: None,
                                 },
                             ),
-                            span: 110..143,
+                            span: 119..152,
                         },
                         Member {
                             docs: [],
                             annotations: [],
                             vis: Default,
+                            inheritance: Inheritance {
+                                abstract_kw: Some(
+                                    158..166,
+                                ),
+                                final_kw: None,
+                            },
                             kind: Method(
                                 Method {
                                     generics: Generics {
                                         params: [
                                             GenericParam {
-                                                name: "K" @ 150..151,
+                                                name: "K" @ 168..169,
                                                 kind: Type {
                                                     bounds: [],
                                                 },
-                                                span: 150..151,
+                                                span: 168..169,
                                             },
                                         ],
-                                        span: 149..152,
+                                        span: 167..170,
                                     },
                                     ret: Ty(
                                         Ty {
@@ -173,74 +193,74 @@ CompilationUnit {
                                                     kind: Ref {
                                                         mutable: true,
                                                         sources: [
-                                                            "src" @ 159..162,
+                                                            "src" @ 177..180,
                                                         ],
                                                         ty: Ty {
                                                             kind: Path {
-                                                                path: "K" @ 164..165,
+                                                                path: "K" @ 182..183,
                                                                 args: [],
                                                             },
-                                                            span: 164..165,
+                                                            span: 182..183,
                                                         },
                                                     },
-                                                    span: 153..165,
+                                                    span: 171..183,
                                                 },
                                             ),
-                                            span: 153..166,
+                                            span: 171..184,
                                         },
                                     ),
-                                    name: "lookup" @ 167..173,
+                                    name: "lookup" @ 185..191,
                                     receiver: Some(
                                         Receiver {
                                             kind: RefMut,
-                                            span: 174..183,
+                                            span: 192..201,
                                         },
                                     ),
                                     params: [
                                         Param {
                                             ty: Ty {
                                                 kind: Path {
-                                                    path: "K" @ 185..186,
+                                                    path: "K" @ 203..204,
                                                     args: [],
                                                 },
-                                                span: 185..186,
+                                                span: 203..204,
                                             },
-                                            name: "key" @ 187..190,
+                                            name: "key" @ 205..208,
                                             variadic: false,
-                                            span: 185..190,
+                                            span: 203..208,
                                         },
                                         Param {
                                             ty: Ty {
                                                 kind: Path {
-                                                    path: "String" @ 192..198,
+                                                    path: "String" @ 210..216,
                                                     args: [],
                                                 },
-                                                span: 192..198,
+                                                span: 210..216,
                                             },
-                                            name: "aliases" @ 202..209,
+                                            name: "aliases" @ 220..227,
                                             variadic: true,
-                                            span: 192..209,
+                                            span: 210..227,
                                         },
                                     ],
                                     throws: [
                                         Ty {
                                             kind: Path {
-                                                path: "NotFound" @ 218..226,
+                                                path: "NotFound" @ 236..244,
                                                 args: [],
                                             },
-                                            span: 218..226,
+                                            span: 236..244,
                                         },
                                     ],
                                     body: None,
                                 },
                             ),
-                            span: 149..227,
+                            span: 158..245,
                         },
                     ],
                 },
             ),
-            span: 0..229,
+            span: 0..247,
         },
     ],
-    span: 0..230,
+    span: 0..248,
 }

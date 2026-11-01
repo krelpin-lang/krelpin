@@ -134,3 +134,15 @@ fn array_initializers() {
     };
     assert_eq!(local.init.as_ref().unwrap().to_string(), "{1, 2, {3}}");
 }
+
+#[test]
+fn switch_expressions() {
+    assert_eq!(
+        expr("switch (day) { case 1, 7 -> \"weekend\"; default -> \"weekday\"; }"),
+        "switch (day) { case 1, 7 -> \"weekend\"; default -> \"weekday\"; }"
+    );
+    assert_eq!(
+        expr("switch (x) { case 0 -> { yield 1; } default -> throw new Error(); }"),
+        "switch (x) { case 0 -> { ... } default -> throw new Error(); }"
+    );
+}

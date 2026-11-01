@@ -58,6 +58,12 @@ impl Parser<'_> {
                 self.expect_semi()?;
                 StmtKind::Return(value)
             }
+            TokenKind::Ident(kw::Yield) => {
+                self.bump();
+                let value = self.parse_expr()?;
+                self.expect_semi()?;
+                StmtKind::Yield(value)
+            }
             TokenKind::Ident(kw::Throw) => {
                 self.bump();
                 let value = self.parse_expr()?;
@@ -138,7 +144,7 @@ impl Parser<'_> {
         );
     }
 
-    fn parse_paren_expr(&mut self) -> PResult<Expr> {
+    pub(crate) fn parse_paren_expr(&mut self) -> PResult<Expr> {
         self.expect(TokenKind::OpenParen)?;
         let expr = self.parse_expr()?;
         self.expect(TokenKind::CloseParen)?;
@@ -279,6 +285,17 @@ impl Parser<'_> {
 
     fn parse_switch_arm(&mut self) -> PResult<SwitchArm> {
         let lo = self.token.span;
+        let labels = self.parse_switch_labels()?;
+        let body = Box::new(self.parse_stmt()?);
+
+        Ok(SwitchArm {
+            labels,
+            body,
+            span: lo.to(self.prev_token.span),
+        })
+    }
+
+    pub(crate) fn parse_switch_labels(&mut self) -> PResult<Option<Vec<Expr>>> {
         let labels = if self.eat_keyword(kw::Default) {
             None
         } else if self.eat_keyword(kw::Case) {
@@ -300,13 +317,7 @@ impl Parser<'_> {
             ));
         }
         self.expect(TokenKind::Arrow)?;
-        let body = Box::new(self.parse_stmt()?);
-
-        Ok(SwitchArm {
-            labels,
-            body,
-            span: lo.to(self.prev_token.span),
-        })
+        Ok(labels)
     }
 
     fn parse_try(&mut self) -> PResult<StmtKind> {

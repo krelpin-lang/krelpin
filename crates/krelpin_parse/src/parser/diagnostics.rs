@@ -14,7 +14,7 @@ impl fmt::Display for Expected {
             Expected::Ident => f.write_str("identifier"),
             Expected::Type => f.write_str("type"),
             Expected::Expr => f.write_str("expression"),
-            Expected::Item => f.write_str("class declaration"),
+            Expected::Item => f.write_str("type declaration"),
         }
     }
 }
@@ -90,7 +90,18 @@ impl Parser<'_> {
 
 fn starts_item(symbol: krelpin_span::Symbol) -> bool {
     use krelpin_span::kw;
-    matches!(symbol, kw::Class | kw::Public | kw::Private | kw::Protected)
+    matches!(
+        symbol,
+        kw::Class
+            | kw::Struct
+            | kw::Interface
+            | kw::Enum
+            | kw::Abstract
+            | kw::Final
+            | kw::Public
+            | kw::Private
+            | kw::Protected
+    )
 }
 
 fn is_open_delimiter(kind: TokenKind) -> bool {

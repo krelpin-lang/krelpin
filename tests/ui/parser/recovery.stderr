@@ -1,4 +1,4 @@
-error: expected class declaration, found keyword `int`
+error: expected type declaration, found keyword `int`
  --> tests/ui/parser/recovery.kr:1:1
   |
 1 | int stray;

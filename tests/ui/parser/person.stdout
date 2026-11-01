@@ -17,6 +17,10 @@ CompilationUnit {
             ],
             annotations: [],
             vis: Default,
+            inheritance: Inheritance {
+                abstract_kw: None,
+                final_kw: None,
+            },
             name: "Person" @ 75..81,
             kind: Class(
                 Class {
@@ -31,6 +35,10 @@ CompilationUnit {
                             docs: [],
                             annotations: [],
                             vis: Default,
+                            inheritance: Inheritance {
+                                abstract_kw: None,
+                                final_kw: None,
+                            },
                             kind: Field(
                                 Field {
                                     storage: Const(
@@ -63,6 +71,10 @@ CompilationUnit {
                             docs: [],
                             annotations: [],
                             vis: Default,
+                            inheritance: Inheritance {
+                                abstract_kw: None,
+                                final_kw: None,
+                            },
                             kind: Field(
                                 Field {
                                     storage: Shared(
@@ -110,6 +122,10 @@ CompilationUnit {
                             docs: [],
                             annotations: [],
                             vis: Default,
+                            inheritance: Inheritance {
+                                abstract_kw: None,
+                                final_kw: None,
+                            },
                             kind: Field(
                                 Field {
                                     storage: Instance,
@@ -130,6 +146,10 @@ CompilationUnit {
                             docs: [],
                             annotations: [],
                             vis: Default,
+                            inheritance: Inheritance {
+                                abstract_kw: None,
+                                final_kw: None,
+                            },
                             kind: Field(
                                 Field {
                                     storage: Instance,
@@ -155,6 +175,10 @@ CompilationUnit {
                             docs: [],
                             annotations: [],
                             vis: Default,
+                            inheritance: Inheritance {
+                                abstract_kw: None,
+                                final_kw: None,
+                            },
                             kind: Constructor(
                                 Constructor {
                                     name: "Person" @ 214..220,
@@ -268,6 +292,10 @@ CompilationUnit {
                             docs: [],
                             annotations: [],
                             vis: Default,
+                            inheritance: Inheritance {
+                                abstract_kw: None,
+                                final_kw: None,
+                            },
                             kind: Method(
                                 Method {
                                     generics: Generics {
@@ -338,6 +366,10 @@ CompilationUnit {
                             docs: [],
                             annotations: [],
                             vis: Default,
+                            inheritance: Inheritance {
+                                abstract_kw: None,
+                                final_kw: None,
+                            },
                             kind: Method(
                                 Method {
                                     generics: Generics {
@@ -412,6 +444,10 @@ CompilationUnit {
                             docs: [],
                             annotations: [],
                             vis: Default,
+                            inheritance: Inheritance {
+                                abstract_kw: None,
+                                final_kw: None,
+                            },
                             kind: Method(
                                 Method {
                                     generics: Generics {
@@ -499,6 +535,10 @@ CompilationUnit {
             docs: [],
             annotations: [],
             vis: Default,
+            inheritance: Inheritance {
+                abstract_kw: None,
+                final_kw: None,
+            },
             name: "Main" @ 571..575,
             kind: Class(
                 Class {
@@ -513,6 +553,10 @@ CompilationUnit {
                             docs: [],
                             annotations: [],
                             vis: Default,
+                            inheritance: Inheritance {
+                                abstract_kw: None,
+                                final_kw: None,
+                            },
                             kind: Method(
                                 Method {
                                     generics: Generics {

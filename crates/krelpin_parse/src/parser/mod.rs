@@ -2,6 +2,7 @@ mod diagnostics;
 mod expr;
 mod item;
 mod lookahead;
+mod member;
 mod stmt;
 mod ty;
 

@@ -9,6 +9,10 @@ CompilationUnit {
             docs: [],
             annotations: [],
             vis: Default,
+            inheritance: Inheritance {
+                abstract_kw: None,
+                final_kw: None,
+            },
             name: "Inventory" @ 24..33,
             kind: Class(
                 Class {
@@ -23,6 +27,10 @@ CompilationUnit {
                             docs: [],
                             annotations: [],
                             vis: Default,
+                            inheritance: Inheritance {
+                                abstract_kw: None,
+                                final_kw: None,
+                            },
                             kind: Field(
                                 Field {
                                     storage: Shared(
@@ -70,6 +78,10 @@ CompilationUnit {
                             docs: [],
                             annotations: [],
                             vis: Default,
+                            inheritance: Inheritance {
+                                abstract_kw: None,
+                                final_kw: None,
+                            },
                             kind: Field(
                                 Field {
                                     storage: Instance,
@@ -98,6 +110,10 @@ CompilationUnit {
                             docs: [],
                             annotations: [],
                             vis: Default,
+                            inheritance: Inheritance {
+                                abstract_kw: None,
+                                final_kw: None,
+                            },
                             kind: Constructor(
                                 Constructor {
                                     name: "Inventory" @ 115..124,
@@ -179,6 +195,10 @@ CompilationUnit {
                             docs: [],
                             annotations: [],
                             vis: Default,
+                            inheritance: Inheritance {
+                                abstract_kw: None,
+                                final_kw: None,
+                            },
                             kind: Method(
                                 Method {
                                     generics: Generics {
@@ -364,6 +384,10 @@ CompilationUnit {
                             docs: [],
                             annotations: [],
                             vis: Default,
+                            inheritance: Inheritance {
+                                abstract_kw: None,
+                                final_kw: None,
+                            },
                             kind: Method(
                                 Method {
                                     generics: Generics {
@@ -644,6 +668,10 @@ CompilationUnit {
                             docs: [],
                             annotations: [],
                             vis: Default,
+                            inheritance: Inheritance {
+                                abstract_kw: None,
+                                final_kw: None,
+                            },
                             kind: Method(
                                 Method {
                                     generics: Generics {

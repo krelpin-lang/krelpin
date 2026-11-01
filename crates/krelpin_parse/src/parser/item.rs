@@ -1,17 +1,38 @@
 use krelpin_ast::ast::{
-    Annotation, Class, CompilationUnit, Constructor, Field, FieldStorage, FnRetTy, Generics, Ident,
-    Import, Item, ItemKind, Member, MemberKind, Method, Param, Receiver, ReceiverKind, Unparsed,
+    Annotation, Class, CompilationUnit, Enum, EnumConstant, FieldStorage, FnRetTy, Generics, Ident,
+    Import, Inheritance, Interface, Item, ItemKind, Member, MemberKind, Path, Struct, Ty,
     Visibility,
 };
 use krelpin_ast::token::TokenKind;
 use krelpin_errors::Diagnostic;
-use krelpin_span::{Symbol, kw};
+use krelpin_span::{Span, Symbol, kw};
 
+use super::lookahead::is_plain_ident;
 use super::{Expected, PResult, Parser};
+
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub(crate) enum Container {
+    Class,
+    Struct,
+    Interface,
+    Enum,
+}
+
+impl Container {
+    fn plural(self) -> &'static str {
+        match self {
+            Container::Class => "classes",
+            Container::Struct => "structs",
+            Container::Interface => "interfaces",
+            Container::Enum => "enums",
+        }
+    }
+}
 
 struct Modifiers {
     vis: Visibility,
     storage: FieldStorage,
+    inheritance: Inheritance,
 }
 
 impl Parser<'_> {
@@ -60,7 +81,7 @@ impl Parser<'_> {
         }
     }
 
-    fn parse_package(&mut self) -> PResult<krelpin_ast::ast::Path> {
+    fn parse_package(&mut self) -> PResult<Path> {
         self.bump();
         let path = self.parse_path()?;
         self.expect(TokenKind::Semi)?;
@@ -90,45 +111,200 @@ impl Parser<'_> {
         let lo = self.token.span;
         let annotations = self.parse_annotations()?;
         let modifiers = self.parse_modifiers();
-        self.reject_storage(modifiers.storage, "classes");
+        self.reject_storage(modifiers.storage, "type declarations");
 
-        if !self.token.is_keyword(kw::Class) {
-            self.expected = vec![Expected::Item];
-            return Err(self.unexpected());
-        }
+        let container = match self.token.kind {
+            TokenKind::Ident(kw::Class) => Container::Class,
+            TokenKind::Ident(kw::Struct) => Container::Struct,
+            TokenKind::Ident(kw::Interface) => Container::Interface,
+            TokenKind::Ident(kw::Enum) => Container::Enum,
+            _ => {
+                self.expected = vec![Expected::Item];
+                return Err(self.unexpected());
+            }
+        };
         self.bump();
 
+        if container != Container::Class {
+            self.reject_inheritance(modifiers.inheritance, container.plural());
+        } else if let Inheritance {
+            abstract_kw: Some(_),
+            final_kw: Some(span),
+        } = modifiers.inheritance
+        {
+            self.emit(
+                Diagnostic::error("a class cannot be both `abstract` and `final`")
+                    .with_span(span)
+                    .with_note("an abstract class must be extended, a final class cannot be"),
+            );
+        }
+
         let name = self.parse_ident()?;
+        let kind = match container {
+            Container::Class => self.parse_class(name)?,
+            Container::Struct => self.parse_struct(name)?,
+            Container::Interface => self.parse_interface(name)?,
+            Container::Enum => self.parse_enum(name)?,
+        };
+
+        Ok(Item {
+            docs,
+            annotations,
+            vis: modifiers.vis,
+            inheritance: modifiers.inheritance,
+            name,
+            kind,
+            span: lo.to(self.prev_token.span),
+        })
+    }
+
+    fn parse_class(&mut self, name: Ident) -> PResult<ItemKind> {
         let generics = self.parse_generics()?;
         let extends = if self.eat_keyword(kw::Extends) {
             Some(self.parse_ty()?)
         } else {
             None
         };
-        let implements = if self.eat_keyword(kw::Implements) {
+        let implements = self.parse_implements()?;
+        let members = self.parse_body(Container::Class, name)?;
+
+        Ok(ItemKind::Class(Class {
+            generics,
+            extends,
+            implements,
+            members,
+        }))
+    }
+
+    fn parse_struct(&mut self, name: Ident) -> PResult<ItemKind> {
+        let generics = self.parse_generics()?;
+        self.reject_extends("structs")?;
+        let implements = self.parse_implements()?;
+        let members = self.parse_body(Container::Struct, name)?;
+
+        Ok(ItemKind::Struct(Struct {
+            generics,
+            implements,
+            members,
+        }))
+    }
+
+    fn parse_interface(&mut self, name: Ident) -> PResult<ItemKind> {
+        let generics = self.parse_generics()?;
+        let extends = if self.eat_keyword(kw::Extends) {
             self.parse_ty_list()?
         } else {
             Vec::new()
         };
-        let members = self.parse_class_body(name)?;
 
-        Ok(Item {
+        if self.token.is_keyword(kw::Implements) {
+            self.emit(
+                Diagnostic::error("interfaces cannot implement other interfaces")
+                    .with_span(self.token.span)
+                    .with_help("use `extends` to inherit from other interfaces"),
+            );
+            self.bump();
+            self.parse_ty_list()?;
+        }
+
+        let members = self.parse_body(Container::Interface, name)?;
+        Ok(ItemKind::Interface(Interface {
+            generics,
+            extends,
+            members,
+        }))
+    }
+
+    fn parse_enum(&mut self, name: Ident) -> PResult<ItemKind> {
+        if self.token.kind == TokenKind::Lt {
+            let generics = self.parse_generics()?;
+            self.error(generics.span, "enums cannot have generic parameters");
+        }
+        self.reject_extends("enums")?;
+        let implements = self.parse_implements()?;
+
+        let open = self.expect(TokenKind::OpenBrace)?;
+        let mut constants = Vec::new();
+        while !matches!(self.token.kind, TokenKind::Semi | TokenKind::CloseBrace) {
+            constants.push(self.parse_enum_constant()?);
+            if !self.eat(TokenKind::Comma) {
+                break;
+            }
+        }
+
+        let members = if self.eat(TokenKind::Semi) {
+            self.parse_member_list(open, Container::Enum, name)?
+        } else if self.eat(TokenKind::CloseBrace) {
+            Vec::new()
+        } else {
+            return Err(self.unexpected());
+        };
+
+        Ok(ItemKind::Enum(Enum {
+            implements,
+            constants,
+            members,
+        }))
+    }
+
+    fn parse_enum_constant(&mut self) -> PResult<EnumConstant> {
+        let lo = self.token.span;
+        let docs = self.parse_docs();
+        let annotations = self.parse_annotations()?;
+        if !is_plain_ident(self.token.kind) {
+            self.expected.push(Expected::Ident);
+            return Err(self.unexpected());
+        }
+        let name = self.parse_ident()?;
+        let args = if self.token.kind == TokenKind::OpenParen {
+            self.parse_args()?
+        } else {
+            Vec::new()
+        };
+
+        Ok(EnumConstant {
             docs,
             annotations,
-            vis: modifiers.vis,
             name,
-            kind: ItemKind::Class(Class {
-                generics,
-                extends,
-                implements,
-                members,
-            }),
+            args,
             span: lo.to(self.prev_token.span),
         })
     }
 
-    fn parse_class_body(&mut self, class_name: Ident) -> PResult<Vec<Member>> {
+    fn parse_implements(&mut self) -> PResult<Vec<Ty>> {
+        if self.eat_keyword(kw::Implements) {
+            self.parse_ty_list()
+        } else {
+            Ok(Vec::new())
+        }
+    }
+
+    fn reject_extends(&mut self, what: &str) -> PResult<()> {
+        if !self.token.is_keyword(kw::Extends) {
+            return Ok(());
+        }
+        let lo = self.token.span;
+        self.bump();
+        self.parse_ty()?;
+        self.emit(
+            Diagnostic::error(format!("{what} cannot extend other types"))
+                .with_span(lo.to(self.prev_token.span))
+                .with_help(format!("{what} can implement interfaces with `implements`")),
+        );
+        Ok(())
+    }
+
+    fn parse_body(&mut self, container: Container, owner: Ident) -> PResult<Vec<Member>> {
         let open = self.expect(TokenKind::OpenBrace)?;
+        self.parse_member_list(open, container, owner)
+    }
+
+    fn parse_member_list(
+        &mut self,
+        open: Span,
+        container: Container,
+        owner: Ident,
+    ) -> PResult<Vec<Member>> {
         let mut members = Vec::new();
 
         loop {
@@ -143,7 +319,7 @@ impl Parser<'_> {
                 return Err(self.unclosed_delimiter(open));
             }
 
-            match self.parse_member(docs, class_name) {
+            match self.parse_member(docs, container, owner) {
                 Ok(member) => members.push(member),
                 Err(error) => {
                     self.recover_to_member_end();
@@ -179,6 +355,7 @@ impl Parser<'_> {
         let mut modifiers = Modifiers {
             vis: Visibility::Default,
             storage: FieldStorage::Instance,
+            inheritance: Inheritance::default(),
         };
 
         loop {
@@ -187,37 +364,48 @@ impl Parser<'_> {
                 return modifiers;
             };
 
-            let vis = match symbol {
-                kw::Public => Some(Visibility::Public(span)),
-                kw::Protected => Some(Visibility::Protected(span)),
-                kw::Private => Some(Visibility::Private(span)),
-                _ => None,
-            };
-            let storage = match symbol {
-                kw::Const => Some(FieldStorage::Const(span)),
-                kw::Shared => Some(FieldStorage::Shared(span)),
-                _ => None,
-            };
-
-            match (vis, storage) {
-                (Some(vis), _) if modifiers.vis == Visibility::Default => modifiers.vis = vis,
-                (Some(_), _) => {
-                    self.emit(
-                        Diagnostic::error("multiple visibility modifiers")
-                            .with_span(span)
-                            .with_help("remove all but one visibility modifier"),
-                    );
+            match symbol {
+                kw::Public | kw::Protected | kw::Private => {
+                    let vis = match symbol {
+                        kw::Public => Visibility::Public(span),
+                        kw::Protected => Visibility::Protected(span),
+                        _ => Visibility::Private(span),
+                    };
+                    if modifiers.vis == Visibility::Default {
+                        modifiers.vis = vis;
+                    } else {
+                        self.emit(
+                            Diagnostic::error("multiple visibility modifiers")
+                                .with_span(span)
+                                .with_help("remove all but one visibility modifier"),
+                        );
+                    }
                 }
-                (_, Some(storage)) if modifiers.storage == FieldStorage::Instance => {
-                    modifiers.storage = storage;
+                kw::Const | kw::Shared => {
+                    let storage = if symbol == kw::Const {
+                        FieldStorage::Const(span)
+                    } else {
+                        FieldStorage::Shared(span)
+                    };
+                    if modifiers.storage == FieldStorage::Instance {
+                        modifiers.storage = storage;
+                    } else {
+                        self.error(span, "a field can only have one of `const` and `shared`");
+                    }
                 }
-                (_, Some(_)) => {
-                    self.emit(
-                        Diagnostic::error("a field can only have one of `const` and `shared`")
-                            .with_span(span),
-                    );
+                kw::Abstract | kw::Final => {
+                    let slot = if symbol == kw::Abstract {
+                        &mut modifiers.inheritance.abstract_kw
+                    } else {
+                        &mut modifiers.inheritance.final_kw
+                    };
+                    if slot.is_some() {
+                        self.error(span, format!("duplicate `{symbol}` modifier"));
+                    } else {
+                        *slot = Some(span);
+                    }
                 }
-                (None, None) => return modifiers,
+                _ => return modifiers,
             }
             self.bump();
         }
@@ -236,26 +424,41 @@ impl Parser<'_> {
         );
     }
 
-    fn parse_member(&mut self, docs: Vec<Symbol>, class_name: Ident) -> PResult<Member> {
+    fn reject_inheritance(&self, inheritance: Inheritance, what: &str) {
+        let modifiers = [
+            ("abstract", inheritance.abstract_kw),
+            ("final", inheritance.final_kw),
+        ];
+        for (keyword, span) in modifiers {
+            if let Some(span) = span {
+                self.error(span, format!("`{keyword}` cannot be used on {what}"));
+            }
+        }
+    }
+
+    fn parse_member(
+        &mut self,
+        docs: Vec<Symbol>,
+        container: Container,
+        owner: Ident,
+    ) -> PResult<Member> {
         let lo = self.token.span;
         let annotations = self.parse_annotations()?;
         let modifiers = self.parse_modifiers();
-        let kind = self.parse_member_kind(class_name, modifiers.storage)?;
+        let kind = self.parse_member_kind(owner, modifiers.storage)?;
+        self.validate_member(container, &modifiers, &kind);
 
         Ok(Member {
             docs,
             annotations,
             vis: modifiers.vis,
+            inheritance: modifiers.inheritance,
             kind,
             span: lo.to(self.prev_token.span),
         })
     }
 
-    fn parse_member_kind(
-        &mut self,
-        class_name: Ident,
-        storage: FieldStorage,
-    ) -> PResult<MemberKind> {
+    fn parse_member_kind(&mut self, owner: Ident, storage: FieldStorage) -> PResult<MemberKind> {
         if self.token.kind == TokenKind::Lt {
             self.reject_storage(storage, "methods");
             let generics = self.parse_generics()?;
@@ -271,7 +474,7 @@ impl Parser<'_> {
             _ => None,
         };
         if let Some(name) = called {
-            if name != class_name.name {
+            if name != owner.name {
                 return Err(self.missing_return_type());
             }
             self.reject_storage(storage, "constructors");
@@ -297,176 +500,60 @@ impl Parser<'_> {
         self.parse_field(storage, ty, name).map(MemberKind::Field)
     }
 
-    fn missing_return_type(&mut self) -> super::ErrorReported {
-        let span = self.token.span;
-        self.emit(
-            Diagnostic::error("missing return type for method")
-                .with_span(span)
-                .with_label("add a return type before the method name")
-                .with_help("use `void` if the method does not return a value"),
-        )
-    }
+    fn validate_member(&self, container: Container, modifiers: &Modifiers, kind: &MemberKind) {
+        let Inheritance {
+            abstract_kw,
+            final_kw,
+        } = modifiers.inheritance;
 
-    fn parse_ret_ty(&mut self) -> PResult<FnRetTy> {
-        if self.eat_keyword_noexpect(kw::Void) {
-            return Ok(FnRetTy::Void(self.prev_token.span));
-        }
-        self.parse_ty().map(FnRetTy::Ty)
-    }
-
-    fn parse_field(
-        &mut self,
-        storage: FieldStorage,
-        ty: krelpin_ast::ast::Ty,
-        name: Ident,
-    ) -> PResult<Field> {
-        let init = if self.eat(TokenKind::Eq) {
-            Some(self.parse_initializer()?)
-        } else {
-            None
-        };
-        self.expect_semi()?;
-
-        Ok(Field {
-            storage,
-            ty,
-            name,
-            init,
-        })
-    }
-
-    fn parse_constructor(&mut self) -> PResult<Constructor> {
-        let name = self.parse_ident()?;
-        let (receiver, params) = self.parse_params()?;
-        if let Some(receiver) = receiver {
-            self.emit(
-                Diagnostic::error("constructors cannot take `this` as a parameter")
-                    .with_span(receiver.span)
-                    .with_help("constructors always have access to the object being built"),
-            );
-        }
-        let throws = self.parse_throws()?;
-        let body = self.parse_block()?;
-
-        Ok(Constructor {
-            name,
-            params,
-            throws,
-            body,
-        })
-    }
-
-    fn parse_method(&mut self, generics: Generics, ret: FnRetTy, name: Ident) -> PResult<Method> {
-        let (receiver, params) = self.parse_params()?;
-        let throws = self.parse_throws()?;
-        let body = if self.eat(TokenKind::Semi) {
-            None
-        } else {
-            Some(self.parse_block()?)
-        };
-
-        Ok(Method {
-            generics,
-            ret,
-            name,
-            receiver,
-            params,
-            throws,
-            body,
-        })
-    }
-
-    fn parse_throws(&mut self) -> PResult<Vec<krelpin_ast::ast::Ty>> {
-        if self.eat_keyword(kw::Throws) {
-            self.parse_ty_list()
-        } else {
-            Ok(Vec::new())
-        }
-    }
-
-    fn parse_params(&mut self) -> PResult<(Option<Receiver>, Vec<Param>)> {
-        self.expect(TokenKind::OpenParen)?;
-        let mut receiver = None;
-        let mut params = Vec::new();
-
-        if self.eat(TokenKind::CloseParen) {
-            return Ok((receiver, params));
-        }
-
-        loop {
-            match self.parse_receiver() {
-                Some(found) if receiver.is_none() && params.is_empty() => receiver = Some(found),
-                Some(found) => {
+        match kind {
+            MemberKind::Field(field) => {
+                if let Some(span) = abstract_kw {
+                    self.error(span, "`abstract` cannot be used on fields");
+                }
+                if container == Container::Interface
+                    && !matches!(field.storage, FieldStorage::Const(_))
+                {
                     self.emit(
-                        Diagnostic::error("`this` must be the first parameter")
-                            .with_span(found.span)
-                            .with_help("move `this` to the start of the parameter list"),
+                        Diagnostic::error("interfaces can only have `const` fields")
+                            .with_span(field.name.span)
+                            .with_help("make the field `const`, or move it to a class"),
                     );
                 }
-                None => params.push(self.parse_param()?),
             }
-
-            if self.eat(TokenKind::CloseParen) {
-                return Ok((receiver, params));
-            }
-            self.expect(TokenKind::Comma)?;
-        }
-    }
-
-    fn parse_receiver(&mut self) -> Option<Receiver> {
-        let lo = self.token.span;
-        let (kind, len) = match (self.look_ahead(0), self.look_ahead(1), self.look_ahead(2)) {
-            (TokenKind::Ident(kw::This), _, _) => (ReceiverKind::Owned, 1),
-            (TokenKind::And, TokenKind::Ident(kw::This), _) => (ReceiverKind::Ref, 2),
-            (TokenKind::And, TokenKind::Ident(kw::Mut), TokenKind::Ident(kw::This)) => {
-                (ReceiverKind::RefMut, 3)
-            }
-            _ => return None,
-        };
-
-        for _ in 0..len {
-            self.bump();
-        }
-        Some(Receiver {
-            kind,
-            span: lo.to(self.prev_token.span),
-        })
-    }
-
-    fn parse_param(&mut self) -> PResult<Param> {
-        let lo = self.token.span;
-        let ty = self.parse_ty()?;
-        let variadic = self.eat_noexpect(TokenKind::DotDotDot);
-        let name = self.parse_ident()?;
-
-        Ok(Param {
-            ty,
-            name,
-            variadic,
-            span: lo.to(self.prev_token.span),
-        })
-    }
-
-    fn parse_unparsed_delimited(&mut self, open: TokenKind, close: TokenKind) -> PResult<Unparsed> {
-        let open_span = self.expect(open)?;
-        let mut depth = 1usize;
-
-        loop {
-            match self.token.kind {
-                TokenKind::Eof => return Err(self.unclosed_delimiter(open_span)),
-                kind if kind == open => depth += 1,
-                kind if kind == close => {
-                    depth -= 1;
-                    if depth == 0 {
-                        self.bump();
-                        return Ok(Unparsed {
-                            span: open_span.to(self.prev_token.span),
-                        });
-                    }
+            MemberKind::Constructor(constructor) => {
+                if container == Container::Interface {
+                    self.error(constructor.name.span, "interfaces cannot have constructors");
                 }
-                _ => {}
+                self.reject_inheritance(modifiers.inheritance, "constructors");
             }
-            self.bump();
+            MemberKind::Method(method) => {
+                if let (Some(_), Some(span)) = (abstract_kw, final_kw) {
+                    self.error(span, "a method cannot be both `abstract` and `final`");
+                }
+
+                let can_be_abstract = matches!(container, Container::Class | Container::Interface);
+                match (abstract_kw, &method.body) {
+                    (Some(span), _) if !can_be_abstract => {
+                        let what = container.plural();
+                        self.error(span, format!("abstract methods are not allowed in {what}"));
+                    }
+                    (Some(span), Some(_)) => {
+                        self.error(span, "abstract methods cannot have a body");
+                    }
+                    (None, None) if container != Container::Interface => {
+                        self.emit(
+                            Diagnostic::error(format!(
+                                "missing body for method `{}`",
+                                method.name.name
+                            ))
+                            .with_span(method.name.span)
+                            .with_help("add a body, or mark the method `abstract`"),
+                        );
+                    }
+                    _ => {}
+                }
+            }
         }
     }
 }

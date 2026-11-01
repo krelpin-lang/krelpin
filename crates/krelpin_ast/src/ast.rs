@@ -78,6 +78,7 @@ pub struct Item {
     pub docs: Vec<Symbol>,
     pub annotations: Vec<Annotation>,
     pub vis: Visibility,
+    pub inheritance: Inheritance,
     pub name: Ident,
     pub kind: ItemKind,
     pub span: Span,
@@ -86,6 +87,15 @@ pub struct Item {
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub enum ItemKind {
     Class(Class),
+    Struct(Struct),
+    Interface(Interface),
+    Enum(Enum),
+}
+
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
+pub struct Inheritance {
+    pub abstract_kw: Option<Span>,
+    pub final_kw: Option<Span>,
 }
 
 #[derive(Clone, Debug, PartialEq, Eq)]
@@ -97,10 +107,41 @@ pub struct Class {
 }
 
 #[derive(Clone, Debug, PartialEq, Eq)]
+pub struct Struct {
+    pub generics: Generics,
+    pub implements: Vec<Ty>,
+    pub members: Vec<Member>,
+}
+
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct Interface {
+    pub generics: Generics,
+    pub extends: Vec<Ty>,
+    pub members: Vec<Member>,
+}
+
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct Enum {
+    pub implements: Vec<Ty>,
+    pub constants: Vec<EnumConstant>,
+    pub members: Vec<Member>,
+}
+
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct EnumConstant {
+    pub docs: Vec<Symbol>,
+    pub annotations: Vec<Annotation>,
+    pub name: Ident,
+    pub args: Vec<Expr>,
+    pub span: Span,
+}
+
+#[derive(Clone, Debug, PartialEq, Eq)]
 pub struct Member {
     pub docs: Vec<Symbol>,
     pub annotations: Vec<Annotation>,
     pub vis: Visibility,
+    pub inheritance: Inheritance,
     pub kind: MemberKind,
     pub span: Span,
 }
@@ -306,6 +347,7 @@ pub enum StmtKind {
         finally: Option<Block>,
     },
     Return(Option<Expr>),
+    Yield(Expr),
     Throw(Expr),
     Break,
     Continue,
@@ -419,6 +461,24 @@ pub enum ExprKind {
         expr: Box<Expr>,
         name: Ident,
     },
+    Switch {
+        scrutinee: Box<Expr>,
+        arms: Vec<SwitchExprArm>,
+    },
+}
+
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct SwitchExprArm {
+    pub labels: Option<Vec<Expr>>,
+    pub body: SwitchExprBody,
+    pub span: Span,
+}
+
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub enum SwitchExprBody {
+    Expr(Expr),
+    Block(Block),
+    Throw(Expr),
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]

@@ -7,6 +7,10 @@ CompilationUnit {
             docs: [],
             annotations: [],
             vis: Default,
+            inheritance: Inheritance {
+                abstract_kw: None,
+                final_kw: None,
+            },
             name: "Main" @ 6..10,
             kind: Class(
                 Class {
@@ -21,6 +25,10 @@ CompilationUnit {
                             docs: [],
                             annotations: [],
                             vis: Default,
+                            inheritance: Inheritance {
+                                abstract_kw: None,
+                                final_kw: None,
+                            },
                             kind: Method(
                                 Method {
                                     generics: Generics {
@@ -66,6 +74,10 @@ CompilationUnit {
                             docs: [],
                             annotations: [],
                             vis: Default,
+                            inheritance: Inheritance {
+                                abstract_kw: None,
+                                final_kw: None,
+                            },
                             kind: Method(
                                 Method {
                                     generics: Generics {
@@ -140,6 +152,10 @@ CompilationUnit {
                             docs: [],
                             annotations: [],
                             vis: Default,
+                            inheritance: Inheritance {
+                                abstract_kw: None,
+                                final_kw: None,
+                            },
                             kind: Method(
                                 Method {
                                     generics: Generics {
@@ -207,6 +223,10 @@ CompilationUnit {
                             docs: [],
                             annotations: [],
                             vis: Default,
+                            inheritance: Inheritance {
+                                abstract_kw: None,
+                                final_kw: None,
+                            },
                             kind: Method(
                                 Method {
                                     generics: Generics {

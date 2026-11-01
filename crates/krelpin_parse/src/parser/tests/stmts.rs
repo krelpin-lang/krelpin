@@ -19,6 +19,7 @@ fn kind_name(kind: &StmtKind) -> &'static str {
         StmtKind::Switch { .. } => "switch",
         StmtKind::Try { .. } => "try",
         StmtKind::Return(_) => "return",
+        StmtKind::Yield(_) => "yield",
         StmtKind::Throw(_) => "throw",
         StmtKind::Break => "break",
         StmtKind::Continue => "continue",
@@ -184,4 +185,9 @@ fn unclosed_nested_block_reports_once() {
         super::errors("class A { void f() { if (x) { y(); }"),
         ["this file contains an unclosed delimiter"]
     );
+}
+
+#[test]
+fn yield_statements() {
+    assert_eq!(kinds(&body("yield 1;")), ["yield"]);
 }
