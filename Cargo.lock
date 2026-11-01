@@ -115,6 +115,15 @@ name = "krelpin_driver"
 version = "0.1.0"
 dependencies = [
  "clap",
+ "krelpin_errors",
+ "krelpin_span",
+]
+
+[[package]]
+name = "krelpin_errors"
+version = "0.1.0"
+dependencies = [
+ "krelpin_span",
 ]
 
 [[package]]

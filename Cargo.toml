@@ -10,5 +10,6 @@ edition = "2024"
 clap = { version = "4", features = ["derive"] }
 unicode-ident = "1"
 krelpin_driver = { path = "crates/krelpin_driver" }
+krelpin_errors = { path = "crates/krelpin_errors" }
 krelpin_lexer = { path = "crates/krelpin_lexer" }
 krelpin_span = { path = "crates/krelpin_span" }

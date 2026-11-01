@@ -1,43 +1,50 @@
 mod args;
+mod session;
 
 use std::fs;
 use std::path::Path;
 use std::process::ExitCode;
 
 use clap::{Parser, ValueEnum};
+use krelpin_errors::Diagnostic;
 
 pub use crate::args::{Args, CrateType, Edition, Emit, LintLevel, PrintKind, Spec};
+pub use crate::session::Session;
 
 pub fn main() -> ExitCode {
     let args = Args::parse();
-    match run(&args) {
-        Ok(()) => ExitCode::SUCCESS,
-        Err(message) => {
-            eprintln!("error: {message}");
-            ExitCode::FAILURE
-        }
-    }
+    let sess = Session::new();
+    run(&args, &sess);
+    sess.finish()
 }
 
-pub fn run(args: &Args) -> Result<(), String> {
+pub fn run(args: &Args, sess: &Session) {
     if let Some(code) = &args.explain {
         println!("no extended information for {code}");
-        return Ok(());
+        return;
     }
 
     if !args.print.is_empty() {
-        return args
-            .print
-            .iter()
-            .try_for_each(|request| print_info(args, request));
+        for request in &args.print {
+            print_info(args, sess, request);
+        }
+        return;
     }
 
     let Some(input) = &args.input else {
-        return Ok(());
+        return;
     };
 
-    let _src = fs::read_to_string(input)
-        .map_err(|error| format!("couldn't read `{}`: {error}", input.display()))?;
+    let _file = match sess.source_map.load_file(input) {
+        Ok(file) => file,
+        Err(error) => {
+            sess.dcx.emit(Diagnostic::error(format!(
+                "couldn't read `{}`: {error}",
+                input.display()
+            )));
+            return;
+        }
+    };
 
     if args.verbose {
         eprintln!(
@@ -48,16 +55,15 @@ pub fn run(args: &Args) -> Result<(), String> {
         );
     }
 
-    match args.emits().into_iter().next() {
-        Some(emit) => Err(format!(
+    for emit in args.emits() {
+        sess.dcx.emit(Diagnostic::error(format!(
             "`--emit={}` is not supported yet",
             value_name(emit.kind)
-        )),
-        None => Ok(()),
+        )));
     }
 }
 
-fn print_info(args: &Args, request: &Spec<PrintKind>) -> Result<(), String> {
+fn print_info(args: &Args, sess: &Session, request: &Spec<PrintKind>) {
     let output = match request.kind {
         PrintKind::CrateName => args.crate_name(),
         PrintKind::Cfg => args.cfg.join("\n"),
@@ -70,24 +76,29 @@ fn print_info(args: &Args, request: &Spec<PrintKind>) -> Result<(), String> {
             .collect::<Vec<_>>()
             .join("\n"),
         kind => {
-            return Err(format!(
+            sess.dcx.emit(Diagnostic::error(format!(
                 "`--print={}` is not supported yet",
                 value_name(kind)
-            ));
+            )));
+            return;
         }
     };
 
-    write_output(request.path.as_deref(), &format!("{output}\n"))
+    write_output(sess, request.path.as_deref(), &format!("{output}\n"));
 }
 
-fn write_output(path: Option<&Path>, content: &str) -> Result<(), String> {
+fn write_output(sess: &Session, path: Option<&Path>, content: &str) {
     let Some(path) = path else {
         print!("{content}");
-        return Ok(());
+        return;
     };
 
-    fs::write(path, content)
-        .map_err(|error| format!("couldn't write `{}`: {error}", path.display()))
+    if let Err(error) = fs::write(path, content) {
+        sess.dcx.emit(Diagnostic::error(format!(
+            "couldn't write `{}`: {error}",
+            path.display()
+        )));
+    }
 }
 
 fn value_name<T: ValueEnum>(value: T) -> String {
