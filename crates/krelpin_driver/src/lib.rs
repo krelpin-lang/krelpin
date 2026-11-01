@@ -56,17 +56,28 @@ pub fn run(args: &Args, sess: &Session) {
         );
     }
 
+    let emits = args.emits();
     let tokens = krelpin_parse::lexer::lex(&file, &sess.dcx);
     if sess.dcx.has_errors() {
         return;
     }
 
-    for emit in args.emits() {
+    for emit in emits.iter().filter(|emit| emit.kind == Emit::Tokens) {
+        write_output(sess, emit.path.as_deref(), &render_tokens(sess, &tokens));
+    }
+    if emits.iter().all(|emit| emit.kind == Emit::Tokens) {
+        return;
+    }
+
+    let unit = krelpin_parse::parser::parse(tokens, &sess.dcx);
+    if sess.dcx.has_errors() {
+        return;
+    }
+
+    for emit in &emits {
         match emit.kind {
-            Emit::Tokens => {
-                let output = render_tokens(sess, &tokens);
-                write_output(sess, emit.path.as_deref(), &output);
-            }
+            Emit::Tokens => {}
+            Emit::Ast => write_output(sess, emit.path.as_deref(), &format!("{unit:#?}\n")),
             kind => sess.dcx.emit(Diagnostic::error(format!(
                 "`--emit={}` is not supported yet",
                 value_name(kind)

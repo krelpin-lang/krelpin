@@ -1,0 +1,4 @@
+class Unclosed {
+    void method() {
+        if (ready) {
+    }

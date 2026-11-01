@@ -1,0 +1,26 @@
+error: expected class declaration, found keyword `int`
+ --> tests/ui/parser/recovery.kr:1:1
+  |
+1 | int stray;
+  | ^^^
+
+error: expected one of `(`, `=`, or `;`, found `String`
+ --> tests/ui/parser/recovery.kr:5:5
+  |
+5 |     String fine;
+  |     ^^^^^^
+
+error: expected `,` or `>`, found `broken`
+ --> tests/ui/parser/recovery.kr:6:17
+  |
+6 |     List<String broken;
+  |                 ^^^^^^
+
+error: expected identifier, found keyword `class`
+  --> tests/ui/parser/recovery.kr:10:9
+   |
+10 |     int class;
+   |         ^^^^^
+
+error: aborting due to 4 previous errors
+

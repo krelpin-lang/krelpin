@@ -1,0 +1,48 @@
+error: fields cannot have type `void`
+ --> tests/ui/parser/signature_errors.kr:2:5
+  |
+2 |     void flag;
+  |     ^^^^
+
+error: `this` must be the first parameter
+ --> tests/ui/parser/signature_errors.kr:3:22
+  |
+3 |     void late(int a, &this) {}
+  |                      ^^^^^
+  |
+  = help: move `this` to the start of the parameter list
+
+error: `const` cannot be used on methods
+ --> tests/ui/parser/signature_errors.kr:4:5
+  |
+4 |     const void constant() {}
+  |     ^^^^^
+  |
+  = help: `const` is only allowed on fields
+
+error: multiple visibility modifiers
+ --> tests/ui/parser/signature_errors.kr:5:12
+  |
+5 |     public private int twice;
+  |            ^^^^^^^
+  |
+  = help: remove all but one visibility modifier
+
+error: constructors cannot take `this` as a parameter
+ --> tests/ui/parser/signature_errors.kr:6:12
+  |
+6 |     Broken(&this) {}
+  |            ^^^^^
+  |
+  = help: constructors always have access to the object being built
+
+error: missing return type for method
+ --> tests/ui/parser/signature_errors.kr:7:5
+  |
+7 |     helper() {}
+  |     ^^^^^^ add a return type before the method name
+  |
+  = help: use `void` if the method does not return a value
+
+error: aborting due to 6 previous errors
+

@@ -1,0 +1,11 @@
+int stray;
+
+class First {
+    int missingSemicolon
+    String fine;
+    List<String broken;
+}
+
+class Second {
+    int class;
+}

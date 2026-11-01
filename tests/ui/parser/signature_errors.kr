@@ -1,0 +1,8 @@
+class Broken {
+    void flag;
+    void late(int a, &this) {}
+    const void constant() {}
+    public private int twice;
+    Broken(&this) {}
+    helper() {}
+}

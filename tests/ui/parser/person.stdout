@@ -1,0 +1,331 @@
+CompilationUnit {
+    docs: [],
+    package: Some(
+        "example" @ 8..15,
+    ),
+    imports: [
+        Import {
+            path: "example.test" @ 25..37,
+            glob: false,
+            span: 18..38,
+        },
+    ],
+    items: [
+        Item {
+            docs: [
+                " A person with a name. ",
+            ],
+            annotations: [],
+            vis: Default,
+            name: "Person" @ 75..81,
+            kind: Class(
+                Class {
+                    generics: Generics {
+                        params: [],
+                        span: 82..82,
+                    },
+                    extends: None,
+                    implements: [],
+                    members: [
+                        Member {
+                            docs: [],
+                            annotations: [],
+                            vis: Default,
+                            kind: Field(
+                                Field {
+                                    storage: Const(
+                                        88..93,
+                                    ),
+                                    ty: Ty {
+                                        kind: Primitive(
+                                            Int,
+                                        ),
+                                        span: 94..97,
+                                    },
+                                    name: "MAX_NAME_LENGTH" @ 98..113,
+                                    init: Some(
+                                        Unparsed {
+                                            span: 116..118,
+                                        },
+                                    ),
+                                },
+                            ),
+                            span: 88..119,
+                        },
+                        Member {
+                            docs: [],
+                            annotations: [],
+                            vis: Default,
+                            kind: Field(
+                                Field {
+                                    storage: Shared(
+                                        124..130,
+                                    ),
+                                    ty: Ty {
+                                        kind: Path {
+                                            path: "AtomicInt" @ 131..140,
+                                            args: [],
+                                        },
+                                        span: 131..140,
+                                    },
+                                    name: "created" @ 141..148,
+                                    init: Some(
+                                        Unparsed {
+                                            span: 151..167,
+                                        },
+                                    ),
+                                },
+                            ),
+                            span: 124..168,
+                        },
+                        Member {
+                            docs: [],
+                            annotations: [],
+                            vis: Default,
+                            kind: Field(
+                                Field {
+                                    storage: Instance,
+                                    ty: Ty {
+                                        kind: Path {
+                                            path: "String" @ 174..180,
+                                            args: [],
+                                        },
+                                        span: 174..180,
+                                    },
+                                    name: "name" @ 181..185,
+                                    init: None,
+                                },
+                            ),
+                            span: 174..186,
+                        },
+                        Member {
+                            docs: [],
+                            annotations: [],
+                            vis: Default,
+                            kind: Field(
+                                Field {
+                                    storage: Instance,
+                                    ty: Ty {
+                                        kind: Nullable(
+                                            Ty {
+                                                kind: Path {
+                                                    path: "String" @ 191..197,
+                                                    args: [],
+                                                },
+                                                span: 191..197,
+                                            },
+                                        ),
+                                        span: 191..198,
+                                    },
+                                    name: "nickname" @ 199..207,
+                                    init: None,
+                                },
+                            ),
+                            span: 191..208,
+                        },
+                        Member {
+                            docs: [],
+                            annotations: [],
+                            vis: Default,
+                            kind: Constructor(
+                                Constructor {
+                                    name: "Person" @ 214..220,
+                                    params: [
+                                        Param {
+                                            ty: Ty {
+                                                kind: Path {
+                                                    path: "String" @ 221..227,
+                                                    args: [],
+                                                },
+                                                span: 221..227,
+                                            },
+                                            name: "name" @ 228..232,
+                                            variadic: false,
+                                            span: 221..232,
+                                        },
+                                    ],
+                                    throws: [],
+                                    body: Unparsed {
+                                        span: 234..333,
+                                    },
+                                },
+                            ),
+                            span: 214..333,
+                        },
+                        Member {
+                            docs: [],
+                            annotations: [],
+                            vis: Default,
+                            kind: Method(
+                                Method {
+                                    generics: Generics {
+                                        params: [],
+                                        span: 0..0,
+                                    },
+                                    ret: Ty(
+                                        Ty {
+                                            kind: Ref {
+                                                mutable: false,
+                                                sources: [],
+                                                ty: Ty {
+                                                    kind: Path {
+                                                        path: "String" @ 340..346,
+                                                        args: [],
+                                                    },
+                                                    span: 340..346,
+                                                },
+                                            },
+                                            span: 339..346,
+                                        },
+                                    ),
+                                    name: "getName" @ 347..354,
+                                    receiver: Some(
+                                        Receiver {
+                                            kind: Ref,
+                                            span: 355..360,
+                                        },
+                                    ),
+                                    params: [],
+                                    throws: [],
+                                    body: Some(
+                                        Unparsed {
+                                            span: 362..396,
+                                        },
+                                    ),
+                                },
+                            ),
+                            span: 339..396,
+                        },
+                        Member {
+                            docs: [],
+                            annotations: [],
+                            vis: Default,
+                            kind: Method(
+                                Method {
+                                    generics: Generics {
+                                        params: [],
+                                        span: 0..0,
+                                    },
+                                    ret: Void(
+                                        402..406,
+                                    ),
+                                    name: "rename" @ 407..413,
+                                    receiver: Some(
+                                        Receiver {
+                                            kind: RefMut,
+                                            span: 414..423,
+                                        },
+                                    ),
+                                    params: [
+                                        Param {
+                                            ty: Ty {
+                                                kind: Path {
+                                                    path: "String" @ 425..431,
+                                                    args: [],
+                                                },
+                                                span: 425..431,
+                                            },
+                                            name: "newName" @ 432..439,
+                                            variadic: false,
+                                            span: 425..439,
+                                        },
+                                    ],
+                                    throws: [],
+                                    body: Some(
+                                        Unparsed {
+                                            span: 441..477,
+                                        },
+                                    ),
+                                },
+                            ),
+                            span: 402..477,
+                        },
+                        Member {
+                            docs: [],
+                            annotations: [],
+                            vis: Default,
+                            kind: Method(
+                                Method {
+                                    generics: Generics {
+                                        params: [],
+                                        span: 0..0,
+                                    },
+                                    ret: Ty(
+                                        Ty {
+                                            kind: Primitive(
+                                                Int,
+                                            ),
+                                            span: 483..486,
+                                        },
+                                    ),
+                                    name: "nicknameLength" @ 487..501,
+                                    receiver: Some(
+                                        Receiver {
+                                            kind: Ref,
+                                            span: 502..507,
+                                        },
+                                    ),
+                                    params: [],
+                                    throws: [],
+                                    body: Some(
+                                        Unparsed {
+                                            span: 509..561,
+                                        },
+                                    ),
+                                },
+                            ),
+                            span: 483..561,
+                        },
+                    ],
+                },
+            ),
+            span: 69..563,
+        },
+        Item {
+            docs: [],
+            annotations: [],
+            vis: Default,
+            name: "Main" @ 571..575,
+            kind: Class(
+                Class {
+                    generics: Generics {
+                        params: [],
+                        span: 576..576,
+                    },
+                    extends: None,
+                    implements: [],
+                    members: [
+                        Member {
+                            docs: [],
+                            annotations: [],
+                            vis: Default,
+                            kind: Method(
+                                Method {
+                                    generics: Generics {
+                                        params: [],
+                                        span: 0..0,
+                                    },
+                                    ret: Void(
+                                        582..586,
+                                    ),
+                                    name: "main" @ 587..591,
+                                    receiver: None,
+                                    params: [],
+                                    throws: [],
+                                    body: Some(
+                                        Unparsed {
+                                            span: 594..703,
+                                        },
+                                    ),
+                                },
+                            ),
+                            span: 582..703,
+                        },
+                    ],
+                },
+            ),
+            span: 565..705,
+        },
+    ],
+    span: 0..706,
+}
