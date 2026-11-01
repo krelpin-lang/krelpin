@@ -1,0 +1,59 @@
+error: mismatched types
+  --> tests/ui/typeck/type_errors.kr:12:16
+   |
+12 |         return this.cents;
+   |                ^^^^^^^^^^ expected `int`, found `long`
+
+error: missing return statement
+  --> tests/ui/typeck/type_errors.kr:19:5
+   |
+19 |     }
+   |     ^ this method must return a `boolean`
+   |
+   = help: add a `return` statement, or `throw` an exception
+
+error: cannot assign to `shared` field `count`
+  --> tests/ui/typeck/type_errors.kr:22:16
+   |
+22 |         Wallet.count++;
+   |                ^^^^^
+   |
+   = note: a `shared` field can be used from many places at once
+   = help: store a type that can be changed safely, like `AtomicInt` or `Mutex<T>`
+
+error: value of type `String?` may be null
+  --> tests/ui/typeck/type_errors.kr:23:20
+   |
+23 |         int size = this.note.length();
+   |                    ^^^^^^^^^
+   |
+   = help: use `?.` to access it only when it is not null, or check `!= null` first
+
+error: mismatched types
+  --> tests/ui/typeck/type_errors.kr:24:23
+   |
+24 |         String text = null;
+   |                       ^^^^ expected `String`, found `null`
+   |
+   = help: `String` can never be `null`; use `String?` to allow it
+
+error: mismatched types
+  --> tests/ui/typeck/type_errors.kr:30:36
+   |
+30 |         Wallet wallet = new Wallet("ten");
+   |                                    ^^^^^ expected `long`, found `String`
+
+error: field `cents` of `Wallet` is private
+  --> tests/ui/typeck/type_errors.kr:31:30
+   |
+31 |         long secret = wallet.cents;
+   |                              ^^^^^ private field
+
+error: cannot apply `+` to `boolean` and `int`
+  --> tests/ui/typeck/type_errors.kr:32:25
+   |
+32 |         boolean wrong = wallet.empty() + 1;
+   |                         ^^^^^^^^^^^^^^^^^^
+
+error: aborting due to 8 previous errors
+

@@ -1,0 +1,68 @@
+package bank;
+
+interface Account {
+    long balance(&this);
+}
+
+enum Kind {
+    CHECKING,
+    SAVINGS;
+}
+
+class BankAccount implements Account {
+    shared AtomicInt opened = new AtomicInt(0);
+    const long OVERDRAFT = 500L;
+
+    String owner;
+    Kind kind;
+    long cents;
+    String? nickname;
+
+    BankAccount(String owner, Kind kind) {
+        this.owner = owner;
+        this.kind = kind;
+        this.cents = 0;
+        this.nickname = null;
+        BankAccount.opened.increment();
+    }
+
+    long balance(&this) {
+        return this.cents;
+    }
+
+    boolean withdraw(&mut this, long amount) {
+        if (this.cents + BankAccount.OVERDRAFT < amount) {
+            return false;
+        }
+        this.cents -= amount;
+        return true;
+    }
+
+    String label(&this) {
+        String? nick = this.nickname;
+        if (nick != null && nick.length() > 0) {
+            return nick;
+        }
+        String kindName = switch (this.kind) {
+            case CHECKING -> "checking";
+            case SAVINGS -> "savings";
+        };
+        return this.owner + " (" + kindName + ")";
+    }
+}
+
+class Main {
+    void main() {
+        BankAccount account = new BankAccount("Ali", Kind.SAVINGS);
+        account.withdraw(100);
+        Account view = account;
+        long left = view.balance();
+        double ratio = (double) left / 3;
+        int[] history = {1, 2, 3};
+        int total = 0;
+        for (int amount : history) {
+            total += amount;
+        }
+        Console.println(account.label() + " " + left + " " + ratio + " " + total);
+    }
+}

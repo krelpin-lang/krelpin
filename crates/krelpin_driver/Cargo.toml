@@ -10,3 +10,4 @@ krelpin_errors.workspace = true
 krelpin_parse.workspace = true
 krelpin_resolve.workspace = true
 krelpin_span.workspace = true
+krelpin_typeck.workspace = true

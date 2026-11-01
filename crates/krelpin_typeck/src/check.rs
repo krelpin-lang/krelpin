@@ -1,0 +1,221 @@
+use std::collections::{HashMap, HashSet};
+
+use krelpin_ast::ast::{
+    CompilationUnit, FieldStorage, FnRetTy, ItemKind, Member, MemberKind, Param,
+};
+use krelpin_errors::Diagnostic;
+use krelpin_span::{Span, Symbol};
+
+use crate::TypeckResults;
+use crate::sig::Tcx;
+use crate::ty::Ty;
+
+pub(crate) struct FnCtxt<'a, 'tcx> {
+    pub(crate) tcx: &'a Tcx<'tcx>,
+    pub(crate) owner: usize,
+    pub(crate) self_ty: Ty,
+    pub(crate) ret: Ty,
+    pub(crate) locals: HashMap<Span, Ty>,
+    pub(crate) narrowed: Vec<HashMap<Span, Ty>>,
+    pub(crate) yields: Vec<Vec<Ty>>,
+    pub(crate) results: HashMap<Span, Ty>,
+}
+
+impl Tcx<'_> {
+    pub(crate) fn break_inheritance_cycles(&mut self) {
+        for def in 0..self.types.len() {
+            if !self.reaches(def, def) {
+                continue;
+            }
+            let name = self.types[def].name;
+            self.dcx.emit(
+                Diagnostic::error(format!(
+                    "cyclic inheritance: `{}` inherits from itself",
+                    name.name
+                ))
+                .with_span(name.span)
+                .with_note("a type cannot be its own ancestor"),
+            );
+            let sig = &mut self.types[def];
+            sig.superclass = None;
+            sig.interfaces
+                .retain(|parent| !matches!(parent, Ty::Adt { .. }));
+        }
+    }
+
+    fn reaches(&self, from: usize, target: usize) -> bool {
+        let mut stack = vec![from];
+        let mut seen = HashSet::new();
+        while let Some(def) = stack.pop() {
+            let sig = &self.types[def];
+            for parent in sig.superclass.iter().chain(sig.interfaces.iter()) {
+                if let Ty::Adt { def: parent, .. } = parent {
+                    if *parent == target {
+                        return true;
+                    }
+                    if seen.insert(*parent) {
+                        stack.push(*parent);
+                    }
+                }
+            }
+        }
+        false
+    }
+}
+
+pub(crate) fn check_unit(tcx: &Tcx<'_>, unit: &CompilationUnit) -> TypeckResults {
+    let mut results = TypeckResults::default();
+
+    for (owner, item) in unit.items.iter().enumerate() {
+        let members: &[Member] = match &item.kind {
+            ItemKind::Class(class) => &class.members,
+            ItemKind::Struct(def) => &def.members,
+            ItemKind::Interface(interface) => &interface.members,
+            ItemKind::Enum(def) => {
+                for constant in &def.constants {
+                    let mut fcx = FnCtxt::new(tcx, owner, Ty::Void);
+                    let arg_tys: Vec<Ty> = constant
+                        .args
+                        .iter()
+                        .map(|arg| fcx.check_expr(arg))
+                        .collect();
+                    fcx.check_ctor_call(owner, &[], &constant.args, &arg_tys, constant.name);
+                    results.expr_types.extend(fcx.results);
+                }
+                &def.members
+            }
+        };
+
+        for member in members {
+            let fcx = check_member(tcx, owner, member);
+            results.expr_types.extend(fcx.results);
+        }
+    }
+
+    results
+}
+
+fn check_member<'a, 'tcx>(tcx: &'a Tcx<'tcx>, owner: usize, member: &Member) -> FnCtxt<'a, 'tcx> {
+    match &member.kind {
+        MemberKind::Field(field) => {
+            let mut fcx = FnCtxt::new(tcx, owner, Ty::Void);
+            if let Some(init) = &field.init {
+                let ty = tcx.types[owner]
+                    .fields
+                    .get(&field.name.name)
+                    .map(|f| f.ty.clone());
+                let expected = ty.unwrap_or(Ty::Unknown);
+                if matches!(
+                    field.storage,
+                    FieldStorage::Shared(_) | FieldStorage::Const(_)
+                ) {
+                    fcx.self_ty = Ty::Unknown;
+                }
+                fcx.check_expr_coerce(init, &expected);
+            }
+            fcx
+        }
+        MemberKind::Constructor(ctor) => {
+            let mut fcx = FnCtxt::new(tcx, owner, Ty::Void);
+            fcx.declare_params(&ctor.params);
+            fcx.check_block(&ctor.body);
+            fcx
+        }
+        MemberKind::Method(method) => {
+            let ret = match &method.ret {
+                FnRetTy::Void(_) => Ty::Void,
+                FnRetTy::Ty(ty) => tcx.lower_ty(ty),
+            };
+            let mut fcx = FnCtxt::new(tcx, owner, ret.clone());
+            if method.receiver.is_none() {
+                fcx.self_ty = Ty::Unknown;
+            }
+            fcx.declare_params(&method.params);
+            if let Some(body) = &method.body {
+                let diverges = fcx.check_block(body);
+                if ret != Ty::Void && !diverges {
+                    let end = body.span.hi;
+                    fcx.emit(
+                        Diagnostic::error("missing return statement")
+                            .with_span(Span::new(end - 1, end))
+                            .with_label(format!("this method must return a `{ret}`"))
+                            .with_help("add a `return` statement, or `throw` an exception"),
+                    );
+                }
+            }
+            fcx
+        }
+    }
+}
+
+impl<'a, 'tcx> FnCtxt<'a, 'tcx> {
+    pub(crate) fn new(tcx: &'a Tcx<'tcx>, owner: usize, ret: Ty) -> Self {
+        FnCtxt {
+            tcx,
+            owner,
+            self_ty: tcx.self_ty(owner),
+            ret,
+            locals: HashMap::new(),
+            narrowed: Vec::new(),
+            yields: Vec::new(),
+            results: HashMap::new(),
+        }
+    }
+
+    fn declare_params(&mut self, params: &[Param]) {
+        for param in params {
+            let ty = self.tcx.lower_ty(&param.ty);
+            let ty = if param.variadic {
+                Ty::Array(Box::new(ty))
+            } else {
+                ty
+            };
+            self.locals.insert(param.name.span, ty);
+        }
+    }
+
+    pub(crate) fn local_ty(&self, decl: Span) -> Ty {
+        self.narrowed
+            .iter()
+            .rev()
+            .find_map(|scope| scope.get(&decl))
+            .or_else(|| self.locals.get(&decl))
+            .cloned()
+            .unwrap_or(Ty::Unknown)
+    }
+
+    pub(crate) fn type_name(&self, def: usize) -> Symbol {
+        self.tcx.types[def].name.name
+    }
+
+    pub(crate) fn emit(&self, diagnostic: Diagnostic) {
+        self.tcx.dcx.emit(diagnostic);
+    }
+
+    pub(crate) fn error(&self, span: Span, message: impl Into<String>) {
+        self.emit(Diagnostic::error(message).with_span(span));
+    }
+
+    pub(crate) fn mismatch(&self, span: Span, expected: &Ty, found: &Ty) {
+        let diagnostic = Diagnostic::error("mismatched types")
+            .with_span(span)
+            .with_label(format!("expected `{expected}`, found `{found}`"));
+
+        let diagnostic = match (expected, found) {
+            (_, Ty::Null) => diagnostic.with_help(format!(
+                "`{expected}` can never be `null`; use `{expected}?` to allow it"
+            )),
+            (expected, Ty::Nullable(inner)) if self.tcx.is_assignable(inner, expected) => {
+                diagnostic.with_help(
+                    "this value may be `null`; use `?:` to give a default, \
+                     or check `!= null` first",
+                )
+            }
+            (Ty::Ref { ty, .. }, found) if self.tcx.is_assignable(found, ty) => {
+                diagnostic.with_help("borrow the value with `&`")
+            }
+            _ => diagnostic,
+        };
+        self.emit(diagnostic);
+    }
+}

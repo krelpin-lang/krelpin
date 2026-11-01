@@ -1,0 +1,420 @@
+use std::collections::HashMap;
+
+use krelpin_ast::ast::{BinOp, Block, Expr, ExprKind, Stmt, StmtKind, UnOp};
+use krelpin_errors::Diagnostic;
+use krelpin_resolve::Res;
+use krelpin_span::{Span, Symbol};
+
+use crate::check::FnCtxt;
+use crate::sig::AdtKind;
+use crate::ty::Ty;
+
+impl FnCtxt<'_, '_> {
+    pub(crate) fn check_block(&mut self, block: &Block) -> bool {
+        self.narrowed.push(HashMap::new());
+        let mut diverges = false;
+        for stmt in &block.stmts {
+            diverges |= self.check_stmt(stmt);
+        }
+        self.narrowed.pop();
+        diverges
+    }
+
+    fn check_stmt(&mut self, stmt: &Stmt) -> bool {
+        match &stmt.kind {
+            StmtKind::Local(local) => {
+                let ty = match (&local.ty, &local.init) {
+                    (Some(ty), init) => {
+                        let ty = self.tcx.lower_ty(ty);
+                        if let Some(init) = init {
+                            self.check_expr_coerce(init, &ty);
+                        }
+                        ty
+                    }
+                    (None, Some(init)) => self.infer_local(local.name.name, init),
+                    (None, None) => {
+                        self.emit(
+                            Diagnostic::error("`var` needs an initializer")
+                                .with_span(local.name.span)
+                                .with_help("give it a value, or write the type instead of `var`"),
+                        );
+                        Ty::Unknown
+                    }
+                };
+                self.locals.insert(local.name.span, ty);
+                false
+            }
+            StmtKind::Expr(expr) => {
+                self.check_expr(expr);
+                false
+            }
+            StmtKind::Block(block) => self.check_block(block),
+            StmtKind::If { cond, then, els } => {
+                self.check_expr_coerce(cond, &Ty::BOOLEAN);
+                let (when_true, when_false) = self.null_checks(cond);
+                let then_diverges = self.with_narrowing(&when_true, |fcx| fcx.check_stmt(then));
+                let else_diverges = match els {
+                    Some(els) => self.with_narrowing(&when_false, |fcx| fcx.check_stmt(els)),
+                    None => false,
+                };
+                if then_diverges && els.is_none() {
+                    self.narrow_here(&when_false);
+                }
+                then_diverges && else_diverges
+            }
+            StmtKind::While { cond, body } => {
+                self.check_expr_coerce(cond, &Ty::BOOLEAN);
+                let (when_true, _) = self.null_checks(cond);
+                self.with_narrowing(&when_true, |fcx| fcx.check_stmt(body));
+                is_true(cond) && !contains_break(body)
+            }
+            StmtKind::DoWhile { body, cond } => {
+                let diverges = self.check_stmt(body);
+                self.check_expr_coerce(cond, &Ty::BOOLEAN);
+                diverges
+            }
+            StmtKind::For {
+                init,
+                cond,
+                update,
+                body,
+            } => {
+                self.narrowed.push(HashMap::new());
+                for stmt in init {
+                    self.check_stmt(stmt);
+                }
+                if let Some(cond) = cond {
+                    self.check_expr_coerce(cond, &Ty::BOOLEAN);
+                }
+                for expr in update {
+                    self.check_expr(expr);
+                }
+                self.check_stmt(body);
+                self.narrowed.pop();
+                cond.as_ref().is_none_or(is_true) && !contains_break(body)
+            }
+            StmtKind::ForEach {
+                ty,
+                name,
+                iter,
+                body,
+            } => {
+                let iter_ty = self.check_expr(iter);
+                let elem = self.element_ty(&iter_ty, iter.span);
+                let declared = match ty {
+                    Some(ty) => {
+                        let declared = self.tcx.lower_ty(ty);
+                        if !self.tcx.is_assignable(&elem, &declared) {
+                            self.mismatch(ty.span, &declared, &elem);
+                        }
+                        declared
+                    }
+                    None => elem,
+                };
+                self.locals.insert(name.span, declared);
+                self.check_stmt(body);
+                false
+            }
+            StmtKind::Switch { scrutinee, arms } => {
+                let scrutinee_ty = self.check_expr(scrutinee);
+                let mut all_diverge = true;
+                for arm in arms {
+                    self.check_case_labels(arm.labels.as_deref(), &scrutinee_ty);
+                    all_diverge &= self.check_stmt(&arm.body) && !contains_break(&arm.body);
+                }
+                let has_default = arms.iter().any(|arm| arm.labels.is_none());
+                has_default && all_diverge
+            }
+            StmtKind::Try {
+                body,
+                catches,
+                finally,
+            } => {
+                let mut diverges = self.check_block(body);
+                for catch in catches {
+                    let ty = match catch.tys.as_slice() {
+                        [ty] => self.tcx.lower_ty(ty),
+                        _ => Ty::prelude("Exception"),
+                    };
+                    self.locals.insert(catch.name.span, ty);
+                    diverges &= self.check_block(&catch.body);
+                }
+                let finally_diverges = finally
+                    .as_ref()
+                    .is_some_and(|finally| self.check_block(finally));
+                diverges || finally_diverges
+            }
+            StmtKind::Return(value) => {
+                self.check_return(value.as_ref(), stmt.span);
+                true
+            }
+            StmtKind::Yield(value) => {
+                let ty = self.check_expr(value);
+                if let Some(yields) = self.yields.last_mut() {
+                    yields.push(ty);
+                }
+                true
+            }
+            StmtKind::Throw(value) => {
+                self.check_expr(value);
+                true
+            }
+            StmtKind::Break | StmtKind::Continue | StmtKind::Empty => false,
+        }
+    }
+
+    fn infer_local(&mut self, name: Symbol, init: &Expr) -> Ty {
+        let ty = self.check_expr(init);
+        let problem = match (&ty, &init.kind) {
+            (_, ExprKind::ArrayInit { ty: None, .. }) => Some("an array initializer"),
+            (Ty::Null, _) => Some("`null`"),
+            (Ty::Void, _) => Some("a method that returns nothing"),
+            _ => None,
+        };
+        match problem {
+            Some(problem) => {
+                self.emit(
+                    Diagnostic::error(format!("cannot infer the type of `{name}` from {problem}"))
+                        .with_span(init.span)
+                        .with_help("write the type instead of `var`"),
+                );
+                Ty::Unknown
+            }
+            None => ty,
+        }
+    }
+
+    fn check_return(&mut self, value: Option<&Expr>, span: Span) {
+        let ret = self.ret.clone();
+        match (value, &ret) {
+            (Some(value), Ty::Void) => {
+                self.check_expr(value);
+                self.emit(
+                    Diagnostic::error("cannot return a value from a method that returns `void`")
+                        .with_span(value.span)
+                        .with_help("remove the value, or change the return type of the method"),
+                );
+            }
+            (Some(value), ret) => {
+                self.check_expr_coerce(value, ret);
+            }
+            (None, Ty::Void | Ty::Unknown) => {}
+            (None, ret) => {
+                self.emit(
+                    Diagnostic::error(format!("this method must return a `{ret}`"))
+                        .with_span(span)
+                        .with_label("missing value"),
+                );
+            }
+        }
+    }
+
+    fn element_ty(&self, iter_ty: &Ty, span: Span) -> Ty {
+        let borrowed = matches!(iter_ty, Ty::Ref { .. });
+        match iter_ty.strip_refs() {
+            Ty::Array(elem) if borrowed => Ty::Ref {
+                mutable: false,
+                ty: elem.clone(),
+            },
+            Ty::Array(elem) => elem.as_ref().clone(),
+            Ty::Primitive(_) | Ty::Null | Ty::Void => {
+                self.error(
+                    span,
+                    format!("cannot iterate over a value of type `{iter_ty}`"),
+                );
+                Ty::Unknown
+            }
+            Ty::Nullable(_) => {
+                self.error(span, format!("value of type `{iter_ty}` may be null"));
+                Ty::Unknown
+            }
+            _ => Ty::Unknown,
+        }
+    }
+
+    pub(crate) fn check_case_labels(&mut self, labels: Option<&[Expr]>, scrutinee: &Ty) {
+        let Some(labels) = labels else {
+            return;
+        };
+        let enum_def = self.enum_def(scrutinee);
+
+        for label in labels {
+            let unresolved = match &label.kind {
+                ExprKind::Name(name) if self.tcx.resolutions.get(name.span).is_none() => {
+                    Some(*name)
+                }
+                _ => None,
+            };
+            if let Some(name) = unresolved {
+                match enum_def {
+                    Some(def) if self.tcx.types[def].enum_constants.contains(&name.name) => {}
+                    Some(def) => self.error(
+                        name.span,
+                        format!(
+                            "no constant `{}` in enum `{}`",
+                            name.name,
+                            self.type_name(def)
+                        ),
+                    ),
+                    None => self.error(
+                        name.span,
+                        format!("cannot find value `{}` in this scope", name.name),
+                    ),
+                }
+                continue;
+            }
+
+            let ty = self.check_expr(label);
+            if !self.tcx.is_assignable(&ty, scrutinee.strip_refs()) {
+                self.mismatch(label.span, scrutinee.strip_refs(), &ty);
+            }
+        }
+    }
+
+    pub(crate) fn check_switch_exhaustive<'e>(
+        &self,
+        arms: impl Iterator<Item = Option<&'e [Expr]>>,
+        scrutinee: &Ty,
+        span: Span,
+    ) {
+        let mut covered = Vec::new();
+        for labels in arms {
+            let Some(labels) = labels else {
+                return;
+            };
+            for label in labels {
+                if let ExprKind::Name(name) = label.kind {
+                    covered.push(name.name);
+                }
+            }
+        }
+
+        let missing: Vec<String> = match self.enum_def(scrutinee) {
+            Some(def) => self.tcx.types[def]
+                .enum_constants
+                .iter()
+                .filter(|constant| !covered.contains(constant))
+                .map(|constant| format!("`{constant}`"))
+                .collect(),
+            None if scrutinee.is_unknown() => Vec::new(),
+            None => vec!["other values".to_owned()],
+        };
+        if missing.is_empty() {
+            return;
+        }
+
+        self.emit(
+            Diagnostic::error("this `switch` expression does not cover every case")
+                .with_span(span)
+                .with_note(format!("not covered: {}", missing.join(", ")))
+                .with_help("add the missing cases, or a `default` case"),
+        );
+    }
+
+    fn enum_def(&self, ty: &Ty) -> Option<usize> {
+        match ty.strip_refs() {
+            Ty::Adt { def, .. } if self.tcx.types[*def].kind == AdtKind::Enum => Some(*def),
+            _ => None,
+        }
+    }
+
+    pub(crate) fn null_checks(&self, cond: &Expr) -> (Vec<Span>, Vec<Span>) {
+        match &cond.kind {
+            ExprKind::Binary { op, lhs, rhs } => match op {
+                BinOp::Ne | BinOp::Eq => {
+                    let checked = match (&lhs.kind, &rhs.kind) {
+                        (ExprKind::Name(name), ExprKind::Null)
+                        | (ExprKind::Null, ExprKind::Name(name)) => self.local_decl(name.span),
+                        _ => None,
+                    };
+                    let checked: Vec<Span> = checked.into_iter().collect();
+                    if *op == BinOp::Ne {
+                        (checked, Vec::new())
+                    } else {
+                        (Vec::new(), checked)
+                    }
+                }
+                BinOp::And => {
+                    let (mut when_true, _) = self.null_checks(lhs);
+                    when_true.extend(self.null_checks(rhs).0);
+                    (when_true, Vec::new())
+                }
+                BinOp::Or => {
+                    let (_, mut when_false) = self.null_checks(lhs);
+                    when_false.extend(self.null_checks(rhs).1);
+                    (Vec::new(), when_false)
+                }
+                _ => (Vec::new(), Vec::new()),
+            },
+            ExprKind::Unary {
+                op: UnOp::Not,
+                expr,
+            } => {
+                let (when_true, when_false) = self.null_checks(expr);
+                (when_false, when_true)
+            }
+            _ => (Vec::new(), Vec::new()),
+        }
+    }
+
+    fn local_decl(&self, span: Span) -> Option<Span> {
+        match self.tcx.resolutions.get(span) {
+            Some(Res::Local(decl)) => Some(decl),
+            _ => None,
+        }
+    }
+
+    pub(crate) fn with_narrowing<T>(
+        &mut self,
+        decls: &[Span],
+        f: impl FnOnce(&mut Self) -> T,
+    ) -> T {
+        let scope = self.narrowing_for(decls);
+        self.narrowed.push(scope);
+        let result = f(self);
+        self.narrowed.pop();
+        result
+    }
+
+    fn narrow_here(&mut self, decls: &[Span]) {
+        let scope = self.narrowing_for(decls);
+        if let Some(current) = self.narrowed.last_mut() {
+            current.extend(scope);
+        }
+    }
+
+    fn narrowing_for(&self, decls: &[Span]) -> HashMap<Span, Ty> {
+        decls
+            .iter()
+            .map(|&decl| (decl, self.local_ty(decl).non_null().clone()))
+            .collect()
+    }
+}
+
+fn is_true(expr: &Expr) -> bool {
+    matches!(expr.kind, ExprKind::Bool(true))
+}
+
+fn contains_break(stmt: &Stmt) -> bool {
+    match &stmt.kind {
+        StmtKind::Break => true,
+        StmtKind::Block(block) => block.stmts.iter().any(contains_break),
+        StmtKind::If { then, els, .. } => {
+            contains_break(then) || els.as_deref().is_some_and(contains_break)
+        }
+        StmtKind::Try {
+            body,
+            catches,
+            finally,
+        } => {
+            body.stmts.iter().any(contains_break)
+                || catches
+                    .iter()
+                    .any(|catch| catch.body.stmts.iter().any(contains_break))
+                || finally
+                    .as_ref()
+                    .is_some_and(|finally| finally.stmts.iter().any(contains_break))
+        }
+        _ => false,
+    }
+}

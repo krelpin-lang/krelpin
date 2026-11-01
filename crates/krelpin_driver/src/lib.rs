@@ -82,7 +82,12 @@ pub fn run(args: &Args, sess: &Session) {
         return;
     }
 
-    krelpin_resolve::resolve(&unit, &sess.dcx);
+    let resolved = krelpin_resolve::resolve(&unit, &sess.dcx);
+    if sess.dcx.has_errors() {
+        return;
+    }
+
+    krelpin_typeck::check(&unit, &resolved.resolutions, &sess.dcx);
     if sess.dcx.has_errors() {
         return;
     }

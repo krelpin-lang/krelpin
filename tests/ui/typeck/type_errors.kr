@@ -1,0 +1,34 @@
+class Wallet {
+    shared int count = 0;
+    long cents;
+    String? note;
+
+    Wallet(long cents) {
+        this.cents = cents;
+        this.note = null;
+    }
+
+    int total(&this) {
+        return this.cents;
+    }
+
+    boolean empty(&this) {
+        if (this.cents == 0) {
+            return true;
+        }
+    }
+
+    void bump(&this) {
+        Wallet.count++;
+        int size = this.note.length();
+        String text = null;
+    }
+}
+
+class Main {
+    void main() {
+        Wallet wallet = new Wallet("ten");
+        long secret = wallet.cents;
+        boolean wrong = wallet.empty() + 1;
+    }
+}

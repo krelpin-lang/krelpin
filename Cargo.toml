@@ -16,3 +16,4 @@ krelpin_lexer = { path = "crates/krelpin_lexer" }
 krelpin_parse = { path = "crates/krelpin_parse" }
 krelpin_resolve = { path = "crates/krelpin_resolve" }
 krelpin_span = { path = "crates/krelpin_span" }
+krelpin_typeck = { path = "crates/krelpin_typeck" }
