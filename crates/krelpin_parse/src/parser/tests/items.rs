@@ -1,72 +1,14 @@
-use krelpin_ast::ast::{
-    Class, CompilationUnit, FieldStorage, FnRetTy, GenericParamKind, ItemKind, Member, MemberKind,
-    ReceiverKind, TyKind, Visibility,
-};
-use krelpin_errors::{DiagCtxt, DiagnosticBuffer};
 use std::thread;
 
+use krelpin_ast::ast::{
+    CompilationUnit, FieldStorage, FnRetTy, GenericParamKind, MemberKind, ReceiverKind, TyKind,
+    Visibility,
+};
+use krelpin_errors::{DiagCtxt, DiagnosticBuffer};
 use krelpin_span::SourceMap;
 
+use super::{class, errors, members, only_member, parse_ok, parse_str, ret_ty};
 use crate::{lexer, parser};
-
-struct Parsed {
-    unit: CompilationUnit,
-    errors: Vec<String>,
-}
-
-fn parse_str(src: &str) -> Parsed {
-    let source_map = SourceMap::new();
-    let file = source_map.new_source_file("test.kr", src.to_owned());
-    let buffer = DiagnosticBuffer::default();
-    let dcx = DiagCtxt::new(buffer.clone());
-    let tokens = lexer::lex(&file, &dcx);
-    let unit = parser::parse(tokens, &dcx);
-    Parsed {
-        unit,
-        errors: buffer.messages(),
-    }
-}
-
-fn parse_ok(src: &str) -> CompilationUnit {
-    let parsed = parse_str(src);
-    assert_eq!(
-        parsed.errors,
-        Vec::<String>::new(),
-        "unexpected errors for {src:?}"
-    );
-    parsed.unit
-}
-
-fn errors(src: &str) -> Vec<String> {
-    parse_str(src).errors
-}
-
-fn class(unit: &CompilationUnit, index: usize) -> &Class {
-    match &unit.items[index].kind {
-        ItemKind::Class(class) => class,
-    }
-}
-
-fn members(src: &str) -> Vec<Member> {
-    let unit = parse_ok(src);
-    class(&unit, 0).members.clone()
-}
-
-fn only_member(src: &str) -> MemberKind {
-    let members = members(&format!("class A {{ {src} }}"));
-    assert_eq!(members.len(), 1, "expected one member in {src:?}");
-    members[0].kind.clone()
-}
-
-fn ret_ty(src: &str) -> String {
-    match only_member(src) {
-        MemberKind::Method(method) => match method.ret {
-            FnRetTy::Ty(ty) => ty.to_string(),
-            FnRetTy::Void(_) => "void".to_owned(),
-        },
-        other => panic!("expected a method, found {other:?}"),
-    }
-}
 
 #[test]
 fn package_and_imports() {

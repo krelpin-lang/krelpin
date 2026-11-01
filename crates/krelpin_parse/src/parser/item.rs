@@ -321,11 +321,11 @@ impl Parser<'_> {
         name: Ident,
     ) -> PResult<Field> {
         let init = if self.eat(TokenKind::Eq) {
-            Some(self.parse_unparsed_expr()?)
+            Some(self.parse_initializer()?)
         } else {
             None
         };
-        self.expect(TokenKind::Semi)?;
+        self.expect_semi()?;
 
         Ok(Field {
             storage,
@@ -346,7 +346,7 @@ impl Parser<'_> {
             );
         }
         let throws = self.parse_throws()?;
-        let body = self.parse_unparsed_delimited(TokenKind::OpenBrace, TokenKind::CloseBrace)?;
+        let body = self.parse_block()?;
 
         Ok(Constructor {
             name,
@@ -362,7 +362,7 @@ impl Parser<'_> {
         let body = if self.eat(TokenKind::Semi) {
             None
         } else {
-            Some(self.parse_unparsed_delimited(TokenKind::OpenBrace, TokenKind::CloseBrace)?)
+            Some(self.parse_block()?)
         };
 
         Ok(Method {
@@ -468,31 +468,5 @@ impl Parser<'_> {
             }
             self.bump();
         }
-    }
-
-    fn parse_unparsed_expr(&mut self) -> PResult<Unparsed> {
-        let lo = self.token.span;
-        if matches!(self.token.kind, TokenKind::Semi | TokenKind::CloseBrace) {
-            self.expected.push(Expected::Expr);
-            return Err(self.unexpected());
-        }
-
-        let mut depth = 0usize;
-        loop {
-            match self.token.kind {
-                TokenKind::Eof => break,
-                TokenKind::Semi | TokenKind::CloseBrace if depth == 0 => break,
-                TokenKind::OpenParen | TokenKind::OpenBrace | TokenKind::OpenBracket => depth += 1,
-                TokenKind::CloseParen | TokenKind::CloseBrace | TokenKind::CloseBracket => {
-                    depth = depth.saturating_sub(1);
-                }
-                _ => {}
-            }
-            self.bump();
-        }
-
-        Ok(Unparsed {
-            span: lo.to(self.prev_token.span),
-        })
     }
 }

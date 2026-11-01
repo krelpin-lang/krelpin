@@ -21,12 +21,16 @@ impl fmt::Display for Expected {
 
 impl Parser<'_> {
     pub(crate) fn unexpected(&mut self) -> ErrorReported {
+        let message = self.unexpected_message();
+        self.error(self.token.span, message)
+    }
+
+    pub(crate) fn unexpected_message(&self) -> String {
         let found = describe(self.token);
-        let message = match expected_list(&self.expected) {
+        match expected_list(&self.expected) {
             Some(expected) => format!("expected {expected}, found {found}"),
             None => format!("unexpected {found}"),
-        };
-        self.error(self.token.span, message)
+        }
     }
 
     pub(crate) fn error(&self, span: Span, message: impl Into<String>) -> ErrorReported {

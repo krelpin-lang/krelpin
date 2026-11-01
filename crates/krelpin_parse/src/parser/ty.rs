@@ -113,6 +113,9 @@ impl Parser<'_> {
         if !self.eat_noexpect(TokenKind::Lt) {
             return Ok(Vec::new());
         }
+        if self.break_and_eat(TokenKind::Gt) {
+            return Ok(Vec::new());
+        }
 
         let mut args = vec![self.parse_ty()?];
         loop {

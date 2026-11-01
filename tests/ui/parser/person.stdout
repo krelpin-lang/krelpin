@@ -44,7 +44,14 @@ CompilationUnit {
                                     },
                                     name: "MAX_NAME_LENGTH" @ 98..113,
                                     init: Some(
-                                        Unparsed {
+                                        Expr {
+                                            kind: Lit(
+                                                Lit {
+                                                    kind: Integer,
+                                                    symbol: "64",
+                                                    suffix: None,
+                                                },
+                                            ),
                                             span: 116..118,
                                         },
                                     ),
@@ -70,7 +77,28 @@ CompilationUnit {
                                     },
                                     name: "created" @ 141..148,
                                     init: Some(
-                                        Unparsed {
+                                        Expr {
+                                            kind: New {
+                                                ty: Ty {
+                                                    kind: Path {
+                                                        path: "AtomicInt" @ 155..164,
+                                                        args: [],
+                                                    },
+                                                    span: 155..164,
+                                                },
+                                                args: [
+                                                    Expr {
+                                                        kind: Lit(
+                                                            Lit {
+                                                                kind: Integer,
+                                                                symbol: "0",
+                                                                suffix: None,
+                                                            },
+                                                        ),
+                                                        span: 165..166,
+                                                    },
+                                                ],
+                                            },
                                             span: 151..167,
                                         },
                                     ),
@@ -145,7 +173,91 @@ CompilationUnit {
                                         },
                                     ],
                                     throws: [],
-                                    body: Unparsed {
+                                    body: Block {
+                                        stmts: [
+                                            Stmt {
+                                                kind: Expr(
+                                                    Expr {
+                                                        kind: Assign {
+                                                            op: None,
+                                                            lhs: Expr {
+                                                                kind: Field {
+                                                                    expr: Expr {
+                                                                        kind: This,
+                                                                        span: 244..248,
+                                                                    },
+                                                                    name: "name" @ 249..253,
+                                                                    safe: false,
+                                                                },
+                                                                span: 244..253,
+                                                            },
+                                                            rhs: Expr {
+                                                                kind: Name(
+                                                                    "name" @ 256..260,
+                                                                ),
+                                                                span: 256..260,
+                                                            },
+                                                        },
+                                                        span: 244..260,
+                                                    },
+                                                ),
+                                                span: 244..261,
+                                            },
+                                            Stmt {
+                                                kind: Expr(
+                                                    Expr {
+                                                        kind: Assign {
+                                                            op: None,
+                                                            lhs: Expr {
+                                                                kind: Field {
+                                                                    expr: Expr {
+                                                                        kind: This,
+                                                                        span: 270..274,
+                                                                    },
+                                                                    name: "nickname" @ 275..283,
+                                                                    safe: false,
+                                                                },
+                                                                span: 270..283,
+                                                            },
+                                                            rhs: Expr {
+                                                                kind: Null,
+                                                                span: 286..290,
+                                                            },
+                                                        },
+                                                        span: 270..290,
+                                                    },
+                                                ),
+                                                span: 270..291,
+                                            },
+                                            Stmt {
+                                                kind: Expr(
+                                                    Expr {
+                                                        kind: MethodCall {
+                                                            receiver: Some(
+                                                                Expr {
+                                                                    kind: Field {
+                                                                        expr: Expr {
+                                                                            kind: Name(
+                                                                                "Person" @ 300..306,
+                                                                            ),
+                                                                            span: 300..306,
+                                                                        },
+                                                                        name: "created" @ 307..314,
+                                                                        safe: false,
+                                                                    },
+                                                                    span: 300..314,
+                                                                },
+                                                            ),
+                                                            name: "increment" @ 315..324,
+                                                            args: [],
+                                                            safe: false,
+                                                        },
+                                                        span: 300..326,
+                                                    },
+                                                ),
+                                                span: 300..327,
+                                            },
+                                        ],
                                         span: 234..333,
                                     },
                                 },
@@ -188,7 +300,33 @@ CompilationUnit {
                                     params: [],
                                     throws: [],
                                     body: Some(
-                                        Unparsed {
+                                        Block {
+                                            stmts: [
+                                                Stmt {
+                                                    kind: Return(
+                                                        Some(
+                                                            Expr {
+                                                                kind: Borrow {
+                                                                    mutable: false,
+                                                                    expr: Expr {
+                                                                        kind: Field {
+                                                                            expr: Expr {
+                                                                                kind: This,
+                                                                                span: 380..384,
+                                                                            },
+                                                                            name: "name" @ 385..389,
+                                                                            safe: false,
+                                                                        },
+                                                                        span: 380..389,
+                                                                    },
+                                                                },
+                                                                span: 379..389,
+                                                            },
+                                                        ),
+                                                    ),
+                                                    span: 372..390,
+                                                },
+                                            ],
                                             span: 362..396,
                                         },
                                     ),
@@ -232,7 +370,37 @@ CompilationUnit {
                                     ],
                                     throws: [],
                                     body: Some(
-                                        Unparsed {
+                                        Block {
+                                            stmts: [
+                                                Stmt {
+                                                    kind: Expr(
+                                                        Expr {
+                                                            kind: Assign {
+                                                                op: None,
+                                                                lhs: Expr {
+                                                                    kind: Field {
+                                                                        expr: Expr {
+                                                                            kind: This,
+                                                                            span: 451..455,
+                                                                        },
+                                                                        name: "name" @ 456..460,
+                                                                        safe: false,
+                                                                    },
+                                                                    span: 451..460,
+                                                                },
+                                                                rhs: Expr {
+                                                                    kind: Name(
+                                                                        "newName" @ 463..470,
+                                                                    ),
+                                                                    span: 463..470,
+                                                                },
+                                                            },
+                                                            span: 451..470,
+                                                        },
+                                                    ),
+                                                    span: 451..471,
+                                                },
+                                            ],
                                             span: 441..477,
                                         },
                                     ),
@@ -268,7 +436,53 @@ CompilationUnit {
                                     params: [],
                                     throws: [],
                                     body: Some(
-                                        Unparsed {
+                                        Block {
+                                            stmts: [
+                                                Stmt {
+                                                    kind: Return(
+                                                        Some(
+                                                            Expr {
+                                                                kind: Binary {
+                                                                    op: Elvis,
+                                                                    lhs: Expr {
+                                                                        kind: MethodCall {
+                                                                            receiver: Some(
+                                                                                Expr {
+                                                                                    kind: Field {
+                                                                                        expr: Expr {
+                                                                                            kind: This,
+                                                                                            span: 526..530,
+                                                                                        },
+                                                                                        name: "nickname" @ 531..539,
+                                                                                        safe: false,
+                                                                                    },
+                                                                                    span: 526..539,
+                                                                                },
+                                                                            ),
+                                                                            name: "length" @ 541..547,
+                                                                            args: [],
+                                                                            safe: true,
+                                                                        },
+                                                                        span: 526..549,
+                                                                    },
+                                                                    rhs: Expr {
+                                                                        kind: Lit(
+                                                                            Lit {
+                                                                                kind: Integer,
+                                                                                symbol: "0",
+                                                                                suffix: None,
+                                                                            },
+                                                                        ),
+                                                                        span: 553..554,
+                                                                    },
+                                                                },
+                                                                span: 526..554,
+                                                            },
+                                                        ),
+                                                    ),
+                                                    span: 519..555,
+                                                },
+                                            ],
                                             span: 509..561,
                                         },
                                     ),
@@ -313,7 +527,122 @@ CompilationUnit {
                                     params: [],
                                     throws: [],
                                     body: Some(
-                                        Unparsed {
+                                        Block {
+                                            stmts: [
+                                                Stmt {
+                                                    kind: Local(
+                                                        Local {
+                                                            ty: Some(
+                                                                Ty {
+                                                                    kind: Path {
+                                                                        path: "Person" @ 604..610,
+                                                                        args: [],
+                                                                    },
+                                                                    span: 604..610,
+                                                                },
+                                                            ),
+                                                            name: "p" @ 611..612,
+                                                            init: Some(
+                                                                Expr {
+                                                                    kind: New {
+                                                                        ty: Ty {
+                                                                            kind: Path {
+                                                                                path: "Person" @ 619..625,
+                                                                                args: [],
+                                                                            },
+                                                                            span: 619..625,
+                                                                        },
+                                                                        args: [
+                                                                            Expr {
+                                                                                kind: Lit(
+                                                                                    Lit {
+                                                                                        kind: Str,
+                                                                                        symbol: "Ali",
+                                                                                        suffix: None,
+                                                                                    },
+                                                                                ),
+                                                                                span: 626..631,
+                                                                            },
+                                                                        ],
+                                                                    },
+                                                                    span: 615..632,
+                                                                },
+                                                            ),
+                                                        },
+                                                    ),
+                                                    span: 604..633,
+                                                },
+                                                Stmt {
+                                                    kind: Expr(
+                                                        Expr {
+                                                            kind: MethodCall {
+                                                                receiver: Some(
+                                                                    Expr {
+                                                                        kind: Name(
+                                                                            "p" @ 642..643,
+                                                                        ),
+                                                                        span: 642..643,
+                                                                    },
+                                                                ),
+                                                                name: "rename" @ 644..650,
+                                                                args: [
+                                                                    Expr {
+                                                                        kind: Lit(
+                                                                            Lit {
+                                                                                kind: Str,
+                                                                                symbol: "Veli",
+                                                                                suffix: None,
+                                                                            },
+                                                                        ),
+                                                                        span: 651..657,
+                                                                    },
+                                                                ],
+                                                                safe: false,
+                                                            },
+                                                            span: 642..658,
+                                                        },
+                                                    ),
+                                                    span: 642..659,
+                                                },
+                                                Stmt {
+                                                    kind: Expr(
+                                                        Expr {
+                                                            kind: MethodCall {
+                                                                receiver: Some(
+                                                                    Expr {
+                                                                        kind: Name(
+                                                                            "Console" @ 668..675,
+                                                                        ),
+                                                                        span: 668..675,
+                                                                    },
+                                                                ),
+                                                                name: "println" @ 676..683,
+                                                                args: [
+                                                                    Expr {
+                                                                        kind: MethodCall {
+                                                                            receiver: Some(
+                                                                                Expr {
+                                                                                    kind: Name(
+                                                                                        "p" @ 684..685,
+                                                                                    ),
+                                                                                    span: 684..685,
+                                                                                },
+                                                                            ),
+                                                                            name: "getName" @ 686..693,
+                                                                            args: [],
+                                                                            safe: false,
+                                                                        },
+                                                                        span: 684..695,
+                                                                    },
+                                                                ],
+                                                                safe: false,
+                                                            },
+                                                            span: 668..696,
+                                                        },
+                                                    ),
+                                                    span: 668..697,
+                                                },
+                                            ],
                                             span: 594..703,
                                         },
                                     ),

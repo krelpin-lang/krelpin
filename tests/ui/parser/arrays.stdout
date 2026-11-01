@@ -53,7 +53,8 @@ CompilationUnit {
                                     ],
                                     throws: [],
                                     body: Some(
-                                        Unparsed {
+                                        Block {
+                                            stmts: [],
                                             span: 42..44,
                                         },
                                     ),
@@ -108,7 +109,26 @@ CompilationUnit {
                                     ],
                                     throws: [],
                                     body: Some(
-                                        Unparsed {
+                                        Block {
+                                            stmts: [
+                                                Stmt {
+                                                    kind: Return(
+                                                        Some(
+                                                            Expr {
+                                                                kind: Lit(
+                                                                    Lit {
+                                                                        kind: Integer,
+                                                                        symbol: "0",
+                                                                        suffix: None,
+                                                                    },
+                                                                ),
+                                                                span: 81..82,
+                                                            },
+                                                        ),
+                                                    ),
+                                                    span: 74..83,
+                                                },
+                                            ],
                                             span: 72..85,
                                         },
                                     ),
@@ -162,7 +182,20 @@ CompilationUnit {
                                     params: [],
                                     throws: [],
                                     body: Some(
-                                        Unparsed {
+                                        Block {
+                                            stmts: [
+                                                Stmt {
+                                                    kind: Return(
+                                                        Some(
+                                                            Expr {
+                                                                kind: Null,
+                                                                span: 123..127,
+                                                            },
+                                                        ),
+                                                    ),
+                                                    span: 116..128,
+                                                },
+                                            ],
                                             span: 114..130,
                                         },
                                     ),
@@ -211,7 +244,20 @@ CompilationUnit {
                                     params: [],
                                     throws: [],
                                     body: Some(
-                                        Unparsed {
+                                        Block {
+                                            stmts: [
+                                                Stmt {
+                                                    kind: Return(
+                                                        Some(
+                                                            Expr {
+                                                                kind: Null,
+                                                                span: 172..176,
+                                                            },
+                                                        ),
+                                                    ),
+                                                    span: 165..177,
+                                                },
+                                            ],
                                             span: 163..179,
                                         },
                                     ),

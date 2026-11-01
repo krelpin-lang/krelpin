@@ -1,0 +1,15 @@
+class Errors {
+    void run(&mut this) {
+        int count = 1
+        count + 1;
+        switch (count) {
+            case 1: reset();
+        }
+        try {
+            work();
+        }
+        if count > 0 {
+            stop();
+        }
+    }
+}

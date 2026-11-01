@@ -5,10 +5,10 @@ error: expected class declaration, found keyword `int`
   | ^^^
 
 error: expected one of `(`, `=`, or `;`, found `String`
- --> tests/ui/parser/recovery.kr:5:5
+ --> tests/ui/parser/recovery.kr:4:25
   |
-5 |     String fine;
-  |     ^^^^^^
+4 |     int missingSemicolon
+  |                         ^ add `;` here
 
 error: expected `,` or `>`, found `broken`
  --> tests/ui/parser/recovery.kr:6:17

@@ -1,5 +1,8 @@
 mod diagnostics;
+mod expr;
 mod item;
+mod lookahead;
+mod stmt;
 mod ty;
 
 #[cfg(test)]
@@ -7,7 +10,7 @@ mod tests;
 
 use krelpin_ast::ast::{CompilationUnit, Ident};
 use krelpin_ast::token::{Token, TokenKind};
-use krelpin_errors::DiagCtxt;
+use krelpin_errors::{DiagCtxt, Diagnostic};
 use krelpin_span::{Span, Symbol};
 
 pub fn parse(tokens: Vec<Token>, dcx: &DiagCtxt) -> CompilationUnit {
@@ -130,6 +133,20 @@ impl<'a> Parser<'a> {
         } else {
             Err(self.unexpected())
         }
+    }
+
+    fn expect_semi(&mut self) -> PResult<()> {
+        if self.eat(TokenKind::Semi) {
+            return Ok(());
+        }
+
+        let message = self.unexpected_message();
+        self.emit(
+            Diagnostic::error(message)
+                .with_span(self.prev_token.span.shrink_to_hi())
+                .with_label("add `;` here"),
+        );
+        Ok(())
     }
 
     fn break_and_eat(&mut self, kind: TokenKind) -> bool {

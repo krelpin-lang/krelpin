@@ -1,0 +1,1149 @@
+CompilationUnit {
+    docs: [],
+    package: Some(
+        "example" @ 8..15,
+    ),
+    imports: [],
+    items: [
+        Item {
+            docs: [],
+            annotations: [],
+            vis: Default,
+            name: "Inventory" @ 24..33,
+            kind: Class(
+                Class {
+                    generics: Generics {
+                        params: [],
+                        span: 34..34,
+                    },
+                    extends: None,
+                    implements: [],
+                    members: [
+                        Member {
+                            docs: [],
+                            annotations: [],
+                            vis: Default,
+                            kind: Field(
+                                Field {
+                                    storage: Shared(
+                                        40..46,
+                                    ),
+                                    ty: Ty {
+                                        kind: Path {
+                                            path: "AtomicInt" @ 47..56,
+                                            args: [],
+                                        },
+                                        span: 47..56,
+                                    },
+                                    name: "instances" @ 57..66,
+                                    init: Some(
+                                        Expr {
+                                            kind: New {
+                                                ty: Ty {
+                                                    kind: Path {
+                                                        path: "AtomicInt" @ 73..82,
+                                                        args: [],
+                                                    },
+                                                    span: 73..82,
+                                                },
+                                                args: [
+                                                    Expr {
+                                                        kind: Lit(
+                                                            Lit {
+                                                                kind: Integer,
+                                                                symbol: "0",
+                                                                suffix: None,
+                                                            },
+                                                        ),
+                                                        span: 83..84,
+                                                    },
+                                                ],
+                                            },
+                                            span: 69..85,
+                                        },
+                                    ),
+                                },
+                            ),
+                            span: 40..86,
+                        },
+                        Member {
+                            docs: [],
+                            annotations: [],
+                            vis: Default,
+                            kind: Field(
+                                Field {
+                                    storage: Instance,
+                                    ty: Ty {
+                                        kind: Path {
+                                            path: "List" @ 92..96,
+                                            args: [
+                                                Ty {
+                                                    kind: Path {
+                                                        path: "Item" @ 97..101,
+                                                        args: [],
+                                                    },
+                                                    span: 97..101,
+                                                },
+                                            ],
+                                        },
+                                        span: 92..102,
+                                    },
+                                    name: "items" @ 103..108,
+                                    init: None,
+                                },
+                            ),
+                            span: 92..109,
+                        },
+                        Member {
+                            docs: [],
+                            annotations: [],
+                            vis: Default,
+                            kind: Constructor(
+                                Constructor {
+                                    name: "Inventory" @ 115..124,
+                                    params: [],
+                                    throws: [],
+                                    body: Block {
+                                        stmts: [
+                                            Stmt {
+                                                kind: Expr(
+                                                    Expr {
+                                                        kind: Assign {
+                                                            op: None,
+                                                            lhs: Expr {
+                                                                kind: Field {
+                                                                    expr: Expr {
+                                                                        kind: This,
+                                                                        span: 137..141,
+                                                                    },
+                                                                    name: "items" @ 142..147,
+                                                                    safe: false,
+                                                                },
+                                                                span: 137..147,
+                                                            },
+                                                            rhs: Expr {
+                                                                kind: New {
+                                                                    ty: Ty {
+                                                                        kind: Path {
+                                                                            path: "ArrayList" @ 154..163,
+                                                                            args: [],
+                                                                        },
+                                                                        span: 154..165,
+                                                                    },
+                                                                    args: [],
+                                                                },
+                                                                span: 150..167,
+                                                            },
+                                                        },
+                                                        span: 137..167,
+                                                    },
+                                                ),
+                                                span: 137..168,
+                                            },
+                                            Stmt {
+                                                kind: Expr(
+                                                    Expr {
+                                                        kind: MethodCall {
+                                                            receiver: Some(
+                                                                Expr {
+                                                                    kind: Field {
+                                                                        expr: Expr {
+                                                                            kind: Name(
+                                                                                "Inventory" @ 177..186,
+                                                                            ),
+                                                                            span: 177..186,
+                                                                        },
+                                                                        name: "instances" @ 187..196,
+                                                                        safe: false,
+                                                                    },
+                                                                    span: 177..196,
+                                                                },
+                                                            ),
+                                                            name: "increment" @ 197..206,
+                                                            args: [],
+                                                            safe: false,
+                                                        },
+                                                        span: 177..208,
+                                                    },
+                                                ),
+                                                span: 177..209,
+                                            },
+                                        ],
+                                        span: 127..215,
+                                    },
+                                },
+                            ),
+                            span: 115..215,
+                        },
+                        Member {
+                            docs: [],
+                            annotations: [],
+                            vis: Default,
+                            kind: Method(
+                                Method {
+                                    generics: Generics {
+                                        params: [],
+                                        span: 0..0,
+                                    },
+                                    ret: Ty(
+                                        Ty {
+                                            kind: Primitive(
+                                                Int,
+                                            ),
+                                            span: 221..224,
+                                        },
+                                    ),
+                                    name: "total" @ 225..230,
+                                    receiver: Some(
+                                        Receiver {
+                                            kind: Ref,
+                                            span: 231..236,
+                                        },
+                                    ),
+                                    params: [],
+                                    throws: [],
+                                    body: Some(
+                                        Block {
+                                            stmts: [
+                                                Stmt {
+                                                    kind: Local(
+                                                        Local {
+                                                            ty: Some(
+                                                                Ty {
+                                                                    kind: Primitive(
+                                                                        Int,
+                                                                    ),
+                                                                    span: 248..251,
+                                                                },
+                                                            ),
+                                                            name: "sum" @ 252..255,
+                                                            init: Some(
+                                                                Expr {
+                                                                    kind: Lit(
+                                                                        Lit {
+                                                                            kind: Integer,
+                                                                            symbol: "0",
+                                                                            suffix: None,
+                                                                        },
+                                                                    ),
+                                                                    span: 258..259,
+                                                                },
+                                                            ),
+                                                        },
+                                                    ),
+                                                    span: 248..260,
+                                                },
+                                                Stmt {
+                                                    kind: ForEach {
+                                                        ty: Some(
+                                                            Ty {
+                                                                kind: Ref {
+                                                                    mutable: false,
+                                                                    sources: [],
+                                                                    ty: Ty {
+                                                                        kind: Path {
+                                                                            path: "Item" @ 275..279,
+                                                                            args: [],
+                                                                        },
+                                                                        span: 275..279,
+                                                                    },
+                                                                },
+                                                                span: 274..279,
+                                                            },
+                                                        ),
+                                                        name: "item" @ 280..284,
+                                                        iter: Expr {
+                                                            kind: Borrow {
+                                                                mutable: false,
+                                                                expr: Expr {
+                                                                    kind: Field {
+                                                                        expr: Expr {
+                                                                            kind: This,
+                                                                            span: 288..292,
+                                                                        },
+                                                                        name: "items" @ 293..298,
+                                                                        safe: false,
+                                                                    },
+                                                                    span: 288..298,
+                                                                },
+                                                            },
+                                                            span: 287..298,
+                                                        },
+                                                        body: Stmt {
+                                                            kind: Block(
+                                                                Block {
+                                                                    stmts: [
+                                                                        Stmt {
+                                                                            kind: Expr(
+                                                                                Expr {
+                                                                                    kind: Assign {
+                                                                                        op: Some(
+                                                                                            Add,
+                                                                                        ),
+                                                                                        lhs: Expr {
+                                                                                            kind: Name(
+                                                                                                "sum" @ 314..317,
+                                                                                            ),
+                                                                                            span: 314..317,
+                                                                                        },
+                                                                                        rhs: Expr {
+                                                                                            kind: Binary {
+                                                                                                op: Mul,
+                                                                                                lhs: Expr {
+                                                                                                    kind: MethodCall {
+                                                                                                        receiver: Some(
+                                                                                                            Expr {
+                                                                                                                kind: Name(
+                                                                                                                    "item" @ 321..325,
+                                                                                                                ),
+                                                                                                                span: 321..325,
+                                                                                                            },
+                                                                                                        ),
+                                                                                                        name: "price" @ 326..331,
+                                                                                                        args: [],
+                                                                                                        safe: false,
+                                                                                                    },
+                                                                                                    span: 321..333,
+                                                                                                },
+                                                                                                rhs: Expr {
+                                                                                                    kind: MethodCall {
+                                                                                                        receiver: Some(
+                                                                                                            Expr {
+                                                                                                                kind: Name(
+                                                                                                                    "item" @ 336..340,
+                                                                                                                ),
+                                                                                                                span: 336..340,
+                                                                                                            },
+                                                                                                        ),
+                                                                                                        name: "count" @ 341..346,
+                                                                                                        args: [],
+                                                                                                        safe: false,
+                                                                                                    },
+                                                                                                    span: 336..348,
+                                                                                                },
+                                                                                            },
+                                                                                            span: 321..348,
+                                                                                        },
+                                                                                    },
+                                                                                    span: 314..348,
+                                                                                },
+                                                                            ),
+                                                                            span: 314..349,
+                                                                        },
+                                                                    ],
+                                                                    span: 300..359,
+                                                                },
+                                                            ),
+                                                            span: 300..359,
+                                                        },
+                                                    },
+                                                    span: 269..359,
+                                                },
+                                                Stmt {
+                                                    kind: Return(
+                                                        Some(
+                                                            Expr {
+                                                                kind: Name(
+                                                                    "sum" @ 375..378,
+                                                                ),
+                                                                span: 375..378,
+                                                            },
+                                                        ),
+                                                    ),
+                                                    span: 368..379,
+                                                },
+                                            ],
+                                            span: 238..385,
+                                        },
+                                    ),
+                                },
+                            ),
+                            span: 221..385,
+                        },
+                        Member {
+                            docs: [],
+                            annotations: [],
+                            vis: Default,
+                            kind: Method(
+                                Method {
+                                    generics: Generics {
+                                        params: [],
+                                        span: 0..0,
+                                    },
+                                    ret: Ty(
+                                        Ty {
+                                            kind: Nullable(
+                                                Ty {
+                                                    kind: Ref {
+                                                        mutable: false,
+                                                        sources: [],
+                                                        ty: Ty {
+                                                            kind: Path {
+                                                                path: "Item" @ 392..396,
+                                                                args: [],
+                                                            },
+                                                            span: 392..396,
+                                                        },
+                                                    },
+                                                    span: 391..396,
+                                                },
+                                            ),
+                                            span: 391..397,
+                                        },
+                                    ),
+                                    name: "find" @ 398..402,
+                                    receiver: Some(
+                                        Receiver {
+                                            kind: Ref,
+                                            span: 403..408,
+                                        },
+                                    ),
+                                    params: [
+                                        Param {
+                                            ty: Ty {
+                                                kind: Path {
+                                                    path: "String" @ 410..416,
+                                                    args: [],
+                                                },
+                                                span: 410..416,
+                                            },
+                                            name: "name" @ 417..421,
+                                            variadic: false,
+                                            span: 410..421,
+                                        },
+                                    ],
+                                    throws: [],
+                                    body: Some(
+                                        Block {
+                                            stmts: [
+                                                Stmt {
+                                                    kind: For {
+                                                        init: [
+                                                            Stmt {
+                                                                kind: Local(
+                                                                    Local {
+                                                                        ty: Some(
+                                                                            Ty {
+                                                                                kind: Primitive(
+                                                                                    Int,
+                                                                                ),
+                                                                                span: 438..441,
+                                                                            },
+                                                                        ),
+                                                                        name: "i" @ 442..443,
+                                                                        init: Some(
+                                                                            Expr {
+                                                                                kind: Lit(
+                                                                                    Lit {
+                                                                                        kind: Integer,
+                                                                                        symbol: "0",
+                                                                                        suffix: None,
+                                                                                    },
+                                                                                ),
+                                                                                span: 446..447,
+                                                                            },
+                                                                        ),
+                                                                    },
+                                                                ),
+                                                                span: 438..447,
+                                                            },
+                                                        ],
+                                                        cond: Some(
+                                                            Expr {
+                                                                kind: Binary {
+                                                                    op: Lt,
+                                                                    lhs: Expr {
+                                                                        kind: Name(
+                                                                            "i" @ 449..450,
+                                                                        ),
+                                                                        span: 449..450,
+                                                                    },
+                                                                    rhs: Expr {
+                                                                        kind: MethodCall {
+                                                                            receiver: Some(
+                                                                                Expr {
+                                                                                    kind: Field {
+                                                                                        expr: Expr {
+                                                                                            kind: This,
+                                                                                            span: 453..457,
+                                                                                        },
+                                                                                        name: "items" @ 458..463,
+                                                                                        safe: false,
+                                                                                    },
+                                                                                    span: 453..463,
+                                                                                },
+                                                                            ),
+                                                                            name: "size" @ 464..468,
+                                                                            args: [],
+                                                                            safe: false,
+                                                                        },
+                                                                        span: 453..470,
+                                                                    },
+                                                                },
+                                                                span: 449..470,
+                                                            },
+                                                        ),
+                                                        update: [
+                                                            Expr {
+                                                                kind: Unary {
+                                                                    op: PostInc,
+                                                                    expr: Expr {
+                                                                        kind: Name(
+                                                                            "i" @ 472..473,
+                                                                        ),
+                                                                        span: 472..473,
+                                                                    },
+                                                                },
+                                                                span: 472..475,
+                                                            },
+                                                        ],
+                                                        body: Stmt {
+                                                            kind: Block(
+                                                                Block {
+                                                                    stmts: [
+                                                                        Stmt {
+                                                                            kind: Local(
+                                                                                Local {
+                                                                                    ty: Some(
+                                                                                        Ty {
+                                                                                            kind: Ref {
+                                                                                                mutable: false,
+                                                                                                sources: [],
+                                                                                                ty: Ty {
+                                                                                                    kind: Path {
+                                                                                                        path: "Item" @ 492..496,
+                                                                                                        args: [],
+                                                                                                    },
+                                                                                                    span: 492..496,
+                                                                                                },
+                                                                                            },
+                                                                                            span: 491..496,
+                                                                                        },
+                                                                                    ),
+                                                                                    name: "item" @ 497..501,
+                                                                                    init: Some(
+                                                                                        Expr {
+                                                                                            kind: Borrow {
+                                                                                                mutable: false,
+                                                                                                expr: Expr {
+                                                                                                    kind: Index {
+                                                                                                        expr: Expr {
+                                                                                                            kind: Field {
+                                                                                                                expr: Expr {
+                                                                                                                    kind: This,
+                                                                                                                    span: 505..509,
+                                                                                                                },
+                                                                                                                name: "items" @ 510..515,
+                                                                                                                safe: false,
+                                                                                                            },
+                                                                                                            span: 505..515,
+                                                                                                        },
+                                                                                                        index: Expr {
+                                                                                                            kind: Name(
+                                                                                                                "i" @ 516..517,
+                                                                                                            ),
+                                                                                                            span: 516..517,
+                                                                                                        },
+                                                                                                    },
+                                                                                                    span: 505..518,
+                                                                                                },
+                                                                                            },
+                                                                                            span: 504..518,
+                                                                                        },
+                                                                                    ),
+                                                                                },
+                                                                            ),
+                                                                            span: 491..519,
+                                                                        },
+                                                                        Stmt {
+                                                                            kind: If {
+                                                                                cond: Expr {
+                                                                                    kind: Binary {
+                                                                                        op: Eq,
+                                                                                        lhs: Expr {
+                                                                                            kind: MethodCall {
+                                                                                                receiver: Some(
+                                                                                                    Expr {
+                                                                                                        kind: Name(
+                                                                                                            "item" @ 536..540,
+                                                                                                        ),
+                                                                                                        span: 536..540,
+                                                                                                    },
+                                                                                                ),
+                                                                                                name: "name" @ 541..545,
+                                                                                                args: [],
+                                                                                                safe: false,
+                                                                                            },
+                                                                                            span: 536..547,
+                                                                                        },
+                                                                                        rhs: Expr {
+                                                                                            kind: Name(
+                                                                                                "name" @ 551..555,
+                                                                                            ),
+                                                                                            span: 551..555,
+                                                                                        },
+                                                                                    },
+                                                                                    span: 536..555,
+                                                                                },
+                                                                                then: Stmt {
+                                                                                    kind: Block(
+                                                                                        Block {
+                                                                                            stmts: [
+                                                                                                Stmt {
+                                                                                                    kind: Return(
+                                                                                                        Some(
+                                                                                                            Expr {
+                                                                                                                kind: Name(
+                                                                                                                    "item" @ 582..586,
+                                                                                                                ),
+                                                                                                                span: 582..586,
+                                                                                                            },
+                                                                                                        ),
+                                                                                                    ),
+                                                                                                    span: 575..587,
+                                                                                                },
+                                                                                            ],
+                                                                                            span: 557..601,
+                                                                                        },
+                                                                                    ),
+                                                                                    span: 557..601,
+                                                                                },
+                                                                                els: None,
+                                                                            },
+                                                                            span: 532..601,
+                                                                        },
+                                                                    ],
+                                                                    span: 477..611,
+                                                                },
+                                                            ),
+                                                            span: 477..611,
+                                                        },
+                                                    },
+                                                    span: 433..611,
+                                                },
+                                                Stmt {
+                                                    kind: Return(
+                                                        Some(
+                                                            Expr {
+                                                                kind: Null,
+                                                                span: 627..631,
+                                                            },
+                                                        ),
+                                                    ),
+                                                    span: 620..632,
+                                                },
+                                            ],
+                                            span: 423..638,
+                                        },
+                                    ),
+                                },
+                            ),
+                            span: 391..638,
+                        },
+                        Member {
+                            docs: [],
+                            annotations: [],
+                            vis: Default,
+                            kind: Method(
+                                Method {
+                                    generics: Generics {
+                                        params: [],
+                                        span: 0..0,
+                                    },
+                                    ret: Void(
+                                        644..648,
+                                    ),
+                                    name: "describe" @ 649..657,
+                                    receiver: Some(
+                                        Receiver {
+                                            kind: Ref,
+                                            span: 658..663,
+                                        },
+                                    ),
+                                    params: [
+                                        Param {
+                                            ty: Ty {
+                                                kind: Nullable(
+                                                    Ty {
+                                                        kind: Path {
+                                                            path: "Item" @ 665..669,
+                                                            args: [],
+                                                        },
+                                                        span: 665..669,
+                                                    },
+                                                ),
+                                                span: 665..670,
+                                            },
+                                            name: "item" @ 671..675,
+                                            variadic: false,
+                                            span: 665..675,
+                                        },
+                                    ],
+                                    throws: [],
+                                    body: Some(
+                                        Block {
+                                            stmts: [
+                                                Stmt {
+                                                    kind: Local(
+                                                        Local {
+                                                            ty: Some(
+                                                                Ty {
+                                                                    kind: Path {
+                                                                        path: "String" @ 687..693,
+                                                                        args: [],
+                                                                    },
+                                                                    span: 687..693,
+                                                                },
+                                                            ),
+                                                            name: "label" @ 694..699,
+                                                            init: Some(
+                                                                Expr {
+                                                                    kind: Binary {
+                                                                        op: Elvis,
+                                                                        lhs: Expr {
+                                                                            kind: MethodCall {
+                                                                                receiver: Some(
+                                                                                    Expr {
+                                                                                        kind: Name(
+                                                                                            "item" @ 702..706,
+                                                                                        ),
+                                                                                        span: 702..706,
+                                                                                    },
+                                                                                ),
+                                                                                name: "name" @ 708..712,
+                                                                                args: [],
+                                                                                safe: true,
+                                                                            },
+                                                                            span: 702..714,
+                                                                        },
+                                                                        rhs: Expr {
+                                                                            kind: Lit(
+                                                                                Lit {
+                                                                                    kind: Str,
+                                                                                    symbol: "unknown",
+                                                                                    suffix: None,
+                                                                                },
+                                                                            ),
+                                                                            span: 718..727,
+                                                                        },
+                                                                    },
+                                                                    span: 702..727,
+                                                                },
+                                                            ),
+                                                        },
+                                                    ),
+                                                    span: 687..728,
+                                                },
+                                                Stmt {
+                                                    kind: Switch {
+                                                        scrutinee: Expr {
+                                                            kind: MethodCall {
+                                                                receiver: Some(
+                                                                    Expr {
+                                                                        kind: Field {
+                                                                            expr: Expr {
+                                                                                kind: This,
+                                                                                span: 745..749,
+                                                                            },
+                                                                            name: "items" @ 750..755,
+                                                                            safe: false,
+                                                                        },
+                                                                        span: 745..755,
+                                                                    },
+                                                                ),
+                                                                name: "size" @ 756..760,
+                                                                args: [],
+                                                                safe: false,
+                                                            },
+                                                            span: 745..762,
+                                                        },
+                                                        arms: [
+                                                            SwitchArm {
+                                                                labels: Some(
+                                                                    [
+                                                                        Expr {
+                                                                            kind: Lit(
+                                                                                Lit {
+                                                                                    kind: Integer,
+                                                                                    symbol: "0",
+                                                                                    suffix: None,
+                                                                                },
+                                                                            ),
+                                                                            span: 783..784,
+                                                                        },
+                                                                    ],
+                                                                ),
+                                                                body: Stmt {
+                                                                    kind: Expr(
+                                                                        Expr {
+                                                                            kind: MethodCall {
+                                                                                receiver: Some(
+                                                                                    Expr {
+                                                                                        kind: Name(
+                                                                                            "Console" @ 788..795,
+                                                                                        ),
+                                                                                        span: 788..795,
+                                                                                    },
+                                                                                ),
+                                                                                name: "println" @ 796..803,
+                                                                                args: [
+                                                                                    Expr {
+                                                                                        kind: Lit(
+                                                                                            Lit {
+                                                                                                kind: Str,
+                                                                                                symbol: "empty",
+                                                                                                suffix: None,
+                                                                                            },
+                                                                                        ),
+                                                                                        span: 804..811,
+                                                                                    },
+                                                                                ],
+                                                                                safe: false,
+                                                                            },
+                                                                            span: 788..812,
+                                                                        },
+                                                                    ),
+                                                                    span: 788..813,
+                                                                },
+                                                                span: 778..813,
+                                                            },
+                                                            SwitchArm {
+                                                                labels: Some(
+                                                                    [
+                                                                        Expr {
+                                                                            kind: Lit(
+                                                                                Lit {
+                                                                                    kind: Integer,
+                                                                                    symbol: "1",
+                                                                                    suffix: None,
+                                                                                },
+                                                                            ),
+                                                                            span: 831..832,
+                                                                        },
+                                                                        Expr {
+                                                                            kind: Lit(
+                                                                                Lit {
+                                                                                    kind: Integer,
+                                                                                    symbol: "2",
+                                                                                    suffix: None,
+                                                                                },
+                                                                            ),
+                                                                            span: 834..835,
+                                                                        },
+                                                                    ],
+                                                                ),
+                                                                body: Stmt {
+                                                                    kind: Expr(
+                                                                        Expr {
+                                                                            kind: MethodCall {
+                                                                                receiver: Some(
+                                                                                    Expr {
+                                                                                        kind: Name(
+                                                                                            "Console" @ 839..846,
+                                                                                        ),
+                                                                                        span: 839..846,
+                                                                                    },
+                                                                                ),
+                                                                                name: "println" @ 847..854,
+                                                                                args: [
+                                                                                    Expr {
+                                                                                        kind: Lit(
+                                                                                            Lit {
+                                                                                                kind: Str,
+                                                                                                symbol: "few",
+                                                                                                suffix: None,
+                                                                                            },
+                                                                                        ),
+                                                                                        span: 855..860,
+                                                                                    },
+                                                                                ],
+                                                                                safe: false,
+                                                                            },
+                                                                            span: 839..861,
+                                                                        },
+                                                                    ),
+                                                                    span: 839..862,
+                                                                },
+                                                                span: 826..862,
+                                                            },
+                                                            SwitchArm {
+                                                                labels: None,
+                                                                body: Stmt {
+                                                                    kind: Block(
+                                                                        Block {
+                                                                            stmts: [
+                                                                                Stmt {
+                                                                                    kind: Expr(
+                                                                                        Expr {
+                                                                                            kind: MethodCall {
+                                                                                                receiver: Some(
+                                                                                                    Expr {
+                                                                                                        kind: Name(
+                                                                                                            "Console" @ 904..911,
+                                                                                                        ),
+                                                                                                        span: 904..911,
+                                                                                                    },
+                                                                                                ),
+                                                                                                name: "println" @ 912..919,
+                                                                                                args: [
+                                                                                                    Expr {
+                                                                                                        kind: Lit(
+                                                                                                            Lit {
+                                                                                                                kind: Str,
+                                                                                                                symbol: "many",
+                                                                                                                suffix: None,
+                                                                                                            },
+                                                                                                        ),
+                                                                                                        span: 920..926,
+                                                                                                    },
+                                                                                                ],
+                                                                                                safe: false,
+                                                                                            },
+                                                                                            span: 904..927,
+                                                                                        },
+                                                                                    ),
+                                                                                    span: 904..928,
+                                                                                },
+                                                                            ],
+                                                                            span: 886..942,
+                                                                        },
+                                                                    ),
+                                                                    span: 886..942,
+                                                                },
+                                                                span: 875..942,
+                                                            },
+                                                        ],
+                                                    },
+                                                    span: 737..952,
+                                                },
+                                                Stmt {
+                                                    kind: Try {
+                                                        body: Block {
+                                                            stmts: [
+                                                                Stmt {
+                                                                    kind: Expr(
+                                                                        Expr {
+                                                                            kind: MethodCall {
+                                                                                receiver: Some(
+                                                                                    Expr {
+                                                                                        kind: This,
+                                                                                        span: 979..983,
+                                                                                    },
+                                                                                ),
+                                                                                name: "save" @ 984..988,
+                                                                                args: [],
+                                                                                safe: false,
+                                                                            },
+                                                                            span: 979..990,
+                                                                        },
+                                                                    ),
+                                                                    span: 979..991,
+                                                                },
+                                                            ],
+                                                            span: 965..1001,
+                                                        },
+                                                        catches: [
+                                                            Catch {
+                                                                tys: [
+                                                                    Ty {
+                                                                        kind: Path {
+                                                                            path: "IOException" @ 1009..1020,
+                                                                            args: [],
+                                                                        },
+                                                                        span: 1009..1020,
+                                                                    },
+                                                                    Ty {
+                                                                        kind: Path {
+                                                                            path: "ParseException" @ 1023..1037,
+                                                                            args: [],
+                                                                        },
+                                                                        span: 1023..1037,
+                                                                    },
+                                                                ],
+                                                                name: "e" @ 1038..1039,
+                                                                body: Block {
+                                                                    stmts: [
+                                                                        Stmt {
+                                                                            kind: Expr(
+                                                                                Expr {
+                                                                                    kind: MethodCall {
+                                                                                        receiver: Some(
+                                                                                            Expr {
+                                                                                                kind: Name(
+                                                                                                    "Console" @ 1055..1062,
+                                                                                                ),
+                                                                                                span: 1055..1062,
+                                                                                            },
+                                                                                        ),
+                                                                                        name: "println" @ 1063..1070,
+                                                                                        args: [
+                                                                                            Expr {
+                                                                                                kind: MethodCall {
+                                                                                                    receiver: Some(
+                                                                                                        Expr {
+                                                                                                            kind: Name(
+                                                                                                                "e" @ 1071..1072,
+                                                                                                            ),
+                                                                                                            span: 1071..1072,
+                                                                                                        },
+                                                                                                    ),
+                                                                                                    name: "message" @ 1073..1080,
+                                                                                                    args: [],
+                                                                                                    safe: false,
+                                                                                                },
+                                                                                                span: 1071..1082,
+                                                                                            },
+                                                                                        ],
+                                                                                        safe: false,
+                                                                                    },
+                                                                                    span: 1055..1083,
+                                                                                },
+                                                                            ),
+                                                                            span: 1055..1084,
+                                                                        },
+                                                                    ],
+                                                                    span: 1041..1094,
+                                                                },
+                                                                span: 1002..1094,
+                                                            },
+                                                        ],
+                                                        finally: Some(
+                                                            Block {
+                                                                stmts: [
+                                                                    Stmt {
+                                                                        kind: Expr(
+                                                                            Expr {
+                                                                                kind: MethodCall {
+                                                                                    receiver: Some(
+                                                                                        Expr {
+                                                                                            kind: Name(
+                                                                                                "Console" @ 1117..1124,
+                                                                                            ),
+                                                                                            span: 1117..1124,
+                                                                                        },
+                                                                                    ),
+                                                                                    name: "println" @ 1125..1132,
+                                                                                    args: [
+                                                                                        Expr {
+                                                                                            kind: Name(
+                                                                                                "label" @ 1133..1138,
+                                                                                            ),
+                                                                                            span: 1133..1138,
+                                                                                        },
+                                                                                    ],
+                                                                                    safe: false,
+                                                                                },
+                                                                                span: 1117..1139,
+                                                                            },
+                                                                        ),
+                                                                        span: 1117..1140,
+                                                                    },
+                                                                ],
+                                                                span: 1103..1150,
+                                                            },
+                                                        ),
+                                                    },
+                                                    span: 961..1150,
+                                                },
+                                                Stmt {
+                                                    kind: Expr(
+                                                        Expr {
+                                                            kind: MethodCall {
+                                                                receiver: Some(
+                                                                    Expr {
+                                                                        kind: Field {
+                                                                            expr: Expr {
+                                                                                kind: This,
+                                                                                span: 1159..1163,
+                                                                            },
+                                                                            name: "items" @ 1164..1169,
+                                                                            safe: false,
+                                                                        },
+                                                                        span: 1159..1169,
+                                                                    },
+                                                                ),
+                                                                name: "forEach" @ 1170..1177,
+                                                                args: [
+                                                                    Expr {
+                                                                        kind: Lambda {
+                                                                            params: [
+                                                                                LambdaParam {
+                                                                                    ty: None,
+                                                                                    name: "i" @ 1178..1179,
+                                                                                    span: 1178..1179,
+                                                                                },
+                                                                            ],
+                                                                            body: Expr(
+                                                                                Expr {
+                                                                                    kind: MethodCall {
+                                                                                        receiver: Some(
+                                                                                            Expr {
+                                                                                                kind: Name(
+                                                                                                    "Console" @ 1183..1190,
+                                                                                                ),
+                                                                                                span: 1183..1190,
+                                                                                            },
+                                                                                        ),
+                                                                                        name: "println" @ 1191..1198,
+                                                                                        args: [
+                                                                                            Expr {
+                                                                                                kind: Cast {
+                                                                                                    ty: Ty {
+                                                                                                        kind: Path {
+                                                                                                            path: "String" @ 1200..1206,
+                                                                                                            args: [],
+                                                                                                        },
+                                                                                                        span: 1200..1206,
+                                                                                                    },
+                                                                                                    expr: Expr {
+                                                                                                        kind: MethodCall {
+                                                                                                            receiver: Some(
+                                                                                                                Expr {
+                                                                                                                    kind: Name(
+                                                                                                                        "i" @ 1208..1209,
+                                                                                                                    ),
+                                                                                                                    span: 1208..1209,
+                                                                                                                },
+                                                                                                            ),
+                                                                                                            name: "name" @ 1210..1214,
+                                                                                                            args: [],
+                                                                                                            safe: false,
+                                                                                                        },
+                                                                                                        span: 1208..1216,
+                                                                                                    },
+                                                                                                },
+                                                                                                span: 1199..1216,
+                                                                                            },
+                                                                                        ],
+                                                                                        safe: false,
+                                                                                    },
+                                                                                    span: 1183..1217,
+                                                                                },
+                                                                            ),
+                                                                        },
+                                                                        span: 1178..1217,
+                                                                    },
+                                                                ],
+                                                                safe: false,
+                                                            },
+                                                            span: 1159..1218,
+                                                        },
+                                                    ),
+                                                    span: 1159..1219,
+                                                },
+                                            ],
+                                            span: 677..1225,
+                                        },
+                                    ),
+                                },
+                            ),
+                            span: 644..1225,
+                        },
+                    ],
+                },
+            ),
+            span: 18..1227,
+        },
+    ],
+    span: 0..1228,
+}

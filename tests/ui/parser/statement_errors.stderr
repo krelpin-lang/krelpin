@@ -1,0 +1,39 @@
+error: expected `;`, found `count`
+ --> tests/ui/parser/statement_errors.kr:3:22
+  |
+3 |         int count = 1
+  |                      ^ add `;` here
+
+error: expression is not a statement
+ --> tests/ui/parser/statement_errors.kr:4:9
+  |
+4 |         count + 1;
+  |         ^^^^^^^^^
+  |
+  = help: only assignments, increments, method calls and object creation can be used as statements
+
+error: switch cases must use `->`
+ --> tests/ui/parser/statement_errors.kr:6:19
+  |
+6 |             case 1: reset();
+  |                   ^
+  |
+  = note: switch cases in Krelpin never fall through to the next case
+  = help: write the case as `case 1 -> ...`
+
+error: `try` without `catch` or `finally`
+ --> tests/ui/parser/statement_errors.kr:8:9
+  |
+8 |         try {
+  |         ^^^
+  |
+  = help: add a `catch` block, a `finally` block, or remove the `try`
+
+error: expected `(`, found `count`
+  --> tests/ui/parser/statement_errors.kr:11:12
+   |
+11 |         if count > 0 {
+   |            ^^^^^
+
+error: aborting due to 5 previous errors
+

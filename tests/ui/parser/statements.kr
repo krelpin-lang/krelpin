@@ -1,0 +1,49 @@
+package example;
+
+class Inventory {
+    shared AtomicInt instances = new AtomicInt(0);
+
+    List<Item> items;
+
+    Inventory() {
+        this.items = new ArrayList<>();
+        Inventory.instances.increment();
+    }
+
+    int total(&this) {
+        int sum = 0;
+        for (&Item item : &this.items) {
+            sum += item.price() * item.count();
+        }
+        return sum;
+    }
+
+    &Item? find(&this, String name) {
+        for (int i = 0; i < this.items.size(); i++) {
+            &Item item = &this.items[i];
+            if (item.name() == name) {
+                return item;
+            }
+        }
+        return null;
+    }
+
+    void describe(&this, Item? item) {
+        String label = item?.name() ?: "unknown";
+        switch (this.items.size()) {
+            case 0 -> Console.println("empty");
+            case 1, 2 -> Console.println("few");
+            default -> {
+                Console.println("many");
+            }
+        }
+        try {
+            this.save();
+        } catch (IOException | ParseException e) {
+            Console.println(e.message());
+        } finally {
+            Console.println(label);
+        }
+        this.items.forEach(i -> Console.println((String) i.name()));
+    }
+}

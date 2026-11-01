@@ -1,6 +1,8 @@
-use std::fmt;
-
 use krelpin_span::{Span, Symbol, kw};
+
+use crate::token::Lit;
+
+mod display;
 
 #[cfg(test)]
 mod tests;
@@ -115,7 +117,7 @@ pub struct Field {
     pub storage: FieldStorage,
     pub ty: Ty,
     pub name: Ident,
-    pub init: Option<Unparsed>,
+    pub init: Option<Expr>,
 }
 
 #[derive(Clone, Debug, PartialEq, Eq)]
@@ -123,7 +125,7 @@ pub struct Constructor {
     pub name: Ident,
     pub params: Vec<Param>,
     pub throws: Vec<Ty>,
-    pub body: Unparsed,
+    pub body: Block,
 }
 
 #[derive(Clone, Debug, PartialEq, Eq)]
@@ -134,7 +136,7 @@ pub struct Method {
     pub receiver: Option<Receiver>,
     pub params: Vec<Param>,
     pub throws: Vec<Ty>,
-    pub body: Option<Unparsed>,
+    pub body: Option<Block>,
 }
 
 #[derive(Clone, Debug, PartialEq, Eq)]
@@ -252,60 +254,244 @@ pub struct Unparsed {
     pub span: Span,
 }
 
-impl fmt::Debug for Ident {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(f, "{:?} @ {:?}", self.name, self.span)
-    }
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct Block {
+    pub stmts: Vec<Stmt>,
+    pub span: Span,
 }
 
-impl fmt::Debug for Path {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(f, "\"{self}\" @ {:?}", self.span)
-    }
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct Stmt {
+    pub kind: StmtKind,
+    pub span: Span,
 }
 
-impl fmt::Display for Path {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        let names: Vec<&str> = self.segments.iter().map(|s| s.name.as_str()).collect();
-        f.write_str(&names.join("."))
-    }
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub enum StmtKind {
+    Local(Local),
+    Expr(Expr),
+    Block(Block),
+    If {
+        cond: Expr,
+        then: Box<Stmt>,
+        els: Option<Box<Stmt>>,
+    },
+    While {
+        cond: Expr,
+        body: Box<Stmt>,
+    },
+    DoWhile {
+        body: Box<Stmt>,
+        cond: Expr,
+    },
+    For {
+        init: Vec<Stmt>,
+        cond: Option<Expr>,
+        update: Vec<Expr>,
+        body: Box<Stmt>,
+    },
+    ForEach {
+        ty: Option<Ty>,
+        name: Ident,
+        iter: Expr,
+        body: Box<Stmt>,
+    },
+    Switch {
+        scrutinee: Expr,
+        arms: Vec<SwitchArm>,
+    },
+    Try {
+        body: Block,
+        catches: Vec<Catch>,
+        finally: Option<Block>,
+    },
+    Return(Option<Expr>),
+    Throw(Expr),
+    Break,
+    Continue,
+    Empty,
 }
 
-impl fmt::Display for Ty {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        match &self.kind {
-            TyKind::Primitive(primitive) => f.write_str(primitive.name()),
-            TyKind::Path { path, args } => {
-                write!(f, "{path}")?;
-                if !args.is_empty() {
-                    let args: Vec<String> = args.iter().map(Ty::to_string).collect();
-                    write!(f, "<{}>", args.join(", "))?;
-                }
-                Ok(())
-            }
-            TyKind::Ref {
-                mutable,
-                sources,
-                ty,
-            } => {
-                f.write_str("&")?;
-                if *mutable {
-                    f.write_str("mut ")?;
-                }
-                if !sources.is_empty() {
-                    let names: Vec<&str> = sources.iter().map(|s| s.name.as_str()).collect();
-                    write!(f, "[{}] ", names.join(", "))?;
-                }
-                match ty.kind {
-                    TyKind::Nullable(_) => write!(f, "({ty})"),
-                    _ => write!(f, "{ty}"),
-                }
-            }
-            TyKind::Nullable(ty) => write!(f, "{ty}?"),
-            TyKind::Array(ty) => match ty.kind {
-                TyKind::Ref { .. } | TyKind::Nullable(_) => write!(f, "({ty})[]"),
-                _ => write!(f, "{ty}[]"),
-            },
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct Local {
+    pub ty: Option<Ty>,
+    pub name: Ident,
+    pub init: Option<Expr>,
+}
+
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct SwitchArm {
+    pub labels: Option<Vec<Expr>>,
+    pub body: Box<Stmt>,
+    pub span: Span,
+}
+
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct Catch {
+    pub tys: Vec<Ty>,
+    pub name: Ident,
+    pub body: Block,
+    pub span: Span,
+}
+
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct Expr {
+    pub kind: ExprKind,
+    pub span: Span,
+}
+
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub enum ExprKind {
+    Lit(Lit),
+    Bool(bool),
+    Null,
+    This,
+    Super,
+    Name(Ident),
+    Field {
+        expr: Box<Expr>,
+        name: Ident,
+        safe: bool,
+    },
+    MethodCall {
+        receiver: Option<Box<Expr>>,
+        name: Ident,
+        args: Vec<Expr>,
+        safe: bool,
+    },
+    Call {
+        callee: Box<Expr>,
+        args: Vec<Expr>,
+    },
+    Index {
+        expr: Box<Expr>,
+        index: Box<Expr>,
+    },
+    New {
+        ty: Ty,
+        args: Vec<Expr>,
+    },
+    NewArray {
+        elem: Ty,
+        len: Box<Expr>,
+    },
+    ArrayInit {
+        ty: Option<Ty>,
+        elems: Vec<Expr>,
+    },
+    Unary {
+        op: UnOp,
+        expr: Box<Expr>,
+    },
+    Borrow {
+        mutable: bool,
+        expr: Box<Expr>,
+    },
+    Binary {
+        op: BinOp,
+        lhs: Box<Expr>,
+        rhs: Box<Expr>,
+    },
+    Assign {
+        op: Option<BinOp>,
+        lhs: Box<Expr>,
+        rhs: Box<Expr>,
+    },
+    Ternary {
+        cond: Box<Expr>,
+        then: Box<Expr>,
+        els: Box<Expr>,
+    },
+    InstanceOf {
+        expr: Box<Expr>,
+        ty: Ty,
+        binding: Option<Ident>,
+    },
+    Cast {
+        ty: Ty,
+        expr: Box<Expr>,
+    },
+    Lambda {
+        params: Vec<LambdaParam>,
+        body: Box<LambdaBody>,
+    },
+    MethodRef {
+        expr: Box<Expr>,
+        name: Ident,
+    },
+}
+
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum UnOp {
+    Neg,
+    Not,
+    BitNot,
+    PreInc,
+    PreDec,
+    PostInc,
+    PostDec,
+}
+
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum BinOp {
+    Or,
+    And,
+    BitOr,
+    BitXor,
+    BitAnd,
+    Eq,
+    Ne,
+    Lt,
+    Le,
+    Gt,
+    Ge,
+    Elvis,
+    Shl,
+    Shr,
+    UShr,
+    Add,
+    Sub,
+    Mul,
+    Div,
+    Rem,
+}
+
+impl BinOp {
+    pub fn as_str(self) -> &'static str {
+        match self {
+            BinOp::Or => "||",
+            BinOp::And => "&&",
+            BinOp::BitOr => "|",
+            BinOp::BitXor => "^",
+            BinOp::BitAnd => "&",
+            BinOp::Eq => "==",
+            BinOp::Ne => "!=",
+            BinOp::Lt => "<",
+            BinOp::Le => "<=",
+            BinOp::Gt => ">",
+            BinOp::Ge => ">=",
+            BinOp::Elvis => "?:",
+            BinOp::Shl => "<<",
+            BinOp::Shr => ">>",
+            BinOp::UShr => ">>>",
+            BinOp::Add => "+",
+            BinOp::Sub => "-",
+            BinOp::Mul => "*",
+            BinOp::Div => "/",
+            BinOp::Rem => "%",
         }
     }
+}
+
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct LambdaParam {
+    pub ty: Option<Ty>,
+    pub name: Ident,
+    pub span: Span,
+}
+
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub enum LambdaBody {
+    Expr(Expr),
+    Block(Block),
 }
