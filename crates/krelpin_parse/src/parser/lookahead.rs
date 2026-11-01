@@ -123,7 +123,12 @@ impl Parser<'_> {
         loop {
             match self.look_ahead(index) {
                 TokenKind::CloseBracket => return Some(index + 1),
-                kind if is_plain_ident(kind) || kind == TokenKind::Comma => index += 1,
+                kind if is_plain_ident(kind)
+                    || kind == TokenKind::Comma
+                    || kind == TokenKind::Ident(kw::This) =>
+                {
+                    index += 1
+                }
                 _ => return None,
             }
         }

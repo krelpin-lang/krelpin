@@ -74,10 +74,22 @@ pub fn run(args: &Args, sess: &Session) {
         return;
     }
 
+    for emit in emits.iter().filter(|emit| emit.kind == Emit::Ast) {
+        write_output(sess, emit.path.as_deref(), &format!("{unit:#?}\n"));
+    }
+    let needs_analysis = |kind: Emit| !matches!(kind, Emit::Tokens | Emit::Ast);
+    if !emits.iter().any(|emit| needs_analysis(emit.kind)) {
+        return;
+    }
+
+    krelpin_resolve::resolve(&unit, &sess.dcx);
+    if sess.dcx.has_errors() {
+        return;
+    }
+
     for emit in &emits {
         match emit.kind {
-            Emit::Tokens => {}
-            Emit::Ast => write_output(sess, emit.path.as_deref(), &format!("{unit:#?}\n")),
+            Emit::Tokens | Emit::Ast | Emit::Metadata => {}
             kind => sess.dcx.emit(Diagnostic::error(format!(
                 "`--emit={}` is not supported yet",
                 value_name(kind)

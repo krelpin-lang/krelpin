@@ -1,4 +1,6 @@
-use krelpin_ast::ast::{GenericParam, GenericParamKind, Generics, Path, PrimitiveTy, Ty, TyKind};
+use krelpin_ast::ast::{
+    GenericParam, GenericParamKind, Generics, Ident, Path, PrimitiveTy, Ty, TyKind,
+};
 use krelpin_ast::token::TokenKind;
 use krelpin_span::kw;
 
@@ -100,13 +102,20 @@ impl Parser<'_> {
         Ok(Path::new(segments))
     }
 
-    fn parse_borrow_sources(&mut self) -> PResult<Vec<krelpin_ast::ast::Ident>> {
-        let mut sources = vec![self.parse_ident()?];
+    fn parse_borrow_sources(&mut self) -> PResult<Vec<Ident>> {
+        let mut sources = vec![self.parse_borrow_source()?];
         while self.eat(TokenKind::Comma) {
-            sources.push(self.parse_ident()?);
+            sources.push(self.parse_borrow_source()?);
         }
         self.expect(TokenKind::CloseBracket)?;
         Ok(sources)
+    }
+
+    fn parse_borrow_source(&mut self) -> PResult<Ident> {
+        if self.eat_keyword_noexpect(kw::This) {
+            return Ok(Ident::new(kw::This, self.prev_token.span));
+        }
+        self.parse_ident()
     }
 
     fn parse_generic_args(&mut self) -> PResult<Vec<Ty>> {

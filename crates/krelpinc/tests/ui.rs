@@ -53,8 +53,10 @@ fn run_test(root: &Path, file: &Path, bless: bool) -> Option<String> {
         .expect("test file is inside the workspace");
     let emit = if relative.starts_with("tests/ui/lexer") {
         "--emit=tokens"
-    } else {
+    } else if relative.starts_with("tests/ui/parser") {
         "--emit=ast"
+    } else {
+        "--emit=metadata"
     };
     let output = Command::new(env!("CARGO_BIN_EXE_krelpinc"))
         .current_dir(root)

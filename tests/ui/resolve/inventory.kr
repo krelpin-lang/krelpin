@@ -1,0 +1,66 @@
+package shop;
+
+import shop.money.Price;
+
+interface Priced {
+    Price price(&this);
+}
+
+enum Category {
+    FOOD,
+    TOOLS;
+}
+
+class Item implements Priced {
+    shared AtomicInt created = new AtomicInt(0);
+    const int MAX_NAME = 32;
+
+    String name;
+    Category category;
+    Price cost;
+
+    Item(String name, Category category, Price cost) {
+        this.name = name;
+        this.category = category;
+        this.cost = cost;
+        Item.created.increment();
+    }
+
+    Price price(&this) {
+        return this.cost;
+    }
+
+    &[this] String label(&this) {
+        return &this.name;
+    }
+
+    String describe(&this) {
+        String kind = switch (this.category) {
+            case FOOD -> "food";
+            case TOOLS -> {
+                yield "tool";
+            }
+        };
+        return kind;
+    }
+
+    int validate(String name) {
+        if (name.length() > Item.MAX_NAME) {
+            return 1;
+        }
+        return 0;
+    }
+}
+
+class Main {
+    void main() {
+        List<Item> items = new ArrayList<>();
+        for (int i = 0; i < 3; i++) {
+            Object value = items.get(i);
+            if (value instanceof Item item) {
+                Console.println(item.describe());
+            }
+        }
+        items.forEach(item -> Console.println(item.label()));
+    }
+}

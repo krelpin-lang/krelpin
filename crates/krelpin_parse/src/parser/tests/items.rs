@@ -139,6 +139,7 @@ fn method_receivers() {
 fn reference_types() {
     assert_eq!(ret_ty("&String f() {}"), "&String");
     assert_eq!(ret_ty("&mut [a, b] String f() {}"), "&mut [a, b] String");
+    assert_eq!(ret_ty("&[this] String f(&this) {}"), "&[this] String");
     assert_eq!(ret_ty("&String? f() {}"), "&String?");
     assert_eq!(ret_ty("&(String?) f() {}"), "&(String?)");
     assert_eq!(ret_ty("&&String f() {}"), "&&String");

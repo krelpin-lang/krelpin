@@ -1,0 +1,25 @@
+class Account {
+    int balance;
+    const int LIMIT = 1000;
+
+    int total() {
+        return this.balance;
+    }
+
+    void deposit(&mut this, int amount) {
+        balance = balance + amount;
+        audit();
+        Strin note = null;
+        int amount = 0;
+    }
+
+    void audit(&this) {
+        if (LIMIT > 0) {
+            break;
+        }
+    }
+
+    &[other] String name(&this) {
+        return null;
+    }
+}

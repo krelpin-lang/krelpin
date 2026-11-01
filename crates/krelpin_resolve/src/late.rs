@@ -1,0 +1,725 @@
+use std::collections::HashMap;
+
+use krelpin_ast::ast::{
+    Block, CompilationUnit, Constructor, Expr, ExprKind, Field, FieldStorage, FnRetTy,
+    GenericParamKind, Generics, Ident, ItemKind, LambdaBody, Member, MemberKind, Method, Param,
+    Stmt, StmtKind, SwitchExprBody, Ty, TyKind,
+};
+use krelpin_errors::{DiagCtxt, Diagnostic};
+use krelpin_span::{Span, Symbol, kw};
+
+use crate::collect::{ItemTable, TypeDef};
+use crate::{Res, Resolutions, prelude};
+
+#[derive(Clone, Copy, PartialEq, Eq)]
+enum StaticContext {
+    Method,
+    SharedField,
+    ConstField,
+    EnumConstant,
+}
+
+#[derive(Clone, Copy, Default)]
+struct Jumps {
+    loops: u32,
+    breakable: u32,
+    switch_exprs: u32,
+}
+
+struct Resolver<'a> {
+    table: &'a ItemTable,
+    dcx: &'a DiagCtxt,
+    resolutions: Resolutions,
+    owner: Option<&'a TypeDef>,
+    class_type_params: Vec<(Symbol, Span)>,
+    type_params: Vec<(Symbol, Span)>,
+    borrow_sources: Vec<(Symbol, Span)>,
+    scopes: Vec<HashMap<Symbol, Span>>,
+    static_context: Option<StaticContext>,
+    jumps: Jumps,
+    in_case_label: bool,
+}
+
+pub(crate) fn resolve_bodies(
+    unit: &CompilationUnit,
+    table: &ItemTable,
+    dcx: &DiagCtxt,
+) -> Resolutions {
+    let mut resolver = Resolver {
+        table,
+        dcx,
+        resolutions: Resolutions::default(),
+        owner: None,
+        class_type_params: Vec::new(),
+        type_params: Vec::new(),
+        borrow_sources: Vec::new(),
+        scopes: Vec::new(),
+        static_context: None,
+        jumps: Jumps::default(),
+        in_case_label: false,
+    };
+
+    for item in &unit.items {
+        resolver.owner = table.types.get(&item.name.name);
+        match &item.kind {
+            ItemKind::Class(class) => {
+                resolver.enter_type(&class.generics);
+                resolver.resolve_tys(class.extends.iter());
+                resolver.resolve_tys(class.implements.iter());
+                resolver.resolve_members(&class.members);
+            }
+            ItemKind::Struct(def) => {
+                resolver.enter_type(&def.generics);
+                resolver.resolve_tys(def.implements.iter());
+                resolver.resolve_members(&def.members);
+            }
+            ItemKind::Interface(interface) => {
+                resolver.enter_type(&interface.generics);
+                resolver.resolve_tys(interface.extends.iter());
+                resolver.resolve_members(&interface.members);
+            }
+            ItemKind::Enum(enum_def) => {
+                resolver.enter_type(&Generics::default());
+                resolver.resolve_tys(enum_def.implements.iter());
+                resolver.static_context = Some(StaticContext::EnumConstant);
+                for constant in &enum_def.constants {
+                    for arg in &constant.args {
+                        resolver.resolve_expr(arg);
+                    }
+                }
+                resolver.resolve_members(&enum_def.members);
+            }
+        }
+    }
+
+    resolver.resolutions
+}
+
+impl<'a> Resolver<'a> {
+    fn enter_type(&mut self, generics: &Generics) {
+        self.class_type_params.clear();
+        self.type_params.clear();
+        self.borrow_sources.clear();
+        self.static_context = None;
+
+        let mut seen = HashMap::new();
+        for param in &generics.params {
+            if seen.insert(param.name.name, param.name.span).is_some() {
+                self.report_duplicate_generic(param.name);
+                continue;
+            }
+            let entry = (param.name.name, param.name.span);
+            match &param.kind {
+                GenericParamKind::Type { bounds } => {
+                    self.class_type_params.push(entry);
+                    self.type_params.push(entry);
+                    self.resolve_tys(bounds.iter());
+                }
+                GenericParamKind::BorrowSource => self.borrow_sources.push(entry),
+            }
+        }
+    }
+
+    fn resolve_members(&mut self, members: &[Member]) {
+        let class_type_params = self.class_type_params.clone();
+        let class_borrow_sources = self.borrow_sources.clone();
+
+        for member in members {
+            let static_context = member_static_context(&member.kind);
+            self.static_context = static_context;
+            self.type_params = if static_context.is_some() {
+                Vec::new()
+            } else {
+                class_type_params.clone()
+            };
+            self.borrow_sources = if static_context.is_some() {
+                Vec::new()
+            } else {
+                class_borrow_sources.clone()
+            };
+            self.scopes.clear();
+            self.jumps = Jumps::default();
+
+            match &member.kind {
+                MemberKind::Field(field) => self.resolve_field(field),
+                MemberKind::Constructor(constructor) => self.resolve_constructor(constructor),
+                MemberKind::Method(method) => self.resolve_method(method),
+            }
+        }
+    }
+
+    fn resolve_field(&mut self, field: &Field) {
+        self.resolve_ty(&field.ty);
+        if let Some(init) = &field.init {
+            self.resolve_expr(init);
+        }
+    }
+
+    fn resolve_constructor(&mut self, constructor: &Constructor) {
+        self.resolve_signature(&constructor.params, &constructor.throws);
+        self.resolve_block(&constructor.body);
+    }
+
+    fn resolve_method(&mut self, method: &Method) {
+        let mut seen = HashMap::new();
+        for param in &method.generics.params {
+            if seen.insert(param.name.name, param.name.span).is_some() {
+                self.report_duplicate_generic(param.name);
+                continue;
+            }
+            let entry = (param.name.name, param.name.span);
+            match &param.kind {
+                GenericParamKind::Type { .. } => self.type_params.push(entry),
+                GenericParamKind::BorrowSource => self.borrow_sources.push(entry),
+            }
+        }
+        for param in &method.generics.params {
+            if let GenericParamKind::Type { bounds } = &param.kind {
+                self.resolve_tys(bounds.iter());
+            }
+        }
+
+        if let Some(receiver) = method.receiver {
+            self.borrow_sources.push((kw::This, receiver.span));
+        }
+        for param in &method.params {
+            self.borrow_sources.push((param.name.name, param.name.span));
+        }
+
+        if let FnRetTy::Ty(ty) = &method.ret {
+            self.resolve_ty(ty);
+        }
+        self.resolve_signature(&method.params, &method.throws);
+        if let Some(body) = &method.body {
+            self.resolve_block(body);
+        }
+    }
+
+    fn resolve_signature(&mut self, params: &[Param], throws: &[Ty]) {
+        self.scopes.push(HashMap::new());
+        for param in params {
+            self.resolve_ty(&param.ty);
+            self.declare(param.name);
+        }
+        self.resolve_tys(throws.iter());
+    }
+
+    fn resolve_tys<'t>(&mut self, tys: impl Iterator<Item = &'t Ty>) {
+        for ty in tys {
+            self.resolve_ty(ty);
+        }
+    }
+
+    fn resolve_ty(&mut self, ty: &Ty) {
+        match &ty.kind {
+            TyKind::Primitive(_) => {}
+            TyKind::Path { path, args } => {
+                if let [segment] = path.segments.as_slice() {
+                    self.resolve_type_name(*segment);
+                }
+                self.resolve_tys(args.iter());
+            }
+            TyKind::Ref { sources, ty, .. } => {
+                for source in sources {
+                    self.resolve_borrow_source(*source);
+                }
+                self.resolve_ty(ty);
+            }
+            TyKind::Nullable(ty) | TyKind::Array(ty) => self.resolve_ty(ty),
+        }
+    }
+
+    fn resolve_type_name(&mut self, name: Ident) {
+        if let Some(res) = self.lookup_type(name.name) {
+            self.resolutions.record(name.span, res);
+            return;
+        }
+
+        let is_class_param = self
+            .class_type_params
+            .iter()
+            .any(|&(param, _)| param == name.name);
+        if is_class_param {
+            self.emit(
+                Diagnostic::error(format!(
+                    "generic parameter `{}` cannot be used here",
+                    name.name
+                ))
+                .with_span(name.span)
+                .with_note(
+                    "shared fields, const fields and methods without `this` belong to the \
+                     class, not to a specific instance",
+                ),
+            );
+            return;
+        }
+
+        if !self.table.has_glob_import {
+            self.emit(
+                Diagnostic::error(format!("cannot find type `{}` in this scope", name.name))
+                    .with_span(name.span)
+                    .with_label("not found in this scope"),
+            );
+        }
+    }
+
+    fn resolve_borrow_source(&mut self, source: Ident) {
+        let found = self
+            .borrow_sources
+            .iter()
+            .rev()
+            .find(|&&(name, _)| name == source.name);
+        match found {
+            Some(&(_, span)) => self
+                .resolutions
+                .record(source.span, Res::BorrowSource(span)),
+            None => {
+                self.emit(
+                    Diagnostic::error(format!("cannot find borrow source `{}`", source.name))
+                        .with_span(source.span)
+                        .with_help(
+                            "a borrow source must name a parameter of the method, `this`, \
+                             or a `&` generic parameter of the class",
+                        ),
+                );
+            }
+        }
+    }
+
+    fn lookup_type(&self, name: Symbol) -> Option<Res> {
+        if let Some(&(_, span)) = self.type_params.iter().rev().find(|&&(p, _)| p == name) {
+            return Some(Res::TypeParam(span));
+        }
+        if let Some(def) = self.table.types.get(&name) {
+            return Some(Res::Item(def.index));
+        }
+        if let Some(&span) = self.table.imports.get(&name) {
+            return Some(Res::Import(span));
+        }
+        prelude::is_type(name.as_str()).then_some(Res::Prelude(name))
+    }
+
+    fn lookup_local(&self, name: Symbol) -> Option<Span> {
+        self.scopes
+            .iter()
+            .rev()
+            .find_map(|scope| scope.get(&name).copied())
+    }
+
+    fn declare(&mut self, name: Ident) {
+        if self.lookup_local(name.name).is_some() {
+            self.emit(
+                Diagnostic::error(format!(
+                    "a variable named `{}` is already defined in this scope",
+                    name.name
+                ))
+                .with_span(name.span)
+                .with_help("choose a different name"),
+            );
+            return;
+        }
+        if let Some(scope) = self.scopes.last_mut() {
+            scope.insert(name.name, name.span);
+        }
+    }
+
+    fn with_scope(&mut self, f: impl FnOnce(&mut Self)) {
+        self.scopes.push(HashMap::new());
+        f(self);
+        self.scopes.pop();
+    }
+
+    fn resolve_block(&mut self, block: &Block) {
+        self.with_scope(|this| {
+            for stmt in &block.stmts {
+                this.resolve_stmt(stmt);
+            }
+        });
+    }
+
+    fn resolve_stmt(&mut self, stmt: &Stmt) {
+        match &stmt.kind {
+            StmtKind::Local(local) => {
+                if let Some(ty) = &local.ty {
+                    self.resolve_ty(ty);
+                }
+                if let Some(init) = &local.init {
+                    self.resolve_expr(init);
+                }
+                self.declare(local.name);
+            }
+            StmtKind::Expr(expr) => self.resolve_expr(expr),
+            StmtKind::Block(block) => self.resolve_block(block),
+            StmtKind::If { cond, then, els } => {
+                self.with_scope(|this| {
+                    this.resolve_expr(cond);
+                    this.with_scope(|this| this.resolve_stmt(then));
+                });
+                if let Some(els) = els {
+                    self.with_scope(|this| this.resolve_stmt(els));
+                }
+            }
+            StmtKind::While { cond, body } => self.with_scope(|this| {
+                this.resolve_expr(cond);
+                this.resolve_loop_body(body);
+            }),
+            StmtKind::DoWhile { body, cond } => {
+                self.resolve_loop_body(body);
+                self.resolve_expr(cond);
+            }
+            StmtKind::For {
+                init,
+                cond,
+                update,
+                body,
+            } => self.with_scope(|this| {
+                for stmt in init {
+                    this.resolve_stmt(stmt);
+                }
+                if let Some(cond) = cond {
+                    this.resolve_expr(cond);
+                }
+                for expr in update {
+                    this.resolve_expr(expr);
+                }
+                this.resolve_loop_body(body);
+            }),
+            StmtKind::ForEach {
+                ty,
+                name,
+                iter,
+                body,
+            } => {
+                self.resolve_expr(iter);
+                self.with_scope(|this| {
+                    if let Some(ty) = ty {
+                        this.resolve_ty(ty);
+                    }
+                    this.declare(*name);
+                    this.resolve_loop_body(body);
+                });
+            }
+            StmtKind::Switch { scrutinee, arms } => {
+                self.resolve_expr(scrutinee);
+                self.jumps.breakable += 1;
+                for arm in arms {
+                    self.resolve_case_labels(arm.labels.as_deref());
+                    self.with_scope(|this| this.resolve_stmt(&arm.body));
+                }
+                self.jumps.breakable -= 1;
+            }
+            StmtKind::Try {
+                body,
+                catches,
+                finally,
+            } => {
+                self.resolve_block(body);
+                for catch in catches {
+                    self.with_scope(|this| {
+                        this.resolve_tys(catch.tys.iter());
+                        this.declare(catch.name);
+                        this.resolve_block(&catch.body);
+                    });
+                }
+                if let Some(finally) = finally {
+                    self.resolve_block(finally);
+                }
+            }
+            StmtKind::Return(value) => {
+                if self.jumps.switch_exprs > 0 {
+                    self.emit(
+                        Diagnostic::error("cannot `return` from inside a switch expression")
+                            .with_span(stmt.span)
+                            .with_help("use `yield` to produce the value of this case"),
+                    );
+                }
+                if let Some(value) = value {
+                    self.resolve_expr(value);
+                }
+            }
+            StmtKind::Yield(value) => {
+                if self.jumps.switch_exprs == 0 {
+                    self.emit(
+                        Diagnostic::error("`yield` outside of a switch expression")
+                            .with_span(stmt.span)
+                            .with_help(
+                                "`yield` gives the value of a `case` block in a switch expression",
+                            ),
+                    );
+                }
+                self.resolve_expr(value);
+            }
+            StmtKind::Throw(value) => self.resolve_expr(value),
+            StmtKind::Break => {
+                if self.jumps.breakable == 0 {
+                    self.emit(
+                        Diagnostic::error("`break` outside of a loop or switch")
+                            .with_span(stmt.span),
+                    );
+                }
+            }
+            StmtKind::Continue => {
+                if self.jumps.loops == 0 {
+                    self.emit(
+                        Diagnostic::error("`continue` outside of a loop").with_span(stmt.span),
+                    );
+                }
+            }
+            StmtKind::Empty => {}
+        }
+    }
+
+    fn resolve_loop_body(&mut self, body: &Stmt) {
+        self.jumps.loops += 1;
+        self.jumps.breakable += 1;
+        self.with_scope(|this| this.resolve_stmt(body));
+        self.jumps.loops -= 1;
+        self.jumps.breakable -= 1;
+    }
+
+    fn resolve_case_labels(&mut self, labels: Option<&[Expr]>) {
+        let Some(labels) = labels else {
+            return;
+        };
+        self.in_case_label = true;
+        for label in labels {
+            self.resolve_expr(label);
+        }
+        self.in_case_label = false;
+    }
+
+    fn resolve_expr(&mut self, expr: &Expr) {
+        match &expr.kind {
+            ExprKind::Lit(_) | ExprKind::Bool(_) | ExprKind::Null => {}
+            ExprKind::This | ExprKind::Super => self.check_this(expr),
+            ExprKind::Name(name) => self.resolve_value_name(*name),
+            ExprKind::Field { expr, .. } => self.resolve_expr(expr),
+            ExprKind::MethodCall {
+                receiver,
+                name,
+                args,
+                ..
+            } => {
+                match receiver {
+                    Some(receiver) => self.resolve_expr(receiver),
+                    None => self.resolve_unqualified_call(*name),
+                }
+                self.resolve_exprs(args);
+            }
+            ExprKind::Call { callee, args } => {
+                self.resolve_expr(callee);
+                self.resolve_exprs(args);
+            }
+            ExprKind::Index { expr, index } => {
+                self.resolve_expr(expr);
+                self.resolve_expr(index);
+            }
+            ExprKind::New { ty, args } => {
+                self.resolve_ty(ty);
+                self.resolve_exprs(args);
+            }
+            ExprKind::NewArray { elem, len } => {
+                self.resolve_ty(elem);
+                self.resolve_expr(len);
+            }
+            ExprKind::ArrayInit { ty, elems } => {
+                if let Some(ty) = ty {
+                    self.resolve_ty(ty);
+                }
+                self.resolve_exprs(elems);
+            }
+            ExprKind::Unary { expr, .. } | ExprKind::Borrow { expr, .. } => {
+                self.resolve_expr(expr);
+            }
+            ExprKind::Binary { lhs, rhs, .. } | ExprKind::Assign { lhs, rhs, .. } => {
+                self.resolve_expr(lhs);
+                self.resolve_expr(rhs);
+            }
+            ExprKind::Ternary { cond, then, els } => {
+                self.resolve_expr(cond);
+                self.resolve_expr(then);
+                self.resolve_expr(els);
+            }
+            ExprKind::InstanceOf { expr, ty, binding } => {
+                self.resolve_expr(expr);
+                self.resolve_ty(ty);
+                if let Some(binding) = binding {
+                    self.declare(*binding);
+                }
+            }
+            ExprKind::Cast { ty, expr } => {
+                self.resolve_ty(ty);
+                self.resolve_expr(expr);
+            }
+            ExprKind::Lambda { params, body } => {
+                let outer_jumps = std::mem::take(&mut self.jumps);
+                self.with_scope(|this| {
+                    for param in params {
+                        if let Some(ty) = &param.ty {
+                            this.resolve_ty(ty);
+                        }
+                        this.declare(param.name);
+                    }
+                    match body.as_ref() {
+                        LambdaBody::Expr(expr) => this.resolve_expr(expr),
+                        LambdaBody::Block(block) => this.resolve_block(block),
+                    }
+                });
+                self.jumps = outer_jumps;
+            }
+            ExprKind::MethodRef { expr, .. } => self.resolve_expr(expr),
+            ExprKind::Switch { scrutinee, arms } => {
+                self.resolve_expr(scrutinee);
+                let outer_jumps = self.jumps;
+                self.jumps = Jumps {
+                    switch_exprs: outer_jumps.switch_exprs + 1,
+                    ..Jumps::default()
+                };
+                for arm in arms {
+                    self.resolve_case_labels(arm.labels.as_deref());
+                    match &arm.body {
+                        SwitchExprBody::Expr(expr) | SwitchExprBody::Throw(expr) => {
+                            self.resolve_expr(expr);
+                        }
+                        SwitchExprBody::Block(block) => self.resolve_block(block),
+                    }
+                }
+                self.jumps = outer_jumps;
+            }
+        }
+    }
+
+    fn resolve_exprs(&mut self, exprs: &[Expr]) {
+        for expr in exprs {
+            self.resolve_expr(expr);
+        }
+    }
+
+    fn resolve_value_name(&mut self, name: Ident) {
+        if let Some(span) = self.lookup_local(name.name) {
+            self.resolutions.record(name.span, Res::Local(span));
+            return;
+        }
+        if let Some(res) = self.lookup_type(name.name) {
+            self.resolutions.record(name.span, res);
+            return;
+        }
+        if self.in_case_label || self.table.has_glob_import {
+            return;
+        }
+
+        let mut diagnostic =
+            Diagnostic::error(format!("cannot find value `{}` in this scope", name.name))
+                .with_span(name.span)
+                .with_label("not found in this scope");
+
+        let field = self.owner.and_then(|owner| {
+            owner
+                .fields
+                .get(&name.name)
+                .map(|field| (owner.name.name, *field))
+        });
+        if let Some((owner, field)) = field {
+            diagnostic = if field.is_instance {
+                diagnostic.with_help(format!(
+                    "to use the field of this object, write `this.{}`",
+                    name.name
+                ))
+            } else {
+                diagnostic.with_help(format!(
+                    "to use the field of the class, write `{owner}.{}`",
+                    name.name
+                ))
+            };
+        }
+        self.emit(diagnostic);
+    }
+
+    fn resolve_unqualified_call(&mut self, name: Ident) {
+        let Some(owner) = self.owner else {
+            return;
+        };
+        let Some(methods) = owner.methods.get(&name.name) else {
+            if !self.table.has_glob_import {
+                self.emit(
+                    Diagnostic::error(format!("cannot find method `{}` in this scope", name.name))
+                        .with_span(name.span)
+                        .with_label("not found in this scope"),
+                );
+            }
+            return;
+        };
+
+        let has_static = methods.iter().any(|method| !method.has_receiver);
+        if has_static {
+            return;
+        }
+
+        let diagnostic = Diagnostic::error(format!(
+            "method `{}` needs an object to be called on",
+            name.name
+        ))
+        .with_span(name.span);
+        let diagnostic = if self.static_context.is_none() {
+            diagnostic.with_help(format!("call it on this object: `this.{}(...)`", name.name))
+        } else {
+            diagnostic.with_note(format!(
+                "`{}` takes `this`, but there is no object here",
+                name.name
+            ))
+        };
+        self.emit(diagnostic);
+    }
+
+    fn check_this(&mut self, expr: &Expr) {
+        let keyword = if expr.kind == ExprKind::This {
+            "this"
+        } else {
+            "super"
+        };
+        let help = match self.static_context {
+            None => return,
+            Some(StaticContext::Method) => {
+                "add `&this`, `&mut this` or `this` as the first parameter of the method"
+            }
+            Some(StaticContext::SharedField) => {
+                "a `shared` field belongs to the class, not to a specific object"
+            }
+            Some(StaticContext::ConstField) => {
+                "a `const` field belongs to the class, not to a specific object"
+            }
+            Some(StaticContext::EnumConstant) => "enum constants are created before any object",
+        };
+        self.emit(
+            Diagnostic::error(format!("`{keyword}` is not available here"))
+                .with_span(expr.span)
+                .with_help(help),
+        );
+    }
+
+    fn report_duplicate_generic(&self, name: Ident) {
+        self.emit(
+            Diagnostic::error(format!(
+                "the generic parameter `{}` is declared multiple times",
+                name.name
+            ))
+            .with_span(name.span),
+        );
+    }
+
+    fn emit(&self, diagnostic: Diagnostic) {
+        self.dcx.emit(diagnostic);
+    }
+}
+
+fn member_static_context(kind: &MemberKind) -> Option<StaticContext> {
+    match kind {
+        MemberKind::Field(field) => match field.storage {
+            FieldStorage::Instance => None,
+            FieldStorage::Shared(_) => Some(StaticContext::SharedField),
+            FieldStorage::Const(_) => Some(StaticContext::ConstField),
+        },
+        MemberKind::Constructor(_) => None,
+        MemberKind::Method(method) => method.receiver.is_none().then_some(StaticContext::Method),
+    }
+}
