@@ -1,0 +1,10 @@
+[package]
+name = "krelpin_parse"
+version.workspace = true
+edition.workspace = true
+
+[dependencies]
+krelpin_ast.workspace = true
+krelpin_errors.workspace = true
+krelpin_lexer.workspace = true
+krelpin_span.workspace = true

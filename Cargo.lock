@@ -122,7 +122,9 @@ name = "krelpin_driver"
 version = "0.1.0"
 dependencies = [
  "clap",
+ "krelpin_ast",
  "krelpin_errors",
+ "krelpin_parse",
  "krelpin_span",
 ]
 
@@ -138,6 +140,16 @@ name = "krelpin_lexer"
 version = "0.1.0"
 dependencies = [
  "unicode-ident",
+]
+
+[[package]]
+name = "krelpin_parse"
+version = "0.1.0"
+dependencies = [
+ "krelpin_ast",
+ "krelpin_errors",
+ "krelpin_lexer",
+ "krelpin_span",
 ]
 
 [[package]]

@@ -6,6 +6,7 @@ use std::path::Path;
 use std::process::ExitCode;
 
 use clap::{Parser, ValueEnum};
+use krelpin_ast::token::Token;
 use krelpin_errors::Diagnostic;
 
 pub use crate::args::{Args, CrateType, Edition, Emit, LintLevel, PrintKind, Spec};
@@ -35,7 +36,7 @@ pub fn run(args: &Args, sess: &Session) {
         return;
     };
 
-    let _file = match sess.source_map.load_file(input) {
+    let file = match sess.source_map.load_file(input) {
         Ok(file) => file,
         Err(error) => {
             sess.dcx.emit(Diagnostic::error(format!(
@@ -55,11 +56,36 @@ pub fn run(args: &Args, sess: &Session) {
         );
     }
 
+    let tokens = krelpin_parse::lexer::lex(&file, &sess.dcx);
+    if sess.dcx.has_errors() {
+        return;
+    }
+
     for emit in args.emits() {
-        sess.dcx.emit(Diagnostic::error(format!(
-            "`--emit={}` is not supported yet",
-            value_name(emit.kind)
-        )));
+        match emit.kind {
+            Emit::Tokens => {
+                let output = render_tokens(sess, &tokens);
+                write_output(sess, emit.path.as_deref(), &output);
+            }
+            kind => sess.dcx.emit(Diagnostic::error(format!(
+                "`--emit={}` is not supported yet",
+                value_name(kind)
+            ))),
+        }
+    }
+}
+
+fn render_tokens(sess: &Session, tokens: &[Token]) -> String {
+    tokens
+        .iter()
+        .map(|token| format!("{}: {:?}\n", location(sess, token), token.kind))
+        .collect()
+}
+
+fn location(sess: &Session, token: &Token) -> String {
+    match sess.source_map.lookup_char_pos(token.span.lo) {
+        Some(loc) => format!("{}:{}", loc.line, loc.col),
+        None => "?".to_owned(),
     }
 }
 
