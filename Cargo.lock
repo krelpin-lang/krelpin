@@ -111,6 +111,13 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "a6cb138bb79a146c1bd460005623e142ef0181e3d0219cb493e02f7d08a35695"
 
 [[package]]
+name = "krelpin_ast"
+version = "0.1.0"
+dependencies = [
+ "krelpin_span",
+]
+
+[[package]]
 name = "krelpin_driver"
 version = "0.1.0"
 dependencies = [
