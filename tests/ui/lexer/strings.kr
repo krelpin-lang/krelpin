@@ -1,0 +1,8 @@
+class Strings {
+    void main() {
+        String a = "bad \q escape";
+        String b = "\u12";
+        String c = "\uD800";
+        String d = "unterminated;
+    }
+}

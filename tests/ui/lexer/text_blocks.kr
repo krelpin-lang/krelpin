@@ -1,0 +1,6 @@
+class TextBlocks {
+    String a = """inline""";
+    String b = """
+        unknown \q escape
+        """;
+}

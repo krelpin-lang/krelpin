@@ -1,0 +1,26 @@
+1:1: Ident("package")
+1:9: Ident("example")
+1:16: Semi
+3:1: Ident("import")
+3:8: Ident("example")
+3:15: Dot
+3:16: Ident("test")
+3:20: Semi
+5:1: Ident("class")
+5:7: Ident("Main")
+5:12: OpenBrace
+6:5: Ident("void")
+6:10: Ident("main")
+6:14: OpenParen
+6:15: CloseParen
+6:17: OpenBrace
+7:9: Ident("Console")
+7:16: Dot
+7:17: Ident("println")
+7:24: OpenParen
+7:25: Literal(Lit { kind: Str, symbol: "Hello World!", suffix: None })
+7:39: CloseParen
+7:40: Semi
+8:5: CloseBrace
+9:1: CloseBrace
+10:1: Eof

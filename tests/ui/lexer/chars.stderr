@@ -1,0 +1,22 @@
+error: empty character literal
+ --> tests/ui/lexer/chars.kr:3:18
+  |
+3 |         char a = '';
+  |                  ^^
+
+error: character literal may only contain one codepoint
+ --> tests/ui/lexer/chars.kr:4:19
+  |
+4 |         char b = 'ab';
+  |                   ^^
+  |
+  = help: if you meant to write a string literal, use double quotes
+
+error: character literal cannot have a suffix
+ --> tests/ui/lexer/chars.kr:5:21
+  |
+5 |         char c = 'x'y;
+  |                     ^
+
+error: aborting due to 3 previous errors
+

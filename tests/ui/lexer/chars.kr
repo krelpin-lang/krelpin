@@ -1,0 +1,7 @@
+class Chars {
+    void main() {
+        char a = '';
+        char b = 'ab';
+        char c = 'x'y;
+    }
+}

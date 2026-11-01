@@ -1,0 +1,9 @@
+package example;
+
+import example.test;
+
+class Main {
+    void main() {
+        Console.println("Hello World!");
+    }
+}

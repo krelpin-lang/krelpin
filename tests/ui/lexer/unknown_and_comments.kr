@@ -1,0 +1,7 @@
+class Unknown {
+	int # value;
+}
+
+class Unclosed {
+    /* never closed
+}

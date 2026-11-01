@@ -1,0 +1,34 @@
+error: unknown character escape: `q`
+ --> tests/ui/lexer/strings.kr:3:25
+  |
+3 |         String a = "bad \q escape";
+  |                         ^^
+  |
+  = help: valid escapes are `\b`, `\t`, `\n`, `\f`, `\r`, `\s`, `\"`, `\'`, `\\`, octal escapes like `\0` and unicode escapes like `\u0041`
+
+error: invalid unicode escape
+ --> tests/ui/lexer/strings.kr:4:21
+  |
+4 |         String b = "\u12";
+  |                     ^^^^
+  |
+  = help: unicode escapes need exactly four hexadecimal digits, like `\u0041`
+
+error: unicode escape must not be a surrogate
+ --> tests/ui/lexer/strings.kr:5:21
+  |
+5 |         String c = "\uD800";
+  |                     ^^^^^^
+  |
+  = note: code points from `\uD800` to `\uDFFF` are not valid characters
+
+error: unterminated double quote string
+ --> tests/ui/lexer/strings.kr:6:20
+  |
+6 |         String d = "unterminated;
+  |                    ^^^^^^^^^^^^^^
+  |
+  = help: add a closing `"`
+
+error: aborting due to 4 previous errors
+

@@ -1,0 +1,10 @@
+class Numbers {
+    void main() {
+        int a = 0b102;
+        int b = 017;
+        int c = 0x;
+        double d = 1e;
+        int e = 10px;
+        float f = 1.5L;
+    }
+}

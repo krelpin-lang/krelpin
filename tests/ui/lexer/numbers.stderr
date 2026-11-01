@@ -1,0 +1,45 @@
+error: invalid digit `2` for a base 2 literal
+ --> tests/ui/lexer/numbers.kr:3:21
+  |
+3 |         int a = 0b102;
+  |                     ^
+
+error: integer literals cannot have leading zeros
+ --> tests/ui/lexer/numbers.kr:4:17
+  |
+4 |         int b = 017;
+  |                 ^^^
+  |
+  = note: octal literals are not supported
+  = help: remove the leading zeros, or use `0x` for hexadecimal
+
+error: no valid digits found for number
+ --> tests/ui/lexer/numbers.kr:5:17
+  |
+5 |         int c = 0x;
+  |                 ^^
+
+error: expected at least one digit in exponent
+ --> tests/ui/lexer/numbers.kr:6:20
+  |
+6 |         double d = 1e;
+  |                    ^^
+
+error: invalid suffix `px` for number literal
+ --> tests/ui/lexer/numbers.kr:7:19
+  |
+7 |         int e = 10px;
+  |                   ^^
+  |
+  = help: valid suffixes are `L` for `long`, and `f` or `d` for decimal floating point numbers
+
+error: invalid suffix `L` for float literal
+ --> tests/ui/lexer/numbers.kr:8:22
+  |
+8 |         float f = 1.5L;
+  |                      ^
+  |
+  = help: valid suffixes are `f` for `float` and `d` for `double`
+
+error: aborting due to 6 previous errors
+

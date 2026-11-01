@@ -1,0 +1,16 @@
+error: unknown start of token: #
+ --> tests/ui/lexer/unknown_and_comments.kr:2:6
+  |
+2 |     int # value;
+  |         ^
+
+error: unterminated block comment
+ --> tests/ui/lexer/unknown_and_comments.kr:6:5
+  |
+6 |     /* never closed
+  |     ^^ comment starts here
+  |
+  = help: close the comment with `*/`
+
+error: aborting due to 2 previous errors
+
