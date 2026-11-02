@@ -1,8 +1,8 @@
 error: `String` is not a `Throwable`
- --> tests/ui/typeck/exception_errors.kr:2:24
+ --> tests/ui/typeck/exception_errors.kr:2:31
   |
-2 |     void main() throws String {
-  |                        ^^^^^^
+2 |     static void main() throws String {
+  |                               ^^^^^^
   |
   = note: only subclasses of `Throwable` can be thrown and caught
 

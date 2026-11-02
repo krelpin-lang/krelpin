@@ -3,13 +3,13 @@ class Sorted<T extends Comparable<T>> {}
 class Thing {}
 
 class Util {
-    <T extends Comparable<T>> T max(T a, T b) {
+    static <T extends Comparable<T>> T max(T a, T b) {
         return a.compareTo(&b) >= 0 ? a : b;
     }
 }
 
 class Main {
-    void main() {
+    static void main() {
         List<String, int>? pairs = null;
         List<int>? numbers = null;
         Sorted<Thing>? things = null;

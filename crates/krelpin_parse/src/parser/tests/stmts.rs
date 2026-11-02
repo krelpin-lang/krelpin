@@ -155,7 +155,7 @@ fn jumps() {
 
 #[test]
 fn missing_semicolon_is_recovered() {
-    let parsed = parse_str("class A { void f() { int x = 1\n int y = 2; } }");
+    let parsed = parse_str("class A { static void f() { int x = 1\n int y = 2; } }");
     assert_eq!(parsed.errors, ["expected `;`, found keyword `int`"]);
     assert_eq!(super::class(&parsed.unit, 0).members.len(), 1);
 }

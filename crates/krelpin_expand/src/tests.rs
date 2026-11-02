@@ -109,7 +109,7 @@ fn derive_targets_are_checked() {
         ["enums without data are already `Equatable`"]
     );
     assert_eq!(
-        errors("class A { @Derive(Equatable) int f(&this) { return 1; } }"),
+        errors("class A { @Derive(Equatable) int f() { return 1; } }"),
         ["`@Derive` cannot be used on members"]
     );
     assert_eq!(

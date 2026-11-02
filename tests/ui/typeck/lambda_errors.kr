@@ -1,9 +1,9 @@
 interface Transform<A, B> {
-    B apply(&this, A value);
+    B apply(A value);
 }
 
 class Main {
-    void main() {
+    static void main() {
         Transform<String, int> length = text -> text.lenght();
         Transform<String, int> pair = (a, b) -> 1;
         Transform<String, int> missing = text -> {

@@ -73,7 +73,7 @@ fn errors(src: &str) -> Vec<String> {
 
 fn in_method(body: &str) -> Vec<String> {
     errors(&format!(
-        "class A {{ int count; void run(&mut this, int arg) {{ {body} }} }}"
+        "class A {{ int count; mut void run(int arg) {{ {body} }} }}"
     ))
 }
 
@@ -89,7 +89,7 @@ fn ok(src: &str) {
 fn hello_world_resolves() {
     ok("package example;\n\
         class Main {\n\
-        \x20   void main() {\n\
+        \x20   static void main() {\n\
         \x20       Console.println(\"Hello World!\");\n\
         \x20   }\n\
         }\n");
@@ -101,7 +101,7 @@ fn locals_params_and_types_resolve() {
         "class Person {\n\
          \x20   String name;\n\
          \x20   Person(String name) { this.name = name; }\n\
-         \x20   void greet(&this, Person other) {\n\
+         \x20   void greet(Person other) {\n\
          \x20       String text = other.name;\n\
          \x20       Console.println(text);\n\
          \x20   }\n\
@@ -139,14 +139,14 @@ fn unknown_names() {
 
 #[test]
 fn fields_need_explicit_this() {
-    let resolved = resolve_str("class A { int count; void run(&mut this) { count = 1; } }");
+    let resolved = resolve_str("class A { int count; mut void run() { count = 1; } }");
     assert_eq!(resolved.errors, ["cannot find value `count` in this scope"]);
     assert_eq!(
         resolved.helps,
         ["to use the field of this object, write `this.count`"]
     );
 
-    let resolved = resolve_str("class A { const int MAX = 1; int f(&this) { return MAX; } }");
+    let resolved = resolve_str("class A { const int MAX = 1; int f() { return MAX; } }");
     assert_eq!(
         resolved.helps,
         ["to use the field of the class, write `A.MAX`"]
@@ -155,23 +155,23 @@ fn fields_need_explicit_this() {
 
 #[test]
 fn this_is_only_available_with_a_receiver() {
-    ok("class A { int x; A() { this.x = 1; } int get(&this) { return this.x; } }");
+    ok("class A { int x; A() { this.x = 1; } int get() { return this.x; } }");
     assert_eq!(
-        errors("class A { int x; int get() { return this.x; } }"),
+        errors("class A { int x; static int get() { return this.x; } }"),
         ["`this` is not available here"]
     );
     assert_eq!(
-        errors("class A { shared A instance = this; }"),
+        errors("class A { static A instance = this; }"),
         ["`this` is not available here"]
     );
 }
 
 #[test]
 fn instance_methods_need_an_object() {
-    ok("class A { void helper(&this) {} void run(&this) { this.helper(); } }");
-    ok("class A { int twice(int x) { return x * 2; } int run(&this) { return twice(2); } }");
+    ok("class A { void helper() {} void run() { this.helper(); } }");
+    ok("class A { static int twice(int x) { return x * 2; } int run() { return twice(2); } }");
 
-    let resolved = resolve_str("class A { void helper(&this) {} void run(&this) { helper(); } }");
+    let resolved = resolve_str("class A { void helper() {} void run() { helper(); } }");
     assert_eq!(
         resolved.errors,
         ["method `helper` needs an object to be called on"]
@@ -201,7 +201,7 @@ fn duplicate_definitions() {
         ["the variant `A` is defined multiple times"]
     );
     assert_eq!(
-        errors("enum E { A(int x), B; void A() {} }"),
+        errors("enum E { A(int x), B; static void A() {} }"),
         ["the variant `A` has the same name as a member of the enum"]
     );
     assert_eq!(
@@ -212,7 +212,7 @@ fn duplicate_definitions() {
 
 #[test]
 fn methods_can_be_overloaded() {
-    ok("class A { void f(&this) {} void f(&this, int x) {} }");
+    ok("class A { void f() {} void f(int x) {} }");
 }
 
 #[test]
@@ -261,21 +261,21 @@ fn instanceof_bindings_are_scoped_to_the_if() {
 
 #[test]
 fn generics_and_borrow_sources() {
-    ok("class Box<T> { T value; <U> U map(&this, U other) { return other; } }");
+    ok("class Box<T> { T value; <U> U map(U other) { return other; } }");
     ok("class Parser<&src> { &[src] String input; }");
-    ok("class A { &[a, b] String longer(&String a, &String b) { return a; } }");
-    ok("class A { String text; &[this] String get(&this) { return &this.text; } }");
+    ok("class A { static &[a, b] String longer(&String a, &String b) { return a; } }");
+    ok("class A { String text; &[this] String get() { return &this.text; } }");
 
     assert_eq!(
-        errors("class A { &[c] String f(&String a) { return a; } }"),
+        errors("class A { static &[c] String f(&String a) { return a; } }"),
         ["cannot find borrow source `c`"]
     );
     assert_eq!(
-        errors("class Box<T> { shared T instance = null; }"),
+        errors("class Box<T> { static T instance = null; }"),
         ["generic parameter `T` cannot be used here"]
     );
     assert_eq!(
-        errors("class Box<T> { T make() { return null; } }"),
+        errors("class Box<T> { static T make() { return null; } }"),
         ["generic parameter `T` cannot be used here"]
     );
 }
@@ -310,7 +310,7 @@ fn jumps_must_be_in_the_right_place() {
 fn enum_constants_in_case_labels() {
     ok("enum Color { RED, GREEN }\n\
         class A {\n\
-        \x20   String name(Color color) {\n\
+        \x20   static String name(Color color) {\n\
         \x20       return switch (color) { case RED -> \"red\"; case GREEN -> \"green\"; };\n\
         \x20   }\n\
         }");
@@ -318,7 +318,10 @@ fn enum_constants_in_case_labels() {
 
 #[test]
 fn glob_imports_suppress_unknown_names() {
-    ok("import java.util.*; class A { Optional<String> find() { return Optional.empty(); } }");
+    ok(
+        "import java.util.*; class A { static Optional<String> find() { return \
+         Optional.empty(); } }",
+    );
 }
 
 #[test]
@@ -355,19 +358,19 @@ fn prelude_types_come_from_the_standard_library() {
 #[test]
 fn types_outside_the_prelude_need_an_import() {
     assert_eq!(
-        errors("class A { void f() throws IOException {} }"),
+        errors("class A { static void f() throws IOException {} }"),
         ["cannot find type `IOException` in this scope"]
     );
 
     let resolved =
-        resolve_str("import std.io.IOException; class A { void f() throws IOException {} }");
+        resolve_str("import std.io.IOException; class A { static void f() throws IOException {} }");
     assert_eq!(resolved.errors, Vec::<String>::new());
     assert_eq!(
         resolved.res_at("IOException {", 0),
         resolved.std_type("std.io.IOException")
     );
 
-    ok("import std.io.*; class A { void f() throws IOException {} }");
+    ok("import std.io.*; class A { static void f() throws IOException {} }");
 }
 
 #[test]
@@ -395,7 +398,7 @@ fn local_types_shadow_the_prelude() {
 
 #[test]
 fn only_the_standard_library_declares_intrinsics() {
-    let resolved = resolve_str("class A { @Intrinsic int f(&this); }");
+    let resolved = resolve_str("class A { @Intrinsic int f(); }");
     assert_eq!(
         resolved.errors,
         ["only the standard library can declare intrinsics"]
@@ -405,10 +408,10 @@ fn only_the_standard_library_declares_intrinsics() {
 #[test]
 fn where_clauses_constrain_generic_parameters() {
     ok("class Bag<T> {\n\
-        \x20   boolean has(&this, T value) where T extends Comparable<T> { return true; }\n\
+        \x20   boolean has(T value) where T extends Comparable<T> { return true; }\n\
         }");
     assert_eq!(
-        errors("class Bag<T> { boolean has(&this, T value) where U extends Comparable<U> {} }"),
+        errors("class Bag<T> { boolean has(T value) where U extends Comparable<U> {} }"),
         ["cannot find generic parameter `U`"]
     );
 }
@@ -418,7 +421,7 @@ fn several_patterns_cannot_bind() {
     assert_eq!(
         errors(
             "enum E { A(int x), B }\n\
-             class C { int f(E e) { return switch (e) { case A(int x), B -> 1; }; } }"
+             class C { static int f(E e) { return switch (e) { case A(int x), B -> 1; }; } }"
         ),
         ["a case with several patterns cannot bind variables"]
     );
@@ -429,7 +432,7 @@ fn pattern_bindings_are_scoped_to_their_case() {
     assert_eq!(
         errors(
             "enum E { A(int x), B }\n\
-             class C { int f(E e) {\n\
+             class C { static int f(E e) {\n\
              \x20   int y = switch (e) { case A(int x) when x > 0 -> x; default -> 0; };\n\
              \x20   return x;\n\
              } }"

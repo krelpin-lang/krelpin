@@ -3,19 +3,19 @@ package geometry;
 import std.function.Consumer;
 
 interface Shape extends Comparable<Shape> {
-    double area(&this);
+    double area();
 
-    String describe(&this) {
+    String describe() {
         return "a shape with area " + this.area();
     }
 
-    int compareTo(&this, &Shape other) {
+    int compareTo(&Shape other) {
         return this.area().compareTo(&other.area());
     }
 }
 
 interface Transform<A, B> {
-    B apply(&this, A value);
+    B apply(A value);
 }
 
 abstract class Polygon implements Shape {
@@ -34,11 +34,11 @@ class Square extends Polygon {
         this.side = side;
     }
 
-    double area(&this) {
+    double area() {
         return this.side * this.side;
     }
 
-    String describe(&this) {
+    String describe() {
         return "a square with side " + this.side;
     }
 }
@@ -50,13 +50,13 @@ class Circle implements Shape {
         this.radius = radius;
     }
 
-    double area(&this) {
+    double area() {
         return Math.PI * this.radius * this.radius;
     }
 }
 
 class Shapes {
-    <T extends Comparable<T>> T largest(List<T> values) {
+    static <T extends Comparable<T>> T largest(List<T> values) {
         T best = values.get(0);
         for (T value : values) {
             if (value.compareTo(&best) > 0) {
@@ -66,7 +66,7 @@ class Shapes {
         return best;
     }
 
-    <A, B> List<B> map(List<A> values, Transform<A, B> transform) {
+    static <A, B> List<B> map(List<A> values, Transform<A, B> transform) {
         List<B> result = new ArrayList<>();
         values.forEach(value -> result.add(transform.apply(value)));
         return result;
@@ -74,7 +74,7 @@ class Shapes {
 }
 
 class Main {
-    void main() {
+    static void main() {
         List<Shape> shapes = new ArrayList<>();
         shapes.add(new Square(2.0));
         shapes.add(new Circle(1.5));

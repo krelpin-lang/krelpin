@@ -1,19 +1,19 @@
 class Pick {
-    void amb(int a, long b) {}
+    static void amb(int a, long b) {}
 
-    void amb(long a, int b) {}
+    static void amb(long a, int b) {}
 
-    int f(long x) {
+    static int f(long x) {
         return 1;
     }
 
-    String f(int x) {
+    static String f(int x) {
         return "";
     }
 }
 
 class Main {
-    void main() {
+    static void main() {
         Pick.amb(1, 2);
         int wrong = Pick.f(1);
     }

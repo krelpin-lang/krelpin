@@ -1,5 +1,5 @@
 class Strings {
-    void main() {
+    static void main() {
         String a = "bad \q escape";
         String b = "\u{12";
         String c = "\u{D800}";

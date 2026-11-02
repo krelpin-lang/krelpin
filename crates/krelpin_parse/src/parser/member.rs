@@ -1,6 +1,6 @@
 use krelpin_ast::ast::{
-    Constructor, Field, FieldStorage, FnRetTy, Generics, Ident, Method, Param, Receiver,
-    ReceiverKind, Ty, Unparsed, WherePredicate,
+    Constructor, Field, FieldStorage, FnRetTy, Generics, Ident, Method, Param, Receiver, Ty,
+    Unparsed, WherePredicate,
 };
 use krelpin_ast::token::TokenKind;
 use krelpin_errors::Diagnostic;
@@ -49,14 +49,7 @@ impl Parser<'_> {
 
     pub(crate) fn parse_constructor(&mut self) -> PResult<Constructor> {
         let name = self.parse_ident()?;
-        let (receiver, params) = self.parse_params()?;
-        if let Some(receiver) = receiver {
-            self.emit(
-                Diagnostic::error("constructors cannot take `this` as a parameter")
-                    .with_span(receiver.span)
-                    .with_help("constructors always have access to the object being built"),
-            );
-        }
+        let params = self.parse_params()?;
         let throws = self.parse_throws()?;
         let body = self.parse_block()?;
 
@@ -73,8 +66,9 @@ impl Parser<'_> {
         generics: Generics,
         ret: FnRetTy,
         name: Ident,
+        receiver: Option<Receiver>,
     ) -> PResult<Method> {
-        let (receiver, params) = self.parse_params()?;
+        let params = self.parse_params()?;
         let throws = self.parse_throws()?;
         let where_clause = self.parse_where_clause()?;
         let body = if self.eat(TokenKind::Semi) {
@@ -126,53 +120,51 @@ impl Parser<'_> {
         }
     }
 
-    fn parse_params(&mut self) -> PResult<(Option<Receiver>, Vec<Param>)> {
+    fn parse_params(&mut self) -> PResult<Vec<Param>> {
         self.expect(TokenKind::OpenParen)?;
-        let mut receiver = None;
         let mut params = Vec::new();
-
         if self.eat(TokenKind::CloseParen) {
-            return Ok((receiver, params));
+            return Ok(params);
         }
 
         loop {
-            match self.parse_receiver() {
-                Some(found) if receiver.is_none() && params.is_empty() => receiver = Some(found),
-                Some(found) => {
-                    self.emit(
-                        Diagnostic::error("`this` must be the first parameter")
-                            .with_span(found.span)
-                            .with_help("move `this` to the start of the parameter list"),
-                    );
-                }
-                None => params.push(self.parse_param()?),
+            if !self.reject_receiver_param() {
+                params.push(self.parse_param()?);
             }
-
             if self.eat(TokenKind::CloseParen) {
-                return Ok((receiver, params));
+                return Ok(params);
             }
             self.expect(TokenKind::Comma)?;
         }
     }
 
-    fn parse_receiver(&mut self) -> Option<Receiver> {
+    fn reject_receiver_param(&mut self) -> bool {
         let lo = self.token.span;
-        let (kind, len) = match (self.look_ahead(0), self.look_ahead(1), self.look_ahead(2)) {
-            (TokenKind::Ident(kw::This), _, _) => (ReceiverKind::Owned, 1),
-            (TokenKind::And, TokenKind::Ident(kw::This), _) => (ReceiverKind::Ref, 2),
-            (TokenKind::And, TokenKind::Ident(kw::Mut), TokenKind::Ident(kw::This)) => {
-                (ReceiverKind::RefMut, 3)
-            }
-            _ => return None,
-        };
-
+        let (written, help, len) =
+            match (self.look_ahead(0), self.look_ahead(1), self.look_ahead(2)) {
+                (TokenKind::Ident(kw::This), _, _) => {
+                    ("this", "remove it and mark the method `consume`", 1)
+                }
+                (TokenKind::And, TokenKind::Ident(kw::This), _) => (
+                    "&this",
+                    "remove it; methods read `this` without changing it by default",
+                    2,
+                ),
+                (TokenKind::And, TokenKind::Ident(kw::Mut), TokenKind::Ident(kw::This)) => {
+                    ("&mut this", "remove it and mark the method `mut`", 3)
+                }
+                _ => return false,
+            };
         for _ in 0..len {
             self.bump();
         }
-        Some(Receiver {
-            kind,
-            span: lo.to(self.prev_token.span),
-        })
+        self.emit(
+            Diagnostic::error(format!("`{written}` is not written as a parameter"))
+                .with_span(lo.to(self.prev_token.span))
+                .with_note("every method that is not `static` can use `this`")
+                .with_help(help),
+        );
+        true
     }
 
     fn parse_param(&mut self) -> PResult<Param> {

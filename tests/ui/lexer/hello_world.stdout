@@ -9,11 +9,12 @@
 5:1: Ident("class")
 5:7: Ident("Main")
 5:12: OpenBrace
-6:5: Ident("void")
-6:10: Ident("main")
-6:14: OpenParen
-6:15: CloseParen
-6:17: OpenBrace
+6:5: Ident("static")
+6:12: Ident("void")
+6:17: Ident("main")
+6:21: OpenParen
+6:22: CloseParen
+6:24: OpenBrace
 7:9: Ident("Console")
 7:16: Dot
 7:17: Ident("println")

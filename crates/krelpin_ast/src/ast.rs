@@ -102,7 +102,7 @@ impl Visibility {
 pub enum FieldStorage {
     Instance,
     Const(Span),
-    Shared(Span),
+    Static(Span),
 }
 
 #[derive(Clone, Debug, PartialEq, Eq)]

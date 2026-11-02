@@ -7,11 +7,11 @@ enum Shape {
 
     const double PI = 3.14159;
 
-    Shape square(double side) {
+    static Shape square(double side) {
         return Rect(side, side);
     }
 
-    double area(&this) {
+    double area() {
         return switch (this) {
             case Circle(double r) -> Shape.PI * r * r;
             case Rect(double w, double h) -> w * h;
@@ -19,7 +19,7 @@ enum Shape {
         };
     }
 
-    String describe(&this) {
+    String describe() {
         return switch (this) {
             case Rect(double w, double h) when w == h -> "square";
             case Rect(_, _) -> "rectangle";
@@ -34,7 +34,7 @@ enum Tree<T> {
     Node(Tree<T> left, Tree<T> right),
     Empty;
 
-    boolean isLeaf(&this) {
+    boolean isLeaf() {
         return this instanceof Leaf(_);
     }
 }
@@ -51,7 +51,7 @@ enum Direction {
     South,
     West;
 
-    Direction turn(&this) {
+    Direction turn() {
         return switch (this) {
             case North -> Direction.East;
             case East -> Direction.South;
@@ -62,7 +62,7 @@ enum Direction {
 }
 
 class Drawing {
-    Tree<Shape> plant(Shape[] shapes) {
+    static Tree<Shape> plant(Shape[] shapes) {
         Tree<Shape> tree = Tree.Empty;
         for (Shape shape : shapes) {
             tree = Tree.Node(tree, Tree.Leaf(shape));
@@ -70,7 +70,7 @@ class Drawing {
         return tree;
     }
 
-    String report(Order order) {
+    static String report(Order order) {
         switch (order) {
             case Placed(Shape.Circle(double r), int quantity) when r > 10.0 -> {
                 return quantity + " big circles";
@@ -87,7 +87,7 @@ class Drawing {
         }
     }
 
-    boolean sameWay(Direction a, Direction b) {
+    static boolean sameWay(Direction a, Direction b) {
         HashSet<Direction> seen = new HashSet<>();
         seen.add(a);
         return a == b && seen.contains(b);

@@ -44,9 +44,9 @@ fn receivers_are_borrowed_explicitly() {
     assert_lowers_to(
         "class Counter {\n\
          \x20   int count;\n\
-         \x20   void bump(&mut this) { this.count++; }\n\
-         \x20   int read(&this) { return this.count; }\n\
-         \x20   int twice(&mut this) { this.bump(); Counter other = new Counter(); \
+         \x20   mut void bump() { this.count++; }\n\
+         \x20   int read() { return this.count; }\n\
+         \x20   mut int twice() { this.bump(); Counter other = new Counter(); \
          other.bump(); return other.read(); }\n\
          }",
         &[
@@ -61,7 +61,7 @@ fn receivers_are_borrowed_explicitly() {
 #[test]
 fn locals_get_their_own_ids() {
     assert_lowers_to(
-        "class A { int f(int x) {\n\
+        "class A { static int f(int x) {\n\
          \x20   int y = x;\n\
          \x20   for (int i = 0; i < 3; i++) { y += i; }\n\
          \x20   for (int i = 0; i < 3; i++) { y -= i; }\n\
@@ -81,8 +81,8 @@ fn locals_get_their_own_ids() {
 fn varargs_are_packed_into_arrays() {
     assert_lowers_to(
         "class A {\n\
-         \x20   int count(String... parts) { return parts.length; }\n\
-         \x20   int run() { return count(\"a\", \"b\") + count(); }\n\
+         \x20   static int count(String... parts) { return parts.length; }\n\
+         \x20   static int run() { return count(\"a\", \"b\") + count(); }\n\
          }",
         &[
             "return len(parts_0);",
@@ -95,7 +95,7 @@ fn varargs_are_packed_into_arrays() {
 fn patterns_bind_locals() {
     assert_lowers_to(
         "enum Shape { Circle(double radius), Empty }\n\
-         class A { double area(Shape shape) {\n\
+         class A { static double area(Shape shape) {\n\
          \x20   return switch (shape) {\n\
          \x20       case Circle(double r) when r > 0.0 -> r * r;\n\
          \x20       case Circle(_), Empty -> 0.0;\n\
@@ -113,8 +113,8 @@ fn structs_and_variants_are_constructed() {
     assert_lowers_to(
         "struct Money { long cents; }\n\
          enum Payment { Cash(Money amount), Free }\n\
-         class A { Payment pay() { return Payment.Cash(new Money(5)); } \
-         Payment free() { return Payment.Free; } }",
+         class A { static Payment pay() { return Payment.Cash(new Money(5)); } \
+         static Payment free() { return Payment.Free; } }",
         &[
             "return Payment::Cash(new Money(5));",
             "return Payment::Free;",

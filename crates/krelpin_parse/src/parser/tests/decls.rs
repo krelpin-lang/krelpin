@@ -24,7 +24,7 @@ fn structs() {
         "struct Point implements Comparable<Point> {\n\
          \x20   int x;\n\
          \x20   int y;\n\
-         \x20   double length(&this) { return Math.sqrt(this.x * this.x + this.y * this.y); }\n\
+         \x20   double length() { return Math.sqrt(this.x * this.x + this.y * this.y); }\n\
          }",
     );
     let ItemKind::Struct(point) = &unit.items[0].kind else {
@@ -39,8 +39,8 @@ fn interfaces() {
     let unit = parse_ok(
         "interface Shape extends Drawable, Comparable<Shape> {\n\
          \x20   const int SIDES = 0;\n\
-         \x20   double area(&this);\n\
-         \x20   String describe(&this) { return \"shape\"; }\n\
+         \x20   double area();\n\
+         \x20   String describe() { return \"shape\"; }\n\
          }",
     );
     let ItemKind::Interface(shape) = &unit.items[0].kind else {
@@ -68,7 +68,7 @@ fn enums() {
          \x20   Empty,\n\
          \x20   ;\n\
          \x20   const double PI = 3.14;\n\
-         \x20   double area(&this) { return 0.0; }\n\
+         \x20   double area() { return 0.0; }\n\
          }",
     );
     let ItemKind::Enum(shape) = &unit.items[0].kind else {
@@ -132,11 +132,11 @@ fn enums_have_no_constructors() {
 fn abstract_and_final() {
     let unit = parse_ok(
         "abstract class Animal {\n\
-         \x20   abstract String sound(&this);\n\
-         \x20   final String name(&this) { return \"animal\"; }\n\
+         \x20   abstract String sound();\n\
+         \x20   final String name() { return \"animal\"; }\n\
          }\n\
          final class Dog extends Animal {\n\
-         \x20   String sound(&this) { return \"woof\"; }\n\
+         \x20   String sound() { return \"woof\"; }\n\
          }",
     );
     assert!(unit.items[0].inheritance.abstract_kw.is_some());
@@ -147,8 +147,8 @@ fn abstract_and_final() {
 fn shared_fields_keep_their_visibility() {
     let unit = parse_ok(
         "class Counter {\n\
-         \x20   shared AtomicInt hidden = new AtomicInt(0);\n\
-         \x20   public shared AtomicInt visible = new AtomicInt(0);\n\
+         \x20   static AtomicInt hidden = new AtomicInt(0);\n\
+         \x20   public static AtomicInt visible = new AtomicInt(0);\n\
          }",
     );
     let ItemKind::Class(counter) = &unit.items[0].kind else {
@@ -203,23 +203,23 @@ fn member_errors() {
         ["structs cannot have constructors"]
     );
     assert_eq!(
-        errors("class A { void f(); }"),
+        errors("class A { static void f(); }"),
         ["missing body for method `f`"]
     );
     assert_eq!(
-        errors("class A { @Intrinsic int f(&this); }"),
+        errors("class A { @Intrinsic int f(); }"),
         Vec::<String>::new()
     );
     assert_eq!(
-        errors("abstract class A { abstract void f() {} }"),
+        errors("abstract class A { abstract static void f() {} }"),
         ["abstract methods cannot have a body"]
     );
     assert_eq!(
-        errors("abstract class A { abstract final void f(); }"),
+        errors("abstract class A { abstract final static void f(); }"),
         ["a method cannot be both `abstract` and `final`"]
     );
     assert_eq!(
-        errors("struct S { abstract void f(); }"),
+        errors("struct S { abstract static void f(); }"),
         ["abstract methods are not allowed in structs"]
     );
     assert_eq!(
@@ -227,7 +227,7 @@ fn member_errors() {
         ["`abstract` cannot be used on fields"]
     );
     assert_eq!(
-        errors("class A { final final void f() {} }"),
+        errors("class A { final final static void f() {} }"),
         ["duplicate `final` modifier"]
     );
 }

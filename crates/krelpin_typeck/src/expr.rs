@@ -968,10 +968,10 @@ impl FnCtxt<'_, '_> {
                     format!("cannot assign to `const` field `{}`", name.name),
                 );
             }
-            FieldStorage::Shared(_) => self.emit(
-                Diagnostic::error(format!("cannot assign to `shared` field `{}`", name.name))
+            FieldStorage::Static(_) => self.emit(
+                Diagnostic::error(format!("cannot assign to `static` field `{}`", name.name))
                     .with_span(name.span)
-                    .with_note("a `shared` field can be used from many places at once")
+                    .with_note("a `static` field can be used from many threads at once")
                     .with_help(
                         "store a type that can be changed safely, like `AtomicInt` or `Mutex<T>`",
                     ),

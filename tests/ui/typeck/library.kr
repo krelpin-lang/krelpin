@@ -17,11 +17,11 @@ class Student implements Comparable<Student> {
         this.grades = new HashMap<>();
     }
 
-    void grade(&mut this, String course, Grade grade) {
+    mut void grade(String course, Grade grade) {
         this.grades.put(course, grade);
     }
 
-    String report(&this, String course) {
+    String report(String course) {
         Grade? grade = this.grades.get(course);
         if (grade == null) {
             return this.name + ": no grade for " + course;
@@ -29,13 +29,13 @@ class Student implements Comparable<Student> {
         return this.name + ": " + grade.name() + " (" + grade.ordinal() + ")";
     }
 
-    int compareTo(&this, &Student other) {
+    int compareTo(&Student other) {
         return this.name.compareTo(&other.name);
     }
 }
 
 class Main {
-    void main() throws IOException {
+    static void main() throws IOException {
         List<Student> students = new ArrayList<>();
         students.add(new Student("Ayşe"));
         students.add(new Student("Mehmet"));

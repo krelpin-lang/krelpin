@@ -1,27 +1,27 @@
 package std.util;
 
 interface List<T> extends Iterable<T> {
-    int size(&this);
+    int size();
 
-    boolean isEmpty(&this) {
+    boolean isEmpty() {
         return this.size() == 0;
     }
 
-    T get(&this, int index);
+    T get(int index);
 
-    T set(&mut this, int index, T value);
+    mut T set(int index, T value);
 
-    void add(&mut this, T value);
+    mut void add(T value);
 
-    void add(&mut this, int index, T value);
+    mut void add(int index, T value);
 
-    T remove(&mut this, int index);
+    mut T remove(int index);
 
-    boolean contains(&this, T value) where T extends Equatable<T> {
+    boolean contains(T value) where T extends Equatable<T> {
         return this.indexOf(value) >= 0;
     }
 
-    int indexOf(&this, T value) where T extends Equatable<T>;
+    int indexOf(T value) where T extends Equatable<T>;
 
-    void clear(&mut this);
+    mut void clear();
 }

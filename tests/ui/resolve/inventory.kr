@@ -3,7 +3,7 @@ package shop;
 import shop.money.Price;
 
 interface Priced {
-    Price price(&this);
+    Price price();
 }
 
 enum Category {
@@ -12,7 +12,7 @@ enum Category {
 }
 
 class Item implements Priced {
-    shared AtomicInt created = new AtomicInt(0);
+    static AtomicInt created = new AtomicInt(0);
     const int MAX_NAME = 32;
 
     String name;
@@ -26,15 +26,15 @@ class Item implements Priced {
         Item.created.increment();
     }
 
-    Price price(&this) {
+    Price price() {
         return this.cost;
     }
 
-    &[this] String label(&this) {
+    &[this] String label() {
         return &this.name;
     }
 
-    String describe(&this) {
+    String describe() {
         String kind = switch (this.category) {
             case FOOD -> "food";
             case TOOLS -> {
@@ -44,7 +44,7 @@ class Item implements Priced {
         return kind;
     }
 
-    int validate(String name) {
+    static int validate(String name) {
         if (name.length() > Item.MAX_NAME) {
             return 1;
         }
@@ -53,7 +53,7 @@ class Item implements Priced {
 }
 
 class Main {
-    void main() {
+    static void main() {
         List<Item> items = new ArrayList<>();
         for (int i = 0; i < 3; i++) {
             Object value = items.get(i);

@@ -4,20 +4,20 @@ final class Console {
     private Console() {}
 
     @Intrinsic
-    void print(Object? value);
+    static void print(Object? value);
 
     @Intrinsic
-    void print(&Object? value);
+    static void print(&Object? value);
 
     @Intrinsic
-    void println();
+    static void println();
 
     @Intrinsic
-    void println(Object? value);
+    static void println(Object? value);
 
     @Intrinsic
-    void println(&Object? value);
+    static void println(&Object? value);
 
     @Intrinsic
-    String? readLine();
+    static String? readLine();
 }

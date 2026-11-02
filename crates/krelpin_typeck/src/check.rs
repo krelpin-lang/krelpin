@@ -105,7 +105,7 @@ fn check_member<'a, 'tcx>(tcx: &'a Tcx<'tcx>, owner: DefId, member: &Member) -> 
                 let expected = ty.unwrap_or(Ty::Unknown);
                 if matches!(
                     field.storage,
-                    FieldStorage::Shared(_) | FieldStorage::Const(_)
+                    FieldStorage::Static(_) | FieldStorage::Const(_)
                 ) {
                     fcx.self_ty = Ty::Unknown;
                 }

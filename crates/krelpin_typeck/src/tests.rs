@@ -59,11 +59,11 @@ fn body(code: &str) -> String {
          \x20   int x;\n\
          \x20   public int y;\n\
          \x20   Point(int x, int y) {{ this.x = x; this.y = y; }}\n\
-         \x20   int sum(&this) {{ return this.x + this.y; }}\n\
-         \x20   int scaled(&this, int factor) {{ return this.sum() * factor; }}\n\
+         \x20   int sum() {{ return this.x + this.y; }}\n\
+         \x20   int scaled(int factor) {{ return this.sum() * factor; }}\n\
          }}\n\
          class Main {{\n\
-         \x20   void run(&this) {{ {code} }}\n\
+         \x20   void run() {{ {code} }}\n\
          }}"
     )
 }
@@ -86,7 +86,7 @@ fn body_ok(code: &str) {
 
 #[test]
 fn hello_world() {
-    ok("class Main { void main() { Console.println(\"Hello World!\"); } }");
+    ok("class Main { static void main() { Console.println(\"Hello World!\"); } }");
 }
 
 #[test]
@@ -172,15 +172,15 @@ fn fields_and_visibility() {
         in_body("Point p = new Point(1, 2); int z = p.z;"),
         ["no field `z` on type `Point`"]
     );
-    ok("class A { private int secret; int peek(&this, A other) { return other.secret; } }");
+    ok("class A { private int secret; int peek(A other) { return other.secret; } }");
 }
 
 #[test]
 fn private_methods_and_constructors() {
     assert_eq!(
         errors(
-            "class A { private void hidden(&this) {} private A() {} }\n\
-             class B { void f(&this, A a) { a.hidden(); A b = new A(); } }"
+            "class A { private void hidden() {} private A() {} }\n\
+             class B { void f(A a) { a.hidden(); A b = new A(); } }"
         ),
         [
             "method `hidden` of `A` is private",
@@ -196,9 +196,9 @@ fn class_and_instance_members() {
             "class Account {{\n\
              \x20   const int LIMIT = 100;\n\
              \x20   int balance;\n\
-             \x20   int total(&this) {{ return this.balance; }}\n\
-             \x20   int limit() {{ return Account.LIMIT; }}\n\
-             \x20   void run(&this) {{ {code} }}\n\
+             \x20   int total() {{ return this.balance; }}\n\
+             \x20   static int limit() {{ return Account.LIMIT; }}\n\
+             \x20   void run() {{ {code} }}\n\
              }}"
         )
     };
@@ -247,16 +247,16 @@ fn method_calls() {
 #[test]
 fn overloads() {
     ok("class A {\n\
-        \x20   int f(&this, int x) { return x; }\n\
-        \x20   String f(&this, String s) { return s; }\n\
-        \x20   void run(&this) { int a = this.f(1); String b = this.f(\"x\"); }\n\
+        \x20   int f(int x) { return x; }\n\
+        \x20   String f(String s) { return s; }\n\
+        \x20   void run() { int a = this.f(1); String b = this.f(\"x\"); }\n\
         }");
     assert_eq!(
         errors(
             "class A {\n\
-             \x20   void f(&this, int x) {}\n\
-             \x20   void f(&this, String s) {}\n\
-             \x20   void run(&this) { this.f(true); }\n\
+             \x20   void f(int x) {}\n\
+             \x20   void f(String s) {}\n\
+             \x20   void run() { this.f(true); }\n\
              }"
         ),
         ["no overload of `f` accepts arguments of type (boolean)"]
@@ -266,8 +266,8 @@ fn overloads() {
 #[test]
 fn varargs() {
     ok("class A {\n\
-        \x20   int sum(int... xs) { return xs.length; }\n\
-        \x20   void run(&this) {\n\
+        \x20   static int sum(int... xs) { return xs.length; }\n\
+        \x20   void run() {\n\
         \x20       int a = A.sum();\n\
         \x20       int b = A.sum(1, 2, 3);\n\
         \x20       int[] xs = {1};\n\
@@ -287,30 +287,30 @@ fn constructors() {
         in_body("Point p = new Point(1);"),
         ["this constructor takes 2 arguments but 1 argument was supplied"]
     );
-    ok("class A {} class B { void f() { A a = new A(); } }");
+    ok("class A {} class B { static void f() { A a = new A(); } }");
     assert_eq!(
-        errors("class A {} class B { void f() { A a = new A(1); } }"),
+        errors("class A {} class B { static void f() { A a = new A(1); } }"),
         ["`A` has no constructor that takes 1 argument"]
     );
     assert_eq!(
-        errors("abstract class A {} class B { void f() { A a = new A(); } }"),
+        errors("abstract class A {} class B { static void f() { A a = new A(); } }"),
         ["cannot create an object of an abstract class `A`"]
     );
     assert_eq!(
-        errors("interface I {} class B { void f() { I i = new I(); } }"),
+        errors("interface I {} class B { static void f() { I i = new I(); } }"),
         ["cannot create an object of an interface `I`"]
     );
 }
 
 #[test]
-fn shared_and_const_fields_cannot_be_assigned() {
+fn static_and_const_fields_cannot_be_assigned() {
     let src = |code: &str| {
         format!(
             "class Counter {{\n\
              \x20   const int MAX = 10;\n\
-             \x20   shared int count = 0;\n\
-             \x20   shared AtomicInt created = new AtomicInt(0);\n\
-             \x20   void run(&this) {{ {code} }}\n\
+             \x20   static int count = 0;\n\
+             \x20   static AtomicInt created = new AtomicInt(0);\n\
+             \x20   void run() {{ {code} }}\n\
              }}"
         )
     };
@@ -319,11 +319,11 @@ fn shared_and_const_fields_cannot_be_assigned() {
     ));
     assert_eq!(
         errors(&src("Counter.count = 1;")),
-        ["cannot assign to `shared` field `count`"]
+        ["cannot assign to `static` field `count`"]
     );
     assert_eq!(
         errors(&src("Counter.count++;")),
-        ["cannot assign to `shared` field `count`"]
+        ["cannot assign to `static` field `count`"]
     );
     assert_eq!(
         errors(&src("Counter.MAX = 2;")),
@@ -333,30 +333,30 @@ fn shared_and_const_fields_cannot_be_assigned() {
 
 #[test]
 fn returns() {
-    ok("class A { int f(boolean b) { if (b) { return 1; } else { return 2; } } }");
-    ok("class A { int f() { while (true) {} } }");
-    ok("class A { int f() throws Exception { throw new Exception(); } }");
-    ok("class A { int f() { throw new IllegalStateException(); } }");
-    ok("class A { int f(int x) { switch (x) { \
+    ok("class A { static int f(boolean b) { if (b) { return 1; } else { return 2; } } }");
+    ok("class A { static int f() { while (true) {} } }");
+    ok("class A { static int f() throws Exception { throw new Exception(); } }");
+    ok("class A { static int f() { throw new IllegalStateException(); } }");
+    ok("class A { static int f(int x) { switch (x) { \
          case 1 -> { return 1; } default -> { return 2; } } } }");
     assert_eq!(
-        errors("class A { int f(boolean b) { if (b) { return 1; } } }"),
+        errors("class A { static int f(boolean b) { if (b) { return 1; } } }"),
         ["missing return statement"]
     );
     assert_eq!(
-        errors("class A { int f() { while (true) { break; } } }"),
+        errors("class A { static int f() { while (true) { break; } } }"),
         ["missing return statement"]
     );
     assert_eq!(
-        errors("class A { void f() { return 1; } }"),
+        errors("class A { static void f() { return 1; } }"),
         ["cannot return a value from a method that returns `void`"]
     );
     assert_eq!(
-        errors("class A { int f() { return; } }"),
+        errors("class A { static int f() { return; } }"),
         ["this method must return a `int`"]
     );
     assert_eq!(
-        errors("class A { int f() { return \"x\"; } }"),
+        errors("class A { static int f() { return \"x\"; } }"),
         ["mismatched types"]
     );
 }
@@ -420,14 +420,14 @@ fn switch_expressions() {
 fn inheritance_and_generics() {
     let src = |code: &str| {
         format!(
-            "class Animal {{ String name(&this) {{ return \"animal\"; }} }}\n\
+            "class Animal {{ String name() {{ return \"animal\"; }} }}\n\
              class Dog extends Animal {{}}\n\
              class Box<T> {{\n\
              \x20   T value;\n\
              \x20   Box(T value) {{ this.value = value; }}\n\
-             \x20   T get(&this) {{ return this.value; }}\n\
+             \x20   T get() {{ return this.value; }}\n\
              }}\n\
-             class Main {{ void run(&this) {{ {code} }} }}"
+             class Main {{ void run() {{ {code} }} }}"
         )
     };
     ok(&src(
@@ -509,7 +509,7 @@ fn casts() {
 #[test]
 fn types_from_unknown_packages_are_lenient() {
     ok("import shop.money.Price;\n\
-        class A { int f(Price price) { return price.cents() + price.anything; } }");
+        class A { static int f(Price price) { return price.cents() + price.anything; } }");
 }
 
 #[test]
@@ -541,10 +541,10 @@ fn string_methods_are_checked() {
 #[test]
 fn every_object_has_the_methods_of_object() {
     body_ok("Point p = new Point(1, 2); String text = p.toString(); Object any = p;");
-    ok("interface Shape { double area(&this); }\n\
-        class Main { String f(Shape shape) { return shape.toString(); } }");
+    ok("interface Shape { double area(); }\n\
+        class Main { static String f(Shape shape) { return shape.toString(); } }");
     ok("enum Color { RED, GREEN }\n\
-        class Main { String f(Color c) { return c.name() + c.ordinal(); } }");
+        class Main { static String f(Color c) { return c.name() + c.ordinal(); } }");
 }
 
 #[test]
@@ -594,7 +594,7 @@ fn collections_are_generic() {
 fn own_types_can_be_iterable() {
     ok("abstract class Countdown implements Iterable<int> {}\n\
         class Main {\n\
-        \x20   void run(&this, Countdown countdown) {\n\
+        \x20   void run(Countdown countdown) {\n\
         \x20       for (int n : countdown) { int x = n; }\n\
         \x20   }\n\
         }");
@@ -684,17 +684,17 @@ fn exceptions() {
         ["mismatched types"]
     );
     ok("import std.io.IOException;\n\
-        class Main { void run(&this) throws IOException { throw new IOException(\"disk\"); } }");
+        class Main { void run() throws IOException { throw new IOException(\"disk\"); } }");
 }
 
 #[test]
-fn atomics_can_change_through_shared_fields() {
+fn atomics_can_change_through_static_fields() {
     ok("class Counter {\n\
-        \x20   shared AtomicInt created = new AtomicInt(0);\n\
+        \x20   static AtomicInt created = new AtomicInt(0);\n\
         \x20   Counter() { int id = Counter.created.increment(); }\n\
         }");
     assert_eq!(
-        errors("class Counter { shared AtomicInt created = new AtomicInt(\"0\"); }"),
+        errors("class Counter { static AtomicInt created = new AtomicInt(\"0\"); }"),
         ["mismatched types"]
     );
 }
@@ -725,7 +725,7 @@ fn generic_arguments_satisfy_bounds() {
         format!(
             "class Sorted<T extends Comparable<T>> {{}}\n\
              class Thing {{}}\n\
-             class Main {{ void run(&this) {{ {code} }} }}"
+             class Main {{ void run() {{ {code} }} }}"
         )
     };
     ok(&src(
@@ -744,20 +744,20 @@ fn generic_arguments_satisfy_bounds() {
 #[test]
 fn type_parameters_have_the_methods_of_their_bounds() {
     ok("class Max {\n\
-        \x20   <T extends Comparable<T>> T max(T a, T b) {\n\
+        \x20   static <T extends Comparable<T>> T max(T a, T b) {\n\
         \x20       return a.compareTo(&b) >= 0 ? a : b;\n\
         \x20   }\n\
         }");
-    ok("class Show<T> { String show(&this, T value) { return value.toString(); } }");
+    ok("class Show<T> { String show(T value) { return value.toString(); } }");
     ok("class View<T extends Comparable<T>> {\n\
-        \x20   Comparable<T> view(&this, T value) { return value; }\n\
+        \x20   Comparable<T> view(T value) { return value; }\n\
         }");
     assert_eq!(
-        errors("class Show<T> { int size(&this, T value) { return value.length(); } }"),
+        errors("class Show<T> { int size(T value) { return value.length(); } }"),
         ["no method named `length` found for `T`"]
     );
     assert_eq!(
-        errors("class View<T> { Comparable<T> view(&this, T value) { return value; } }"),
+        errors("class View<T> { Comparable<T> view(T value) { return value; } }"),
         ["mismatched types"]
     );
 }
@@ -765,16 +765,16 @@ fn type_parameters_have_the_methods_of_their_bounds() {
 fn pick(code: &str) -> String {
     format!(
         "class Pick {{\n\
-         \x20   int f(long x) {{ return 1; }}\n\
-         \x20   String f(int x) {{ return \"\"; }}\n\
-         \x20   boolean g(Object? x) {{ return true; }}\n\
-         \x20   char g(String? x) {{ return 'c'; }}\n\
-         \x20   int v(String... xs) {{ return 0; }}\n\
-         \x20   String v(String x) {{ return x; }}\n\
-         \x20   void amb(int a, long b) {{}}\n\
-         \x20   void amb(long a, int b) {{}}\n\
+         \x20   static int f(long x) {{ return 1; }}\n\
+         \x20   static String f(int x) {{ return \"\"; }}\n\
+         \x20   static boolean g(Object? x) {{ return true; }}\n\
+         \x20   static char g(String? x) {{ return 'c'; }}\n\
+         \x20   static int v(String... xs) {{ return 0; }}\n\
+         \x20   static String v(String x) {{ return x; }}\n\
+         \x20   static void amb(int a, long b) {{}}\n\
+         \x20   static void amb(long a, int b) {{}}\n\
          }}\n\
-         class Main {{ void run(&this) {{ {code} }} }}"
+         class Main {{ void run() {{ {code} }} }}"
     )
 }
 
@@ -816,15 +816,15 @@ fn ambiguous_calls() {
 fn util(code: &str) -> String {
     format!(
         "class Util {{\n\
-         \x20   <T> T first(List<T> xs) {{ return xs.get(0); }}\n\
-         \x20   <T> T either(T a, T b) {{ return a; }}\n\
-         \x20   <T extends Comparable<T>> T max(T a, T b) {{\n\
+         \x20   static <T> T first(List<T> xs) {{ return xs.get(0); }}\n\
+         \x20   static <T> T either(T a, T b) {{ return a; }}\n\
+         \x20   static <T extends Comparable<T>> T max(T a, T b) {{\n\
          \x20       return a.compareTo(&b) >= 0 ? a : b;\n\
          \x20   }}\n\
-         \x20   <T> List<T> listOf(T... xs) {{ return new ArrayList<>(); }}\n\
+         \x20   static <T> List<T> listOf(T... xs) {{ return new ArrayList<>(); }}\n\
          }}\n\
          class Thing {{}}\n\
-         class Main {{ void run(&this) {{ {code} }} }}"
+         class Main {{ void run() {{ {code} }} }}"
     )
 }
 
@@ -862,15 +862,15 @@ fn inferred_type_arguments_satisfy_bounds() {
 fn closures(code: &str) -> String {
     format!(
         "import std.function.Consumer;\n\
-         interface Mapper<A, B> {{ B apply(&this, A value); }}\n\
+         interface Mapper<A, B> {{ B apply(A value); }}\n\
          class Thing {{ Thing(String name) {{}} }}\n\
          class Exec {{\n\
-         \x20   int run(Runnable task) {{ return 0; }}\n\
-         \x20   String run(Consumer<String> action) {{ return \"\"; }}\n\
+         \x20   static int run(Runnable task) {{ return 0; }}\n\
+         \x20   static String run(Consumer<String> action) {{ return \"\"; }}\n\
          }}\n\
          class Main {{\n\
-         \x20   int helper(&this, String s) {{ return 1; }}\n\
-         \x20   void run(&this) {{ {code} }}\n\
+         \x20   int helper(String s) {{ return 1; }}\n\
+         \x20   void run() {{ {code} }}\n\
          }}"
     )
 }
@@ -952,10 +952,10 @@ fn method_references() {
 fn shapes(code: &str) -> String {
     format!(
         "interface Shape {{\n\
-         \x20   double area(&this);\n\
-         \x20   String name(&this) {{ return \"shape\"; }}\n\
+         \x20   double area();\n\
+         \x20   String name() {{ return \"shape\"; }}\n\
          }}\n\
-         interface Box<T> {{ T get(&this); }}\n\
+         interface Box<T> {{ T get(); }}\n\
          {code}"
     )
 }
@@ -963,15 +963,15 @@ fn shapes(code: &str) -> String {
 #[test]
 fn abstract_methods_are_implemented() {
     ok(&shapes(
-        "class Circle implements Shape { double area(&this) { return 3.14; } }",
+        "class Circle implements Shape { double area() { return 3.14; } }",
     ));
     ok(&shapes("abstract class Base implements Shape {}"));
     ok(&shapes(
-        "class Base { double area(&this) { return 1.0; } }\n\
+        "class Base { double area() { return 1.0; } }\n\
          class Square extends Base implements Shape {}",
     ));
     ok(&shapes(
-        "class IntBox implements Box<int> { int get(&this) { return 1; } }",
+        "class IntBox implements Box<int> { int get() { return 1; } }",
     ));
 
     let src = shapes("class Square implements Shape {}");
@@ -982,23 +982,20 @@ fn abstract_methods_are_implemented() {
     assert_eq!(
         helps(&src),
         [
-            "missing: `double area(&this)`",
+            "missing: `double area()`",
             "implement the missing methods, or mark `Square` as `abstract`",
         ]
     );
     assert_eq!(
         helps(&shapes("struct Point implements Shape {}")),
-        [
-            "missing: `double area(&this)`",
-            "implement the missing methods"
-        ]
+        ["missing: `double area()`", "implement the missing methods"]
     );
     assert_eq!(
         errors(&shapes("enum Kind implements Shape { ROUND }")),
         ["`Kind` does not implement every method of `Shape`"]
     );
     assert_eq!(
-        errors("class A { abstract void f(&this); }"),
+        errors("class A { abstract void f(); }"),
         ["`A` is not abstract but declares abstract methods"]
     );
 }
@@ -1006,10 +1003,10 @@ fn abstract_methods_are_implemented() {
 fn base(code: &str) -> String {
     format!(
         "class Base {{\n\
-         \x20   void f(&this) {{}}\n\
-         \x20   final void g(&this) {{}}\n\
-         \x20   public void h(&this) {{}}\n\
-         \x20   Base copy(&this) {{ return new Base(); }}\n\
+         \x20   void f() {{}}\n\
+         \x20   final void g() {{}}\n\
+         \x20   public void h() {{}}\n\
+         \x20   Base copy() {{ return new Base(); }}\n\
          }}\n\
          {code}"
     )
@@ -1019,45 +1016,45 @@ fn base(code: &str) -> String {
 fn overrides_keep_the_signature() {
     ok(&base(
         "class A extends Base {\n\
-         \x20   void f(&this) {}\n\
-         \x20   void f(&mut this, int x) {}\n\
-         \x20   A copy(&this) { return new A(); }\n\
-         \x20   String toString(&this) { return \"a\"; }\n\
+         \x20   void f() {}\n\
+         \x20   mut void f(int x) {}\n\
+         \x20   A copy() { return new A(); }\n\
+         \x20   String toString() { return \"a\"; }\n\
          }",
     ));
     assert_eq!(
-        errors(&base("class A extends Base { void f(&mut this) {} }")),
-        ["`f` takes `&mut this` but `Base.f` takes `&this`"]
+        errors(&base("class A extends Base { mut void f() {} }")),
+        ["`f` is `mut` but `Base.f` is read-only"]
     );
     assert_eq!(
-        errors(&base("class A extends Base { void f() {} }")),
-        ["`f` takes no `this` but `Base.f` takes `&this`"]
+        errors(&base("class A extends Base { static void f() {} }")),
+        ["`f` is `static` but `Base.f` is read-only"]
     );
     assert_eq!(
-        errors(&base("class A extends Base { void g(&this) {} }")),
+        errors(&base("class A extends Base { void g() {} }")),
         ["cannot override `Base.g` because it is `final`"]
     );
     assert_eq!(
-        errors(&base("class A extends Base { private void h(&this) {} }")),
+        errors(&base("class A extends Base { private void h() {} }")),
         ["`h` cannot be less visible than `Base.h`"]
     );
     assert_eq!(
-        errors(&base("class A extends Base { int f(&this) { return 1; } }")),
+        errors(&base("class A extends Base { int f() { return 1; } }")),
         ["`f` returns `int` but `Base.f` returns `void`"]
     );
     assert_eq!(
         errors(&base(
-            "class A extends Base { String copy(&this) { return \"\"; } }"
+            "class A extends Base { String copy() { return \"\"; } }"
         )),
         ["`copy` returns `String` but `Base.copy` returns `Base`"]
     );
     assert_eq!(
-        errors("class A { int toString(&this) { return 1; } }"),
+        errors("class A { int toString() { return 1; } }"),
         ["`toString` returns `int` but `Object.toString` returns `String`"]
     );
     assert_eq!(
         errors(&shapes(
-            "class StrBox implements Box<String> { int get(&this) { return 1; } }"
+            "class StrBox implements Box<String> { int get() { return 1; } }"
         )),
         ["`get` returns `int` but `Box.get` returns `String`"]
     );
@@ -1098,7 +1095,7 @@ fn parents_have_the_right_kind() {
         ["cannot extend `String` because it is `final`"]
     );
     assert_eq!(
-        errors("interface I { void f(&this); } class A extends I {}"),
+        errors("interface I { void f(); } class A extends I {}"),
         ["a class cannot extend an interface"]
     );
 }
@@ -1115,7 +1112,7 @@ fn only_throwables_are_thrown_and_caught() {
         ["cannot throw a value of type `RuntimeException?`"]
     );
     assert_eq!(
-        errors("class A { void f() throws String {} }"),
+        errors("class A { static void f() throws String {} }"),
         ["`String` is not a `Throwable`"]
     );
     assert_eq!(
@@ -1161,10 +1158,10 @@ fn files(code: &str) -> String {
     format!(
         "import std.io.IOException;\n\
          class Files {{\n\
-         \x20   String read(String path) throws IOException {{ return path; }}\n\
-         \x20   void write(String text) {{}}\n\
+         \x20   static String read(String path) throws IOException {{ return path; }}\n\
+         \x20   static void write(String text) {{}}\n\
          }}\n\
-         interface Source {{ String next(&this) throws IOException; }}\n\
+         interface Source {{ String next() throws IOException; }}\n\
          class Main {{\n\
          \x20   {code}\n\
          }}"
@@ -1174,22 +1171,20 @@ fn files(code: &str) -> String {
 #[test]
 fn checked_exceptions_are_caught_or_declared() {
     ok(&files(
-        "void run(&this) throws IOException { String text = Files.read(\"a\"); }",
+        "void run() throws IOException { String text = Files.read(\"a\"); }",
+    ));
+    ok(&files("void run() throws Exception { Files.read(\"a\"); }"));
+    ok(&files(
+        "void run() { try { Files.read(\"a\"); } catch (IOException e) {} }",
     ));
     ok(&files(
-        "void run(&this) throws Exception { Files.read(\"a\"); }",
+        "void run() { try { Files.read(\"a\"); } catch (Exception e) {} }",
     ));
     ok(&files(
-        "void run(&this) { try { Files.read(\"a\"); } catch (IOException e) {} }",
-    ));
-    ok(&files(
-        "void run(&this) { try { Files.read(\"a\"); } catch (Exception e) {} }",
-    ));
-    ok(&files(
-        "void run(&this) { throw new IllegalArgumentException(\"bad\"); }",
+        "void run() { throw new IllegalArgumentException(\"bad\"); }",
     ));
 
-    let src = files("void run(&this) { Files.read(\"a\"); }");
+    let src = files("void run() { Files.read(\"a\"); }");
     assert_eq!(errors(&src), ["unreported exception `IOException`"]);
     assert_eq!(
         helps(&src),
@@ -1199,14 +1194,12 @@ fn checked_exceptions_are_caught_or_declared() {
         ]
     );
     assert_eq!(
-        errors(&files(
-            "void run(&this) { throw new IOException(\"disk\"); }"
-        )),
+        errors(&files("void run() { throw new IOException(\"disk\"); }")),
         ["unreported exception `IOException`"]
     );
     assert_eq!(
         errors(&files(
-            "void run(&this) { try { Files.read(\"a\"); } catch (RuntimeException e) {} }"
+            "void run() { try { Files.read(\"a\"); } catch (RuntimeException e) {} }"
         )),
         ["unreported exception `IOException`"]
     );
@@ -1216,13 +1209,13 @@ fn checked_exceptions_are_caught_or_declared() {
 fn exceptions_thrown_in_catch_blocks_are_not_caught_by_them() {
     assert_eq!(
         errors(&files(
-            "void run(&this) { \
+            "void run() { \
              try { Files.read(\"a\"); } catch (IOException e) { Files.read(\"b\"); } }"
         )),
         ["unreported exception `IOException`"]
     );
     ok(&files(
-        "void run(&this) { try { try { Files.read(\"a\"); } finally {} } \
+        "void run() { try { try { Files.read(\"a\"); } finally {} } \
          catch (IOException e) {} }",
     ));
 }
@@ -1230,7 +1223,7 @@ fn exceptions_thrown_in_catch_blocks_are_not_caught_by_them() {
 #[test]
 fn lambdas_cannot_throw_checked_exceptions_their_method_does_not() {
     let src = files(
-        "void run(&this) throws IOException { \
+        "void run() throws IOException { \
          List<String> paths = new ArrayList<>(); \
          paths.forEach(path -> Files.read(path)); }",
     );
@@ -1239,21 +1232,19 @@ fn lambdas_cannot_throw_checked_exceptions_their_method_does_not() {
         helps(&src)[1],
         "catch it inside the lambda, because `accept` cannot throw it"
     );
-    ok(&files(
-        "void run(&this) { Source s = () -> Files.read(\"a\"); }",
-    ));
+    ok(&files("void run() { Source s = () -> Files.read(\"a\"); }"));
 }
 
 #[test]
 fn constructors_declare_their_exceptions() {
     ok("import std.io.IOException;\n\
         class Conn { Conn() throws IOException {} }\n\
-        class Main { void run(&this) throws IOException { Conn c = new Conn(); } }");
+        class Main { void run() throws IOException { Conn c = new Conn(); } }");
     assert_eq!(
         errors(
             "import std.io.IOException;\n\
              class Conn { Conn() throws IOException {} }\n\
-             class Main { void run(&this) { Conn c = new Conn(); } }"
+             class Main { void run() { Conn c = new Conn(); } }"
         ),
         ["unreported exception `IOException`"]
     );
@@ -1263,20 +1254,20 @@ fn constructors_declare_their_exceptions() {
 fn catching_checked_exceptions_that_are_never_thrown() {
     assert_eq!(
         errors(&files(
-            "void run(&this) { try { Files.write(\"a\"); } catch (IOException e) {} }"
+            "void run() { try { Files.write(\"a\"); } catch (IOException e) {} }"
         )),
         ["`IOException` is never thrown in the body of this `try`"]
     );
     ok(&files(
-        "void run(&this) { try { Files.write(\"a\"); } catch (Exception e) {} }",
+        "void run() { try { Files.write(\"a\"); } catch (Exception e) {} }",
     ));
     ok(&files(
-        "void run(&this) { try { Files.write(\"a\"); } catch (IllegalStateException e) {} }",
+        "void run() { try { Files.write(\"a\"); } catch (IllegalStateException e) {} }",
     ));
     ok("import std.io.IOException;\n\
         import java.net.Socket;\n\
         class Main {\n\
-        \x20   void run(&this, Socket s) { try { s.connect(); } catch (IOException e) {} }\n\
+        \x20   void run(Socket s) { try { s.connect(); } catch (IOException e) {} }\n\
         }");
 }
 
@@ -1285,17 +1276,17 @@ fn overrides_cannot_throw_more() {
     let src = |code: &str| {
         format!(
             "import std.io.IOException;\n\
-             class Base {{ void f(&this) {{}} void g(&this) throws Exception {{}} }}\n\
+             class Base {{ void f() {{}} void g() throws Exception {{}} }}\n\
              {code}"
         )
     };
     ok(&src(
-        "class A extends Base { void g(&this) throws IOException {} \
-         void f(&this) throws IllegalStateException {} }",
+        "class A extends Base { void g() throws IOException {} \
+         void f() throws IllegalStateException {} }",
     ));
     assert_eq!(
         errors(&src(
-            "class A extends Base { void f(&this) throws IOException {} }"
+            "class A extends Base { void f() throws IOException {} }"
         )),
         ["`f` cannot throw `IOException` because `Base.f` does not"]
     );
@@ -1306,12 +1297,12 @@ fn bag(code: &str) -> String {
         "class Bag<T> {{\n\
          \x20   T first;\n\
          \x20   Bag(T first) {{ this.first = first; }}\n\
-         \x20   boolean isSmall(&this, T limit) where T extends Comparable<T> {{\n\
+         \x20   boolean isSmall(T limit) where T extends Comparable<T> {{\n\
          \x20       return this.first.compareTo(&limit) < 0;\n\
          \x20   }}\n\
          }}\n\
          class Thing {{}}\n\
-         class Main {{ void run(&this) {{ {code} }} }}"
+         class Main {{ void run() {{ {code} }} }}"
     )
 }
 
@@ -1329,7 +1320,7 @@ fn where_clauses_are_checked_at_the_call() {
     );
     assert_eq!(
         errors(
-            "class Bag<T> { T first; boolean bad(&this, T other) { \
+            "class Bag<T> { T first; boolean bad(T other) { \
              return this.first.compareTo(&other) < 0; } }"
         ),
         ["no method named `compareTo` found for `T`"]
@@ -1341,12 +1332,12 @@ fn points(code: &str) -> String {
         "class Point implements Hashable<Point> {{\n\
          \x20   int x;\n\
          \x20   Point(int x) {{ this.x = x; }}\n\
-         \x20   boolean equals(&this, &Point other) {{ return this.x == other.x; }}\n\
-         \x20   int hashCode(&this) {{ return this.x; }}\n\
+         \x20   boolean equals(&Point other) {{ return this.x == other.x; }}\n\
+         \x20   int hashCode() {{ return this.x; }}\n\
          }}\n\
          class Thing {{}}\n\
          enum Color {{ RED, GREEN }}\n\
-         class Main {{ void run(&this) {{ {code} }} }}"
+         class Main {{ void run() {{ {code} }} }}"
     )
 }
 
@@ -1376,8 +1367,8 @@ fn equality_needs_equatable() {
 
 #[test]
 fn generic_equality_needs_a_bound() {
-    ok("class Box<T extends Equatable<T>> { boolean same(&this, T a, T b) { return a == b; } }");
-    let src = "class Box<T> { boolean same(&this, T a, T b) { return a == b; } }";
+    ok("class Box<T extends Equatable<T>> { boolean same(T a, T b) { return a == b; } }");
+    let src = "class Box<T> { boolean same(T a, T b) { return a == b; } }";
     assert_eq!(
         errors(src),
         ["values of type `T` cannot be compared with `==`"]
@@ -1455,7 +1446,7 @@ fn enum_variants_carry_data() {
              \x20   Shape unit() {{ return Circle(1.0); }}\n\
              }}\n\
              enum Tree<T> {{ Leaf(T value), Node(Tree<T> left, Tree<T> right), Empty }}\n\
-             class Main {{ void run(&this) {{ {code} }} }}"
+             class Main {{ void run() {{ {code} }} }}"
         )
     };
     ok(&src(
@@ -1491,7 +1482,7 @@ fn only_enums_without_data_are_hashable() {
         format!(
             "enum Color {{ RED, GREEN }}\n\
              enum Shape {{ Circle(double radius), Empty }}\n\
-             class Main {{ void run(&this) {{ {code} }} }}"
+             class Main {{ void run() {{ {code} }} }}"
         )
     };
     ok(&src(
@@ -1523,7 +1514,7 @@ fn variants(code: &str) -> String {
 #[test]
 fn patterns_destructure_variants() {
     ok(&variants(
-        "double area(Shape shape) {\n\
+        "static double area(Shape shape) {\n\
          \x20   return switch (shape) {\n\
          \x20       case Circle(double r) -> 3.14 * r * r;\n\
          \x20       case Rect(double w, double h) when w == h -> w * w;\n\
@@ -1531,10 +1522,10 @@ fn patterns_destructure_variants() {
          \x20       case Empty -> 0.0;\n\
          \x20   };\n\
          }\n\
-         boolean round(Tree<Shape> tree) {\n\
+         static boolean round(Tree<Shape> tree) {\n\
          \x20   return tree instanceof Leaf(Circle(_));\n\
          }\n\
-         String first(Tree<String> tree) {\n\
+         static String first(Tree<String> tree) {\n\
          \x20   if (tree instanceof Leaf(String value) && value.length() > 0) {\n\
          \x20       return value;\n\
          \x20   }\n\
@@ -1543,38 +1534,39 @@ fn patterns_destructure_variants() {
     ));
     assert_eq!(
         errors(&variants(
-            "double f(Shape s) { return switch (s) { \
+            "static double f(Shape s) { return switch (s) { \
              case Circle(int r) -> 1.0; default -> 0.0; }; }"
         )),
         ["mismatched types"]
     );
     assert_eq!(
         errors(&variants(
-            "int f(Shape s) { return switch (s) { case Rect(double w) -> 1; default -> 0; }; }"
+            "static int f(Shape s) { return switch (s) { case Rect(double w) -> 1; default -> \
+             0; }; }"
         )),
         ["this pattern has 1 field, but the variant `Shape.Rect` has 2 fields"]
     );
     assert_eq!(
         errors(&variants(
-            "int f(Shape s) { return switch (s) { case Circle -> 1; default -> 0; }; }"
+            "static int f(Shape s) { return switch (s) { case Circle -> 1; default -> 0; }; }"
         )),
         ["the variant `Shape.Circle` has fields"]
     );
     assert_eq!(
         errors(&variants(
-            "int f(Shape s) { return switch (s) { case Empty(_) -> 1; default -> 0; }; }"
+            "static int f(Shape s) { return switch (s) { case Empty(_) -> 1; default -> 0; }; }"
         )),
         ["the variant `Shape.Empty` has no fields"]
     );
     assert_eq!(
         errors(&variants(
-            "int f(Shape s) { return switch (s) { case Square -> 1; default -> 0; }; }"
+            "static int f(Shape s) { return switch (s) { case Square -> 1; default -> 0; }; }"
         )),
         ["no variant `Square` in enum `Shape`"]
     );
     assert_eq!(
         errors(&variants(
-            "int f(Object o) { return switch (o) { case Main(int x) -> 1; default -> 0; }; }"
+            "static int f(Object o) { return switch (o) { case Main(int x) -> 1; default -> 0; }; }"
         )),
         ["`Main` is not an enum variant"]
     );
@@ -1590,38 +1582,39 @@ fn switches_on_enums_cover_every_case() {
             .collect()
     };
     assert_eq!(
-        notes("int f(Shape s) { return switch (s) { case Circle(_) -> 1; }; }"),
+        notes("static int f(Shape s) { return switch (s) { case Circle(_) -> 1; }; }"),
         ["not covered: `Rect(_, _)` and `Empty`"]
     );
     assert_eq!(
         notes(
-            "int f(Tree<Shape> t) { return switch (t) { \
+            "static int f(Tree<Shape> t) { return switch (t) { \
              case Leaf(Circle(_)) -> 1; case Node(_, _), Empty -> 0; }; }"
         ),
         ["not covered: `Leaf(Rect(_, _))` and `Leaf(Empty)`"]
     );
     assert_eq!(
         notes(
-            "int f(Shape s) { return switch (s) { case Circle(_) -> 1; \
+            "static int f(Shape s) { return switch (s) { case Circle(_) -> 1; \
              case Rect(_, _) when true -> 2; case Empty -> 3; }; }"
         ),
         ["not covered: `Rect(_, _)`"]
     );
     assert_eq!(
-        notes("int f(boolean b) { return switch (b) { case true -> 1; }; }"),
+        notes("static int f(boolean b) { return switch (b) { case true -> 1; }; }"),
         ["not covered: `false`"]
     );
     assert_eq!(
         errors(&variants(
-            "void f(Shape s) { switch (s) { case Empty -> {} } }"
+            "static void f(Shape s) { switch (s) { case Empty -> {} } }"
         )),
         ["this `switch` statement does not cover every case"]
     );
     ok(&variants(
-        "void f(Shape s, int n) { switch (n) { case 1 -> {} } switch (s) { default -> {} } }",
+        "static void f(Shape s, int n) { switch (n) { case 1 -> {} } switch (s) { default -> \
+         {} } }",
     ));
     ok(&variants(
-        "int f(Shape s) { switch (s) { case Circle(_) -> { return 1; } \
+        "static int f(Shape s) { switch (s) { case Circle(_) -> { return 1; } \
          case Rect(_, _) -> { return 2; } case Empty -> { return 3; } } }",
     ));
 }
@@ -1630,25 +1623,28 @@ fn switches_on_enums_cover_every_case() {
 fn unreachable_patterns_are_reported() {
     assert_eq!(
         errors(&variants(
-            "int f(Shape s) { return switch (s) { case Circle(_) -> 1; default -> 0; \
+            "static int f(Shape s) { return switch (s) { case Circle(_) -> 1; default -> 0; \
              case Empty -> 2; }; }"
         )),
         ["unreachable pattern"]
     );
     assert_eq!(
         errors(&variants(
-            "int f(int n) { return switch (n) { case 1, 2 -> 1; case 1 -> 2; default -> 0; }; }"
+            "static int f(int n) { return switch (n) { case 1, 2 -> 1; case 1 -> 2; default -> \
+             0; }; }"
         )),
         ["unreachable pattern"]
     );
     assert_eq!(
         errors(&variants(
-            "int f(Object o) { return switch (o) { case Object any -> 1; case String s -> 2; }; }"
+            "static int f(Object o) { return switch (o) { case Object any -> 1; case String s \
+             -> 2; }; }"
         )),
         ["unreachable pattern"]
     );
     ok(&variants(
-        "int f(Object o) { return switch (o) { case String s -> 1; case Object any -> 2; }; }",
+        "static int f(Object o) { return switch (o) { case String s -> 1; case Object any -> \
+         2; }; }",
     ));
 }
 
@@ -1663,7 +1659,7 @@ fn derived_equality_and_hashing() {
         @Derive(Equatable, Hashable)\n\
         enum Shape { Circle(Point center, double radius), Empty }\n\
         class Main {\n\
-        \x20   boolean run(&this) {\n\
+        \x20   boolean run() {\n\
         \x20       HashMap<Shape, String> names = new HashMap<>();\n\
         \x20       names.put(Shape.Circle(new Point(1), 2.0), \"circle\");\n\
         \x20       return new Point(1) == new Point(2) && Shape.Empty == Shape.Empty;\n\
@@ -1688,7 +1684,7 @@ fn structs_are_built_from_their_fields() {
         format!(
             "@Derive(Equatable, Comparable)\n\
              struct Version {{ int major; String tag; int build = 0; }}\n\
-             class Main {{ void run(&this) {{ {code} }} }}"
+             class Main {{ void run() {{ {code} }} }}"
         )
     };
     ok(&src("Version a = new Version(1, \"beta\"); \
@@ -1710,11 +1706,11 @@ fn structs_are_built_from_their_fields() {
 #[test]
 fn results_record_callees_and_fields() {
     let src = "struct Money { long cents; String currency; }\n\
-               class Main { long run(&this, Money m, String... tags) {\n\
+               class Main { long run(Money m, String... tags) {\n\
                \x20   this.log(\"a\", \"b\");\n\
                \x20   return m.cents + m.currency.length();\n\
                }\n\
-               void log(&this, String... tags) {} }";
+               void log(String... tags) {} }";
     let (results, diagnostics, source_map) = check_str(src);
     assert!(diagnostics.is_empty(), "{diagnostics:?}");
     let named = |name: &str| {

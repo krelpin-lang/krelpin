@@ -1,29 +1,29 @@
 interface Shape {
-    double area(&this);
+    double area();
 
-    int sides(&this);
+    int sides();
 }
 
 class Base {
-    void draw(&this) {}
+    void draw() {}
 
-    final void reset(&this) {}
+    final void reset() {}
 
-    Base copy(&this) {
+    Base copy() {
         return new Base();
     }
 }
 
 class Square extends Base implements Shape {
-    double area(&this) {
+    double area() {
         return 1.0;
     }
 
-    void draw(&mut this) {}
+    mut void draw() {}
 
-    void reset(&this) {}
+    void reset() {}
 
-    String copy(&this) {
+    String copy() {
         return "";
     }
 }

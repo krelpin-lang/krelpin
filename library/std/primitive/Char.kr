@@ -6,7 +6,7 @@ final class Char implements Comparable<char>, Hashable<char> {
 
     private Char() {}
 
-    int compareTo(&this, &char other) {
+    int compareTo(&char other) {
         if (this < other) {
             return -1;
         }
@@ -14,33 +14,33 @@ final class Char implements Comparable<char>, Hashable<char> {
     }
 
     @Intrinsic
-    boolean isDigit(&this);
+    boolean isDigit();
 
     @Intrinsic
-    boolean isLetter(&this);
+    boolean isLetter();
 
     @Intrinsic
-    boolean isLetterOrDigit(&this);
+    boolean isLetterOrDigit();
 
     @Intrinsic
-    boolean isWhitespace(&this);
+    boolean isWhitespace();
 
     @Intrinsic
-    boolean isUpperCase(&this);
+    boolean isUpperCase();
 
     @Intrinsic
-    boolean isLowerCase(&this);
+    boolean isLowerCase();
 
     @Intrinsic
-    char toUpperCase(&this);
+    char toUpperCase();
 
     @Intrinsic
-    char toLowerCase(&this);
+    char toLowerCase();
 
-    boolean equals(&this, &char other) {
+    boolean equals(&char other) {
         return this == other;
     }
 
     @Intrinsic
-    int hashCode(&this);
+    int hashCode();
 }

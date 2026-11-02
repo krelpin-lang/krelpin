@@ -6,7 +6,7 @@ final class Double implements Comparable<double>, Hashable<double> {
 
     private Double() {}
 
-    int compareTo(&this, &double other) {
+    int compareTo(&double other) {
         if (this < other) {
             return -1;
         }
@@ -14,12 +14,12 @@ final class Double implements Comparable<double>, Hashable<double> {
     }
 
     @Intrinsic
-    double parse(String text);
+    static double parse(String text);
 
-    boolean equals(&this, &double other) {
+    boolean equals(&double other) {
         return this == other;
     }
 
     @Intrinsic
-    int hashCode(&this);
+    int hashCode();
 }

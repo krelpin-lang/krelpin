@@ -6,7 +6,7 @@ final class Short implements Comparable<short>, Hashable<short> {
 
     private Short() {}
 
-    int compareTo(&this, &short other) {
+    int compareTo(&short other) {
         if (this < other) {
             return -1;
         }
@@ -14,12 +14,12 @@ final class Short implements Comparable<short>, Hashable<short> {
     }
 
     @Intrinsic
-    short parse(String text);
+    static short parse(String text);
 
-    boolean equals(&this, &short other) {
+    boolean equals(&short other) {
         return this == other;
     }
 
     @Intrinsic
-    int hashCode(&this);
+    int hashCode();
 }

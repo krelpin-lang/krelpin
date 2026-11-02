@@ -32,7 +32,7 @@ fn hello_world() {
     let unit = parse_ok(
         "package example;\n\
          class Main {\n\
-         \x20   void main() {\n\
+         \x20   static void main() {\n\
          \x20       Console.println(\"Hello World!\");\n\
          \x20   }\n\
          }\n",
@@ -53,7 +53,7 @@ fn fields() {
     let members = members(
         "class Person {\n\
          \x20   const int MAX = 64;\n\
-         \x20   shared AtomicInt created = new AtomicInt(0);\n\
+         \x20   static AtomicInt created = new AtomicInt(0);\n\
          \x20   String name;\n\
          \x20   public int age;\n\
          \x20   private String? nickname;\n\
@@ -67,7 +67,7 @@ fn fields() {
                 let storage = match field.storage {
                     FieldStorage::Instance => "instance",
                     FieldStorage::Const(_) => "const",
-                    FieldStorage::Shared(_) => "shared",
+                    FieldStorage::Static(_) => "static",
                 };
                 (
                     storage.to_owned(),
@@ -81,7 +81,7 @@ fn fields() {
 
     let expected = [
         ("const", "int MAX", true),
-        ("shared", "AtomicInt created", true),
+        ("static", "AtomicInt created", true),
         ("instance", "String name", false),
         ("instance", "int age", false),
         ("instance", "String? nickname", false),
@@ -110,10 +110,10 @@ fn constructors() {
 fn method_receivers() {
     let members = members(
         "class Person {\n\
-         \x20   &String getName(&this) { return &this.name; }\n\
-         \x20   void rename(&mut this, String newName) {}\n\
-         \x20   String intoName(this) { return this.name; }\n\
-         \x20   int max(int a, int b) { return a; }\n\
+         \x20   &String getName() { return &this.name; }\n\
+         \x20   mut void rename(String newName) {}\n\
+         \x20   consume String intoName() { return this.name; }\n\
+         \x20   static int max(int a, int b) { return a; }\n\
          }",
     );
 
@@ -137,30 +137,33 @@ fn method_receivers() {
 
 #[test]
 fn reference_types() {
-    assert_eq!(ret_ty("&String f() {}"), "&String");
-    assert_eq!(ret_ty("&mut [a, b] String f() {}"), "&mut [a, b] String");
-    assert_eq!(ret_ty("&[this] String f(&this) {}"), "&[this] String");
-    assert_eq!(ret_ty("&String? f() {}"), "&String?");
-    assert_eq!(ret_ty("&(String?) f() {}"), "&(String?)");
-    assert_eq!(ret_ty("&&String f() {}"), "&&String");
+    assert_eq!(ret_ty("static &String f() {}"), "&String");
+    assert_eq!(
+        ret_ty("static &mut [a, b] String f() {}"),
+        "&mut [a, b] String"
+    );
+    assert_eq!(ret_ty("&[this] String f() {}"), "&[this] String");
+    assert_eq!(ret_ty("static &String? f() {}"), "&String?");
+    assert_eq!(ret_ty("static &(String?) f() {}"), "&(String?)");
+    assert_eq!(ret_ty("static &&String f() {}"), "&&String");
 }
 
 #[test]
 fn array_types() {
-    assert_eq!(ret_ty("String[] f() {}"), "String[]");
-    assert_eq!(ret_ty("int[][] f() {}"), "int[][]");
-    assert_eq!(ret_ty("&int[] f() {}"), "&int[]");
-    assert_eq!(ret_ty("&mut [src] int[] f() {}"), "&mut [src] int[]");
-    assert_eq!(ret_ty("String[]? f() {}"), "String[]?");
-    assert_eq!(ret_ty("&String[]? f() {}"), "&String[]?");
-    assert_eq!(ret_ty("(&String)[] f() {}"), "(&String)[]");
-    assert_eq!(ret_ty("(String?)[] f() {}"), "(String?)[]");
-    assert_eq!(ret_ty("List<String>[] f() {}"), "List<String>[]");
+    assert_eq!(ret_ty("static String[] f() {}"), "String[]");
+    assert_eq!(ret_ty("static int[][] f() {}"), "int[][]");
+    assert_eq!(ret_ty("static &int[] f() {}"), "&int[]");
+    assert_eq!(ret_ty("static &mut [src] int[] f() {}"), "&mut [src] int[]");
+    assert_eq!(ret_ty("static String[]? f() {}"), "String[]?");
+    assert_eq!(ret_ty("static &String[]? f() {}"), "&String[]?");
+    assert_eq!(ret_ty("static (&String)[] f() {}"), "(&String)[]");
+    assert_eq!(ret_ty("static (String?)[] f() {}"), "(String?)[]");
+    assert_eq!(ret_ty("static List<String>[] f() {}"), "List<String>[]");
 }
 
 #[test]
 fn reference_binds_to_whole_array() {
-    let MemberKind::Method(method) = only_member("&int[] f() {}") else {
+    let MemberKind::Method(method) = only_member("static &int[] f() {}") else {
         panic!("expected a method");
     };
     let FnRetTy::Ty(ty) = method.ret else {
@@ -175,11 +178,14 @@ fn reference_binds_to_whole_array() {
 #[test]
 fn generic_types_split_closing_brackets() {
     assert_eq!(
-        ret_ty("Map<String, List<&String>> f() {}"),
+        ret_ty("static Map<String, List<&String>> f() {}"),
         "Map<String, List<&String>>"
     );
-    assert_eq!(ret_ty("A<B<C<D>>> f() {}"), "A<B<C<D>>>");
-    assert_eq!(ret_ty("java.util.List<int> f() {}"), "java.util.List<int>");
+    assert_eq!(ret_ty("static A<B<C<D>>> f() {}"), "A<B<C<D>>>");
+    assert_eq!(
+        ret_ty("static java.util.List<int> f() {}"),
+        "java.util.List<int>"
+    );
 }
 
 #[test]
@@ -208,23 +214,22 @@ fn extends_and_implements() {
 
 #[test]
 fn generic_methods_varargs_throws_and_abstract_methods() {
-    let MemberKind::Method(first) = only_member("<T> T first(List<T> items) {}") else {
+    let MemberKind::Method(first) = only_member("static <T> T first(List<T> items) {}") else {
         panic!("expected a method");
     };
     assert_eq!(first.generics.params.len(), 1);
 
-    let MemberKind::Method(log) = only_member("void log(String... parts) {}") else {
+    let MemberKind::Method(log) = only_member("static void log(String... parts) {}") else {
         panic!("expected a method");
     };
     assert!(log.params[0].variadic);
 
-    let MemberKind::Method(read) = only_member("void read(&this) throws IOException, Bad {}")
-    else {
+    let MemberKind::Method(read) = only_member("void read() throws IOException, Bad {}") else {
         panic!("expected a method");
     };
     assert_eq!(read.throws.len(), 2);
 
-    let MemberKind::Method(run) = only_member("abstract void run(&this);") else {
+    let MemberKind::Method(run) = only_member("abstract void run();") else {
         panic!("expected a method");
     };
     assert!(run.body.is_none());
@@ -232,8 +237,7 @@ fn generic_methods_varargs_throws_and_abstract_methods() {
 
 #[test]
 fn docs_and_annotations() {
-    let members =
-        members("class A { /** Docs */ @Override @Since(\"1.0\") String text(&this) {} }");
+    let members = members("class A { /** Docs */ @Override @Since(\"1.0\") String text() {} }");
     assert_eq!(members[0].docs.len(), 1);
     assert_eq!(members[0].docs[0].as_str(), " Docs ");
 
@@ -266,12 +270,15 @@ fn signature_errors() {
         ["fields cannot have type `void`"]
     );
     assert_eq!(
-        errors("class A { void f(int a, &this) {} }"),
-        ["`this` must be the first parameter"]
+        errors("class A { void f(&this, int a) {} }"),
+        ["`&this` is not written as a parameter"]
     );
     assert_eq!(
-        errors("class A { A(&this) {} }"),
-        ["constructors cannot take `this` as a parameter"]
+        errors("class A { void f(&mut this) {} void g(this) {} }"),
+        [
+            "`&mut this` is not written as a parameter",
+            "`this` is not written as a parameter"
+        ]
     );
 }
 
@@ -282,16 +289,28 @@ fn modifier_errors() {
         ["`const` cannot be used on methods"]
     );
     assert_eq!(
-        errors("shared class A {}"),
-        ["`shared` cannot be used on type declarations"]
+        errors("static class A {}"),
+        ["`static` cannot be used on type declarations"]
+    );
+    assert_eq!(
+        errors("class A { static mut void f() {} mut int x; mut A() {} }"),
+        [
+            "a `static` method cannot be `mut`",
+            "`mut` cannot be used on fields",
+            "`mut` cannot be used on constructors"
+        ]
+    );
+    assert_eq!(
+        errors("class A { mut consume void f() {} }"),
+        ["only one of `mut` and `consume` can be used"]
     );
     assert_eq!(
         errors("class A { public private int x; }"),
         ["multiple visibility modifiers"]
     );
     assert_eq!(
-        errors("class A { const shared int x; }"),
-        ["a field can only have one of `const` and `shared`"]
+        errors("class A { const static int x; }"),
+        ["only one of `const` and `static` can be used"]
     );
 }
 
@@ -398,7 +417,7 @@ fn files_are_parsed_in_parallel() {
 #[test]
 fn where_clauses() {
     let MemberKind::Method(method) = only_member(
-        "boolean has(&this, T value) \
+        "boolean has(T value) \
          where T extends Comparable<T> & Cloneable, U extends Object {}",
     ) else {
         panic!("expected a method");

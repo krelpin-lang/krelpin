@@ -1,5 +1,5 @@
 class Wallet {
-    shared int count = 0;
+    static int count = 0;
     long cents;
     String? note;
 
@@ -8,17 +8,17 @@ class Wallet {
         this.note = null;
     }
 
-    int total(&this) {
+    int total() {
         return this.cents;
     }
 
-    boolean empty(&this) {
+    boolean empty() {
         if (this.cents == 0) {
             return true;
         }
     }
 
-    void bump(&this) {
+    void bump() {
         Wallet.count++;
         int size = this.note.length();
         String text = null;
@@ -26,7 +26,7 @@ class Wallet {
 }
 
 class Main {
-    void main() {
+    static void main() {
         Wallet wallet = new Wallet("ten");
         long secret = wallet.cents;
         boolean wrong = wallet.empty() + 1;

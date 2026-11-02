@@ -2,5 +2,5 @@ abstract class Parser<&src, T extends Comparable<T> & Cloneable> implements Iter
     &[src] String input;
     Map<String, List<&String>> cache;
 
-    abstract <K> &mut [src] K? lookup(&mut this, K key, String... aliases) throws NotFound;
+    abstract mut <K> &mut [src] K? lookup(K key, String... aliases) throws NotFound;
 }

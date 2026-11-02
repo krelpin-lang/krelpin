@@ -1,5 +1,5 @@
 package std.lang;
 
 interface Equatable<T> {
-    boolean equals(&this, &T other);
+    boolean equals(&T other);
 }

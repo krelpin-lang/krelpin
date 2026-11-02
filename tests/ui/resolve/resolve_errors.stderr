@@ -4,7 +4,7 @@ error: `this` is not available here
 6 |         return this.balance;
   |                ^^^^
   |
-  = help: add `&this`, `&mut this` or `this` as the first parameter of the method
+  = help: remove `static` from the method to give it a `this`
 
 error: cannot find value `balance` in this scope
   --> tests/ui/resolve/resolve_errors.kr:10:9
@@ -61,7 +61,7 @@ error: `break` outside of a loop or switch
 error: cannot find borrow source `other`
   --> tests/ui/resolve/resolve_errors.kr:22:7
    |
-22 |     &[other] String name(&this) {
+22 |     &[other] String name() {
    |       ^^^^^
    |
    = help: a borrow source must name a parameter of the method, `this`, or a `&` generic parameter of the class

@@ -6,7 +6,7 @@ final class Long implements Comparable<long>, Hashable<long> {
 
     private Long() {}
 
-    int compareTo(&this, &long other) {
+    int compareTo(&long other) {
         if (this < other) {
             return -1;
         }
@@ -14,12 +14,12 @@ final class Long implements Comparable<long>, Hashable<long> {
     }
 
     @Intrinsic
-    long parse(String text);
+    static long parse(String text);
 
-    boolean equals(&this, &long other) {
+    boolean equals(&long other) {
         return this == other;
     }
 
     @Intrinsic
-    int hashCode(&this);
+    int hashCode();
 }

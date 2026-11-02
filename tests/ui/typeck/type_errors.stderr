@@ -12,13 +12,13 @@ error: missing return statement
    |
    = help: add a `return` statement, or `throw` an exception
 
-error: cannot assign to `shared` field `count`
+error: cannot assign to `static` field `count`
   --> tests/ui/typeck/type_errors.kr:22:16
    |
 22 |         Wallet.count++;
    |                ^^^^^
    |
-   = note: a `shared` field can be used from many places at once
+   = note: a `static` field can be used from many threads at once
    = help: store a type that can be changed safely, like `AtomicInt` or `Mutex<T>`
 
 error: value of type `String?` may be null

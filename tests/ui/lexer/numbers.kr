@@ -1,5 +1,5 @@
 class Numbers {
-    void main() {
+    static void main() {
         int a = 0b102;
         int b = 017;
         int c = 0x;

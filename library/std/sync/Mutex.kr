@@ -8,5 +8,5 @@ final class Mutex<T> {
     }
 
     @Intrinsic
-    &mut [this] T lock(&this);
+    &mut [this] T lock();
 }

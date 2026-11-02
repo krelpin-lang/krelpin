@@ -1,5 +1,5 @@
 class Main {
-    void main() {
+    static void main() {
         String name = "Krelpin";
         int size = name.lenght();
         String part = name.substring("0");

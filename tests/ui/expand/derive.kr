@@ -30,25 +30,25 @@ enum Priority {
 class Register {
     HashMap<Payment, int> counts = new HashMap<>();
 
-    void record(&mut this, Payment payment) {
+    mut void record(Payment payment) {
         int? count = this.counts.get(payment);
         this.counts.put(payment, (count ?: 0) + 1);
     }
 
-    boolean same(Money a, Money b) {
+    static boolean same(Money a, Money b) {
         return a == b;
     }
 
-    String cheaper(Money a, Money b) {
+    static String cheaper(Money a, Money b) {
         Money cheapest = a.compareTo(&b) <= 0 ? a : b;
         return "cheapest: " + cheapest.toString();
     }
 
-    Money tip() {
+    static Money tip() {
         return new Money(500, "TRY");
     }
 
-    boolean urgent(Priority priority) {
+    static boolean urgent(Priority priority) {
         return priority.compareTo(&Priority.Normal) > 0;
     }
 }

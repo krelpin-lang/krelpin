@@ -13,7 +13,7 @@ enum Order {
 }
 
 class Errors {
-    void create(&this) {
+    void create() {
         Shape a = Shape.Circle("wide");
         Shape b = Shape.Rect(1.0);
         Shape c = Shape.Circle;
@@ -22,7 +22,7 @@ class Errors {
         boolean same = a == b;
     }
 
-    double area(Shape shape) {
+    static double area(Shape shape) {
         return switch (shape) {
             case Circle(int r) -> r;
             case Rect(double w) -> w;
@@ -32,14 +32,14 @@ class Errors {
         };
     }
 
-    String name(Order order) {
+    static String name(Order order) {
         return switch (order) {
             case Placed(Circle(_), int quantity) -> "circles";
             case Cancelled(_), Delivered -> "done";
         };
     }
 
-    void check(Shape shape, int n, boolean flag) {
+    static void check(Shape shape, int n, boolean flag) {
         switch (shape) {
             case Circle(double r) when r > 1.0 -> {}
             case Rect(_, _) -> {}

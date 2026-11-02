@@ -14,7 +14,7 @@ use crate::{PackagePath, Res, Resolutions};
 #[derive(Clone, Copy, PartialEq, Eq)]
 enum StaticContext {
     Method,
-    SharedField,
+    StaticField,
     ConstField,
 }
 
@@ -273,7 +273,7 @@ impl<'a> Resolver<'a> {
                 ))
                 .with_span(name.span)
                 .with_note(
-                    "shared fields, const fields and methods without `this` belong to the \
+                    "static fields, const fields and static methods belong to the \
                      class, not to a specific instance",
                 ),
             );
@@ -740,11 +740,9 @@ impl<'a> Resolver<'a> {
         };
         let help = match self.static_context {
             None => return,
-            Some(StaticContext::Method) => {
-                "add `&this`, `&mut this` or `this` as the first parameter of the method"
-            }
-            Some(StaticContext::SharedField) => {
-                "a `shared` field belongs to the class, not to a specific object"
+            Some(StaticContext::Method) => "remove `static` from the method to give it a `this`",
+            Some(StaticContext::StaticField) => {
+                "a `static` field belongs to the class, not to a specific object"
             }
             Some(StaticContext::ConstField) => {
                 "a `const` field belongs to the class, not to a specific object"
@@ -776,7 +774,7 @@ fn member_static_context(kind: &MemberKind) -> Option<StaticContext> {
     match kind {
         MemberKind::Field(field) => match field.storage {
             FieldStorage::Instance => None,
-            FieldStorage::Shared(_) => Some(StaticContext::SharedField),
+            FieldStorage::Static(_) => Some(StaticContext::StaticField),
             FieldStorage::Const(_) => Some(StaticContext::ConstField),
         },
         MemberKind::Constructor(_) => None,

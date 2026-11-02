@@ -419,9 +419,9 @@ fn ternary_is_not_glued() {
 fn class_level_fields_and_constructors() {
     use TokenKind::*;
     assert_eq!(
-        kinds("shared AtomicInt created = new AtomicInt(0);"),
+        kinds("static AtomicInt created = new AtomicInt(0);"),
         [
-            Ident(kw::Shared),
+            Ident(kw::Static),
             ident("AtomicInt"),
             ident("created"),
             Eq,

@@ -2,5 +2,5 @@ package std.lang;
 
 class Object {
     @Intrinsic
-    String toString(&this);
+    String toString();
 }

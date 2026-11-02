@@ -115,7 +115,7 @@ impl Tcx<'_> {
         if method.receiver != theirs.receiver {
             self.dcx.emit(
                 Diagnostic::error(format!(
-                    "`{}` takes {} but `{owner}.{}` takes {}",
+                    "`{}` is {} but `{owner}.{}` is {}",
                     name.name,
                     describe_receiver(method.receiver),
                     name.name,
@@ -279,30 +279,35 @@ fn article(kind: AdtKind) -> &'static str {
 
 fn describe_receiver(receiver: Option<ReceiverKind>) -> &'static str {
     match receiver {
-        None => "no `this`",
-        Some(ReceiverKind::Owned) => "`this`",
-        Some(ReceiverKind::Ref) => "`&this`",
-        Some(ReceiverKind::RefMut) => "`&mut this`",
+        None => "`static`",
+        Some(ReceiverKind::Owned) => "`consume`",
+        Some(ReceiverKind::Ref) => "read-only",
+        Some(ReceiverKind::RefMut) => "`mut`",
+    }
+}
+
+fn receiver_modifier(receiver: Option<ReceiverKind>) -> &'static str {
+    match receiver {
+        None => "static ",
+        Some(ReceiverKind::Owned) => "consume ",
+        Some(ReceiverKind::Ref) => "",
+        Some(ReceiverKind::RefMut) => "mut ",
     }
 }
 
 fn describe_method(method: &MethodSig, fn_sig: &FnSig) -> String {
-    let receiver = match method.receiver {
-        None => None,
-        Some(ReceiverKind::Owned) => Some("this".to_owned()),
-        Some(ReceiverKind::Ref) => Some("&this".to_owned()),
-        Some(ReceiverKind::RefMut) => Some("&mut this".to_owned()),
-    };
-    let params: Vec<String> = receiver
-        .into_iter()
-        .chain(fn_sig.params.iter().map(Ty::to_string))
-        .collect();
+    let params: Vec<String> = fn_sig.params.iter().map(Ty::to_string).collect();
     let ret = if fn_sig.ret == Ty::Void {
         "void".to_owned()
     } else {
         fn_sig.ret.to_string()
     };
-    format!("`{ret} {}({})`", fn_sig.name, params.join(", "))
+    format!(
+        "`{}{ret} {}({})`",
+        receiver_modifier(method.receiver),
+        fn_sig.name,
+        params.join(", ")
+    )
 }
 
 fn visibility_rank(vis: Visibility) -> u8 {

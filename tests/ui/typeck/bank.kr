@@ -1,7 +1,7 @@
 package bank;
 
 interface Account {
-    long balance(&this);
+    long balance();
 }
 
 enum Kind {
@@ -10,7 +10,7 @@ enum Kind {
 }
 
 class BankAccount implements Account {
-    shared AtomicInt opened = new AtomicInt(0);
+    static AtomicInt opened = new AtomicInt(0);
     const long OVERDRAFT = 500L;
 
     String owner;
@@ -26,11 +26,11 @@ class BankAccount implements Account {
         BankAccount.opened.increment();
     }
 
-    long balance(&this) {
+    long balance() {
         return this.cents;
     }
 
-    boolean withdraw(&mut this, long amount) {
+    mut boolean withdraw(long amount) {
         if (this.cents + BankAccount.OVERDRAFT < amount) {
             return false;
         }
@@ -38,7 +38,7 @@ class BankAccount implements Account {
         return true;
     }
 
-    String label(&this) {
+    String label() {
         String? nick = this.nickname;
         if (nick != null && nick.length() > 0) {
             return nick;
@@ -52,7 +52,7 @@ class BankAccount implements Account {
 }
 
 class Main {
-    void main() {
+    static void main() {
         BankAccount account = new BankAccount("Ali", Kind.SAVINGS);
         account.withdraw(100);
         Account view = account;

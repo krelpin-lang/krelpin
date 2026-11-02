@@ -6,57 +6,57 @@ final class Math {
 
     private Math() {}
 
-    int abs(int value) {
+    static int abs(int value) {
         return value < 0 ? -value : value;
     }
 
-    long abs(long value) {
+    static long abs(long value) {
         return value < 0 ? -value : value;
     }
 
-    double abs(double value) {
+    static double abs(double value) {
         return value < 0 ? -value : value;
     }
 
-    int min(int a, int b) {
+    static int min(int a, int b) {
         return a < b ? a : b;
     }
 
-    long min(long a, long b) {
+    static long min(long a, long b) {
         return a < b ? a : b;
     }
 
-    double min(double a, double b) {
+    static double min(double a, double b) {
         return a < b ? a : b;
     }
 
-    int max(int a, int b) {
+    static int max(int a, int b) {
         return a > b ? a : b;
     }
 
-    long max(long a, long b) {
+    static long max(long a, long b) {
         return a > b ? a : b;
     }
 
-    double max(double a, double b) {
+    static double max(double a, double b) {
         return a > b ? a : b;
     }
 
     @Intrinsic
-    double sqrt(double value);
+    static double sqrt(double value);
 
     @Intrinsic
-    double pow(double base, double exponent);
+    static double pow(double base, double exponent);
 
     @Intrinsic
-    double floor(double value);
+    static double floor(double value);
 
     @Intrinsic
-    double ceil(double value);
+    static double ceil(double value);
 
     @Intrinsic
-    long round(double value);
+    static long round(double value);
 
     @Intrinsic
-    double random();
+    static double random();
 }

@@ -2,8 +2,8 @@ package std.lang;
 
 abstract class Enum {
     @Intrinsic
-    String name(&this);
+    String name();
 
     @Intrinsic
-    int ordinal(&this);
+    int ordinal();
 }

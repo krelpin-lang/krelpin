@@ -2,29 +2,29 @@ package std.util;
 
 class ArrayList<T> implements List<T> {
     @Intrinsic
-    int size(&this);
+    int size();
 
     @Intrinsic
-    T get(&this, int index);
+    T get(int index);
 
     @Intrinsic
-    T set(&mut this, int index, T value);
+    mut T set(int index, T value);
 
     @Intrinsic
-    void add(&mut this, T value);
+    mut void add(T value);
 
     @Intrinsic
-    void add(&mut this, int index, T value);
+    mut void add(int index, T value);
 
     @Intrinsic
-    T remove(&mut this, int index);
+    mut T remove(int index);
 
     @Intrinsic
-    int indexOf(&this, T value) where T extends Equatable<T>;
+    int indexOf(T value) where T extends Equatable<T>;
 
     @Intrinsic
-    void clear(&mut this);
+    mut void clear();
 
     @Intrinsic
-    Iterator<T> iterator(&this);
+    Iterator<T> iterator();
 }
