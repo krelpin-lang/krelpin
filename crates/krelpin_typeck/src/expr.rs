@@ -11,7 +11,7 @@ use crate::check::{FnCtxt, plural};
 use crate::closure::is_closure;
 use crate::lang_items::LangItem;
 use crate::sig::{AdtKind, FieldSig};
-use crate::ty::{Ty, promote};
+use crate::ty::{Ty, promote, promote_unary};
 
 enum Receiver {
     None,
@@ -711,7 +711,7 @@ impl FnCtxt<'_, '_> {
         }
 
         match (op, value.primitive()) {
-            (UnOp::Neg | UnOp::BitNot, Some(primitive)) => promote(primitive, PrimitiveTy::Int),
+            (UnOp::Neg | UnOp::BitNot, Some(primitive)) => promote_unary(primitive),
             _ => value,
         }
     }
@@ -785,7 +785,7 @@ impl FnCtxt<'_, '_> {
                 .then(|| numeric_result(l, r))
                 .flatten(),
             BinOp::Shl | BinOp::Shr | BinOp::UShr => both(Ty::is_integral)
-                .then(|| l.primitive().map(|p| promote(p, PrimitiveTy::Int)))
+                .then(|| l.primitive().map(promote_unary))
                 .flatten(),
             BinOp::Eq | BinOp::Ne | BinOp::And | BinOp::Or | BinOp::Elvis => None,
         };
@@ -994,7 +994,7 @@ impl FnCtxt<'_, '_> {
 
 fn numeric_result(l: &Ty, r: &Ty) -> Option<Ty> {
     match (l.primitive(), r.primitive()) {
-        (Some(a), Some(b)) if l.is_numeric() && r.is_numeric() => Some(promote(a, b)),
+        (Some(a), Some(b)) if l.is_numeric() && r.is_numeric() => promote(a, b),
         _ => None,
     }
 }
@@ -1003,7 +1003,9 @@ fn narrows_literal(expr: &Expr, expected: &Ty) -> bool {
     is_int_literal(expr)
         && matches!(
             expected.non_null(),
-            Ty::Primitive(PrimitiveTy::Byte | PrimitiveTy::Short | PrimitiveTy::Char)
+            Ty::Primitive(
+                PrimitiveTy::Byte | PrimitiveTy::Short | PrimitiveTy::Char | PrimitiveTy::Float
+            )
         )
 }
 

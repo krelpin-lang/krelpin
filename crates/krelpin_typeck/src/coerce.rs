@@ -72,7 +72,7 @@ impl Tcx<'_> {
             (Ty::Primitive(a), Ty::Primitive(b))
                 if *a != PrimitiveTy::Boolean && *b != PrimitiveTy::Boolean =>
             {
-                Some(promote(*a, *b))
+                promote(*a, *b)
             }
             _ if self.is_assignable(env, a, b) => Some(b.clone()),
             _ if self.is_assignable(env, b, a) => Some(a.clone()),

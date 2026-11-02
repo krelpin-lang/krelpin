@@ -136,16 +136,22 @@ pub fn is_integral(primitive: PrimitiveTy) -> bool {
     )
 }
 
-pub fn promote(a: PrimitiveTy, b: PrimitiveTy) -> Ty {
-    let either = |p| a == p || b == p;
-    if either(PrimitiveTy::Double) {
-        Ty::DOUBLE
-    } else if either(PrimitiveTy::Float) {
-        Ty::FLOAT
-    } else if either(PrimitiveTy::Long) {
-        Ty::LONG
-    } else {
-        Ty::INT
+pub fn promote(a: PrimitiveTy, b: PrimitiveTy) -> Option<Ty> {
+    [
+        PrimitiveTy::Int,
+        PrimitiveTy::Long,
+        PrimitiveTy::Float,
+        PrimitiveTy::Double,
+    ]
+    .into_iter()
+    .find(|&to| widens(a, to) && widens(b, to))
+    .map(Ty::Primitive)
+}
+
+pub fn promote_unary(primitive: PrimitiveTy) -> Ty {
+    match primitive {
+        PrimitiveTy::Byte | PrimitiveTy::Short | PrimitiveTy::Char => Ty::INT,
+        primitive => Ty::Primitive(primitive),
     }
 }
 
@@ -156,8 +162,7 @@ pub fn widens(from: PrimitiveTy, to: PrimitiveTy) -> bool {
             (from, to),
             (Byte, Short | Int | Long | Float | Double)
                 | (Short | Char, Int | Long | Float | Double)
-                | (Int, Long | Float | Double)
-                | (Long, Float | Double)
+                | (Int, Long | Double)
                 | (Float, Double)
         )
 }

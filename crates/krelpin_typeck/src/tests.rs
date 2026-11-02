@@ -88,7 +88,7 @@ fn hello_world() {
 fn literal_and_local_types() {
     body_ok(
         "int a = 1; long b = 2L; double c = 1.5; float d = 1.5f; char e = 'x'; \
-             boolean f = true; String g = \"text\"; byte h = 10; long i = a; double j = b;",
+             boolean f = true; String g = \"text\"; byte h = 10; long i = a; double j = a;",
     );
 
     assert_eq!(in_body("int a = \"text\";"), ["mismatched types"]);
@@ -1416,5 +1416,25 @@ fn chars_are_unicode_scalars() {
     assert_eq!(
         in_body("String s = \"x\"; char c = s.charAt(0);"),
         ["no method named `charAt` found for `String`"]
+    );
+}
+
+#[test]
+fn only_lossless_conversions_are_implicit() {
+    body_ok(
+        "byte b = 1; short s = b; int i = s; long l = i; double d = i; float f = 1.5f; \
+         double e = f; float literal = 1; char c = 'x'; int code = c; \
+         double mixed = i + f; float narrowed = (float) i; double wide = (double) l;",
+    );
+    assert_eq!(in_body("int i = 1; float f = i;"), ["mismatched types"]);
+    assert_eq!(in_body("long l = 1L; double d = l;"), ["mismatched types"]);
+    assert_eq!(in_body("long l = 1L; float f = l;"), ["mismatched types"]);
+    assert_eq!(
+        in_body("int i = 1; float f = 1.5f; float sum = i + f;"),
+        ["mismatched types"]
+    );
+    assert_eq!(
+        in_body("long l = 1L; double d = 1.5; double sum = l * d;"),
+        ["cannot apply `*` to `long` and `double`"]
     );
 }
