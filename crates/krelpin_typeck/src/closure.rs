@@ -3,6 +3,7 @@ use krelpin_errors::Diagnostic;
 use krelpin_span::def_id::DefId;
 use krelpin_span::{Span, Symbol, kw};
 
+use crate::Callee;
 use crate::check::{FnCtxt, plural};
 use crate::exceptions::ExceptionScope;
 use crate::lang_items::LangItem;
@@ -73,6 +74,15 @@ impl Tcx<'_> {
                     .iter()
                     .any(|other| other.params.len() == method.params.len())
             })
+    }
+}
+
+fn callee(method: &MethodSig, sig: FnSig) -> Callee {
+    Callee {
+        method: method.clone(),
+        params: sig.params,
+        ret: sig.ret,
+        packs_varargs: false,
     }
 }
 
@@ -247,7 +257,7 @@ impl FnCtxt<'_, '_> {
             return;
         }
 
-        let Some(ret) = self.resolve_method_ref(&receiver, name, sig) else {
+        let Some((ret, callee)) = self.resolve_method_ref(&receiver, name, sig) else {
             let params: Vec<String> = sig.params.iter().map(Ty::to_string).collect();
             self.emit(
                 Diagnostic::error(format!("`{ty}::{}` does not match `{expected}`", name.name))
@@ -263,9 +273,17 @@ impl FnCtxt<'_, '_> {
         if sig.ret != Ty::Void && !self.is_assignable(&ret, &sig.ret) {
             self.mismatch(name.span, &sig.ret, &ret);
         }
+        if let Some(callee) = callee {
+            self.results.callees.insert(name.span, callee);
+        }
     }
 
-    fn resolve_method_ref(&self, receiver: &RefReceiver, name: Ident, sig: &FnSig) -> Option<Ty> {
+    fn resolve_method_ref(
+        &self,
+        receiver: &RefReceiver,
+        name: Ident,
+        sig: &FnSig,
+    ) -> Option<(Ty, Option<Callee>)> {
         let fits = |params: &[Ty], args: &[Ty]| {
             params.len() == args.len()
                 && args
@@ -278,12 +296,14 @@ impl FnCtxt<'_, '_> {
         {
             let subst = self.tcx.subst_for(*def, args);
             let ctors = &self.tcx.sig(*def).ctors;
-            let default_ctor = ctors.is_empty() && sig.params.is_empty();
-            let found = default_ctor
-                || ctors
-                    .iter()
-                    .any(|ctor| fits(&instantiate(ctor, &subst).params, &sig.params));
-            return found.then(|| ty.clone());
+            if ctors.is_empty() && sig.params.is_empty() {
+                return Some((ty.clone(), None));
+            }
+            return ctors.iter().find_map(|ctor| {
+                let ctor_sig = instantiate(ctor, &subst);
+                fits(&ctor_sig.params, &sig.params)
+                    .then(|| (ty.clone(), Some(callee(ctor, ctor_sig))))
+            });
         }
 
         let (ty, is_type) = match receiver {
@@ -304,7 +324,7 @@ impl FnCtxt<'_, '_> {
                         }),
                         (None, false) => false,
                     };
-                    matches.then_some(method_sig.ret)
+                    matches.then(|| (method_sig.ret.clone(), Some(callee(&method, method_sig))))
                 })
         })
     }
