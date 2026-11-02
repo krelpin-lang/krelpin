@@ -6,9 +6,10 @@ enum Shape {
     Empty;
 }
 
-enum Option<T> {
-    Some(T value),
-    None;
+enum Order {
+    Placed(Shape item, int quantity),
+    Cancelled(String reason),
+    Delivered;
 }
 
 class Errors {
@@ -17,7 +18,7 @@ class Errors {
         Shape b = Shape.Rect(1.0);
         Shape c = Shape.Circle;
         Shape d = Shape.Empty();
-        Option<String> e = Option.Some(5);
+        Order e = Order.Placed(Shape.Empty, "two");
         boolean same = a == b;
     }
 
@@ -31,10 +32,10 @@ class Errors {
         };
     }
 
-    String name(Option<Shape> shape) {
-        return switch (shape) {
-            case Some(Circle(_)) -> "circle";
-            case None -> "none";
+    String name(Order order) {
+        return switch (order) {
+            case Placed(Circle(_), int quantity) -> "circles";
+            case Cancelled(_), Delivered -> "done";
         };
     }
 

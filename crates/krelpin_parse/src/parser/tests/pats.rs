@@ -45,11 +45,11 @@ fn pattern_kinds() {
 fn nested_patterns_and_guards() {
     assert_eq!(
         expr(
-            "switch (shape) { case Some(Circle(double r)) when r > 0 -> r; \
-             case Some(_), None -> 0; }"
+            "switch (tree) { case Node(Leaf(int v), _) when v > 0 -> v; \
+             case Leaf(_), Empty -> 0; }"
         ),
-        "switch (shape) { case Some(Circle(double r)) when (r > 0) -> r; \
-         case Some(_), None -> 0; }"
+        "switch (tree) { case Node(Leaf(int v), _) when (v > 0) -> v; \
+         case Leaf(_), Empty -> 0; }"
     );
 }
 
@@ -68,7 +68,7 @@ fn instanceof_takes_a_pattern() {
 #[test]
 fn guards_are_not_lambdas() {
     assert_eq!(
-        expr("switch (x) { case Some(boolean ready) when ready -> 1; default -> 0; }"),
-        "switch (x) { case Some(boolean ready) when ready -> 1; default -> 0; }"
+        expr("switch (x) { case Leaf(boolean ready) when ready -> 1; default -> 0; }"),
+        "switch (x) { case Leaf(boolean ready) when ready -> 1; default -> 0; }"
     );
 }

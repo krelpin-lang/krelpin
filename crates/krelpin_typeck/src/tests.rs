@@ -1449,13 +1449,13 @@ fn enum_variants_carry_data() {
              \x20   Empty;\n\
              \x20   Shape unit() {{ return Circle(1.0); }}\n\
              }}\n\
-             enum Option<T> {{ Some(T value), None }}\n\
+             enum Tree<T> {{ Leaf(T value), Node(Tree<T> left, Tree<T> right), Empty }}\n\
              class Main {{ void run(&this) {{ {code} }} }}"
         )
     };
     ok(&src(
         "Shape a = Shape.Circle(2.0); Shape b = Shape.Rect(1, 2.0); Shape c = Shape.Empty; \
-         Option<String> s = Option.Some(\"x\"); Option<int> n = Option.None; \
+         Tree<String> s = Tree.Leaf(\"x\"); Tree<int> n = Tree.Empty; \
          String name = a.name(); int index = c.ordinal();",
     ));
     assert_eq!(
@@ -1463,7 +1463,7 @@ fn enum_variants_carry_data() {
         ["mismatched types"]
     );
     assert_eq!(
-        errors(&src("Option<String> s = Option.Some(5);")),
+        errors(&src("Tree<String> s = Tree.Leaf(5);")),
         ["mismatched types"]
     );
     assert_eq!(
@@ -1510,7 +1510,7 @@ fn variants(code: &str) -> String {
          \x20   Rect(double width, double height),\n\
          \x20   Empty;\n\
          }}\n\
-         enum Option<T> {{ Some(T value), None }}\n\
+         enum Tree<T> {{ Leaf(T value), Node(Tree<T> left, Tree<T> right), Empty }}\n\
          class Main {{ {code} }}"
     )
 }
@@ -1526,11 +1526,11 @@ fn patterns_destructure_variants() {
          \x20       case Empty -> 0.0;\n\
          \x20   };\n\
          }\n\
-         boolean round(Option<Shape> shape) {\n\
-         \x20   return shape instanceof Some(Circle(_));\n\
+         boolean round(Tree<Shape> tree) {\n\
+         \x20   return tree instanceof Leaf(Circle(_));\n\
          }\n\
-         String first(Option<String> name) {\n\
-         \x20   if (name instanceof Some(String value) && value.length() > 0) {\n\
+         String first(Tree<String> tree) {\n\
+         \x20   if (tree instanceof Leaf(String value) && value.length() > 0) {\n\
          \x20       return value;\n\
          \x20   }\n\
          \x20   return \"\";\n\
@@ -1590,10 +1590,10 @@ fn switches_on_enums_cover_every_case() {
     );
     assert_eq!(
         notes(
-            "int f(Option<Shape> s) { return switch (s) { \
-             case Some(Circle(_)) -> 1; case None -> 0; }; }"
+            "int f(Tree<Shape> t) { return switch (t) { \
+             case Leaf(Circle(_)) -> 1; case Node(_, _), Empty -> 0; }; }"
         ),
-        ["not covered: `Some(Rect(_, _))` and `Some(Empty)`"]
+        ["not covered: `Leaf(Rect(_, _))` and `Leaf(Empty)`"]
     );
     assert_eq!(
         notes(

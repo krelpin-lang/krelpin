@@ -29,13 +29,20 @@ enum Shape {
     }
 }
 
-enum Option<T> {
-    Some(T value),
-    None;
+enum Tree<T> {
+    Leaf(T value),
+    Node(Tree<T> left, Tree<T> right),
+    Empty;
 
-    boolean isSome(&this) {
-        return this instanceof Some(_);
+    boolean isLeaf(&this) {
+        return this instanceof Leaf(_);
     }
+}
+
+enum Order {
+    Placed(Shape item, int quantity),
+    Cancelled(String reason),
+    Delivered;
 }
 
 enum Direction {
@@ -55,28 +62,27 @@ enum Direction {
 }
 
 class Drawing {
-    Option<Shape> largest(Shape[] shapes) {
-        Option<Shape> best = Option.None;
-        double bestArea = 0.0;
+    Tree<Shape> plant(Shape[] shapes) {
+        Tree<Shape> tree = Tree.Empty;
         for (Shape shape : shapes) {
-            if (shape.area() > bestArea) {
-                best = Option.Some(shape);
-                bestArea = shape.area();
-            }
+            tree = Tree.Node(tree, Tree.Leaf(shape));
         }
-        return best;
+        return tree;
     }
 
-    String report(Option<Shape> shape) {
-        switch (shape) {
-            case Some(Shape.Circle(double r)) when r > 10.0 -> {
-                return "a big circle";
+    String report(Order order) {
+        switch (order) {
+            case Placed(Shape.Circle(double r), int quantity) when r > 10.0 -> {
+                return quantity + " big circles";
             }
-            case Some(Shape value) -> {
-                return value.describe();
+            case Placed(Shape item, int quantity) -> {
+                return quantity + " x " + item.describe();
             }
-            case None -> {
-                return "no shapes";
+            case Cancelled(String reason) -> {
+                return "cancelled: " + reason;
+            }
+            case Delivered -> {
+                return "delivered";
             }
         }
     }
