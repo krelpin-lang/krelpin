@@ -1,8 +1,8 @@
 use std::collections::HashMap;
 
 use krelpin_ast::ast::{
-    self, CompilationUnit, FieldStorage, FnRetTy, GenericParamKind, Generics, Ident, ItemKind,
-    Member, MemberKind, Param, ReceiverKind, TyKind, Visibility,
+    self, CompilationUnit, Constructor, FieldStorage, FnRetTy, GenericParamKind, Generics, Ident,
+    ItemKind, Member, MemberKind, Method, Param, ReceiverKind, TyKind, Visibility, is_intrinsic,
 };
 use krelpin_errors::DiagCtxt;
 use krelpin_resolve::{ItemTable, Res, Resolutions, ResolverOutput};
@@ -25,7 +25,8 @@ pub struct TypeSig {
     pub name: Ident,
     pub kind: AdtKind,
     pub is_abstract: bool,
-    pub generics: Vec<Symbol>,
+    pub is_final: bool,
+    pub generics: Vec<GenericParamSig>,
     pub superclass: Option<Ty>,
     pub interfaces: Vec<Ty>,
     pub fields: HashMap<Symbol, FieldSig>,
@@ -52,7 +53,15 @@ pub struct MethodSig {
     pub receiver: Option<ReceiverKind>,
     pub vis: Visibility,
     pub owner: DefId,
-    pub generics: Vec<Symbol>,
+    pub generics: Vec<GenericParamSig>,
+    pub is_abstract: bool,
+    pub is_final: bool,
+}
+
+#[derive(Clone, Debug)]
+pub struct GenericParamSig {
+    pub name: Symbol,
+    pub bounds: Vec<Ty>,
 }
 
 pub struct Tcx<'a> {
@@ -140,15 +149,25 @@ impl<'a> Tcx<'a> {
 
     pub fn self_ty(&self, def: DefId) -> Ty {
         let generics = &self.sig(def).generics;
-        self.def_ty(def, generics.iter().map(|&name| Ty::Param(name)).collect())
+        self.def_ty(
+            def,
+            generics.iter().map(|param| Ty::Param(param.name)).collect(),
+        )
     }
 
     pub fn subst_for(&self, def: DefId, args: &[Ty]) -> Subst {
         let generics = &self.sig(def).generics;
         if args.len() == generics.len() {
-            generics.iter().copied().zip(args.iter().cloned()).collect()
+            generics
+                .iter()
+                .map(|param| param.name)
+                .zip(args.iter().cloned())
+                .collect()
         } else {
-            generics.iter().map(|&name| (name, Ty::Unknown)).collect()
+            generics
+                .iter()
+                .map(|param| (param.name, Ty::Unknown))
+                .collect()
         }
     }
 
@@ -225,7 +244,8 @@ impl<'a> Tcx<'a> {
             name: item.name,
             kind,
             is_abstract: kind == AdtKind::Interface || item.inheritance.abstract_kw.is_some(),
-            generics: type_params(generics),
+            is_final: item.inheritance.final_kw.is_some(),
+            generics: self.generic_params(generics),
             superclass: superclass.or_else(|| self.implicit_superclass(def_id, kind)),
             interfaces,
             fields: HashMap::new(),
@@ -268,30 +288,10 @@ impl<'a> Tcx<'a> {
                     });
                 }
                 MemberKind::Constructor(ctor) => {
-                    sig.ctors.push(self.method_sig(
-                        ctor.name,
-                        &EMPTY_GENERICS,
-                        &ctor.params,
-                        Ty::Void,
-                        None,
-                        vis,
-                        def_id,
-                    ));
+                    sig.ctors.push(self.ctor_sig(ctor, vis, def_id));
                 }
                 MemberKind::Method(method) => {
-                    let ret = match &method.ret {
-                        FnRetTy::Void(_) => Ty::Void,
-                        FnRetTy::Ty(ty) => self.lower_ty(ty),
-                    };
-                    let method_sig = self.method_sig(
-                        method.name,
-                        &method.generics,
-                        &method.params,
-                        ret,
-                        method.receiver.map(|receiver| receiver.kind),
-                        vis,
-                        def_id,
-                    );
+                    let method_sig = self.method_sig(member, method, vis, def_id);
                     sig.methods
                         .entry(method.name.name)
                         .or_default()
@@ -303,37 +303,74 @@ impl<'a> Tcx<'a> {
         sig
     }
 
-    #[allow(clippy::too_many_arguments)]
     fn method_sig(
         &self,
-        name: Ident,
-        generics: &Generics,
-        params: &[Param],
-        ret: Ty,
-        receiver: Option<ReceiverKind>,
+        member: &Member,
+        method: &Method,
         vis: Visibility,
         owner: DefId,
     ) -> MethodSig {
+        let ret = match &method.ret {
+            FnRetTy::Void(_) => Ty::Void,
+            FnRetTy::Ty(ty) => self.lower_ty(ty),
+        };
+        let is_abstract = member.inheritance.abstract_kw.is_some()
+            || (method.body.is_none() && !is_intrinsic(&member.annotations));
         MethodSig {
-            name,
-            params: params
-                .iter()
-                .map(|param| {
-                    let ty = self.lower_ty(&param.ty);
-                    if param.variadic {
-                        Ty::Array(Box::new(ty))
-                    } else {
-                        ty
-                    }
-                })
-                .collect(),
-            variadic: params.last().is_some_and(|param| param.variadic),
+            name: method.name,
+            params: self.param_tys(&method.params),
+            variadic: is_variadic(&method.params),
             ret,
-            receiver,
+            receiver: method.receiver.map(|receiver| receiver.kind),
             vis,
             owner,
-            generics: type_params(generics),
+            generics: self.generic_params(&method.generics),
+            is_abstract,
+            is_final: member.inheritance.final_kw.is_some(),
         }
+    }
+
+    fn ctor_sig(&self, ctor: &Constructor, vis: Visibility, owner: DefId) -> MethodSig {
+        MethodSig {
+            name: ctor.name,
+            params: self.param_tys(&ctor.params),
+            variadic: is_variadic(&ctor.params),
+            ret: Ty::Void,
+            receiver: None,
+            vis,
+            owner,
+            generics: Vec::new(),
+            is_abstract: false,
+            is_final: false,
+        }
+    }
+
+    fn param_tys(&self, params: &[Param]) -> Vec<Ty> {
+        params
+            .iter()
+            .map(|param| {
+                let ty = self.lower_ty(&param.ty);
+                if param.variadic {
+                    Ty::Array(Box::new(ty))
+                } else {
+                    ty
+                }
+            })
+            .collect()
+    }
+
+    pub(crate) fn generic_params(&self, generics: &Generics) -> Vec<GenericParamSig> {
+        generics
+            .params
+            .iter()
+            .filter_map(|param| match &param.kind {
+                GenericParamKind::Type { bounds } => Some(GenericParamSig {
+                    name: param.name.name,
+                    bounds: self.lower_tys(bounds),
+                }),
+                GenericParamKind::BorrowSource => None,
+            })
+            .collect()
     }
 
     fn lower_tys(&self, tys: &[ast::Ty]) -> Vec<Ty> {
@@ -346,11 +383,6 @@ static EMPTY_GENERICS: Generics = Generics {
     span: krelpin_span::Span::DUMMY,
 };
 
-fn type_params(generics: &Generics) -> Vec<Symbol> {
-    generics
-        .params
-        .iter()
-        .filter(|param| matches!(param.kind, GenericParamKind::Type { .. }))
-        .map(|param| param.name.name)
-        .collect()
+fn is_variadic(params: &[Param]) -> bool {
+    params.last().is_some_and(|param| param.variadic)
 }

@@ -8,7 +8,7 @@ use krelpin_resolve::Res;
 use krelpin_span::def_id::DefId;
 use krelpin_span::{Span, Symbol};
 
-use crate::check::FnCtxt;
+use crate::check::{FnCtxt, plural};
 use crate::lang_items::LangItem;
 use crate::sig::{AdtKind, FieldSig, MethodSig};
 use crate::ty::{Subst, Ty, promote};
@@ -58,7 +58,7 @@ impl FnCtxt<'_, '_> {
     }
 
     fn accepts(&self, expr: &Expr, actual: &Ty, expected: &Ty) -> bool {
-        self.tcx.is_assignable(actual, expected)
+        self.is_assignable(actual, expected)
             || (is_int_literal(expr)
                 && matches!(
                     expected.non_null(),
@@ -109,10 +109,10 @@ impl FnCtxt<'_, '_> {
             ExprKind::New { ty, args } => self.check_new(ty, args, expr.span),
             ExprKind::NewArray { elem, len } => {
                 self.check_expr_coerce(len, &Ty::INT);
-                Ty::Array(Box::new(self.tcx.lower_ty(elem)))
+                Ty::Array(Box::new(self.lower_ty(elem)))
             }
             ExprKind::ArrayInit { ty, elems } => {
-                let ty = ty.as_ref().map_or(Ty::Unknown, |ty| self.tcx.lower_ty(ty));
+                let ty = ty.as_ref().map_or(Ty::Unknown, |ty| self.lower_ty(ty));
                 if ty.is_unknown() {
                     self.error(
                         expr.span,
@@ -152,7 +152,7 @@ impl FnCtxt<'_, '_> {
                 binding,
             } => {
                 self.check_expr(operand);
-                let ty = self.tcx.lower_ty(ty);
+                let ty = self.lower_ty(ty);
                 if let Some(binding) = binding {
                     self.locals.insert(binding.span, ty);
                 }
@@ -160,7 +160,7 @@ impl FnCtxt<'_, '_> {
             }
             ExprKind::Cast { ty, expr: operand } => {
                 let from = self.check_expr(operand);
-                let to = self.tcx.lower_ty(ty);
+                let to = self.lower_ty(ty);
                 self.check_cast(&from, &to, expr.span);
                 to
             }
@@ -169,7 +169,7 @@ impl FnCtxt<'_, '_> {
                     let ty = param
                         .ty
                         .as_ref()
-                        .map_or(Ty::Unknown, |ty| self.tcx.lower_ty(ty));
+                        .map_or(Ty::Unknown, |ty| self.lower_ty(ty));
                     self.locals.insert(param.name.span, ty);
                 }
                 let outer_ret = std::mem::replace(&mut self.ret, Ty::Unknown);
@@ -345,8 +345,12 @@ impl FnCtxt<'_, '_> {
 
     fn instance_field(&mut self, ty: &Ty, name: Ident) -> (Ty, Option<FieldSig>) {
         match ty {
-            Ty::Adt { def, args, .. } => {
-                let Some((field, field_ty)) = self.find_field(*def, args, name.name) else {
+            Ty::Adt { .. } | Ty::Param(_) => {
+                let found = self
+                    .receiver_adts(ty)
+                    .into_iter()
+                    .find_map(|(def, args)| self.find_field(def, &args, name.name));
+                let Some((field, field_ty)) = found else {
                     self.no_field(ty, name);
                     return (Ty::Unknown, None);
                 };
@@ -525,11 +529,12 @@ impl FnCtxt<'_, '_> {
 
     fn instance_call(&mut self, ty: &Ty, name: Ident, args: &[Expr], arg_tys: &[Ty]) -> Ty {
         match ty {
-            Ty::Adt {
-                def, args: ty_args, ..
-            } => {
-                let def = *def;
-                let candidates = self.collect_methods(def, ty_args, name.name);
+            Ty::Adt { .. } | Ty::Param(_) => {
+                let receivers = self.receiver_adts(ty);
+                let candidates: Vec<_> = receivers
+                    .iter()
+                    .flat_map(|(def, args)| self.collect_methods(*def, args, name.name))
+                    .collect();
                 if candidates.is_empty() {
                     self.no_method(ty, name);
                     return Ty::Unknown;
@@ -539,7 +544,7 @@ impl FnCtxt<'_, '_> {
                     .filter(|(method, _)| method.receiver.is_some())
                     .collect();
                 if instance.is_empty() {
-                    let owner = self.type_name(def);
+                    let owner = self.type_name(receivers[0].0);
                     self.emit(
                         Diagnostic::error(format!(
                             "`{}` belongs to the class `{owner}`",
@@ -557,6 +562,26 @@ impl FnCtxt<'_, '_> {
                 Ty::Unknown
             }
             _ => Ty::Unknown,
+        }
+    }
+
+    fn receiver_adts(&self, ty: &Ty) -> Vec<(DefId, Vec<Ty>)> {
+        match ty {
+            Ty::Adt { def, args, .. } => vec![(*def, args.clone())],
+            Ty::Param(name) => {
+                let bounds: Vec<_> = self
+                    .param_env
+                    .bounds(*name)
+                    .iter()
+                    .flat_map(|bound| self.receiver_adts(bound))
+                    .collect();
+                if !bounds.is_empty() {
+                    return bounds;
+                }
+                let object = self.tcx.lang_items.get(LangItem::Object);
+                object.into_iter().map(|def| (def, Vec::new())).collect()
+            }
+            _ => Vec::new(),
         }
     }
 
@@ -622,7 +647,7 @@ impl FnCtxt<'_, '_> {
             .into_iter()
             .map(|(method, mut subst)| {
                 for generic in &method.generics {
-                    subst.insert(*generic, Ty::Unknown);
+                    subst.insert(generic.name, Ty::Unknown);
                 }
                 let params = method.params.iter().map(|p| p.subst(&subst)).collect();
                 let ret = method.ret.subst(&subst);
@@ -703,7 +728,7 @@ impl FnCtxt<'_, '_> {
     }
 
     fn check_new(&mut self, ty: &krelpin_ast::ast::Ty, args: &[Expr], span: Span) -> Ty {
-        let ty = self.tcx.lower_ty(ty);
+        let ty = self.lower_ty(ty);
         let arg_tys: Vec<Ty> = args.iter().map(|arg| self.check_expr(arg)).collect();
 
         match &ty {
@@ -894,7 +919,7 @@ impl FnCtxt<'_, '_> {
             }
             (Ty::Null, Ty::Primitive(_)) | (Ty::Primitive(_), Ty::Null) => false,
             (Ty::Null, _) | (_, Ty::Null) => true,
-            _ => self.tcx.is_assignable(l, r) || self.tcx.is_assignable(r, l),
+            _ => self.is_assignable(l, r) || self.is_assignable(r, l),
         }
     }
 
@@ -1008,8 +1033,8 @@ impl FnCtxt<'_, '_> {
             (Some(_), None) | (None, Some(_)) => {
                 !(from_value.is_unknown()
                     || to_value.is_unknown()
-                    || self.tcx.is_assignable(from_value, to_value)
-                    || self.tcx.is_assignable(to_value, from_value))
+                    || self.is_assignable(from_value, to_value)
+                    || self.is_assignable(to_value, from_value))
             }
             (None, None) => false,
         };
@@ -1022,13 +1047,15 @@ impl FnCtxt<'_, '_> {
         if a.is_unknown() || b.is_unknown() {
             return if a.is_unknown() { b.clone() } else { a.clone() };
         }
-        self.tcx.common_ty(a, b).unwrap_or_else(|| {
-            self.error(
-                span,
-                format!("{what} have incompatible types `{a}` and `{b}`"),
-            );
-            Ty::Unknown
-        })
+        self.tcx
+            .common_ty(&self.param_env, a, b)
+            .unwrap_or_else(|| {
+                self.error(
+                    span,
+                    format!("{what} have incompatible types `{a}` and `{b}`"),
+                );
+                Ty::Unknown
+            })
     }
 
     fn lit_ty(&self, lit: &Lit) -> Ty {
@@ -1087,14 +1114,6 @@ fn param_options(variadic: bool, params: &[Ty], index: usize, arg_count: usize) 
             }
         }
         _ => vec![params.get(index).cloned().unwrap_or(Ty::Unknown)],
-    }
-}
-
-fn plural(count: usize, word: &str) -> String {
-    if count == 1 {
-        format!("1 {word}")
-    } else {
-        format!("{count} {word}s")
     }
 }
 

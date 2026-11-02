@@ -27,7 +27,7 @@ impl FnCtxt<'_, '_> {
             StmtKind::Local(local) => {
                 let ty = match (&local.ty, &local.init) {
                     (Some(ty), init) => {
-                        let ty = self.tcx.lower_ty(ty);
+                        let ty = self.lower_ty(ty);
                         if let Some(init) = init {
                             self.check_expr_coerce(init, &ty);
                         }
@@ -105,8 +105,8 @@ impl FnCtxt<'_, '_> {
                 let elem = self.element_ty(&iter_ty, iter.span);
                 let declared = match ty {
                     Some(ty) => {
-                        let declared = self.tcx.lower_ty(ty);
-                        if !self.tcx.is_assignable(&elem, &declared) {
+                        let declared = self.lower_ty(ty);
+                        if !self.is_assignable(&elem, &declared) {
                             self.mismatch(ty.span, &declared, &elem);
                         }
                         declared
@@ -135,7 +135,7 @@ impl FnCtxt<'_, '_> {
                 let mut diverges = self.check_block(body);
                 for catch in catches {
                     let ty = match catch.tys.as_slice() {
-                        [ty] => self.tcx.lower_ty(ty),
+                        [ty] => self.lower_ty(ty),
                         _ => self.tcx.lang_ty(LangItem::Exception),
                     };
                     self.locals.insert(catch.name.span, ty);
@@ -285,7 +285,7 @@ impl FnCtxt<'_, '_> {
             }
 
             let ty = self.check_expr(label);
-            if !self.tcx.is_assignable(&ty, scrutinee.strip_refs()) {
+            if !self.is_assignable(&ty, scrutinee.strip_refs()) {
                 self.mismatch(label.span, scrutinee.strip_refs(), &ty);
             }
         }

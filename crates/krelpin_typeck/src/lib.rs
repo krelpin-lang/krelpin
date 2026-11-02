@@ -2,9 +2,11 @@ mod check;
 mod coerce;
 mod expr;
 mod lang_items;
+mod param_env;
 mod sig;
 mod stmt;
 pub mod ty;
+mod wfcheck;
 
 #[cfg(test)]
 mod tests;
@@ -16,8 +18,10 @@ use krelpin_errors::DiagCtxt;
 use krelpin_resolve::ResolverOutput;
 use krelpin_span::Span;
 
+pub use crate::coerce::Coercion;
 pub use crate::lang_items::{LangItem, LangItems};
-pub use crate::sig::{AdtKind, FieldSig, MethodSig, Tcx, TypeSig};
+pub use crate::param_env::ParamEnv;
+pub use crate::sig::{AdtKind, FieldSig, GenericParamSig, MethodSig, Tcx, TypeSig};
 pub use crate::ty::Ty;
 
 #[derive(Debug, Default)]

@@ -8,6 +8,7 @@ use krelpin_span::def_id::DefId;
 use krelpin_span::{Span, Symbol};
 
 use crate::TypeckResults;
+use crate::param_env::ParamEnv;
 use crate::sig::Tcx;
 use crate::ty::Ty;
 
@@ -15,6 +16,7 @@ pub(crate) struct FnCtxt<'a, 'tcx> {
     pub(crate) tcx: &'a Tcx<'tcx>,
     pub(crate) owner: DefId,
     pub(crate) self_ty: Ty,
+    pub(crate) param_env: ParamEnv,
     pub(crate) ret: Ty,
     pub(crate) locals: HashMap<Span, Ty>,
     pub(crate) narrowed: Vec<HashMap<Span, Ty>>,
@@ -69,6 +71,7 @@ pub(crate) fn check_units(tcx: &Tcx<'_>, units: &[CompilationUnit]) -> TypeckRes
 
     for (type_def, item) in tcx.items.items(units) {
         let owner = type_def.def;
+        tcx.check_item_wf(owner, item);
         let members: &[Member] = match &item.kind {
             ItemKind::Class(class) => &class.members,
             ItemKind::Struct(def) => &def.members,
@@ -130,6 +133,9 @@ fn check_member<'a, 'tcx>(tcx: &'a Tcx<'tcx>, owner: DefId, member: &Member) -> 
                 FnRetTy::Ty(ty) => tcx.lower_ty(ty),
             };
             let mut fcx = FnCtxt::new(tcx, owner, ret.clone());
+            fcx.param_env = fcx
+                .param_env
+                .with_generics(&tcx.generic_params(&method.generics));
             if method.receiver.is_none() {
                 fcx.self_ty = Ty::Unknown;
             }
@@ -157,6 +163,7 @@ impl<'a, 'tcx> FnCtxt<'a, 'tcx> {
             tcx,
             owner,
             self_ty: tcx.self_ty(owner),
+            param_env: ParamEnv::default().with_generics(&tcx.sig(owner).generics),
             ret,
             locals: HashMap::new(),
             narrowed: Vec::new(),
@@ -175,6 +182,15 @@ impl<'a, 'tcx> FnCtxt<'a, 'tcx> {
             };
             self.locals.insert(param.name.span, ty);
         }
+    }
+
+    pub(crate) fn lower_ty(&self, ty: &krelpin_ast::ast::Ty) -> Ty {
+        self.tcx.check_wf(&self.param_env, ty);
+        self.tcx.lower_ty(ty)
+    }
+
+    pub(crate) fn is_assignable(&self, from: &Ty, to: &Ty) -> bool {
+        self.tcx.is_assignable(&self.param_env, from, to)
     }
 
     pub(crate) fn local_ty(&self, decl: Span) -> Ty {
@@ -208,17 +224,24 @@ impl<'a, 'tcx> FnCtxt<'a, 'tcx> {
             (_, Ty::Null) => diagnostic.with_help(format!(
                 "`{expected}` can never be `null`; use `{expected}?` to allow it"
             )),
-            (expected, Ty::Nullable(inner)) if self.tcx.is_assignable(inner, expected) => {
-                diagnostic.with_help(
+            (expected, Ty::Nullable(inner)) if self.is_assignable(inner, expected) => diagnostic
+                .with_help(
                     "this value may be `null`; use `?:` to give a default, \
                      or check `!= null` first",
-                )
-            }
-            (Ty::Ref { ty, .. }, found) if self.tcx.is_assignable(found, ty) => {
+                ),
+            (Ty::Ref { ty, .. }, found) if self.is_assignable(found, ty) => {
                 diagnostic.with_help("borrow the value with `&`")
             }
             _ => diagnostic,
         };
         self.emit(diagnostic);
+    }
+}
+
+pub(crate) fn plural(count: usize, word: &str) -> String {
+    if count == 1 {
+        format!("1 {word}")
+    } else {
+        format!("{count} {word}s")
     }
 }

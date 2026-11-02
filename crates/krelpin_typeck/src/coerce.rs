@@ -2,22 +2,39 @@ use krelpin_ast::ast::PrimitiveTy;
 use krelpin_span::def_id::DefId;
 
 use crate::lang_items::LangItem;
+use crate::param_env::ParamEnv;
 use crate::sig::Tcx;
 use crate::ty::{Ty, promote, widens};
 
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum Coercion {
+    Subtype,
+    Boxing,
+}
+
 impl Tcx<'_> {
-    pub fn is_assignable(&self, from: &Ty, to: &Ty) -> bool {
+    pub fn is_assignable(&self, env: &ParamEnv, from: &Ty, to: &Ty) -> bool {
+        self.coerces(env, from, to, Coercion::Boxing)
+    }
+
+    pub fn is_subtype(&self, env: &ParamEnv, from: &Ty, to: &Ty) -> bool {
+        self.coerces(env, from, to, Coercion::Subtype)
+    }
+
+    pub fn coerces(&self, env: &ParamEnv, from: &Ty, to: &Ty, coercion: Coercion) -> bool {
+        let coerces = |from, to| self.coerces(env, from, to, coercion);
         match (from, to) {
             (Ty::Unknown, _) | (_, Ty::Unknown) => true,
             _ if from == to => true,
             (Ty::Null, Ty::Nullable(_)) => true,
-            (Ty::Nullable(from), Ty::Nullable(to)) => self.is_assignable(from, to),
+            (Ty::Nullable(from), Ty::Nullable(to)) => coerces(from, to),
             (Ty::Nullable(_) | Ty::Null, _) => false,
-            (from, Ty::Nullable(to)) => self.is_assignable(from, to),
+            (from, Ty::Nullable(to)) => coerces(from, to),
             (Ty::Primitive(from), Ty::Primitive(to)) => widens(*from, *to),
             (Ty::Primitive(primitive), Ty::Adt { def, .. })
             | (Ty::Adt { def, .. }, Ty::Primitive(primitive)) => {
-                self.lang_items.is(*def, LangItem::boxed(*primitive))
+                coercion == Coercion::Boxing
+                    && self.lang_items.is(*def, LangItem::boxed(*primitive))
             }
             (
                 Ty::Ref {
@@ -32,7 +49,7 @@ impl Tcx<'_> {
                 if *to_mut {
                     *from_mut && (from == to || from.is_unknown() || to.is_unknown())
                 } else {
-                    self.is_assignable(from, to)
+                    coerces(from, to)
                 }
             }
             (Ty::Ref { .. }, _) | (_, Ty::Ref { .. }) => false,
@@ -40,12 +57,20 @@ impl Tcx<'_> {
             (_, Ty::Adt { def, .. }) if self.lang_items.is(*def, LangItem::Object) => true,
             (Ty::External { .. }, _) | (_, Ty::External { .. }) => true,
             (Ty::Array(from), Ty::Array(to)) => from == to || from.is_unknown() || to.is_unknown(),
-            (Ty::Adt { def, args, .. }, to) => self.adt_assignable(*def, args, to),
+            (Ty::Param(name), to) => env.bounds(*name).iter().any(|bound| coerces(bound, to)),
+            (Ty::Adt { def, args, .. }, to) => self.adt_coerces(env, *def, args, to, coercion),
             _ => false,
         }
     }
 
-    fn adt_assignable(&self, def: DefId, args: &[Ty], to: &Ty) -> bool {
+    fn adt_coerces(
+        &self,
+        env: &ParamEnv,
+        def: DefId,
+        args: &[Ty],
+        to: &Ty,
+        coercion: Coercion,
+    ) -> bool {
         match to {
             Ty::Adt {
                 def: target,
@@ -60,10 +85,10 @@ impl Tcx<'_> {
         sig.superclass
             .iter()
             .chain(sig.interfaces.iter())
-            .any(|parent| self.is_assignable(&parent.subst(&subst), to))
+            .any(|parent| self.coerces(env, &parent.subst(&subst), to, coercion))
     }
 
-    pub fn common_ty(&self, a: &Ty, b: &Ty) -> Option<Ty> {
+    pub fn common_ty(&self, env: &ParamEnv, a: &Ty, b: &Ty) -> Option<Ty> {
         match (a, b) {
             (Ty::Null, other) | (other, Ty::Null) => Some(other.clone().nullable()),
             (Ty::Primitive(a), Ty::Primitive(b))
@@ -71,8 +96,8 @@ impl Tcx<'_> {
             {
                 Some(promote(*a, *b))
             }
-            _ if self.is_assignable(a, b) => Some(b.clone()),
-            _ if self.is_assignable(b, a) => Some(a.clone()),
+            _ if self.is_assignable(env, a, b) => Some(b.clone()),
+            _ if self.is_assignable(env, b, a) => Some(a.clone()),
             _ => None,
         }
     }

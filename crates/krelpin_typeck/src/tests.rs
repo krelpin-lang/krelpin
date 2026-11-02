@@ -671,3 +671,78 @@ fn atomics_can_change_through_shared_fields() {
         ["mismatched types"]
     );
 }
+
+#[test]
+fn generic_arguments_are_counted() {
+    assert_eq!(
+        errors("class A { List<String, Integer> xs; }"),
+        ["`List` takes 1 type argument but 2 were supplied"]
+    );
+    assert_eq!(
+        errors("class A { String<Integer> s; }"),
+        ["`String` takes 0 type arguments but 1 was supplied"]
+    );
+    assert_eq!(
+        errors("class A<T> { T<String> x; }"),
+        ["type parameter `T` does not take type arguments"]
+    );
+    assert_eq!(
+        in_body("Map<String>? ages = null;"),
+        ["`Map` takes 2 type arguments but 1 was supplied"]
+    );
+}
+
+#[test]
+fn generic_arguments_are_not_primitive() {
+    assert_eq!(
+        errors("class A { List<int> xs; }"),
+        ["type arguments cannot be primitive types"]
+    );
+    assert_eq!(
+        helps("class A { List<int> xs; }"),
+        ["use `Integer` instead"]
+    );
+}
+
+#[test]
+fn generic_arguments_satisfy_bounds() {
+    let src = |code: &str| {
+        format!(
+            "class Sorted<T extends Comparable<T>> {{}}\n\
+             class Thing {{}}\n\
+             class Main {{ void run(&this) {{ {code} }} }}"
+        )
+    };
+    ok(&src(
+        "Sorted<String>? s = null; Sorted<Integer>? i = new Sorted<>();",
+    ));
+    assert_eq!(
+        errors(&src("Sorted<Thing>? s = null;")),
+        ["type `Thing` does not satisfy the bound of `T`"]
+    );
+    assert_eq!(
+        labels(&src("Sorted<Thing>? s = null;")),
+        ["`Thing` is not a `Comparable<Thing>`"]
+    );
+}
+
+#[test]
+fn type_parameters_have_the_methods_of_their_bounds() {
+    ok("class Max {\n\
+        \x20   <T extends Comparable<T>> T max(T a, T b) {\n\
+        \x20       return a.compareTo(b) >= 0 ? a : b;\n\
+        \x20   }\n\
+        }");
+    ok("class Show<T> { String show(&this, T value) { return value.toString(); } }");
+    ok("class View<T extends Comparable<T>> {\n\
+        \x20   Comparable<T> view(&this, T value) { return value; }\n\
+        }");
+    assert_eq!(
+        errors("class Show<T> { int size(&this, T value) { return value.length(); } }"),
+        ["no method named `length` found for `T`"]
+    );
+    assert_eq!(
+        errors("class View<T> { Comparable<T> view(&this, T value) { return value; } }"),
+        ["mismatched types"]
+    );
+}
