@@ -1,0 +1,18 @@
+class Sorted<T extends Comparable<T>> {}
+
+class Thing {}
+
+class Util {
+    <T extends Comparable<T>> T max(T a, T b) {
+        return a.compareTo(b) >= 0 ? a : b;
+    }
+}
+
+class Main {
+    void main() {
+        List<String, Integer>? pairs = null;
+        List<int>? numbers = null;
+        Sorted<Thing>? things = null;
+        Thing best = Util.max(new Thing(), new Thing());
+    }
+}

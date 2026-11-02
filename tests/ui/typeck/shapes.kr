@@ -1,0 +1,99 @@
+package geometry;
+
+import std.function.Consumer;
+
+interface Shape extends Comparable<Shape> {
+    double area(&this);
+
+    String describe(&this) {
+        return "a shape with area " + this.area();
+    }
+
+    int compareTo(&this, Shape other) {
+        return Double.compare(this.area(), other.area());
+    }
+}
+
+interface Transform<A, B> {
+    B apply(&this, A value);
+}
+
+abstract class Polygon implements Shape {
+    int sides;
+
+    Polygon(int sides) {
+        this.sides = sides;
+    }
+}
+
+class Square extends Polygon {
+    double side;
+
+    Square(double side) {
+        super(4);
+        this.side = side;
+    }
+
+    double area(&this) {
+        return this.side * this.side;
+    }
+
+    String describe(&this) {
+        return "a square with side " + this.side;
+    }
+}
+
+class Circle implements Shape {
+    double radius;
+
+    Circle(double radius) {
+        this.radius = radius;
+    }
+
+    double area(&this) {
+        return Math.PI * this.radius * this.radius;
+    }
+}
+
+class Shapes {
+    <T extends Comparable<T>> T largest(List<T> values) {
+        T best = values.get(0);
+        for (T value : values) {
+            if (value.compareTo(best) > 0) {
+                best = value;
+            }
+        }
+        return best;
+    }
+
+    <A, B> List<B> map(List<A> values, Transform<A, B> transform) {
+        List<B> result = new ArrayList<>();
+        values.forEach(value -> result.add(transform.apply(value)));
+        return result;
+    }
+}
+
+class Main {
+    void main() {
+        List<Shape> shapes = new ArrayList<>();
+        shapes.add(new Square(2.0));
+        shapes.add(new Circle(1.5));
+
+        Shape biggest = Shapes.largest(shapes);
+        List<String> names = Shapes.map(shapes, shape -> shape.describe());
+        List<Double> areas = Shapes.map(shapes, Shape::area);
+
+        Consumer<String> print = Console::println;
+        names.forEach(print);
+        areas.forEach(area -> Console.println(area.doubleValue()));
+
+        try {
+            if (biggest.area() > 100.0) {
+                throw new IllegalStateException("too big");
+            }
+        } catch (IllegalArgumentException | IllegalStateException e) {
+            String? message = e.getMessage();
+            Console.println(message ?: "unknown");
+        }
+    }
+}

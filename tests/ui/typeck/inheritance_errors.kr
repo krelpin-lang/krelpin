@@ -1,0 +1,33 @@
+interface Shape {
+    double area(&this);
+
+    int sides(&this);
+}
+
+class Base {
+    void draw(&this) {}
+
+    final void reset(&this) {}
+
+    Base copy(&this) {
+        return new Base();
+    }
+}
+
+class Square extends Base implements Shape {
+    double area(&this) {
+        return 1.0;
+    }
+
+    void draw(&mut this) {}
+
+    void reset(&this) {}
+
+    String copy(&this) {
+        return "";
+    }
+}
+
+class Text extends String {}
+
+class Wrong extends Shape {}

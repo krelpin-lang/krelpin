@@ -1,0 +1,10 @@
+class Main {
+    void main() throws String {
+        try {
+            throw "oops";
+        } catch (Exception e) {
+        } catch (IllegalStateException e) {
+        } catch (String text) {
+        }
+    }
+}

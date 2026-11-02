@@ -1,0 +1,17 @@
+error: call to `amb` is ambiguous
+  --> tests/ui/typeck/overload_errors.kr:17:14
+   |
+17 |         Pick.amb(1, 2);
+   |              ^^^
+   |
+   = note: it could call `Pick.amb(Integer, long)` or `Pick.amb(long, Integer)`
+   = help: cast the arguments to the types of the method you want to call
+
+error: mismatched types
+  --> tests/ui/typeck/overload_errors.kr:18:21
+   |
+18 |         int wrong = Pick.f(1);
+   |                     ^^^^^^^^^ expected `int`, found `String`
+
+error: aborting due to 2 previous errors
+

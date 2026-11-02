@@ -1,0 +1,20 @@
+class Pick {
+    void amb(Integer a, long b) {}
+
+    void amb(long a, Integer b) {}
+
+    int f(long x) {
+        return 1;
+    }
+
+    String f(int x) {
+        return "";
+    }
+}
+
+class Main {
+    void main() {
+        Pick.amb(1, 2);
+        int wrong = Pick.f(1);
+    }
+}

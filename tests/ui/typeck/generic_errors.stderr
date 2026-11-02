@@ -1,0 +1,28 @@
+error: `List` takes 1 type argument but 2 were supplied
+  --> tests/ui/typeck/generic_errors.kr:13:9
+   |
+13 |         List<String, Integer>? pairs = null;
+   |         ^^^^^^^^^^^^^^^^^^^^^
+
+error: type arguments cannot be primitive types
+  --> tests/ui/typeck/generic_errors.kr:14:14
+   |
+14 |         List<int>? numbers = null;
+   |              ^^^
+   |
+   = help: use `Integer` instead
+
+error: type `Thing` does not satisfy the bound of `T`
+  --> tests/ui/typeck/generic_errors.kr:15:16
+   |
+15 |         Sorted<Thing>? things = null;
+   |                ^^^^^ `Thing` is not a `Comparable<Thing>`
+
+error: type `Thing` does not satisfy the bound of `T`
+  --> tests/ui/typeck/generic_errors.kr:16:27
+   |
+16 |         Thing best = Util.max(new Thing(), new Thing());
+   |                           ^^^ `Thing` is not a `Comparable<Thing>`
+
+error: aborting due to 4 previous errors
+

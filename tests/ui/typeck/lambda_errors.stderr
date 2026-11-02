@@ -1,0 +1,38 @@
+error: no method named `lenght` found for `String`
+ --> tests/ui/typeck/lambda_errors.kr:7:58
+  |
+7 |         Transform<String, Integer> length = text -> text.lenght();
+  |                                                          ^^^^^^ method not found
+
+error: this lambda takes 2 parameters but `apply` takes 1 parameter
+ --> tests/ui/typeck/lambda_errors.kr:8:43
+  |
+8 |         Transform<String, Integer> pair = (a, b) -> 1;
+  |                                           ^^^^^^^^^^^
+
+error: missing return statement
+  --> tests/ui/typeck/lambda_errors.kr:11:9
+   |
+11 |         };
+   |         ^ this lambda must return a `Integer`
+   |
+   = help: add a `return` statement, or `throw` an exception
+
+error: a lambda cannot be used as `String`
+  --> tests/ui/typeck/lambda_errors.kr:12:31
+   |
+12 |         String notAFunction = () -> 1;
+   |                               ^^^^^^^
+   |
+   = note: `String` is not an interface with exactly one abstract method
+
+error: `String::size` does not match `Transform<String, Integer>`
+  --> tests/ui/typeck/lambda_errors.kr:13:51
+   |
+13 |         Transform<String, Integer> size = String::size;
+   |                                                   ^^^^
+   |
+   = note: `Transform<String, Integer>` needs a method that takes (String) and returns `Integer`
+
+error: aborting due to 5 previous errors
+

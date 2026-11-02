@@ -1,0 +1,45 @@
+error: `draw` takes `&mut this` but `Base.draw` takes `&this`
+  --> tests/ui/typeck/inheritance_errors.kr:22:10
+   |
+22 |     void draw(&mut this) {}
+   |          ^^^^
+
+error: cannot override `Base.reset` because it is `final`
+  --> tests/ui/typeck/inheritance_errors.kr:24:10
+   |
+24 |     void reset(&this) {}
+   |          ^^^^^
+
+error: `copy` returns `String` but `Base.copy` returns `Base`
+  --> tests/ui/typeck/inheritance_errors.kr:26:12
+   |
+26 |     String copy(&this) {
+   |            ^^^^
+   |
+   = help: an overriding method must return the same type or a subtype
+
+error: `Square` does not implement every method of `Shape`
+  --> tests/ui/typeck/inheritance_errors.kr:17:7
+   |
+17 | class Square extends Base implements Shape {
+   |       ^^^^^^
+   |
+   = note: missing: `int sides(&this)`
+   = help: implement the missing methods, or mark `Square` as `abstract`
+
+error: cannot extend `String` because it is `final`
+  --> tests/ui/typeck/inheritance_errors.kr:31:20
+   |
+31 | class Text extends String {}
+   |                    ^^^^^^
+
+error: a class cannot extend an interface
+  --> tests/ui/typeck/inheritance_errors.kr:33:21
+   |
+33 | class Wrong extends Shape {}
+   |                     ^^^^^ `Shape` is an interface
+   |
+   = help: use `implements Shape` instead
+
+error: aborting due to 6 previous errors
+

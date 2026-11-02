@@ -1,0 +1,32 @@
+error: `String` is not a `Throwable`
+ --> tests/ui/typeck/exception_errors.kr:2:24
+  |
+2 |     void main() throws String {
+  |                        ^^^^^^
+  |
+  = note: only subclasses of `Throwable` can be thrown and caught
+
+error: cannot throw a value of type `String`
+ --> tests/ui/typeck/exception_errors.kr:4:19
+  |
+4 |             throw "oops";
+  |                   ^^^^^^
+  |
+  = note: only subclasses of `Throwable` can be thrown and caught
+
+error: `IllegalStateException` has already been caught
+ --> tests/ui/typeck/exception_errors.kr:6:18
+  |
+6 |         } catch (IllegalStateException e) {
+  |                  ^^^^^^^^^^^^^^^^^^^^^ already caught by the `catch` for `Exception`
+
+error: `String` cannot be caught
+ --> tests/ui/typeck/exception_errors.kr:7:18
+  |
+7 |         } catch (String text) {
+  |                  ^^^^^^
+  |
+  = note: only subclasses of `Throwable` can be thrown and caught
+
+error: aborting due to 4 previous errors
+
