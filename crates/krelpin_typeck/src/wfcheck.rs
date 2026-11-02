@@ -59,8 +59,14 @@ impl Tcx<'_> {
             MemberKind::Method(method) => {
                 let env = env
                     .clone()
-                    .with_generics(&self.generic_params(&method.generics));
+                    .with_generics(&self.generic_params(&method.generics))
+                    .with_where_bounds(&self.where_bounds(&method.where_clause));
                 self.check_bounds_wf(&env, &method.generics);
+                for predicate in &method.where_clause {
+                    for bound in &predicate.bounds {
+                        self.check_wf(&env, bound);
+                    }
+                }
                 if let ast::FnRetTy::Ty(ty) = &method.ret {
                     self.check_wf(&env, ty);
                 }

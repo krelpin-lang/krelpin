@@ -1,6 +1,6 @@
 use krelpin_ast::ast::{
     Constructor, Field, FieldStorage, FnRetTy, Generics, Ident, Method, Param, Receiver,
-    ReceiverKind, Ty, Unparsed,
+    ReceiverKind, Ty, Unparsed, WherePredicate,
 };
 use krelpin_ast::token::TokenKind;
 use krelpin_errors::Diagnostic;
@@ -76,6 +76,7 @@ impl Parser<'_> {
     ) -> PResult<Method> {
         let (receiver, params) = self.parse_params()?;
         let throws = self.parse_throws()?;
+        let where_clause = self.parse_where_clause()?;
         let body = if self.eat(TokenKind::Semi) {
             None
         } else {
@@ -89,8 +90,32 @@ impl Parser<'_> {
             receiver,
             params,
             throws,
+            where_clause,
             body,
         })
+    }
+
+    fn parse_where_clause(&mut self) -> PResult<Vec<WherePredicate>> {
+        let mut predicates = Vec::new();
+        if !self.eat_keyword(kw::Where) {
+            return Ok(predicates);
+        }
+        loop {
+            let lo = self.token.span;
+            let param = self.parse_ident()?;
+            if !self.eat_keyword(kw::Extends) {
+                return Err(self.unexpected());
+            }
+            let bounds = self.parse_bounds()?;
+            predicates.push(WherePredicate {
+                param,
+                bounds,
+                span: lo.to(self.prev_token.span),
+            });
+            if !self.eat(TokenKind::Comma) {
+                return Ok(predicates);
+            }
+        }
     }
 
     fn parse_throws(&mut self) -> PResult<Vec<Ty>> {

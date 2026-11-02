@@ -397,3 +397,14 @@ fn only_the_standard_library_declares_intrinsics() {
         ["only the standard library can declare intrinsics"]
     );
 }
+
+#[test]
+fn where_clauses_constrain_generic_parameters() {
+    ok("class Bag<T> {\n\
+        \x20   boolean has(&this, T value) where T extends Comparable<T> { return true; }\n\
+        }");
+    assert_eq!(
+        errors("class Bag<T> { boolean has(&this, T value) where U extends Comparable<U> {} }"),
+        ["cannot find generic parameter `U`"]
+    );
+}

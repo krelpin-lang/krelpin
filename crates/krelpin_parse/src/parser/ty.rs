@@ -174,6 +174,14 @@ impl Parser<'_> {
         })
     }
 
+    pub(crate) fn parse_bounds(&mut self) -> PResult<Vec<Ty>> {
+        let mut bounds = vec![self.parse_ty()?];
+        while self.break_and_eat(TokenKind::And) {
+            bounds.push(self.parse_ty()?);
+        }
+        Ok(bounds)
+    }
+
     fn parse_generic_param(&mut self) -> PResult<GenericParam> {
         let lo = self.token.span;
 
@@ -187,13 +195,11 @@ impl Parser<'_> {
         }
 
         let name = self.parse_ident()?;
-        let mut bounds = Vec::new();
-        if self.eat_keyword(kw::Extends) {
-            bounds.push(self.parse_ty()?);
-            while self.break_and_eat(TokenKind::And) {
-                bounds.push(self.parse_ty()?);
-            }
-        }
+        let bounds = if self.eat_keyword(kw::Extends) {
+            self.parse_bounds()?
+        } else {
+            Vec::new()
+        };
 
         Ok(GenericParam {
             name,

@@ -1298,3 +1298,38 @@ fn overrides_cannot_throw_more() {
         ["`f` cannot throw `IOException` because `Base.f` does not"]
     );
 }
+
+fn bag(code: &str) -> String {
+    format!(
+        "class Bag<T> {{\n\
+         \x20   T first;\n\
+         \x20   Bag(T first) {{ this.first = first; }}\n\
+         \x20   boolean isSmall(&this, T limit) where T extends Comparable<T> {{\n\
+         \x20       return this.first.compareTo(limit) < 0;\n\
+         \x20   }}\n\
+         }}\n\
+         class Thing {{}}\n\
+         class Main {{ void run(&this) {{ {code} }} }}"
+    )
+}
+
+#[test]
+fn where_clauses_are_checked_at_the_call() {
+    ok(&bag(
+        "Bag<String> words = new Bag<String>(\"a\"); boolean small = words.isSmall(\"b\");",
+    ));
+    ok(&bag("Bag<Thing> things = new Bag<Thing>(new Thing());"));
+    assert_eq!(
+        errors(&bag(
+            "Bag<Thing> things = new Bag<Thing>(new Thing()); things.isSmall(new Thing());"
+        )),
+        ["type `Thing` does not satisfy the bound of `T`"]
+    );
+    assert_eq!(
+        errors(
+            "class Bag<T> { T first; boolean bad(&this, T other) { \
+             return this.first.compareTo(other) < 0; } }"
+        ),
+        ["no method named `compareTo` found for `T`"]
+    );
+}

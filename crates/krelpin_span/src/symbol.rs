@@ -71,6 +71,7 @@ keywords! {
     True: "true",
     Try: "try",
     Void: "void",
+    Where: "where",
     While: "while",
     Yield: "yield",
 }

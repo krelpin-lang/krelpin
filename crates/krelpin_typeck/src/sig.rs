@@ -2,7 +2,8 @@ use std::collections::HashMap;
 
 use krelpin_ast::ast::{
     self, CompilationUnit, Constructor, FieldStorage, FnRetTy, GenericParamKind, Generics, Ident,
-    ItemKind, Member, MemberKind, Method, Param, ReceiverKind, TyKind, Visibility, is_intrinsic,
+    ItemKind, Member, MemberKind, Method, Param, ReceiverKind, TyKind, Visibility, WherePredicate,
+    is_intrinsic,
 };
 use krelpin_errors::DiagCtxt;
 use krelpin_resolve::{ItemTable, Res, Resolutions, ResolverOutput};
@@ -54,6 +55,7 @@ pub struct MethodSig {
     pub vis: Visibility,
     pub owner: DefId,
     pub generics: Vec<GenericParamSig>,
+    pub where_bounds: Vec<GenericParamSig>,
     pub throws: Vec<Ty>,
     pub is_abstract: bool,
     pub is_final: bool,
@@ -391,6 +393,7 @@ impl<'a> Tcx<'a> {
             vis,
             owner,
             generics: self.generic_params(&method.generics),
+            where_bounds: self.where_bounds(&method.where_clause),
             throws: self.lower_tys(&method.throws),
             is_abstract,
             is_final: member.inheritance.final_kw.is_some(),
@@ -407,6 +410,7 @@ impl<'a> Tcx<'a> {
             vis,
             owner,
             generics: Vec::new(),
+            where_bounds: Vec::new(),
             throws: self.lower_tys(&ctor.throws),
             is_abstract: false,
             is_final: false,
@@ -423,6 +427,16 @@ impl<'a> Tcx<'a> {
                 } else {
                     ty
                 }
+            })
+            .collect()
+    }
+
+    pub(crate) fn where_bounds(&self, predicates: &[WherePredicate]) -> Vec<GenericParamSig> {
+        predicates
+            .iter()
+            .map(|predicate| GenericParamSig {
+                name: predicate.param.name,
+                bounds: self.lower_tys(&predicate.bounds),
             })
             .collect()
     }

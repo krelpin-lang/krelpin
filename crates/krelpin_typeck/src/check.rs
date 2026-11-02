@@ -136,7 +136,8 @@ fn check_member<'a, 'tcx>(tcx: &'a Tcx<'tcx>, owner: DefId, member: &Member) -> 
             let mut fcx = FnCtxt::new(tcx, owner, ret.clone());
             fcx.param_env = fcx
                 .param_env
-                .with_generics(&tcx.generic_params(&method.generics));
+                .with_generics(&tcx.generic_params(&method.generics))
+                .with_where_bounds(&tcx.where_bounds(&method.where_clause));
             if method.receiver.is_none() {
                 fcx.self_ty = Ty::Unknown;
             }

@@ -60,6 +60,7 @@ CompilationUnit {
                                         },
                                     ],
                                     throws: [],
+                                    where_clause: [],
                                     body: Some(
                                         Block {
                                             stmts: [],
@@ -120,6 +121,7 @@ CompilationUnit {
                                         },
                                     ],
                                     throws: [],
+                                    where_clause: [],
                                     body: Some(
                                         Block {
                                             stmts: [
@@ -197,6 +199,7 @@ CompilationUnit {
                                     ),
                                     params: [],
                                     throws: [],
+                                    where_clause: [],
                                     body: Some(
                                         Block {
                                             stmts: [
@@ -263,6 +266,7 @@ CompilationUnit {
                                     ),
                                     params: [],
                                     throws: [],
+                                    where_clause: [],
                                     body: Some(
                                         Block {
                                             stmts: [

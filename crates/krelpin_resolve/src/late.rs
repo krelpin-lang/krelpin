@@ -3,7 +3,7 @@ use std::collections::HashMap;
 use krelpin_ast::ast::{
     Block, CompilationUnit, Constructor, Expr, ExprKind, Field, FieldStorage, FnRetTy,
     GenericParamKind, Generics, Ident, ItemKind, LambdaBody, Member, MemberKind, Method, Param,
-    PrimitiveTy, Stmt, StmtKind, SwitchExprBody, Ty, TyKind,
+    PrimitiveTy, Stmt, StmtKind, SwitchExprBody, Ty, TyKind, WherePredicate,
 };
 use krelpin_errors::{DiagCtxt, Diagnostic};
 use krelpin_span::{Span, Symbol, kw};
@@ -186,6 +186,9 @@ impl<'a> Resolver<'a> {
                 self.resolve_tys(bounds.iter());
             }
         }
+        for predicate in &method.where_clause {
+            self.resolve_where_predicate(predicate);
+        }
 
         if let Some(receiver) = method.receiver {
             self.borrow_sources.push((kw::This, receiver.span));
@@ -201,6 +204,27 @@ impl<'a> Resolver<'a> {
         if let Some(body) = &method.body {
             self.resolve_block(body);
         }
+    }
+
+    fn resolve_where_predicate(&mut self, predicate: &WherePredicate) {
+        let param = predicate.param;
+        let found = self
+            .type_params
+            .iter()
+            .rev()
+            .find(|&&(name, _)| name == param.name);
+        let Some(&(_, span)) = found else {
+            self.emit(
+                Diagnostic::error(format!("cannot find generic parameter `{}`", param.name))
+                    .with_span(param.span)
+                    .with_help(
+                        "a `where` clause can only constrain the generic parameters in scope",
+                    ),
+            );
+            return;
+        };
+        self.resolutions.record(param.span, Res::TypeParam(span));
+        self.resolve_tys(predicate.bounds.iter());
     }
 
     fn resolve_signature(&mut self, params: &[Param], throws: &[Ty]) {

@@ -251,6 +251,7 @@ CompilationUnit {
                                             span: 236..244,
                                         },
                                     ],
+                                    where_clause: [],
                                     body: None,
                                 },
                             ),

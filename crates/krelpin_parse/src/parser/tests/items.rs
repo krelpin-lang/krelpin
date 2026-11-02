@@ -394,3 +394,22 @@ fn files_are_parsed_in_parallel() {
     assert_eq!(units[5].items[0].name.name.as_str(), "C5");
     assert_eq!(units[0].items[0].name.name.as_str(), "C0");
 }
+
+#[test]
+fn where_clauses() {
+    let MemberKind::Method(method) = only_member(
+        "boolean has(&this, T value) \
+         where T extends Comparable<T> & Cloneable, U extends Object {}",
+    ) else {
+        panic!("expected a method");
+    };
+    let predicates: Vec<String> = method
+        .where_clause
+        .iter()
+        .map(|predicate| {
+            let bounds: Vec<String> = predicate.bounds.iter().map(ToString::to_string).collect();
+            format!("{}: {}", predicate.param.name, bounds.join(" & "))
+        })
+        .collect();
+    assert_eq!(predicates, ["T: Comparable<T> & Cloneable", "U: Object"]);
+}

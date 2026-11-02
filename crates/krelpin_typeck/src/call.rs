@@ -109,7 +109,7 @@ impl FnCtxt<'_, '_> {
             }
             return Ty::Unknown;
         };
-        self.check_inferred_bounds(chosen, name);
+        self.check_call_bounds(chosen, name);
         self.check_vis(chosen.method.vis, chosen.method.owner, false, what, name);
         for thrown in &chosen.method.throws {
             self.raise(thrown.subst(&chosen.subst), name.span);
@@ -221,8 +221,9 @@ impl FnCtxt<'_, '_> {
             .find(|a| applicable.iter().all(|b| more_specific(a, b)))
     }
 
-    fn check_inferred_bounds(&self, candidate: &Candidate, name: Ident) {
-        for param in &candidate.method.generics {
+    fn check_call_bounds(&self, candidate: &Candidate, name: Ident) {
+        let method = &candidate.method;
+        for param in method.generics.iter().chain(&method.where_bounds) {
             match candidate.subst.get(&param.name) {
                 Some(Ty::Unknown) | None => {}
                 Some(arg) => {

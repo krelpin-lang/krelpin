@@ -189,7 +189,15 @@ pub struct Method {
     pub receiver: Option<Receiver>,
     pub params: Vec<Param>,
     pub throws: Vec<Ty>,
+    pub where_clause: Vec<WherePredicate>,
     pub body: Option<Block>,
+}
+
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct WherePredicate {
+    pub param: Ident,
+    pub bounds: Vec<Ty>,
+    pub span: Span,
 }
 
 #[derive(Clone, Debug, PartialEq, Eq)]

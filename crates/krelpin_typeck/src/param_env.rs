@@ -18,6 +18,16 @@ impl ParamEnv {
         self
     }
 
+    pub fn with_where_bounds(mut self, predicates: &[GenericParamSig]) -> ParamEnv {
+        for predicate in predicates {
+            self.bounds
+                .entry(predicate.name)
+                .or_default()
+                .extend(predicate.bounds.iter().cloned());
+        }
+        self
+    }
+
     pub fn bounds(&self, name: Symbol) -> &[Ty] {
         self.bounds.get(&name).map_or(&[], Vec::as_slice)
     }
