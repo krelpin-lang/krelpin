@@ -283,7 +283,8 @@ impl FnCtxt<'_, '_> {
             RefReceiver::Value(ty) => (ty.strip_refs(), false),
         };
         self.receiver_adts(ty).into_iter().find_map(|(def, args)| {
-            self.collect_methods(def, &args, name.name)
+            self.tcx
+                .methods_named(def, &args, name.name)
                 .into_iter()
                 .find_map(|(method, subst)| {
                     let method_sig = instantiate(&method, &subst);

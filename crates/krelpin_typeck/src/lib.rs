@@ -3,6 +3,7 @@ mod check;
 mod closure;
 mod coerce;
 mod expr;
+mod inherit;
 mod lang_items;
 mod param_env;
 mod sig;

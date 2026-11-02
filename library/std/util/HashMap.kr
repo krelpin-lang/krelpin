@@ -1,3 +1,27 @@
 package std.util;
 
-class HashMap<K, V> implements Map<K, V> {}
+class HashMap<K, V> implements Map<K, V> {
+    @Intrinsic
+    int size(&this);
+
+    @Intrinsic
+    V? get(&this, K key);
+
+    @Intrinsic
+    V? put(&mut this, K key, V value);
+
+    @Intrinsic
+    V? remove(&mut this, K key);
+
+    @Intrinsic
+    boolean containsKey(&this, K key);
+
+    @Intrinsic
+    void clear(&mut this);
+
+    @Intrinsic
+    Set<K> keySet(&this);
+
+    @Intrinsic
+    List<V> values(&this);
+}

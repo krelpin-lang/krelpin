@@ -197,6 +197,68 @@ impl<'a> Tcx<'a> {
             })
     }
 
+    pub(crate) fn methods_named(
+        &self,
+        def: DefId,
+        args: &[Ty],
+        name: Symbol,
+    ) -> Vec<(MethodSig, Subst)> {
+        let mut out = Vec::new();
+        self.find_methods(def, args, name, &mut out);
+        if !out.is_empty() || self.sig(def).kind != AdtKind::Interface {
+            return out;
+        }
+        if let Some(object) = self.lang_items.get(LangItem::Object) {
+            self.find_methods(object, &[], name, &mut out);
+        }
+        out
+    }
+
+    fn find_methods(
+        &self,
+        def: DefId,
+        args: &[Ty],
+        name: Symbol,
+        out: &mut Vec<(MethodSig, Subst)>,
+    ) {
+        let sig = self.sig(def);
+        let subst = self.subst_for(def, args);
+        if let Some(methods) = sig.methods.get(&name) {
+            out.extend(methods.iter().map(|method| (method.clone(), subst.clone())));
+        }
+        for parent in sig.superclass.iter().chain(sig.interfaces.iter()) {
+            if let Ty::Adt { def, args, .. } = parent.subst(&subst) {
+                self.find_methods(def, &args, name, out);
+            }
+        }
+    }
+
+    pub(crate) fn supertypes(&self, def: DefId) -> Vec<(DefId, Subst)> {
+        let mut out = Vec::new();
+        let self_args: Vec<Ty> = self
+            .sig(def)
+            .generics
+            .iter()
+            .map(|param| Ty::Param(param.name))
+            .collect();
+        self.collect_supertypes(def, &self_args, &mut out);
+        out
+    }
+
+    fn collect_supertypes(&self, def: DefId, args: &[Ty], out: &mut Vec<(DefId, Subst)>) {
+        let subst = self.subst_for(def, args);
+        let sig = self.sig(def);
+        for parent in sig.superclass.iter().chain(sig.interfaces.iter()) {
+            match parent.subst(&subst) {
+                Ty::Adt { def, args, .. } if out.iter().all(|(seen, _)| *seen != def) => {
+                    out.push((def, self.subst_for(def, &args)));
+                    self.collect_supertypes(def, &args, out);
+                }
+                _ => {}
+            }
+        }
+    }
+
     fn implicit_superclass(&self, def: DefId, kind: AdtKind) -> Option<Ty> {
         let parent = match kind {
             AdtKind::Class | AdtKind::Struct => LangItem::Object,

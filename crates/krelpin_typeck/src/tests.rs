@@ -950,3 +950,153 @@ fn method_references() {
         ["expected `String`, found `int`"]
     );
 }
+
+fn shapes(code: &str) -> String {
+    format!(
+        "interface Shape {{\n\
+         \x20   double area(&this);\n\
+         \x20   String name(&this) {{ return \"shape\"; }}\n\
+         }}\n\
+         interface Box<T> {{ T get(&this); }}\n\
+         {code}"
+    )
+}
+
+#[test]
+fn abstract_methods_are_implemented() {
+    ok(&shapes(
+        "class Circle implements Shape { double area(&this) { return 3.14; } }",
+    ));
+    ok(&shapes("abstract class Base implements Shape {}"));
+    ok(&shapes(
+        "class Base { double area(&this) { return 1.0; } }\n\
+         class Square extends Base implements Shape {}",
+    ));
+    ok(&shapes(
+        "class IntBox implements Box<Integer> { Integer get(&this) { return 1; } }",
+    ));
+
+    let src = shapes("class Square implements Shape {}");
+    assert_eq!(
+        errors(&src),
+        ["`Square` does not implement every method of `Shape`"]
+    );
+    assert_eq!(
+        helps(&src),
+        [
+            "missing: `double area(&this)`",
+            "implement the missing methods, or mark `Square` as `abstract`",
+        ]
+    );
+    assert_eq!(
+        helps(&shapes("struct Point implements Shape {}")),
+        [
+            "missing: `double area(&this)`",
+            "implement the missing methods"
+        ]
+    );
+    assert_eq!(
+        errors(&shapes("enum Kind implements Shape { ROUND }")),
+        ["`Kind` does not implement every method of `Shape`"]
+    );
+    assert_eq!(
+        errors("class A { abstract void f(&this); }"),
+        ["`A` is not abstract but declares abstract methods"]
+    );
+}
+
+fn base(code: &str) -> String {
+    format!(
+        "class Base {{\n\
+         \x20   void f(&this) {{}}\n\
+         \x20   final void g(&this) {{}}\n\
+         \x20   public void h(&this) {{}}\n\
+         \x20   Base copy(&this) {{ return new Base(); }}\n\
+         }}\n\
+         {code}"
+    )
+}
+
+#[test]
+fn overrides_keep_the_signature() {
+    ok(&base(
+        "class A extends Base {\n\
+         \x20   void f(&this) {}\n\
+         \x20   void f(&mut this, int x) {}\n\
+         \x20   A copy(&this) { return new A(); }\n\
+         \x20   String toString(&this) { return \"a\"; }\n\
+         }",
+    ));
+    assert_eq!(
+        errors(&base("class A extends Base { void f(&mut this) {} }")),
+        ["`f` takes `&mut this` but `Base.f` takes `&this`"]
+    );
+    assert_eq!(
+        errors(&base("class A extends Base { void f() {} }")),
+        ["`f` takes no `this` but `Base.f` takes `&this`"]
+    );
+    assert_eq!(
+        errors(&base("class A extends Base { void g(&this) {} }")),
+        ["cannot override `Base.g` because it is `final`"]
+    );
+    assert_eq!(
+        errors(&base("class A extends Base { private void h(&this) {} }")),
+        ["`h` cannot be less visible than `Base.h`"]
+    );
+    assert_eq!(
+        errors(&base("class A extends Base { int f(&this) { return 1; } }")),
+        ["`f` returns `int` but `Base.f` returns `void`"]
+    );
+    assert_eq!(
+        errors(&base(
+            "class A extends Base { String copy(&this) { return \"\"; } }"
+        )),
+        ["`copy` returns `String` but `Base.copy` returns `Base`"]
+    );
+    assert_eq!(
+        errors("class A { int toString(&this) { return 1; } }"),
+        ["`toString` returns `int` but `Object.toString` returns `String`"]
+    );
+    assert_eq!(
+        errors(&shapes(
+            "class StrBox implements Box<String> { Integer get(&this) { return 1; } }"
+        )),
+        ["`get` returns `Integer` but `Box.get` returns `String`"]
+    );
+}
+
+#[test]
+fn parents_have_the_right_kind() {
+    assert_eq!(
+        errors("interface I {} class A extends I {}"),
+        ["a class cannot extend an interface"]
+    );
+    assert_eq!(
+        helps("interface I {} class A extends I {}"),
+        ["use `implements I` instead"]
+    );
+    assert_eq!(
+        errors("class B {} class A implements B {}"),
+        ["`B` is not an interface"]
+    );
+    assert_eq!(
+        helps("class B {} class A implements B {}"),
+        ["use `extends B` instead"]
+    );
+    assert_eq!(
+        errors("class B {} interface I extends B {}"),
+        ["an interface can only extend interfaces"]
+    );
+    assert_eq!(
+        errors("struct S {} class A extends S {}"),
+        ["a class can only extend another class"]
+    );
+    assert_eq!(
+        errors("final class F {} class A extends F {}"),
+        ["cannot extend `F` because it is `final`"]
+    );
+    assert_eq!(
+        errors("class A extends String {}"),
+        ["cannot extend `String` because it is `final`"]
+    );
+}

@@ -72,6 +72,7 @@ pub(crate) fn check_units(tcx: &Tcx<'_>, units: &[CompilationUnit]) -> TypeckRes
     for (type_def, item) in tcx.items.items(units) {
         let owner = type_def.def;
         tcx.check_item_wf(owner, item);
+        tcx.check_inheritance(owner, item);
         let members: &[Member] = match &item.kind {
             ItemKind::Class(class) => &class.members,
             ItemKind::Struct(def) => &def.members,

@@ -1,3 +1,21 @@
 package std.util;
 
-class HashSet<T> implements Set<T> {}
+class HashSet<T> implements Set<T> {
+    @Intrinsic
+    int size(&this);
+
+    @Intrinsic
+    boolean add(&mut this, T value);
+
+    @Intrinsic
+    boolean remove(&mut this, T value);
+
+    @Intrinsic
+    boolean contains(&this, T value);
+
+    @Intrinsic
+    void clear(&mut this);
+
+    @Intrinsic
+    Iterator<T> iterator(&this);
+}

@@ -1,3 +1,30 @@
 package std.util;
 
-class ArrayList<T> implements List<T> {}
+class ArrayList<T> implements List<T> {
+    @Intrinsic
+    int size(&this);
+
+    @Intrinsic
+    T get(&this, int index);
+
+    @Intrinsic
+    T set(&mut this, int index, T value);
+
+    @Intrinsic
+    void add(&mut this, T value);
+
+    @Intrinsic
+    void add(&mut this, int index, T value);
+
+    @Intrinsic
+    T remove(&mut this, int index);
+
+    @Intrinsic
+    int indexOf(&this, T value);
+
+    @Intrinsic
+    void clear(&mut this);
+
+    @Intrinsic
+    Iterator<T> iterator(&this);
+}

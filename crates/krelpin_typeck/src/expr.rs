@@ -11,8 +11,8 @@ use crate::check::{FnCtxt, plural};
 use crate::closure::is_closure;
 use crate::coerce::Coercion;
 use crate::lang_items::LangItem;
-use crate::sig::{AdtKind, FieldSig, MethodSig};
-use crate::ty::{Subst, Ty, promote};
+use crate::sig::{AdtKind, FieldSig};
+use crate::ty::{Ty, promote};
 
 enum Receiver {
     None,
@@ -375,29 +375,6 @@ impl FnCtxt<'_, '_> {
         }
     }
 
-    fn find_methods(
-        &self,
-        def: DefId,
-        args: &[Ty],
-        name: Symbol,
-        out: &mut Vec<(MethodSig, Subst)>,
-    ) {
-        let sig = self.tcx.sig(def);
-        let subst = self.tcx.subst_for(def, args);
-        if let Some(methods) = sig.methods.get(&name) {
-            out.extend(methods.iter().map(|method| (method.clone(), subst.clone())));
-        }
-        for parent in sig.superclass.iter().chain(sig.interfaces.iter()) {
-            if let Ty::Adt {
-                def: parent, args, ..
-            } = parent
-            {
-                let args: Vec<Ty> = args.iter().map(|arg| arg.subst(&subst)).collect();
-                self.find_methods(*parent, &args, name, out);
-            }
-        }
-    }
-
     pub(crate) fn check_vis(
         &self,
         vis: Visibility,
@@ -459,7 +436,7 @@ impl FnCtxt<'_, '_> {
         let ret = match receiver {
             Receiver::None => {
                 let owner = self.owner;
-                let candidates = self.collect_methods(owner, &[], name.name);
+                let candidates = self.tcx.methods_named(owner, &[], name.name);
                 let statics: Vec<_> = candidates
                     .into_iter()
                     .filter(|(method, _)| method.receiver.is_none())
@@ -490,7 +467,7 @@ impl FnCtxt<'_, '_> {
             return Ty::Array(Box::new(ty.clone()));
         }
 
-        let candidates = self.collect_methods(def, &[], name.name);
+        let candidates = self.tcx.methods_named(def, &[], name.name);
         if candidates.is_empty() {
             self.no_method(ty, name);
             return Ty::Unknown;
@@ -519,7 +496,7 @@ impl FnCtxt<'_, '_> {
                 let receivers = self.receiver_adts(ty);
                 let candidates: Vec<_> = receivers
                     .iter()
-                    .flat_map(|(def, args)| self.collect_methods(*def, args, name.name))
+                    .flat_map(|(def, args)| self.tcx.methods_named(*def, args, name.name))
                     .collect();
                 if candidates.is_empty() {
                     self.no_method(ty, name);
@@ -577,23 +554,6 @@ impl FnCtxt<'_, '_> {
                 .with_span(name.span)
                 .with_label("method not found"),
         );
-    }
-
-    pub(crate) fn collect_methods(
-        &self,
-        def: DefId,
-        args: &[Ty],
-        name: Symbol,
-    ) -> Vec<(MethodSig, Subst)> {
-        let mut out = Vec::new();
-        self.find_methods(def, args, name, &mut out);
-        if !out.is_empty() || self.tcx.sig(def).kind != AdtKind::Interface {
-            return out;
-        }
-        if let Some(object) = self.tcx.lang_items.get(LangItem::Object) {
-            self.find_methods(object, &[], name, &mut out);
-        }
-        out
     }
 
     pub(crate) fn check_ctor_call(
@@ -686,7 +646,8 @@ impl FnCtxt<'_, '_> {
                         .with_span(base.span);
                 let has_get = match other {
                     Ty::Adt { def, args, .. } => !self
-                        .collect_methods(*def, args, Symbol::intern("get"))
+                        .tcx
+                        .methods_named(*def, args, Symbol::intern("get"))
                         .is_empty(),
                     _ => false,
                 };

@@ -1,11 +1,11 @@
 package std.util;
 
-import std.function.Consumer;
-
 interface Set<T> extends Iterable<T> {
     int size(&this);
 
-    boolean isEmpty(&this);
+    boolean isEmpty(&this) {
+        return this.size() == 0;
+    }
 
     boolean add(&mut this, T value);
 
@@ -14,6 +14,4 @@ interface Set<T> extends Iterable<T> {
     boolean contains(&this, T value);
 
     void clear(&mut this);
-
-    void forEach(&this, Consumer<T> action);
 }

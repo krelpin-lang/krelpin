@@ -3,7 +3,9 @@ package std.util;
 interface Map<K, V> {
     int size(&this);
 
-    boolean isEmpty(&this);
+    boolean isEmpty(&this) {
+        return this.size() == 0;
+    }
 
     V? get(&this, K key);
 
