@@ -1099,6 +1099,10 @@ fn parents_have_the_right_kind() {
         errors("class A extends String {}"),
         ["cannot extend `String` because it is `final`"]
     );
+    assert_eq!(
+        errors("interface I { void f(&this); } class A extends I {}"),
+        ["a class cannot extend an interface"]
+    );
 }
 
 #[test]

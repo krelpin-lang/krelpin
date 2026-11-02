@@ -9,12 +9,14 @@ use crate::ty::{Subst, Ty};
 
 impl Tcx<'_> {
     pub(crate) fn check_inheritance(&self, def: DefId, item: &Item) {
-        self.check_parents(def, item);
+        if !self.check_parents(def, item) {
+            return;
+        }
         self.check_overrides(def);
         self.check_abstract_methods_implemented(def);
     }
 
-    fn check_parents(&self, def: DefId, item: &Item) {
+    fn check_parents(&self, def: DefId, item: &Item) -> bool {
         let (extends, implements): (Vec<&ast::Ty>, Vec<&ast::Ty>) = match &item.kind {
             ItemKind::Class(class) => (
                 class.extends.iter().collect(),
@@ -25,6 +27,7 @@ impl Tcx<'_> {
             ItemKind::Enum(def) => (Vec::new(), def.implements.iter().collect()),
         };
         let kind = self.sig(def).kind;
+        let mut valid = true;
 
         for ty in extends {
             let Ty::Adt {
@@ -54,6 +57,7 @@ impl Tcx<'_> {
                     .with_label(format!("`{name}` is {}", article(other))),
             };
             self.dcx.emit(diagnostic.with_span(ty.span));
+            valid = false;
         }
 
         for ty in implements {
@@ -76,7 +80,9 @@ impl Tcx<'_> {
                 diagnostic
             };
             self.dcx.emit(diagnostic);
+            valid = false;
         }
+        valid
     }
 
     fn check_overrides(&self, def: DefId) {
