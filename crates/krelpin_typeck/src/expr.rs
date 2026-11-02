@@ -173,7 +173,7 @@ impl FnCtxt<'_, '_> {
                             arm_tys.push((value.span, self.check_expr(value)))
                         }
                         SwitchExprBody::Throw(value) => {
-                            self.check_expr(value);
+                            self.check_throw(value);
                         }
                         SwitchExprBody::Block(block) => {
                             self.yields.push(Vec::new());

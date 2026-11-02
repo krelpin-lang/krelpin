@@ -133,11 +133,9 @@ impl FnCtxt<'_, '_> {
                 finally,
             } => {
                 let mut diverges = self.check_block(body);
+                let mut caught = Vec::new();
                 for catch in catches {
-                    let ty = match catch.tys.as_slice() {
-                        [ty] => self.lower_ty(ty),
-                        _ => self.tcx.lang_ty(LangItem::Exception),
-                    };
+                    let ty = self.check_catch(catch, &mut caught);
                     self.locals.insert(catch.name.span, ty);
                     diverges &= self.check_block(&catch.body);
                 }
@@ -158,7 +156,7 @@ impl FnCtxt<'_, '_> {
                 true
             }
             StmtKind::Throw(value) => {
-                self.check_expr(value);
+                self.check_throw(value);
                 true
             }
             StmtKind::Break | StmtKind::Continue | StmtKind::Empty => false,

@@ -2,6 +2,7 @@ mod call;
 mod check;
 mod closure;
 mod coerce;
+mod exceptions;
 mod expr;
 mod inherit;
 mod lang_items;

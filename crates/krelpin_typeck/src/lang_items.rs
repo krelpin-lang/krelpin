@@ -27,7 +27,7 @@ lang_items! {
     String: "std.lang.String",
     Enum: "std.lang.Enum",
     Iterable: "std.lang.Iterable",
-    Exception: "std.lang.Exception",
+    Throwable: "std.lang.Throwable",
     Boolean: "std.lang.Boolean",
     Byte: "std.lang.Byte",
     Short: "std.lang.Short",

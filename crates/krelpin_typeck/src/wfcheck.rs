@@ -55,6 +55,7 @@ impl Tcx<'_> {
                 for ty in &ctor.throws {
                     self.check_wf(env, ty);
                 }
+                self.check_throws_clause(env, &ctor.throws);
             }
             MemberKind::Method(method) => {
                 let env = env
@@ -70,6 +71,7 @@ impl Tcx<'_> {
                 for ty in &method.throws {
                     self.check_wf(&env, ty);
                 }
+                self.check_throws_clause(&env, &method.throws);
             }
         }
     }

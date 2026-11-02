@@ -1100,3 +1100,57 @@ fn parents_have_the_right_kind() {
         ["cannot extend `String` because it is `final`"]
     );
 }
+
+#[test]
+fn only_throwables_are_thrown_and_caught() {
+    body_ok("throw new IllegalStateException(\"broken\");");
+    assert_eq!(
+        in_body("throw \"oops\";"),
+        ["cannot throw a value of type `String`"]
+    );
+    assert_eq!(
+        in_body("RuntimeException? error = null; throw error;"),
+        ["cannot throw a value of type `RuntimeException?`"]
+    );
+    assert_eq!(
+        errors("class A { void f() throws String {} }"),
+        ["`String` is not a `Throwable`"]
+    );
+    assert_eq!(
+        in_body("try {} catch (String s) {}"),
+        ["`String` cannot be caught"]
+    );
+}
+
+#[test]
+fn multi_catch_binds_the_common_superclass() {
+    body_ok(
+        "try {} catch (IllegalArgumentException | IllegalStateException e) { \
+         RuntimeException r = e; String? message = e.getMessage(); }",
+    );
+    assert_eq!(
+        in_body(
+            "try {} catch (IllegalArgumentException | IllegalStateException e) { \
+             IllegalStateException s = e; }"
+        ),
+        ["mismatched types"]
+    );
+    assert_eq!(
+        in_body("try {} catch (RuntimeException | IllegalStateException e) {}"),
+        ["`IllegalStateException` and `RuntimeException` overlap in this `catch`"]
+    );
+}
+
+#[test]
+fn exceptions_are_caught_only_once() {
+    body_ok("try {} catch (RuntimeException e) {} catch (Exception e) {}");
+    let code = "try {} catch (Exception e) {} catch (RuntimeException e) {}";
+    assert_eq!(
+        in_body(code),
+        ["`RuntimeException` has already been caught"]
+    );
+    assert_eq!(
+        labels(&body(code)),
+        ["already caught by the `catch` for `Exception`"]
+    );
+}
