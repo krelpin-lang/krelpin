@@ -125,7 +125,10 @@ dependencies = [
  "krelpin_ast",
  "krelpin_errors",
  "krelpin_parse",
+ "krelpin_resolve",
  "krelpin_span",
+ "krelpin_sysroot",
+ "krelpin_typeck",
 ]
 
 [[package]]
@@ -153,8 +156,41 @@ dependencies = [
 ]
 
 [[package]]
+name = "krelpin_resolve"
+version = "0.1.0"
+dependencies = [
+ "krelpin_ast",
+ "krelpin_errors",
+ "krelpin_parse",
+ "krelpin_span",
+ "krelpin_sysroot",
+]
+
+[[package]]
 name = "krelpin_span"
 version = "0.1.0"
+
+[[package]]
+name = "krelpin_sysroot"
+version = "0.1.0"
+dependencies = [
+ "krelpin_ast",
+ "krelpin_errors",
+ "krelpin_parse",
+ "krelpin_span",
+]
+
+[[package]]
+name = "krelpin_typeck"
+version = "0.1.0"
+dependencies = [
+ "krelpin_ast",
+ "krelpin_errors",
+ "krelpin_parse",
+ "krelpin_resolve",
+ "krelpin_span",
+ "krelpin_sysroot",
+]
 
 [[package]]
 name = "krelpinc"

@@ -4,6 +4,7 @@ use krelpin_ast::ast::{
     CompilationUnit, FieldStorage, FnRetTy, ItemKind, Member, MemberKind, Param,
 };
 use krelpin_errors::Diagnostic;
+use krelpin_span::def_id::DefId;
 use krelpin_span::{Span, Symbol};
 
 use crate::TypeckResults;
@@ -12,7 +13,7 @@ use crate::ty::Ty;
 
 pub(crate) struct FnCtxt<'a, 'tcx> {
     pub(crate) tcx: &'a Tcx<'tcx>,
-    pub(crate) owner: usize,
+    pub(crate) owner: DefId,
     pub(crate) self_ty: Ty,
     pub(crate) ret: Ty,
     pub(crate) locals: HashMap<Span, Ty>,
@@ -23,11 +24,11 @@ pub(crate) struct FnCtxt<'a, 'tcx> {
 
 impl Tcx<'_> {
     pub(crate) fn break_inheritance_cycles(&mut self) {
-        for def in 0..self.types.len() {
+        for def in (0..self.types.len()).map(DefId::from_index) {
             if !self.reaches(def, def) {
                 continue;
             }
-            let name = self.types[def].name;
+            let name = self.sig(def).name;
             self.dcx.emit(
                 Diagnostic::error(format!(
                     "cyclic inheritance: `{}` inherits from itself",
@@ -36,18 +37,18 @@ impl Tcx<'_> {
                 .with_span(name.span)
                 .with_note("a type cannot be its own ancestor"),
             );
-            let sig = &mut self.types[def];
+            let sig = &mut self.types[def.index()];
             sig.superclass = None;
             sig.interfaces
                 .retain(|parent| !matches!(parent, Ty::Adt { .. }));
         }
     }
 
-    fn reaches(&self, from: usize, target: usize) -> bool {
+    fn reaches(&self, from: DefId, target: DefId) -> bool {
         let mut stack = vec![from];
         let mut seen = HashSet::new();
         while let Some(def) = stack.pop() {
-            let sig = &self.types[def];
+            let sig = self.sig(def);
             for parent in sig.superclass.iter().chain(sig.interfaces.iter()) {
                 if let Ty::Adt { def: parent, .. } = parent {
                     if *parent == target {
@@ -63,10 +64,11 @@ impl Tcx<'_> {
     }
 }
 
-pub(crate) fn check_unit(tcx: &Tcx<'_>, unit: &CompilationUnit) -> TypeckResults {
+pub(crate) fn check_units(tcx: &Tcx<'_>, units: &[CompilationUnit]) -> TypeckResults {
     let mut results = TypeckResults::default();
 
-    for (owner, item) in unit.items.iter().enumerate() {
+    for (type_def, item) in tcx.items.items(units) {
+        let owner = type_def.def;
         let members: &[Member] = match &item.kind {
             ItemKind::Class(class) => &class.members,
             ItemKind::Struct(def) => &def.members,
@@ -95,12 +97,13 @@ pub(crate) fn check_unit(tcx: &Tcx<'_>, unit: &CompilationUnit) -> TypeckResults
     results
 }
 
-fn check_member<'a, 'tcx>(tcx: &'a Tcx<'tcx>, owner: usize, member: &Member) -> FnCtxt<'a, 'tcx> {
+fn check_member<'a, 'tcx>(tcx: &'a Tcx<'tcx>, owner: DefId, member: &Member) -> FnCtxt<'a, 'tcx> {
     match &member.kind {
         MemberKind::Field(field) => {
             let mut fcx = FnCtxt::new(tcx, owner, Ty::Void);
             if let Some(init) = &field.init {
-                let ty = tcx.types[owner]
+                let ty = tcx
+                    .sig(owner)
                     .fields
                     .get(&field.name.name)
                     .map(|f| f.ty.clone());
@@ -149,7 +152,7 @@ fn check_member<'a, 'tcx>(tcx: &'a Tcx<'tcx>, owner: usize, member: &Member) -> 
 }
 
 impl<'a, 'tcx> FnCtxt<'a, 'tcx> {
-    pub(crate) fn new(tcx: &'a Tcx<'tcx>, owner: usize, ret: Ty) -> Self {
+    pub(crate) fn new(tcx: &'a Tcx<'tcx>, owner: DefId, ret: Ty) -> Self {
         FnCtxt {
             tcx,
             owner,
@@ -184,8 +187,8 @@ impl<'a, 'tcx> FnCtxt<'a, 'tcx> {
             .unwrap_or(Ty::Unknown)
     }
 
-    pub(crate) fn type_name(&self, def: usize) -> Symbol {
-        self.tcx.types[def].name.name
+    pub(crate) fn type_name(&self, def: DefId) -> Symbol {
+        self.tcx.sig(def).name.name
     }
 
     pub(crate) fn emit(&self, diagnostic: Diagnostic) {

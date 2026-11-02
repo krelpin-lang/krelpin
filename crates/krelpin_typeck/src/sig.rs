@@ -5,10 +5,12 @@ use krelpin_ast::ast::{
     Member, MemberKind, Param, ReceiverKind, TyKind, Visibility,
 };
 use krelpin_errors::DiagCtxt;
-use krelpin_resolve::{Res, Resolutions};
+use krelpin_resolve::{ItemTable, Res, Resolutions, ResolverOutput};
 use krelpin_span::Symbol;
+use krelpin_span::def_id::DefId;
 
-use crate::ty::Ty;
+use crate::lang_items::{LangItem, LangItems};
+use crate::ty::{Subst, Ty};
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum AdtKind {
@@ -38,7 +40,7 @@ pub struct FieldSig {
     pub ty: Ty,
     pub vis: Visibility,
     pub storage: FieldStorage,
-    pub owner: usize,
+    pub owner: DefId,
 }
 
 #[derive(Clone, Debug)]
@@ -49,30 +51,63 @@ pub struct MethodSig {
     pub ret: Ty,
     pub receiver: Option<ReceiverKind>,
     pub vis: Visibility,
-    pub owner: usize,
+    pub owner: DefId,
     pub generics: Vec<Symbol>,
 }
 
 pub struct Tcx<'a> {
     pub types: Vec<TypeSig>,
+    pub lang_items: LangItems,
+    pub(crate) items: &'a ItemTable,
     pub(crate) resolutions: &'a Resolutions,
     pub(crate) dcx: &'a DiagCtxt,
 }
 
 impl<'a> Tcx<'a> {
-    pub fn new(unit: &CompilationUnit, resolutions: &'a Resolutions, dcx: &'a DiagCtxt) -> Self {
+    pub fn new(units: &[CompilationUnit], resolved: &'a ResolverOutput, dcx: &'a DiagCtxt) -> Self {
         let mut tcx = Tcx {
             types: Vec::new(),
-            resolutions,
+            lang_items: LangItems::collect(&resolved.items, dcx),
+            items: &resolved.items,
+            resolutions: &resolved.resolutions,
             dcx,
         };
-        tcx.types = unit
+        tcx.types = resolved
             .items
-            .iter()
-            .enumerate()
-            .map(|(index, item)| tcx.collect_item(index, item))
+            .items(units)
+            .map(|(type_def, item)| tcx.collect_item(type_def.def, item))
             .collect();
         tcx
+    }
+
+    pub fn sig(&self, def: DefId) -> &TypeSig {
+        &self.types[def.index()]
+    }
+
+    pub fn lang_ty(&self, item: LangItem) -> Ty {
+        self.lang_items
+            .get(item)
+            .map_or(Ty::Unknown, |def| self.def_ty(def, Vec::new()))
+    }
+
+    pub fn is_lang_ty(&self, ty: &Ty, item: LangItem) -> bool {
+        matches!(ty, Ty::Adt { def, .. } if self.lang_items.is(*def, item))
+    }
+
+    pub fn string_ty(&self) -> Ty {
+        self.lang_ty(LangItem::String)
+    }
+
+    pub fn is_string(&self, ty: &Ty) -> bool {
+        self.is_lang_ty(ty, LangItem::String)
+    }
+
+    fn def_ty(&self, def: DefId, args: Vec<Ty>) -> Ty {
+        Ty::Adt {
+            def,
+            name: self.items.def(def).name.name,
+            args,
+        }
     }
 
     pub fn lower_ty(&self, ty: &ast::Ty) -> Ty {
@@ -85,12 +120,7 @@ impl<'a> Tcx<'a> {
                     return last.map_or(Ty::Unknown, |name| Ty::External { name, args });
                 };
                 match self.resolutions.get(segment.span) {
-                    Some(Res::Item(def)) => Ty::Adt {
-                        def,
-                        name: segment.name,
-                        args,
-                    },
-                    Some(Res::Prelude(name)) => Ty::Prelude { name, args },
+                    Some(Res::Item(def)) => self.def_ty(def, args),
                     Some(Res::Import(_)) => Ty::External {
                         name: segment.name,
                         args,
@@ -108,35 +138,57 @@ impl<'a> Tcx<'a> {
         }
     }
 
-    pub fn self_ty(&self, def: usize) -> Ty {
-        let sig = &self.types[def];
-        Ty::Adt {
-            def,
-            name: sig.name.name,
-            args: sig.generics.iter().map(|&name| Ty::Param(name)).collect(),
+    pub fn self_ty(&self, def: DefId) -> Ty {
+        let generics = &self.sig(def).generics;
+        self.def_ty(def, generics.iter().map(|&name| Ty::Param(name)).collect())
+    }
+
+    pub fn subst_for(&self, def: DefId, args: &[Ty]) -> Subst {
+        let generics = &self.sig(def).generics;
+        if args.len() == generics.len() {
+            generics.iter().copied().zip(args.iter().cloned()).collect()
+        } else {
+            generics.iter().map(|&name| (name, Ty::Unknown)).collect()
         }
     }
 
-    pub fn subst_for(&self, def: usize, args: &[Ty]) -> crate::ty::Subst {
-        let generics = &self.types[def].generics;
-        if args.len() != generics.len() {
-            return crate::ty::Subst::new();
-        }
-        generics.iter().copied().zip(args.iter().cloned()).collect()
-    }
-
-    pub fn is_subclass(&self, sub: usize, sup: usize) -> bool {
+    pub fn is_subclass(&self, sub: DefId, sup: DefId) -> bool {
         if sub == sup {
             return true;
         }
-        let sig = &self.types[sub];
+        let sig = self.sig(sub);
         sig.superclass
             .iter()
             .chain(sig.interfaces.iter())
             .any(|parent| matches!(parent, Ty::Adt { def, .. } if self.is_subclass(*def, sup)))
     }
 
-    fn collect_item(&self, index: usize, item: &ast::Item) -> TypeSig {
+    pub fn upcast(&self, def: DefId, args: &[Ty], target: DefId) -> Option<Vec<Ty>> {
+        if def == target {
+            return Some(args.to_vec());
+        }
+        let subst = self.subst_for(def, args);
+        let sig = self.sig(def);
+        sig.superclass
+            .iter()
+            .chain(sig.interfaces.iter())
+            .find_map(|parent| match parent.subst(&subst) {
+                Ty::Adt { def, args, .. } => self.upcast(def, &args, target),
+                _ => None,
+            })
+    }
+
+    fn implicit_superclass(&self, def: DefId, kind: AdtKind) -> Option<Ty> {
+        let parent = match kind {
+            AdtKind::Class | AdtKind::Struct => LangItem::Object,
+            AdtKind::Enum => LangItem::Enum,
+            AdtKind::Interface => return None,
+        };
+        let parent = self.lang_items.get(parent)?;
+        (parent != def).then(|| self.def_ty(parent, Vec::new()))
+    }
+
+    fn collect_item(&self, def_id: DefId, item: &ast::Item) -> TypeSig {
         let (kind, generics, superclass, interfaces, members): (_, _, _, Vec<Ty>, &[Member]) =
             match &item.kind {
                 ItemKind::Class(class) => (
@@ -174,7 +226,7 @@ impl<'a> Tcx<'a> {
             kind,
             is_abstract: kind == AdtKind::Interface || item.inheritance.abstract_kw.is_some(),
             generics: type_params(generics),
-            superclass,
+            superclass: superclass.or_else(|| self.implicit_superclass(def_id, kind)),
             interfaces,
             fields: HashMap::new(),
             methods: HashMap::new(),
@@ -183,11 +235,7 @@ impl<'a> Tcx<'a> {
         };
 
         if let ItemKind::Enum(def) = &item.kind {
-            let self_ty = Ty::Adt {
-                def: index,
-                name: item.name.name,
-                args: Vec::new(),
-            };
+            let self_ty = self.def_ty(def_id, Vec::new());
             for constant in &def.constants {
                 sig.enum_constants.push(constant.name.name);
                 sig.fields.insert(
@@ -197,7 +245,7 @@ impl<'a> Tcx<'a> {
                         ty: self_ty.clone(),
                         vis: Visibility::Public(constant.name.span),
                         storage: FieldStorage::Const(constant.name.span),
-                        owner: index,
+                        owner: def_id,
                     },
                 );
             }
@@ -216,7 +264,7 @@ impl<'a> Tcx<'a> {
                         ty: self.lower_ty(&field.ty),
                         vis,
                         storage: field.storage,
-                        owner: index,
+                        owner: def_id,
                     });
                 }
                 MemberKind::Constructor(ctor) => {
@@ -227,7 +275,7 @@ impl<'a> Tcx<'a> {
                         Ty::Void,
                         None,
                         vis,
-                        index,
+                        def_id,
                     ));
                 }
                 MemberKind::Method(method) => {
@@ -242,7 +290,7 @@ impl<'a> Tcx<'a> {
                         ret,
                         method.receiver.map(|receiver| receiver.kind),
                         vis,
-                        index,
+                        def_id,
                     );
                     sig.methods
                         .entry(method.name.name)
@@ -264,7 +312,7 @@ impl<'a> Tcx<'a> {
         ret: Ty,
         receiver: Option<ReceiverKind>,
         vis: Visibility,
-        owner: usize,
+        owner: DefId,
     ) -> MethodSig {
         MethodSig {
             name,

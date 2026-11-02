@@ -1,5 +1,6 @@
 mod collect;
 mod late;
+mod package;
 mod prelude;
 
 #[cfg(test)]
@@ -9,18 +10,19 @@ use std::collections::HashMap;
 
 use krelpin_ast::ast::CompilationUnit;
 use krelpin_errors::DiagCtxt;
-use krelpin_span::{Span, Symbol};
+use krelpin_span::Span;
+use krelpin_span::def_id::DefId;
 
-pub use crate::collect::{FieldDef, ItemTable, MethodDef, TypeDef};
+pub use crate::collect::{FieldDef, ItemTable, MethodDef, TypeDef, UnitScope};
+pub use crate::package::PackagePath;
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum Res {
     Local(Span),
     TypeParam(Span),
     BorrowSource(Span),
-    Item(usize),
+    Item(DefId),
     Import(Span),
-    Prelude(Symbol),
 }
 
 #[derive(Debug, Default)]
@@ -51,8 +53,8 @@ pub struct ResolverOutput {
     pub resolutions: Resolutions,
 }
 
-pub fn resolve(unit: &CompilationUnit, dcx: &DiagCtxt) -> ResolverOutput {
-    let items = collect::collect(unit, dcx);
-    let resolutions = late::resolve_bodies(unit, &items, dcx);
+pub fn resolve(units: &[CompilationUnit], dcx: &DiagCtxt) -> ResolverOutput {
+    let items = collect::collect(units, dcx);
+    let resolutions = late::resolve_bodies(units, &items, dcx);
     ResolverOutput { items, resolutions }
 }

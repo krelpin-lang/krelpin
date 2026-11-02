@@ -8,6 +8,7 @@ use std::process::ExitCode;
 use clap::{Parser, ValueEnum};
 use krelpin_ast::token::Token;
 use krelpin_errors::Diagnostic;
+use krelpin_sysroot::Sysroot;
 
 pub use crate::args::{Args, CrateType, Edition, Emit, LintLevel, PrintKind, Spec};
 pub use crate::session::Session;
@@ -82,12 +83,20 @@ pub fn run(args: &Args, sess: &Session) {
         return;
     }
 
-    let resolved = krelpin_resolve::resolve(&unit, &sess.dcx);
+    let Some(sysroot) = locate_sysroot(args, sess) else {
+        return;
+    };
+    let mut units = sysroot.load_std(&sess.source_map, &sess.dcx);
+    if sess.dcx.has_errors() {
+        return;
+    }
+    units.push(unit);
+    let resolved = krelpin_resolve::resolve(&units, &sess.dcx);
     if sess.dcx.has_errors() {
         return;
     }
 
-    krelpin_typeck::check(&unit, &resolved.resolutions, &sess.dcx);
+    krelpin_typeck::check(&units, &resolved, &sess.dcx);
     if sess.dcx.has_errors() {
         return;
     }
@@ -99,6 +108,16 @@ pub fn run(args: &Args, sess: &Session) {
                 "`--emit={}` is not supported yet",
                 value_name(kind)
             ))),
+        }
+    }
+}
+
+fn locate_sysroot(args: &Args, sess: &Session) -> Option<Sysroot> {
+    match Sysroot::locate(args.sysroot.as_deref()) {
+        Ok(sysroot) => Some(sysroot),
+        Err(error) => {
+            sess.dcx.emit(error.into_diagnostic());
+            None
         }
     }
 }
@@ -124,6 +143,10 @@ fn print_info(args: &Args, sess: &Session, request: &Spec<PrintKind>) {
         PrintKind::HostTuple => {
             format!("{}-{}", std::env::consts::ARCH, std::env::consts::OS)
         }
+        PrintKind::Sysroot => match locate_sysroot(args, sess) {
+            Some(sysroot) => sysroot.root().display().to_string(),
+            None => return,
+        },
         PrintKind::SupportedCrateTypes => CrateType::value_variants()
             .iter()
             .map(|&kind| value_name(kind))

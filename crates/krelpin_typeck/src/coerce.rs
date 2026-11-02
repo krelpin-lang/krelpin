@@ -1,17 +1,9 @@
 use krelpin_ast::ast::PrimitiveTy;
+use krelpin_span::def_id::DefId;
 
+use crate::lang_items::LangItem;
 use crate::sig::Tcx;
-use crate::ty::{Ty, boxed_name, promote, widens};
-
-const PRELUDE_SUPERTYPES: &[(&str, &str)] = &[
-    ("ArrayList", "List"),
-    ("HashMap", "Map"),
-    ("HashSet", "Set"),
-    ("List", "Iterable"),
-    ("Set", "Iterable"),
-    ("RuntimeException", "Exception"),
-    ("IOException", "Exception"),
-];
+use crate::ty::{Ty, promote, widens};
 
 impl Tcx<'_> {
     pub fn is_assignable(&self, from: &Ty, to: &Ty) -> bool {
@@ -23,9 +15,9 @@ impl Tcx<'_> {
             (Ty::Nullable(_) | Ty::Null, _) => false,
             (from, Ty::Nullable(to)) => self.is_assignable(from, to),
             (Ty::Primitive(from), Ty::Primitive(to)) => widens(*from, *to),
-            (Ty::Primitive(primitive), Ty::Prelude { name, .. })
-            | (Ty::Prelude { name, .. }, Ty::Primitive(primitive)) => {
-                name.as_str() == boxed_name(*primitive)
+            (Ty::Primitive(primitive), Ty::Adt { def, .. })
+            | (Ty::Adt { def, .. }, Ty::Primitive(primitive)) => {
+                self.lang_items.is(*def, LangItem::boxed(*primitive))
             }
             (
                 Ty::Ref {
@@ -45,25 +37,15 @@ impl Tcx<'_> {
             }
             (Ty::Ref { .. }, _) | (_, Ty::Ref { .. }) => false,
             (Ty::Primitive(_) | Ty::Void, _) | (_, Ty::Primitive(_) | Ty::Void) => false,
-            (_, Ty::Prelude { name, .. }) if name.as_str() == "Object" => true,
+            (_, Ty::Adt { def, .. }) if self.lang_items.is(*def, LangItem::Object) => true,
             (Ty::External { .. }, _) | (_, Ty::External { .. }) => true,
             (Ty::Array(from), Ty::Array(to)) => from == to || from.is_unknown() || to.is_unknown(),
             (Ty::Adt { def, args, .. }, to) => self.adt_assignable(*def, args, to),
-            (
-                Ty::Prelude {
-                    name: from,
-                    args: from_args,
-                },
-                Ty::Prelude {
-                    name: to,
-                    args: to_args,
-                },
-            ) => args_compatible(from_args, to_args) && prelude_subtype(from.as_str(), to.as_str()),
             _ => false,
         }
     }
 
-    fn adt_assignable(&self, def: usize, args: &[Ty], to: &Ty) -> bool {
+    fn adt_assignable(&self, def: DefId, args: &[Ty], to: &Ty) -> bool {
         match to {
             Ty::Adt {
                 def: target,
@@ -74,7 +56,7 @@ impl Tcx<'_> {
         }
 
         let subst = self.subst_for(def, args);
-        let sig = &self.types[def];
+        let sig = self.sig(def);
         sig.superclass
             .iter()
             .chain(sig.interfaces.iter())
@@ -103,11 +85,4 @@ fn args_compatible(a: &[Ty], b: &[Ty]) -> bool {
             && a.iter()
                 .zip(b)
                 .all(|(a, b)| a == b || a.is_unknown() || b.is_unknown()))
-}
-
-fn prelude_subtype(from: &str, to: &str) -> bool {
-    from == to
-        || PRELUDE_SUPERTYPES
-            .iter()
-            .any(|&(sub, sup)| sub == from && prelude_subtype(sup, to))
 }

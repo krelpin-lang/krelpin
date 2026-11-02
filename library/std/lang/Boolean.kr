@@ -1,0 +1,32 @@
+package std.lang;
+
+final class Boolean implements Comparable<Boolean> {
+    private boolean value;
+
+    Boolean(boolean value) {
+        this.value = value;
+    }
+
+    boolean booleanValue(&this) {
+        return this.value;
+    }
+
+    int compareTo(&this, Boolean other) {
+        return Boolean.compare(this.value, other.value);
+    }
+
+    int compare(boolean a, boolean b) {
+        if (a == b) {
+            return 0;
+        }
+        return a ? 1 : -1;
+    }
+
+    Boolean valueOf(boolean value) {
+        return new Boolean(value);
+    }
+
+    boolean parseBoolean(String text) {
+        return text.equals("true");
+    }
+}

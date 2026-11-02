@@ -3,9 +3,11 @@ use std::collections::HashMap;
 use krelpin_ast::ast::{BinOp, Block, Expr, ExprKind, Stmt, StmtKind, UnOp};
 use krelpin_errors::Diagnostic;
 use krelpin_resolve::Res;
+use krelpin_span::def_id::DefId;
 use krelpin_span::{Span, Symbol};
 
 use crate::check::FnCtxt;
+use crate::lang_items::LangItem;
 use crate::sig::AdtKind;
 use crate::ty::Ty;
 
@@ -134,7 +136,7 @@ impl FnCtxt<'_, '_> {
                 for catch in catches {
                     let ty = match catch.tys.as_slice() {
                         [ty] => self.tcx.lower_ty(ty),
-                        _ => Ty::prelude("Exception"),
+                        _ => self.tcx.lang_ty(LangItem::Exception),
                     };
                     self.locals.insert(catch.name.span, ty);
                     diverges &= self.check_block(&catch.body);
@@ -210,26 +212,44 @@ impl FnCtxt<'_, '_> {
     }
 
     fn element_ty(&self, iter_ty: &Ty, span: Span) -> Ty {
-        let borrowed = matches!(iter_ty, Ty::Ref { .. });
-        match iter_ty.strip_refs() {
-            Ty::Array(elem) if borrowed => Ty::Ref {
-                mutable: false,
-                ty: elem.clone(),
-            },
+        let elem = match iter_ty.strip_refs() {
             Ty::Array(elem) => elem.as_ref().clone(),
+            Ty::Adt { def, args, .. } => {
+                let iterable = self.tcx.lang_items.get(LangItem::Iterable);
+                match iterable.and_then(|iterable| self.tcx.upcast(*def, args, iterable)) {
+                    Some(args) => args.first().cloned().unwrap_or(Ty::Unknown),
+                    None => {
+                        self.cannot_iterate(iter_ty, span);
+                        return Ty::Unknown;
+                    }
+                }
+            }
             Ty::Primitive(_) | Ty::Null | Ty::Void => {
-                self.error(
-                    span,
-                    format!("cannot iterate over a value of type `{iter_ty}`"),
-                );
-                Ty::Unknown
+                self.cannot_iterate(iter_ty, span);
+                return Ty::Unknown;
             }
             Ty::Nullable(_) => {
                 self.error(span, format!("value of type `{iter_ty}` may be null"));
-                Ty::Unknown
+                return Ty::Unknown;
             }
-            _ => Ty::Unknown,
+            _ => return Ty::Unknown,
+        };
+
+        match iter_ty {
+            Ty::Ref { .. } if !elem.is_unknown() => Ty::Ref {
+                mutable: false,
+                ty: Box::new(elem),
+            },
+            _ => elem,
         }
+    }
+
+    fn cannot_iterate(&self, iter_ty: &Ty, span: Span) {
+        self.emit(
+            Diagnostic::error(format!("cannot iterate over a value of type `{iter_ty}`"))
+                .with_span(span)
+                .with_note("`for` loops work with arrays and types that implement `Iterable`"),
+        );
     }
 
     pub(crate) fn check_case_labels(&mut self, labels: Option<&[Expr]>, scrutinee: &Ty) {
@@ -247,7 +267,7 @@ impl FnCtxt<'_, '_> {
             };
             if let Some(name) = unresolved {
                 match enum_def {
-                    Some(def) if self.tcx.types[def].enum_constants.contains(&name.name) => {}
+                    Some(def) if self.tcx.sig(def).enum_constants.contains(&name.name) => {}
                     Some(def) => self.error(
                         name.span,
                         format!(
@@ -290,7 +310,9 @@ impl FnCtxt<'_, '_> {
         }
 
         let missing: Vec<String> = match self.enum_def(scrutinee) {
-            Some(def) => self.tcx.types[def]
+            Some(def) => self
+                .tcx
+                .sig(def)
                 .enum_constants
                 .iter()
                 .filter(|constant| !covered.contains(constant))
@@ -311,9 +333,9 @@ impl FnCtxt<'_, '_> {
         );
     }
 
-    fn enum_def(&self, ty: &Ty) -> Option<usize> {
+    fn enum_def(&self, ty: &Ty) -> Option<DefId> {
         match ty.strip_refs() {
-            Ty::Adt { def, .. } if self.tcx.types[*def].kind == AdtKind::Enum => Some(*def),
+            Ty::Adt { def, .. } if self.tcx.sig(*def).kind == AdtKind::Enum => Some(*def),
             _ => None,
         }
     }

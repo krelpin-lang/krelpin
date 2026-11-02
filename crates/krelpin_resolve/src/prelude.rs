@@ -1,39 +1,10 @@
-const TYPES: &[&str] = &[
-    "Object",
-    "String",
-    "Console",
-    "Math",
-    "Integer",
-    "Long",
-    "Double",
-    "Float",
-    "Boolean",
-    "Character",
-    "Byte",
-    "Short",
-    "List",
-    "ArrayList",
-    "Map",
-    "HashMap",
-    "Set",
-    "HashSet",
-    "Iterator",
-    "Iterable",
-    "Comparable",
-    "Cloneable",
-    "Runnable",
-    "Thread",
-    "AtomicInt",
-    "AtomicLong",
-    "AtomicBool",
-    "Mutex",
-    "Exception",
-    "RuntimeException",
-    "Error",
-    "IOException",
-    "Override",
-];
+use crate::PackagePath;
 
-pub(crate) fn is_type(name: &str) -> bool {
-    TYPES.contains(&name)
+const PACKAGES: &[&str] = &["std.lang", "std.util", "std.sync"];
+
+pub(crate) fn packages() -> Vec<PackagePath> {
+    PACKAGES
+        .iter()
+        .map(|package| PackagePath::parse(package))
+        .collect()
 }

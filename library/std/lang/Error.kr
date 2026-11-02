@@ -1,0 +1,11 @@
+package std.lang;
+
+class Error extends Throwable {
+    Error() {
+        super();
+    }
+
+    Error(String message) {
+        super(message);
+    }
+}

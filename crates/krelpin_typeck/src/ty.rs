@@ -3,6 +3,7 @@ use std::fmt;
 
 use krelpin_ast::ast::PrimitiveTy;
 use krelpin_span::Symbol;
+use krelpin_span::def_id::DefId;
 
 pub type Subst = HashMap<Symbol, Ty>;
 
@@ -12,11 +13,7 @@ pub enum Ty {
     Void,
     Null,
     Adt {
-        def: usize,
-        name: Symbol,
-        args: Vec<Ty>,
-    },
-    Prelude {
+        def: DefId,
         name: Symbol,
         args: Vec<Ty>,
     },
@@ -42,27 +39,12 @@ impl Ty {
     pub const DOUBLE: Ty = Ty::Primitive(PrimitiveTy::Double);
     pub const CHAR: Ty = Ty::Primitive(PrimitiveTy::Char);
 
-    pub fn prelude(name: &str) -> Ty {
-        Ty::Prelude {
-            name: Symbol::intern(name),
-            args: Vec::new(),
-        }
-    }
-
-    pub fn string() -> Ty {
-        Ty::prelude("String")
-    }
-
     pub fn is_unknown(&self) -> bool {
         matches!(self, Ty::Unknown)
     }
 
     pub fn is_boolean(&self) -> bool {
         *self == Ty::BOOLEAN
-    }
-
-    pub fn is_string(&self) -> bool {
-        matches!(self, Ty::Prelude { name, .. } if name.as_str() == "String")
     }
 
     pub fn primitive(&self) -> Option<PrimitiveTy> {
@@ -110,10 +92,6 @@ impl Ty {
             Ty::Param(name) => subst.get(name).cloned().unwrap_or_else(|| self.clone()),
             Ty::Adt { def, name, args } => Ty::Adt {
                 def: *def,
-                name: *name,
-                args: all(args),
-            },
-            Ty::Prelude { name, args } => Ty::Prelude {
                 name: *name,
                 args: all(args),
             },
@@ -173,19 +151,6 @@ pub fn widens(from: PrimitiveTy, to: PrimitiveTy) -> bool {
         )
 }
 
-pub fn boxed_name(primitive: PrimitiveTy) -> &'static str {
-    match primitive {
-        PrimitiveTy::Boolean => "Boolean",
-        PrimitiveTy::Byte => "Byte",
-        PrimitiveTy::Short => "Short",
-        PrimitiveTy::Int => "Integer",
-        PrimitiveTy::Long => "Long",
-        PrimitiveTy::Char => "Character",
-        PrimitiveTy::Float => "Float",
-        PrimitiveTy::Double => "Double",
-    }
-}
-
 impl fmt::Display for Ty {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         let with_args = |f: &mut fmt::Formatter<'_>, name: &Symbol, args: &[Ty]| {
@@ -201,9 +166,7 @@ impl fmt::Display for Ty {
             Ty::Primitive(primitive) => f.write_str(primitive.name()),
             Ty::Void => f.write_str("void"),
             Ty::Null => f.write_str("null"),
-            Ty::Adt { name, args, .. }
-            | Ty::Prelude { name, args }
-            | Ty::External { name, args } => with_args(f, name, args),
+            Ty::Adt { name, args, .. } | Ty::External { name, args } => with_args(f, name, args),
             Ty::Param(name) => write!(f, "{name}"),
             Ty::Ref { mutable, ty } => {
                 f.write_str(if *mutable { "&mut " } else { "&" })?;

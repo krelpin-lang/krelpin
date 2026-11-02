@@ -1,0 +1,10 @@
+[package]
+name = "krelpin_sysroot"
+version.workspace = true
+edition.workspace = true
+
+[dependencies]
+krelpin_ast.workspace = true
+krelpin_errors.workspace = true
+krelpin_parse.workspace = true
+krelpin_span.workspace = true

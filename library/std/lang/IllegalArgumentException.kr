@@ -1,0 +1,11 @@
+package std.lang;
+
+class IllegalArgumentException extends RuntimeException {
+    IllegalArgumentException() {
+        super();
+    }
+
+    IllegalArgumentException(String message) {
+        super(message);
+    }
+}

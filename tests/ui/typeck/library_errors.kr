@@ -1,0 +1,19 @@
+class Main {
+    void main() {
+        String name = "Krelpin";
+        int size = name.lenght();
+        char first = name.charAt("0");
+
+        List<String> names = new ArrayList<>();
+        names.add(42);
+        int count = names.get(0);
+        String second = names[1];
+
+        Map<String, Integer> ages = new HashMap<>();
+        for (String key : ages) {}
+
+        Long big = 5;
+        Console console = new Console();
+        String line = Console.readLine();
+    }
+}

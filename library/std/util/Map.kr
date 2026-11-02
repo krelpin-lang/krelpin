@@ -1,0 +1,21 @@
+package std.util;
+
+interface Map<K, V> {
+    int size(&this);
+
+    boolean isEmpty(&this);
+
+    V? get(&this, K key);
+
+    V? put(&mut this, K key, V value);
+
+    V? remove(&mut this, K key);
+
+    boolean containsKey(&this, K key);
+
+    void clear(&mut this);
+
+    Set<K> keySet(&this);
+
+    List<V> values(&this);
+}

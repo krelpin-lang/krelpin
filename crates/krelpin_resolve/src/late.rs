@@ -8,8 +8,8 @@ use krelpin_ast::ast::{
 use krelpin_errors::{DiagCtxt, Diagnostic};
 use krelpin_span::{Span, Symbol, kw};
 
-use crate::collect::{ItemTable, TypeDef};
-use crate::{Res, Resolutions, prelude};
+use crate::collect::{ItemTable, TypeDef, UnitScope};
+use crate::{PackagePath, Res, Resolutions, prelude};
 
 #[derive(Clone, Copy, PartialEq, Eq)]
 enum StaticContext {
@@ -30,7 +30,9 @@ struct Resolver<'a> {
     table: &'a ItemTable,
     dcx: &'a DiagCtxt,
     resolutions: Resolutions,
-    owner: Option<&'a TypeDef>,
+    prelude: Vec<PackagePath>,
+    scope: &'a UnitScope,
+    owner: &'a TypeDef,
     class_type_params: Vec<(Symbol, Span)>,
     type_params: Vec<(Symbol, Span)>,
     borrow_sources: Vec<(Symbol, Span)>,
@@ -41,15 +43,20 @@ struct Resolver<'a> {
 }
 
 pub(crate) fn resolve_bodies(
-    unit: &CompilationUnit,
+    units: &[CompilationUnit],
     table: &ItemTable,
     dcx: &DiagCtxt,
 ) -> Resolutions {
+    let Some(first) = table.defs.first() else {
+        return Resolutions::default();
+    };
     let mut resolver = Resolver {
         table,
         dcx,
         resolutions: Resolutions::default(),
-        owner: None,
+        prelude: prelude::packages(),
+        scope: &table.scopes[first.unit],
+        owner: first,
         class_type_params: Vec::new(),
         type_params: Vec::new(),
         borrow_sources: Vec::new(),
@@ -59,8 +66,9 @@ pub(crate) fn resolve_bodies(
         in_case_label: false,
     };
 
-    for item in &unit.items {
-        resolver.owner = table.types.get(&item.name.name);
+    for (type_def, item) in table.items(units) {
+        resolver.owner = type_def;
+        resolver.scope = &table.scopes[type_def.unit];
         match &item.kind {
             ItemKind::Class(class) => {
                 resolver.enter_type(&class.generics);
@@ -254,7 +262,7 @@ impl<'a> Resolver<'a> {
             return;
         }
 
-        if !self.table.has_glob_import {
+        if !self.scope.has_unknown_glob {
             self.emit(
                 Diagnostic::error(format!("cannot find type `{}` in this scope", name.name))
                     .with_span(name.span)
@@ -290,13 +298,14 @@ impl<'a> Resolver<'a> {
         if let Some(&(_, span)) = self.type_params.iter().rev().find(|&&(p, _)| p == name) {
             return Some(Res::TypeParam(span));
         }
-        if let Some(def) = self.table.types.get(&name) {
-            return Some(Res::Item(def.index));
+        if let Some(&res) = self.scope.imports.get(&name) {
+            return Some(res);
         }
-        if let Some(&span) = self.table.imports.get(&name) {
-            return Some(Res::Import(span));
-        }
-        prelude::is_type(name.as_str()).then_some(Res::Prelude(name))
+        std::iter::once(&self.scope.package)
+            .chain(&self.scope.globs)
+            .chain(&self.prelude)
+            .find_map(|package| self.table.lookup(package, name))
+            .map(Res::Item)
     }
 
     fn lookup_local(&self, name: Symbol) -> Option<Span> {
@@ -604,7 +613,7 @@ impl<'a> Resolver<'a> {
             self.resolutions.record(name.span, res);
             return;
         }
-        if self.in_case_label || self.table.has_glob_import {
+        if self.in_case_label || self.scope.has_unknown_glob {
             return;
         }
 
@@ -613,13 +622,8 @@ impl<'a> Resolver<'a> {
                 .with_span(name.span)
                 .with_label("not found in this scope");
 
-        let field = self.owner.and_then(|owner| {
-            owner
-                .fields
-                .get(&name.name)
-                .map(|field| (owner.name.name, *field))
-        });
-        if let Some((owner, field)) = field {
+        if let Some(field) = self.owner.fields.get(&name.name) {
+            let owner = self.owner.name.name;
             diagnostic = if field.is_instance {
                 diagnostic.with_help(format!(
                     "to use the field of this object, write `this.{}`",
@@ -636,11 +640,8 @@ impl<'a> Resolver<'a> {
     }
 
     fn resolve_unqualified_call(&mut self, name: Ident) {
-        let Some(owner) = self.owner else {
-            return;
-        };
-        let Some(methods) = owner.methods.get(&name.name) else {
-            if !self.table.has_glob_import {
+        let Some(methods) = self.owner.methods.get(&name.name) else {
+            if !self.scope.has_unknown_glob {
                 self.emit(
                     Diagnostic::error(format!("cannot find method `{}` in this scope", name.name))
                         .with_span(name.span)

@@ -1,0 +1,11 @@
+package std.lang;
+
+class UnsupportedOperationException extends RuntimeException {
+    UnsupportedOperationException() {
+        super();
+    }
+
+    UnsupportedOperationException(String message) {
+        super(message);
+    }
+}

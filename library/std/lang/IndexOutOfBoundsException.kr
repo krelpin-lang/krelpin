@@ -1,0 +1,11 @@
+package std.lang;
+
+class IndexOutOfBoundsException extends RuntimeException {
+    IndexOutOfBoundsException() {
+        super();
+    }
+
+    IndexOutOfBoundsException(String message) {
+        super(message);
+    }
+}

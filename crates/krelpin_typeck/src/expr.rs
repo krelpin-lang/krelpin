@@ -5,9 +5,11 @@ use krelpin_ast::ast::{
 use krelpin_ast::token::{Lit, LitKind};
 use krelpin_errors::Diagnostic;
 use krelpin_resolve::Res;
+use krelpin_span::def_id::DefId;
 use krelpin_span::{Span, Symbol};
 
 use crate::check::FnCtxt;
+use crate::lang_items::LangItem;
 use crate::sig::{AdtKind, FieldSig, MethodSig};
 use crate::ty::{Subst, Ty, promote};
 
@@ -66,14 +68,16 @@ impl FnCtxt<'_, '_> {
 
     fn check_expr_kind(&mut self, expr: &Expr) -> Ty {
         match &expr.kind {
-            ExprKind::Lit(lit) => lit_ty(lit),
+            ExprKind::Lit(lit) => self.lit_ty(lit),
             ExprKind::Bool(_) => Ty::BOOLEAN,
             ExprKind::Null => Ty::Null,
             ExprKind::This => self.self_ty.clone(),
-            ExprKind::Super => self.tcx.types[self.owner]
+            ExprKind::Super => self
+                .tcx
+                .sig(self.owner)
                 .superclass
                 .clone()
-                .unwrap_or_else(|| Ty::prelude("Object")),
+                .unwrap_or_else(|| self.tcx.lang_ty(LangItem::Object)),
             ExprKind::Name(name) => self.check_name(*name),
             ExprKind::Field {
                 expr: base,
@@ -89,7 +93,7 @@ impl FnCtxt<'_, '_> {
             ExprKind::Call { callee, args } => {
                 let arg_tys: Vec<Ty> = args.iter().map(|arg| self.check_expr(arg)).collect();
                 let target = match callee.kind {
-                    ExprKind::Super => self.tcx.types[self.owner].superclass.clone(),
+                    ExprKind::Super => self.tcx.sig(self.owner).superclass.clone(),
                     _ => Some(self.tcx.self_ty(self.owner)),
                 };
                 if let Some(Ty::Adt {
@@ -236,10 +240,6 @@ impl FnCtxt<'_, '_> {
                 name: name.name,
                 args: Vec::new(),
             }),
-            Res::Prelude(symbol) => Some(Ty::Prelude {
-                name: symbol,
-                args: Vec::new(),
-            }),
             Res::Import(_) => Some(Ty::External {
                 name: name.name,
                 args: Vec::new(),
@@ -252,7 +252,7 @@ impl FnCtxt<'_, '_> {
     fn check_name(&mut self, name: Ident) -> Ty {
         match self.tcx.resolutions.get(name.span) {
             Some(Res::Local(decl)) => self.local_ty(decl),
-            Some(Res::Item(_) | Res::Prelude(_) | Res::Import(_) | Res::TypeParam(_)) => {
+            Some(Res::Item(_) | Res::Import(_) | Res::TypeParam(_)) => {
                 self.emit(
                     Diagnostic::error(format!("expected a value, found type `{}`", name.name))
                         .with_span(name.span)
@@ -381,8 +381,8 @@ impl FnCtxt<'_, '_> {
         );
     }
 
-    fn find_field(&self, def: usize, args: &[Ty], name: Symbol) -> Option<(FieldSig, Ty)> {
-        let sig = &self.tcx.types[def];
+    fn find_field(&self, def: DefId, args: &[Ty], name: Symbol) -> Option<(FieldSig, Ty)> {
+        let sig = self.tcx.sig(def);
         let subst = self.tcx.subst_for(def, args);
         if let Some(field) = sig.fields.get(&name) {
             return Some((field.clone(), field.ty.subst(&subst)));
@@ -400,12 +400,12 @@ impl FnCtxt<'_, '_> {
 
     fn find_methods(
         &self,
-        def: usize,
+        def: DefId,
         args: &[Ty],
         name: Symbol,
         out: &mut Vec<(MethodSig, Subst)>,
     ) {
-        let sig = &self.tcx.types[def];
+        let sig = self.tcx.sig(def);
         let subst = self.tcx.subst_for(def, args);
         if let Some(methods) = sig.methods.get(&name) {
             out.extend(methods.iter().map(|method| (method.clone(), subst.clone())));
@@ -424,7 +424,7 @@ impl FnCtxt<'_, '_> {
     pub(crate) fn check_vis(
         &self,
         vis: Visibility,
-        owner: usize,
+        owner: DefId,
         default_private: bool,
         what: &str,
         name: Ident,
@@ -493,7 +493,7 @@ impl FnCtxt<'_, '_> {
         };
         let def = *def;
 
-        if self.tcx.types[def].kind == AdtKind::Enum
+        if self.tcx.sig(def).kind == AdtKind::Enum
             && name.name.as_str() == "values"
             && args.is_empty()
         {
@@ -531,9 +531,6 @@ impl FnCtxt<'_, '_> {
                 let def = *def;
                 let candidates = self.collect_methods(def, ty_args, name.name);
                 if candidates.is_empty() {
-                    if let Some(ret) = self.builtin_method(def, name.name, args.len()) {
-                        return ret;
-                    }
                     self.no_method(ty, name);
                     return Ty::Unknown;
                 }
@@ -563,18 +560,6 @@ impl FnCtxt<'_, '_> {
         }
     }
 
-    fn builtin_method(&self, def: usize, name: Symbol, arity: usize) -> Option<Ty> {
-        let is_enum = self.tcx.types[def].kind == AdtKind::Enum;
-        match (name.as_str(), arity) {
-            ("toString", 0) => Some(Ty::string()),
-            ("hashCode", 0) => Some(Ty::INT),
-            ("equals", 1) => Some(Ty::BOOLEAN),
-            ("name", 0) if is_enum => Some(Ty::string()),
-            ("ordinal", 0) if is_enum => Some(Ty::INT),
-            _ => None,
-        }
-    }
-
     fn no_method(&self, ty: &Ty, name: Ident) {
         self.emit(
             Diagnostic::error(format!("no method named `{}` found for `{ty}`", name.name))
@@ -583,21 +568,27 @@ impl FnCtxt<'_, '_> {
         );
     }
 
-    fn collect_methods(&self, def: usize, args: &[Ty], name: Symbol) -> Vec<(MethodSig, Subst)> {
+    fn collect_methods(&self, def: DefId, args: &[Ty], name: Symbol) -> Vec<(MethodSig, Subst)> {
         let mut out = Vec::new();
         self.find_methods(def, args, name, &mut out);
+        if !out.is_empty() || self.tcx.sig(def).kind != AdtKind::Interface {
+            return out;
+        }
+        if let Some(object) = self.tcx.lang_items.get(LangItem::Object) {
+            self.find_methods(object, &[], name, &mut out);
+        }
         out
     }
 
     pub(crate) fn check_ctor_call(
         &mut self,
-        def: usize,
+        def: DefId,
         ty_args: &[Ty],
         args: &[Expr],
         arg_tys: &[Ty],
         name: Ident,
     ) {
-        let ctors = self.tcx.types[def].ctors.clone();
+        let ctors = self.tcx.sig(def).ctors.clone();
         if ctors.is_empty() {
             if !args.is_empty() {
                 self.error(
@@ -611,12 +602,7 @@ impl FnCtxt<'_, '_> {
             }
             return;
         }
-        let mut subst = self.tcx.subst_for(def, ty_args);
-        if subst.is_empty() {
-            for generic in &self.tcx.types[def].generics {
-                subst.insert(*generic, Ty::Unknown);
-            }
-        }
+        let subst = self.tcx.subst_for(def, ty_args);
         let candidates = ctors
             .into_iter()
             .map(|ctor| (ctor, subst.clone()))
@@ -726,7 +712,7 @@ impl FnCtxt<'_, '_> {
                 name,
                 args: ty_args,
             } => {
-                let sig = &self.tcx.types[*def];
+                let sig = self.tcx.sig(*def);
                 let problem = match sig.kind {
                     AdtKind::Interface => Some("an interface"),
                     AdtKind::Enum => Some("an enum"),
@@ -768,7 +754,13 @@ impl FnCtxt<'_, '_> {
                 let diagnostic =
                     Diagnostic::error(format!("cannot index into a value of type `{other}`"))
                         .with_span(base.span);
-                let diagnostic = if matches!(other, Ty::Prelude { .. }) {
+                let has_get = match other {
+                    Ty::Adt { def, args, .. } => !self
+                        .collect_methods(*def, args, Symbol::intern("get"))
+                        .is_empty(),
+                    _ => false,
+                };
+                let diagnostic = if has_get {
                     diagnostic.with_help("use `.get(index)` instead")
                 } else {
                     diagnostic
@@ -855,8 +847,8 @@ impl FnCtxt<'_, '_> {
         if l.is_unknown() || r.is_unknown() {
             return if is_comparison {
                 Ty::BOOLEAN
-            } else if op == BinOp::Add && (l.is_string() || r.is_string()) {
-                Ty::string()
+            } else if op == BinOp::Add && (self.tcx.is_string(l) || self.tcx.is_string(r)) {
+                self.tcx.string_ty()
             } else {
                 Ty::Unknown
             };
@@ -868,7 +860,9 @@ impl FnCtxt<'_, '_> {
             BinOp::Lt | BinOp::Le | BinOp::Gt | BinOp::Ge => {
                 both(Ty::is_numeric).then_some(Ty::BOOLEAN)
             }
-            BinOp::Add if l.is_string() || r.is_string() => Some(Ty::string()),
+            BinOp::Add if self.tcx.is_string(l) || self.tcx.is_string(r) => {
+                Some(self.tcx.string_ty())
+            }
             BinOp::Add | BinOp::Sub | BinOp::Mul | BinOp::Div | BinOp::Rem => numeric_result(l, r),
             BinOp::BitAnd | BinOp::BitOr | BinOp::BitXor if both(Ty::is_boolean) => {
                 Some(Ty::BOOLEAN)
@@ -928,7 +922,7 @@ impl FnCtxt<'_, '_> {
                 let target_value = target.strip_refs();
                 let ok = target_value.is_unknown()
                     || value.is_unknown()
-                    || (op == BinOp::Add && target_value.is_string())
+                    || (op == BinOp::Add && self.tcx.is_string(target_value))
                     || match op {
                         BinOp::BitAnd | BinOp::BitOr | BinOp::BitXor => {
                             (target_value.is_boolean() && value.is_boolean())
@@ -1036,22 +1030,22 @@ impl FnCtxt<'_, '_> {
             Ty::Unknown
         })
     }
-}
 
-fn lit_ty(lit: &Lit) -> Ty {
-    let suffix = lit.suffix.map(Symbol::as_str);
-    match lit.kind {
-        LitKind::Integer => match suffix {
-            Some("L" | "l") => Ty::LONG,
-            _ => Ty::INT,
-        },
-        LitKind::Float => match suffix {
-            Some("f" | "F") => Ty::FLOAT,
-            _ => Ty::DOUBLE,
-        },
-        LitKind::Char => Ty::CHAR,
-        LitKind::Str | LitKind::TextBlock => Ty::string(),
-        LitKind::Err => Ty::Unknown,
+    fn lit_ty(&self, lit: &Lit) -> Ty {
+        let suffix = lit.suffix.map(Symbol::as_str);
+        match lit.kind {
+            LitKind::Integer => match suffix {
+                Some("L" | "l") => Ty::LONG,
+                _ => Ty::INT,
+            },
+            LitKind::Float => match suffix {
+                Some("f" | "F") => Ty::FLOAT,
+                _ => Ty::DOUBLE,
+            },
+            LitKind::Char => Ty::CHAR,
+            LitKind::Str | LitKind::TextBlock => self.tcx.string_ty(),
+            LitKind::Err => Ty::Unknown,
+        }
     }
 }
 

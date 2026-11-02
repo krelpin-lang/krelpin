@@ -1,0 +1,62 @@
+error: no method named `lenght` found for `String`
+ --> tests/ui/typeck/library_errors.kr:4:25
+  |
+4 |         int size = name.lenght();
+  |                         ^^^^^^ method not found
+
+error: mismatched types
+ --> tests/ui/typeck/library_errors.kr:5:34
+  |
+5 |         char first = name.charAt("0");
+  |                                  ^^^ expected `int`, found `String`
+
+error: mismatched types
+ --> tests/ui/typeck/library_errors.kr:8:19
+  |
+8 |         names.add(42);
+  |                   ^^ expected `String`, found `int`
+
+error: mismatched types
+ --> tests/ui/typeck/library_errors.kr:9:21
+  |
+9 |         int count = names.get(0);
+  |                     ^^^^^^^^^^^^ expected `int`, found `String`
+
+error: cannot index into a value of type `List<String>`
+  --> tests/ui/typeck/library_errors.kr:10:25
+   |
+10 |         String second = names[1];
+   |                         ^^^^^
+   |
+   = help: use `.get(index)` instead
+
+error: cannot iterate over a value of type `Map<String, Integer>`
+  --> tests/ui/typeck/library_errors.kr:13:27
+   |
+13 |         for (String key : ages) {}
+   |                           ^^^^
+   |
+   = note: `for` loops work with arrays and types that implement `Iterable`
+
+error: mismatched types
+  --> tests/ui/typeck/library_errors.kr:15:20
+   |
+15 |         Long big = 5;
+   |                    ^ expected `Long`, found `int`
+
+error: constructor `Console` of `Console` is private
+  --> tests/ui/typeck/library_errors.kr:16:27
+   |
+16 |         Console console = new Console();
+   |                           ^^^^^^^^^^^^^ private constructor
+
+error: mismatched types
+  --> tests/ui/typeck/library_errors.kr:17:23
+   |
+17 |         String line = Console.readLine();
+   |                       ^^^^^^^^^^^^^^^^^^ expected `String`, found `String?`
+   |
+   = help: this value may be `null`; use `?:` to give a default, or check `!= null` first
+
+error: aborting due to 9 previous errors
+

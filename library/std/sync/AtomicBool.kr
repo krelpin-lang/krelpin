@@ -1,0 +1,18 @@
+package std.sync;
+
+final class AtomicBool {
+    private boolean value;
+
+    AtomicBool(boolean value) {
+        this.value = value;
+    }
+
+    @Intrinsic
+    boolean get(&this);
+
+    @Intrinsic
+    void set(&this, boolean value);
+
+    @Intrinsic
+    boolean compareAndSet(&this, boolean expected, boolean value);
+}

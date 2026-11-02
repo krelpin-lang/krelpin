@@ -1,0 +1,11 @@
+package std.lang;
+
+class RuntimeException extends Exception {
+    RuntimeException() {
+        super();
+    }
+
+    RuntimeException(String message) {
+        super(message);
+    }
+}

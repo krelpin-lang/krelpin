@@ -1,0 +1,18 @@
+package std.lang;
+
+final class Thread {
+    private Runnable task;
+
+    Thread(Runnable task) {
+        this.task = task;
+    }
+
+    @Intrinsic
+    void start(&mut this);
+
+    @Intrinsic
+    void join(&mut this);
+
+    @Intrinsic
+    void sleep(long millis);
+}

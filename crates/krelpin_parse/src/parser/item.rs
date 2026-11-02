@@ -1,7 +1,7 @@
 use krelpin_ast::ast::{
     Annotation, Class, CompilationUnit, Enum, EnumConstant, FieldStorage, FnRetTy, Generics, Ident,
     Import, Inheritance, Interface, Item, ItemKind, Member, MemberKind, Path, Struct, Ty,
-    Visibility,
+    Visibility, is_intrinsic,
 };
 use krelpin_ast::token::TokenKind;
 use krelpin_errors::Diagnostic;
@@ -446,7 +446,7 @@ impl Parser<'_> {
         let annotations = self.parse_annotations()?;
         let modifiers = self.parse_modifiers();
         let kind = self.parse_member_kind(owner, modifiers.storage)?;
-        self.validate_member(container, &modifiers, &kind);
+        self.validate_member(container, &annotations, &modifiers, &kind);
 
         Ok(Member {
             docs,
@@ -500,7 +500,13 @@ impl Parser<'_> {
         self.parse_field(storage, ty, name).map(MemberKind::Field)
     }
 
-    fn validate_member(&self, container: Container, modifiers: &Modifiers, kind: &MemberKind) {
+    fn validate_member(
+        &self,
+        container: Container,
+        annotations: &[Annotation],
+        modifiers: &Modifiers,
+        kind: &MemberKind,
+    ) {
         let Inheritance {
             abstract_kw,
             final_kw,
@@ -541,7 +547,9 @@ impl Parser<'_> {
                     (Some(span), Some(_)) => {
                         self.error(span, "abstract methods cannot have a body");
                     }
-                    (None, None) if container != Container::Interface => {
+                    (None, None)
+                        if container != Container::Interface && !is_intrinsic(annotations) =>
+                    {
                         self.emit(
                             Diagnostic::error(format!(
                                 "missing body for method `{}`",

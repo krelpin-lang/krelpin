@@ -1,0 +1,11 @@
+package std.lang;
+
+class ArithmeticException extends RuntimeException {
+    ArithmeticException() {
+        super();
+    }
+
+    ArithmeticException(String message) {
+        super(message);
+    }
+}

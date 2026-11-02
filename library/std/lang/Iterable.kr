@@ -1,0 +1,7 @@
+package std.lang;
+
+import std.util.Iterator;
+
+interface Iterable<T> {
+    Iterator<T> iterator(&this);
+}

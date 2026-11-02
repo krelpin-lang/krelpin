@@ -1,0 +1,34 @@
+package std.lang;
+
+final class Double implements Comparable<Double> {
+    public const double MIN_VALUE = 4.9e-324;
+    public const double MAX_VALUE = 1.7976931348623157e308;
+
+    private double value;
+
+    Double(double value) {
+        this.value = value;
+    }
+
+    double doubleValue(&this) {
+        return this.value;
+    }
+
+    int compareTo(&this, Double other) {
+        return Double.compare(this.value, other.value);
+    }
+
+    int compare(double a, double b) {
+        if (a < b) {
+            return -1;
+        }
+        return a > b ? 1 : 0;
+    }
+
+    Double valueOf(double value) {
+        return new Double(value);
+    }
+
+    @Intrinsic
+    double parseDouble(String text);
+}

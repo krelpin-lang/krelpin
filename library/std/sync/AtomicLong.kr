@@ -1,0 +1,27 @@
+package std.sync;
+
+final class AtomicLong {
+    private long value;
+
+    AtomicLong(long value) {
+        this.value = value;
+    }
+
+    @Intrinsic
+    long get(&this);
+
+    @Intrinsic
+    void set(&this, long value);
+
+    @Intrinsic
+    boolean compareAndSet(&this, long expected, long value);
+
+    @Intrinsic
+    long increment(&this);
+
+    @Intrinsic
+    long decrement(&this);
+
+    @Intrinsic
+    long addAndGet(&this, long delta);
+}

@@ -174,6 +174,10 @@ fn member_errors() {
         ["missing body for method `f`"]
     );
     assert_eq!(
+        errors("class A { @Intrinsic int f(&this); }"),
+        Vec::<String>::new()
+    );
+    assert_eq!(
         errors("abstract class A { abstract void f() {} }"),
         ["abstract methods cannot have a body"]
     );

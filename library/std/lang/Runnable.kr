@@ -1,0 +1,5 @@
+package std.lang;
+
+interface Runnable {
+    void run(&this);
+}

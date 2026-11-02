@@ -1,0 +1,19 @@
+package std.util;
+
+import std.function.Consumer;
+
+interface Set<T> extends Iterable<T> {
+    int size(&this);
+
+    boolean isEmpty(&this);
+
+    boolean add(&mut this, T value);
+
+    boolean remove(&mut this, T value);
+
+    boolean contains(&this, T value);
+
+    void clear(&mut this);
+
+    void forEach(&this, Consumer<T> action);
+}

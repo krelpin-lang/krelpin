@@ -1,0 +1,62 @@
+package std.lang;
+
+final class Math {
+    public const double PI = 3.141592653589793;
+    public const double E = 2.718281828459045;
+
+    private Math() {}
+
+    int abs(int value) {
+        return value < 0 ? -value : value;
+    }
+
+    long abs(long value) {
+        return value < 0 ? -value : value;
+    }
+
+    double abs(double value) {
+        return value < 0 ? -value : value;
+    }
+
+    int min(int a, int b) {
+        return a < b ? a : b;
+    }
+
+    long min(long a, long b) {
+        return a < b ? a : b;
+    }
+
+    double min(double a, double b) {
+        return a < b ? a : b;
+    }
+
+    int max(int a, int b) {
+        return a > b ? a : b;
+    }
+
+    long max(long a, long b) {
+        return a > b ? a : b;
+    }
+
+    double max(double a, double b) {
+        return a > b ? a : b;
+    }
+
+    @Intrinsic
+    double sqrt(double value);
+
+    @Intrinsic
+    double pow(double base, double exponent);
+
+    @Intrinsic
+    double floor(double value);
+
+    @Intrinsic
+    double ceil(double value);
+
+    @Intrinsic
+    long round(double value);
+
+    @Intrinsic
+    double random();
+}

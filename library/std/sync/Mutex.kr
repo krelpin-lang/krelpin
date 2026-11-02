@@ -1,0 +1,12 @@
+package std.sync;
+
+final class Mutex<T> {
+    private T value;
+
+    Mutex(T value) {
+        this.value = value;
+    }
+
+    @Intrinsic
+    &mut [this] T lock(&this);
+}

@@ -1,0 +1,17 @@
+package std.lang;
+
+class Throwable {
+    private String? message;
+
+    Throwable() {
+        this.message = null;
+    }
+
+    Throwable(String message) {
+        this.message = message;
+    }
+
+    String? getMessage(&this) {
+        return this.message;
+    }
+}

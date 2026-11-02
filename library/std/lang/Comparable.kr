@@ -1,0 +1,5 @@
+package std.lang;
+
+interface Comparable<T> {
+    int compareTo(&this, T other);
+}

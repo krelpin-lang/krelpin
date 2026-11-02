@@ -1,0 +1,74 @@
+package std.lang;
+
+final class String implements Comparable<String> {
+    @Intrinsic
+    int length(&this);
+
+    boolean isEmpty(&this) {
+        return this.length() == 0;
+    }
+
+    @Intrinsic
+    char charAt(&this, int index);
+
+    @Intrinsic
+    String substring(&this, int begin);
+
+    @Intrinsic
+    String substring(&this, int begin, int end);
+
+    @Intrinsic
+    int indexOf(&this, String text);
+
+    boolean contains(&this, String text) {
+        return this.indexOf(text) >= 0;
+    }
+
+    @Intrinsic
+    boolean startsWith(&this, String prefix);
+
+    @Intrinsic
+    boolean endsWith(&this, String suffix);
+
+    @Intrinsic
+    String toUpperCase(&this);
+
+    @Intrinsic
+    String toLowerCase(&this);
+
+    @Intrinsic
+    String trim(&this);
+
+    @Intrinsic
+    String replace(&this, String target, String replacement);
+
+    @Intrinsic
+    String repeat(&this, int count);
+
+    @Intrinsic
+    String[] split(&this, String separator);
+
+    @Intrinsic
+    int compareTo(&this, String other);
+
+    @Intrinsic
+    String join(String separator, String... parts);
+
+    @Intrinsic
+    String valueOf(boolean value);
+
+    @Intrinsic
+    String valueOf(char value);
+
+    @Intrinsic
+    String valueOf(int value);
+
+    @Intrinsic
+    String valueOf(long value);
+
+    @Intrinsic
+    String valueOf(double value);
+
+    @Intrinsic
+    String valueOf(Object? value);
+}

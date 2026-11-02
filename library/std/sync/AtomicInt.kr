@@ -1,0 +1,27 @@
+package std.sync;
+
+final class AtomicInt {
+    private int value;
+
+    AtomicInt(int value) {
+        this.value = value;
+    }
+
+    @Intrinsic
+    int get(&this);
+
+    @Intrinsic
+    void set(&this, int value);
+
+    @Intrinsic
+    boolean compareAndSet(&this, int expected, int value);
+
+    @Intrinsic
+    int increment(&this);
+
+    @Intrinsic
+    int decrement(&this);
+
+    @Intrinsic
+    int addAndGet(&this, int delta);
+}

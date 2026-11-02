@@ -1,0 +1,56 @@
+package school;
+
+import std.io.IOException;
+
+enum Grade {
+    A,
+    B,
+    C;
+}
+
+class Student implements Comparable<Student> {
+    public String name;
+    Map<String, Grade> grades;
+
+    Student(String name) {
+        this.name = name;
+        this.grades = new HashMap<>();
+    }
+
+    void grade(&mut this, String course, Grade grade) {
+        this.grades.put(course, grade);
+    }
+
+    String report(&this, String course) {
+        Grade? grade = this.grades.get(course);
+        if (grade == null) {
+            return this.name + ": no grade for " + course;
+        }
+        return this.name + ": " + grade.name() + " (" + grade.ordinal() + ")";
+    }
+
+    int compareTo(&this, Student other) {
+        return this.name.compareTo(other.name);
+    }
+}
+
+class Main {
+    void main() throws IOException {
+        List<Student> students = new ArrayList<>();
+        students.add(new Student("Ayşe"));
+        students.add(new Student("Mehmet"));
+
+        int longest = 0;
+        for (Student student : students) {
+            longest = Math.max(longest, student.name.length());
+            Console.println(student.report("math").toUpperCase());
+        }
+
+        Integer boxed = longest;
+        String? line = Console.readLine();
+        if (line == null) {
+            throw new IOException("no input");
+        }
+        Console.println("longest name: " + boxed + ", input: " + line.trim());
+    }
+}

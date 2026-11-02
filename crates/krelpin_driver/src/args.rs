@@ -147,6 +147,9 @@ pub struct Args {
     )]
     pub target: Option<String>,
 
+    #[arg(long, value_name = "PATH", help = "Override the system root")]
+    pub sysroot: Option<PathBuf>,
+
     #[arg(short = 'A', long, value_name = "LINT", help = "Set lint allowed")]
     pub allow: Vec<String>,
 

@@ -1,0 +1,11 @@
+package std.lang;
+
+class IllegalStateException extends RuntimeException {
+    IllegalStateException() {
+        super();
+    }
+
+    IllegalStateException(String message) {
+        super(message);
+    }
+}

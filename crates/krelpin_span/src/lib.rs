@@ -1,3 +1,4 @@
+pub mod def_id;
 mod pos;
 mod source_map;
 mod symbol;

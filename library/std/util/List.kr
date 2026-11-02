@@ -1,0 +1,27 @@
+package std.util;
+
+import std.function.Consumer;
+
+interface List<T> extends Iterable<T> {
+    int size(&this);
+
+    boolean isEmpty(&this);
+
+    T get(&this, int index);
+
+    T set(&mut this, int index, T value);
+
+    void add(&mut this, T value);
+
+    void add(&mut this, int index, T value);
+
+    T remove(&mut this, int index);
+
+    boolean contains(&this, T value);
+
+    int indexOf(&this, T value);
+
+    void clear(&mut this);
+
+    void forEach(&this, Consumer<T> action);
+}

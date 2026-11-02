@@ -1,0 +1,11 @@
+package std.io;
+
+class IOException extends Exception {
+    IOException() {
+        super();
+    }
+
+    IOException(String message) {
+        super(message);
+    }
+}

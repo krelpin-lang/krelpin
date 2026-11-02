@@ -1,8 +1,11 @@
+use std::path::Path;
+
 use krelpin_errors::{DiagCtxt, DiagnosticBuffer};
 use krelpin_parse::{lexer, parser};
-use krelpin_span::{BytePos, SourceMap, Span};
+use krelpin_span::{BytePos, SourceMap, Span, Symbol};
+use krelpin_sysroot::Sysroot;
 
-use crate::{Res, ResolverOutput, resolve};
+use crate::{PackagePath, Res, ResolverOutput, resolve};
 
 struct Resolved {
     src: String,
@@ -18,6 +21,23 @@ impl Resolved {
         let span = Span::new(BytePos(start), BytePos(start + len));
         self.output.resolutions.get(span)
     }
+
+    fn local_type(&self, name: &str) -> Option<Res> {
+        let def = self
+            .output
+            .items
+            .lookup(&PackagePath::default(), Symbol::intern(name))?;
+        Some(Res::Item(def))
+    }
+
+    fn std_type(&self, path: &str) -> Option<Res> {
+        self.output.items.lookup_path(path).map(Res::Item)
+    }
+}
+
+fn test_sysroot() -> Sysroot {
+    let root = Path::new(env!("CARGO_MANIFEST_DIR")).join("../..");
+    Sysroot::new(root).expect("the workspace is a sysroot")
 }
 
 fn resolve_str(src: &str) -> Resolved {
@@ -26,13 +46,15 @@ fn resolve_str(src: &str) -> Resolved {
     let buffer = DiagnosticBuffer::default();
     let dcx = DiagCtxt::new(buffer.clone());
     let unit = parser::parse(lexer::lex(&file, &dcx), &dcx);
+    let mut units = test_sysroot().load_std(&source_map, &dcx);
+    units.push(unit);
     assert_eq!(
         buffer.messages(),
         Vec::<String>::new(),
         "parse errors in {src:?}"
     );
 
-    let output = resolve(&unit, &dcx);
+    let output = resolve(&units, &dcx);
     let diagnostics = buffer.diagnostics();
     Resolved {
         src: src.to_owned(),
@@ -92,10 +114,10 @@ fn locals_params_and_types_resolve() {
         resolved.res_at("name;", 1),
         Some(Res::Local(Span::new(BytePos(param), BytePos(param + 4))))
     );
-    assert_eq!(resolved.res_at("Person", 2), Some(Res::Item(0)));
+    assert_eq!(resolved.res_at("Person", 2), resolved.local_type("Person"));
     assert_eq!(
         resolved.res_at("Console", 0),
-        Some(Res::Prelude(krelpin_span::Symbol::intern("Console")))
+        resolved.std_type("std.lang.Console")
     );
 }
 
@@ -303,5 +325,75 @@ fn catch_and_lambda_parameters() {
              List<Integer> xs = null; xs.forEach(x -> Console.println(x + arg));"
         ),
         Vec::<String>::new()
+    );
+}
+
+#[test]
+fn prelude_types_come_from_the_standard_library() {
+    let resolved = resolve_str(
+        "class A { List<String> names; AtomicInt count; Object any; Comparable<A> order; }",
+    );
+    assert_eq!(resolved.errors, Vec::<String>::new());
+    assert_eq!(
+        resolved.res_at("List", 0),
+        resolved.std_type("std.util.List")
+    );
+    assert_eq!(
+        resolved.res_at("String", 0),
+        resolved.std_type("std.lang.String")
+    );
+    assert_eq!(
+        resolved.res_at("AtomicInt", 0),
+        resolved.std_type("std.sync.AtomicInt")
+    );
+}
+
+#[test]
+fn types_outside_the_prelude_need_an_import() {
+    assert_eq!(
+        errors("class A { void f() throws IOException {} }"),
+        ["cannot find type `IOException` in this scope"]
+    );
+
+    let resolved =
+        resolve_str("import std.io.IOException; class A { void f() throws IOException {} }");
+    assert_eq!(resolved.errors, Vec::<String>::new());
+    assert_eq!(
+        resolved.res_at("IOException {", 0),
+        resolved.std_type("std.io.IOException")
+    );
+
+    ok("import std.io.*; class A { void f() throws IOException {} }");
+}
+
+#[test]
+fn imports_from_known_packages_are_checked() {
+    assert_eq!(
+        errors("import std.util.Lst; class A {}"),
+        ["cannot find type `Lst` in package `std.util`"]
+    );
+    assert_eq!(
+        errors("import std.io.*; class A { Strem s; }"),
+        ["cannot find type `Strem` in this scope"]
+    );
+    ok("import shop.money.Price; class A { Price price; }");
+}
+
+#[test]
+fn local_types_shadow_the_prelude() {
+    let resolved = resolve_str("class String {} class A { String text; }");
+    assert_eq!(resolved.errors, Vec::<String>::new());
+    assert_eq!(
+        resolved.res_at("String text", 0),
+        resolved.local_type("String")
+    );
+}
+
+#[test]
+fn only_the_standard_library_declares_intrinsics() {
+    let resolved = resolve_str("class A { @Intrinsic int f(&this); }");
+    assert_eq!(
+        resolved.errors,
+        ["only the standard library can declare intrinsics"]
     );
 }

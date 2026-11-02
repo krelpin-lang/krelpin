@@ -1,6 +1,14 @@
+use std::path::Path;
+
 use krelpin_errors::{DiagCtxt, Diagnostic, DiagnosticBuffer};
 use krelpin_parse::{lexer, parser};
 use krelpin_span::SourceMap;
+use krelpin_sysroot::Sysroot;
+
+fn test_sysroot() -> Sysroot {
+    let root = Path::new(env!("CARGO_MANIFEST_DIR")).join("../..");
+    Sysroot::new(root).expect("the workspace is a sysroot")
+}
 
 fn diagnostics(src: &str) -> Vec<Diagnostic> {
     let source_map = SourceMap::new();
@@ -9,14 +17,16 @@ fn diagnostics(src: &str) -> Vec<Diagnostic> {
     let dcx = DiagCtxt::new(buffer.clone());
 
     let unit = parser::parse(lexer::lex(&file, &dcx), &dcx);
-    let resolved = krelpin_resolve::resolve(&unit, &dcx);
+    let mut units = test_sysroot().load_std(&source_map, &dcx);
+    units.push(unit);
+    let resolved = krelpin_resolve::resolve(&units, &dcx);
     assert_eq!(
         buffer.messages(),
         Vec::<String>::new(),
         "parse or resolve errors in {src:?}"
     );
 
-    crate::check(&unit, &resolved.resolutions, &dcx);
+    crate::check(&units, &resolved, &dcx);
     buffer.diagnostics()
 }
 
@@ -502,9 +512,162 @@ fn casts() {
 }
 
 #[test]
-fn unknown_library_types_are_lenient() {
+fn types_from_unknown_packages_are_lenient() {
+    ok("import shop.money.Price;\n\
+        class A { int f(Price price) { return price.cents() + price.anything; } }");
+}
+
+#[test]
+fn standard_library_has_no_errors() {
+    ok("");
+}
+
+#[test]
+fn string_methods_are_checked() {
+    body_ok(
+        "String s = \"Krelpin\"; int n = s.length(); char c = s.charAt(0); \
+         boolean b = s.contains(\"pin\") && !s.isEmpty(); String[] parts = s.split(\",\"); \
+         String joined = String.join(\", \", \"a\", \"b\");",
+    );
+    assert_eq!(
+        in_body("String s = \"x\"; int n = s.lenght();"),
+        ["no method named `lenght` found for `String`"]
+    );
+    assert_eq!(
+        in_body("String s = \"x\"; String n = s.length();"),
+        ["mismatched types"]
+    );
+    assert_eq!(
+        in_body("String s = \"x\"; char c = s.charAt(\"0\");"),
+        ["mismatched types"]
+    );
+}
+
+#[test]
+fn every_object_has_the_methods_of_object() {
+    body_ok(
+        "Point p = new Point(1, 2); String text = p.toString(); int hash = p.hashCode(); \
+         boolean same = p.equals(new Point(1, 2)); Object any = p;",
+    );
+    ok("interface Shape { double area(&this); }\n\
+        class Main { String f(Shape shape) { return shape.toString(); } }");
+    ok("enum Color { RED, GREEN }\n\
+        class Main { String f(Color c) { return c.name() + c.ordinal(); } }");
+}
+
+#[test]
+fn collections_are_generic() {
     body_ok(
         "List<String> names = new ArrayList<>(); names.add(\"x\"); int n = names.size(); \
-             for (String name : names) { Console.println(name.length()); }",
+         String first = names.get(0); \
+         for (String name : names) { Console.println(name.length()); }",
+    );
+    body_ok(
+        "Map<String, Integer> ages = new HashMap<>(); ages.put(\"Ali\", 30); \
+         Integer? age = ages.get(\"Ali\"); int years = age ?: 0;",
+    );
+    assert_eq!(
+        in_body("List<String> names = new ArrayList<>(); int first = names.get(0);"),
+        ["mismatched types"]
+    );
+    assert_eq!(
+        in_body("List<String> names = new ArrayList<>(); names.add(1);"),
+        ["mismatched types"]
+    );
+    assert_eq!(
+        in_body("List<String> names = new ArrayList<>(); for (int name : names) {}"),
+        ["mismatched types"]
+    );
+    assert_eq!(
+        in_body("Map<String, Integer> ages = new HashMap<>(); int age = ages.get(\"Ali\");"),
+        ["mismatched types"]
+    );
+    assert_eq!(
+        in_body("Map<String, Integer> ages = new HashMap<>(); for (String key : ages) {}"),
+        ["cannot iterate over a value of type `Map<String, Integer>`"]
+    );
+    assert_eq!(
+        in_body("List<String> names = new ArrayList<>(); String s = names[0];"),
+        ["cannot index into a value of type `List<String>`"]
+    );
+    assert_eq!(
+        helps(&body(
+            "List<String> names = new ArrayList<>(); String s = names[0];"
+        )),
+        ["use `.get(index)` instead"]
+    );
+}
+
+#[test]
+fn own_types_can_be_iterable() {
+    ok("abstract class Countdown implements Iterable<Integer> {}\n\
+        class Main {\n\
+        \x20   void run(&this, Countdown countdown) {\n\
+        \x20       for (Integer n : countdown) { int x = n; }\n\
+        \x20   }\n\
+        }");
+}
+
+#[test]
+fn primitives_box_into_their_classes() {
+    body_ok("Integer boxed = 5; int unboxed = boxed; Character c = 'x';");
+    assert_eq!(in_body("Long boxed = 5;"), ["mismatched types"]);
+    assert_eq!(in_body("Integer boxed = 5L;"), ["mismatched types"]);
+}
+
+#[test]
+fn class_members_of_the_standard_library() {
+    body_ok(
+        "int a = Math.max(1, 2); long b = Math.max(1L, 2); double c = Math.sqrt(2.0) * Math.PI; \
+         int big = Integer.MAX_VALUE; int parsed = Integer.parseInt(\"42\");",
+    );
+    assert_eq!(in_body("int a = Math.sqrt(2.0);"), ["mismatched types"]);
+    assert_eq!(
+        in_body("Console c = new Console();"),
+        ["constructor `Console` of `Console` is private"]
+    );
+    assert_eq!(
+        in_body("Math.PI = 3.0;"),
+        ["cannot assign to `const` field `PI`"]
+    );
+}
+
+#[test]
+fn console_prints_values_and_borrows() {
+    body_ok(
+        "Console.println(); Console.println(1); Console.println(2L); Console.println('c'); \
+         Console.println(true); Console.println(1.5); Console.println(\"text\"); \
+         Console.println(new Point(1, 2)); String s = \"x\"; Console.println(&s); \
+         Console.print(null); String? line = Console.readLine();",
+    );
+    assert_eq!(
+        in_body("String line = Console.readLine();"),
+        ["mismatched types"]
+    );
+}
+
+#[test]
+fn exceptions() {
+    body_ok(
+        "try { throw new IllegalArgumentException(\"bad\"); } \
+         catch (RuntimeException e) { String? message = e.getMessage(); }",
+    );
+    assert_eq!(
+        in_body("try {} catch (Exception e) { String message = e.getMessage(); }"),
+        ["mismatched types"]
+    );
+    ok("import std.io.IOException;\n\
+        class Main { void run(&this) throws IOException { throw new IOException(\"disk\"); } }");
+}
+
+#[test]
+fn atomics_can_change_through_shared_fields() {
+    ok("class Counter {\n\
+        \x20   shared AtomicInt created = new AtomicInt(0);\n\
+        \x20   Counter() { int id = Counter.created.increment(); }\n\
+        }");
+    assert_eq!(
+        errors("class Counter { shared AtomicInt created = new AtomicInt(\"0\"); }"),
+        ["mismatched types"]
     );
 }

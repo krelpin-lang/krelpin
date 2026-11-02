@@ -58,6 +58,18 @@ pub struct Annotation {
     pub span: Span,
 }
 
+impl Annotation {
+    pub fn is(&self, name: &str) -> bool {
+        matches!(self.path.segments.as_slice(), [segment] if segment.name.as_str() == name)
+    }
+}
+
+pub fn is_intrinsic(annotations: &[Annotation]) -> bool {
+    annotations
+        .iter()
+        .any(|annotation| annotation.is("Intrinsic"))
+}
+
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum Visibility {
     Default,
