@@ -169,6 +169,8 @@ impl FnCtxt<'_, '_> {
         let ty = self.check_expr(init);
         let problem = match (&ty, &init.kind) {
             (_, ExprKind::ArrayInit { ty: None, .. }) => Some("an array initializer"),
+            (_, ExprKind::Lambda { .. }) => Some("a lambda"),
+            (_, ExprKind::MethodRef { .. }) => Some("a method reference"),
             (Ty::Null, _) => Some("`null`"),
             (Ty::Void, _) => Some("a method that returns nothing"),
             _ => None,

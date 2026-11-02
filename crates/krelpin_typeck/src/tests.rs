@@ -856,3 +856,97 @@ fn inferred_type_arguments_satisfy_bounds() {
         ["type `Thing` does not satisfy the bound of `T`"]
     );
 }
+
+fn closures(code: &str) -> String {
+    format!(
+        "import std.function.Consumer;\n\
+         interface Mapper<A, B> {{ B apply(&this, A value); }}\n\
+         class Thing {{ Thing(String name) {{}} }}\n\
+         class Exec {{\n\
+         \x20   int run(Runnable task) {{ return 0; }}\n\
+         \x20   String run(Consumer<String> action) {{ return \"\"; }}\n\
+         }}\n\
+         class Main {{\n\
+         \x20   int helper(&this, String s) {{ return 1; }}\n\
+         \x20   void run(&this) {{ {code} }}\n\
+         }}"
+    )
+}
+
+#[test]
+fn lambdas_take_the_types_of_their_target() {
+    ok(&closures(
+        "Runnable r = () -> Console.println(\"x\"); \
+         Consumer<String> c = s -> Console.println(s.length()); \
+         Mapper<String, Integer> m = s -> s.length(); \
+         Mapper<String, Integer> b = (String s) -> { return s.length(); }; \
+         List<String> names = new ArrayList<>(); \
+         names.forEach(name -> Console.println(name.length()));",
+    ));
+    assert_eq!(
+        errors(&closures("Mapper<String, Integer> m = s -> s.lenght();")),
+        ["no method named `lenght` found for `String`"]
+    );
+    assert_eq!(
+        errors(&closures(
+            "List<String> names = new ArrayList<>(); names.forEach(name -> name.lenght());"
+        )),
+        ["no method named `lenght` found for `String`"]
+    );
+    assert_eq!(
+        labels(&closures("Mapper<String, Integer> m = s -> s;")),
+        ["expected `Integer`, found `String`"]
+    );
+}
+
+#[test]
+fn lambda_errors() {
+    assert_eq!(
+        errors(&closures("Mapper<String, Integer> m = (a, b) -> 1;")),
+        ["this lambda takes 2 parameters but `apply` takes 1 parameter"]
+    );
+    assert_eq!(
+        labels(&closures("Mapper<String, Integer> m = (Integer s) -> 1;")),
+        ["expected `String`, found `Integer`"]
+    );
+    assert_eq!(
+        errors(&closures(
+            "Mapper<String, Integer> m = s -> { Console.println(s); };"
+        )),
+        ["missing return statement"]
+    );
+    assert_eq!(
+        errors(&closures("String s = () -> 1;")),
+        ["a lambda cannot be used as `String`"]
+    );
+    assert_eq!(
+        errors(&closures("var f = () -> 1;")),
+        ["cannot infer the type of `f` from a lambda"]
+    );
+}
+
+#[test]
+fn lambdas_choose_overloads_by_their_parameters() {
+    ok(&closures(
+        "int a = Exec.run(() -> {}); String b = Exec.run(s -> Console.println(s.length()));",
+    ));
+}
+
+#[test]
+fn method_references() {
+    ok(&closures(
+        "Mapper<String, Integer> len = String::length; \
+         Mapper<String, Integer> parse = Integer::parseInt; \
+         Consumer<String> print = Console::println; \
+         Mapper<String, Thing> make = Thing::new; \
+         Mapper<String, Integer> own = this::helper;",
+    ));
+    assert_eq!(
+        errors(&closures("Mapper<String, Integer> size = String::size;")),
+        ["`String::size` does not match `Mapper<String, Integer>`"]
+    );
+    assert_eq!(
+        labels(&closures("Mapper<String, String> len = String::length;")),
+        ["expected `String`, found `int`"]
+    );
+}

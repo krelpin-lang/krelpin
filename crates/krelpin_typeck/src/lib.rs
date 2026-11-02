@@ -1,5 +1,6 @@
 mod call;
 mod check;
+mod closure;
 mod coerce;
 mod expr;
 mod lang_items;
@@ -19,6 +20,7 @@ use krelpin_errors::DiagCtxt;
 use krelpin_resolve::ResolverOutput;
 use krelpin_span::Span;
 
+pub use crate::closure::FnSig;
 pub use crate::coerce::Coercion;
 pub use crate::lang_items::{LangItem, LangItems};
 pub use crate::param_env::ParamEnv;

@@ -4,6 +4,7 @@ use krelpin_errors::Diagnostic;
 use krelpin_span::Symbol;
 
 use crate::check::{FnCtxt, plural};
+use crate::closure::is_closure;
 use crate::coerce::Coercion;
 use crate::lang_items::LangItem;
 use crate::sig::MethodSig;
@@ -59,6 +60,9 @@ impl FnCtxt<'_, '_> {
         expected: &Ty,
         coercion: Coercion,
     ) -> bool {
+        if let Some(fits) = self.closure_fits(expr, expected) {
+            return fits;
+        }
         let narrows_literal = coercion == Coercion::Boxing
             && is_int_literal(expr)
             && matches!(
@@ -122,13 +126,22 @@ impl FnCtxt<'_, '_> {
         };
 
         let Some(chosen) = self.most_specific(&applicable, args.len(), phase) else {
-            if !arg_tys.iter().any(Ty::references_unknown) {
+            let unknown_arg = args
+                .iter()
+                .zip(arg_tys)
+                .any(|(arg, ty)| !is_closure(arg) && ty.references_unknown());
+            if !unknown_arg {
                 self.report_ambiguity(&applicable, name);
             }
             return Ty::Unknown;
         };
         self.check_inferred_bounds(chosen, name);
         self.check_vis(chosen.method.vis, chosen.method.owner, false, what, name);
+        for (index, arg) in args.iter().enumerate() {
+            if is_closure(arg) {
+                self.check_closure(arg, &chosen.param(index, phase));
+            }
+        }
         chosen.ret.clone()
     }
 
@@ -266,7 +279,7 @@ impl FnCtxt<'_, '_> {
         self.error(name.span, message);
     }
 
-    fn report_arg_mismatches(&self, candidate: &Candidate, args: &[Expr], arg_tys: &[Ty]) {
+    fn report_arg_mismatches(&mut self, candidate: &Candidate, args: &[Expr], arg_tys: &[Ty]) {
         for (index, (arg, ty)) in args.iter().zip(arg_tys).enumerate() {
             let phases: &[Phase] = if candidate.accepts_arity(args.len(), Phase::Loose) {
                 &[Phase::Loose, Phase::Variadic]
@@ -281,8 +294,12 @@ impl FnCtxt<'_, '_> {
             let fits = expected
                 .iter()
                 .any(|expected| self.accepts(arg, ty, expected, Coercion::Boxing));
-            if let (false, Some(expected)) = (fits, expected.last()) {
-                self.mismatch(arg.span, expected, ty);
+            match (fits, expected.last()) {
+                (false, Some(expected)) if is_closure(arg) => {
+                    self.check_closure(arg, expected);
+                }
+                (false, Some(expected)) => self.mismatch(arg.span, expected, ty),
+                _ => {}
             }
         }
     }

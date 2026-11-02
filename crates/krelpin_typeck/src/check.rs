@@ -79,12 +79,9 @@ pub(crate) fn check_units(tcx: &Tcx<'_>, units: &[CompilationUnit]) -> TypeckRes
             ItemKind::Enum(def) => {
                 for constant in &def.constants {
                     let mut fcx = FnCtxt::new(tcx, owner, Ty::Void);
-                    let arg_tys: Vec<Ty> = constant
-                        .args
-                        .iter()
-                        .map(|arg| fcx.check_expr(arg))
-                        .collect();
+                    let arg_tys = fcx.check_closure_args(&constant.args);
                     fcx.check_ctor_call(owner, &[], &constant.args, &arg_tys, constant.name);
+                    fcx.finish_closure_args(&constant.args);
                     results.expr_types.extend(fcx.results);
                 }
                 &def.members
@@ -142,14 +139,8 @@ fn check_member<'a, 'tcx>(tcx: &'a Tcx<'tcx>, owner: DefId, member: &Member) -> 
             fcx.declare_params(&method.params);
             if let Some(body) = &method.body {
                 let diverges = fcx.check_block(body);
-                if ret != Ty::Void && !diverges {
-                    let end = body.span.hi;
-                    fcx.emit(
-                        Diagnostic::error("missing return statement")
-                            .with_span(Span::new(end - 1, end))
-                            .with_label(format!("this method must return a `{ret}`"))
-                            .with_help("add a `return` statement, or `throw` an exception"),
-                    );
+                if !diverges {
+                    fcx.report_missing_return(body.span, &ret, "method");
                 }
             }
             fcx
@@ -182,6 +173,19 @@ impl<'a, 'tcx> FnCtxt<'a, 'tcx> {
             };
             self.locals.insert(param.name.span, ty);
         }
+    }
+
+    pub(crate) fn report_missing_return(&self, body: Span, ret: &Ty, what: &str) {
+        if matches!(ret, Ty::Void | Ty::Unknown) {
+            return;
+        }
+        let end = body.hi;
+        self.emit(
+            Diagnostic::error("missing return statement")
+                .with_span(Span::new(end - 1, end))
+                .with_label(format!("this {what} must return a `{ret}`"))
+                .with_help("add a `return` statement, or `throw` an exception"),
+        );
     }
 
     pub(crate) fn lower_ty(&self, ty: &krelpin_ast::ast::Ty) -> Ty {

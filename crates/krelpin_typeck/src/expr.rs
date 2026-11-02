@@ -1,6 +1,5 @@
 use krelpin_ast::ast::{
-    BinOp, Expr, ExprKind, FieldStorage, Ident, LambdaBody, PrimitiveTy, SwitchExprBody, UnOp,
-    Visibility,
+    BinOp, Expr, ExprKind, FieldStorage, Ident, PrimitiveTy, SwitchExprBody, UnOp, Visibility,
 };
 use krelpin_ast::token::{Lit, LitKind};
 use krelpin_errors::Diagnostic;
@@ -9,6 +8,7 @@ use krelpin_span::def_id::DefId;
 use krelpin_span::{Span, Symbol};
 
 use crate::check::{FnCtxt, plural};
+use crate::closure::is_closure;
 use crate::coerce::Coercion;
 use crate::lang_items::LangItem;
 use crate::sig::{AdtKind, FieldSig, MethodSig};
@@ -28,6 +28,9 @@ impl FnCtxt<'_, '_> {
     }
 
     pub(crate) fn check_expr_coerce(&mut self, expr: &Expr, expected: &Ty) -> Ty {
+        if is_closure(expr) {
+            return self.check_closure(expr, expected);
+        }
         if let ExprKind::ArrayInit { ty: None, elems } = &expr.kind {
             let Ty::Array(elem) = expected.non_null().strip_refs() else {
                 if !expected.is_unknown() {
@@ -83,7 +86,7 @@ impl FnCtxt<'_, '_> {
                 safe,
             } => self.check_method_call(receiver.as_deref(), *name, args, *safe),
             ExprKind::Call { callee, args } => {
-                let arg_tys: Vec<Ty> = args.iter().map(|arg| self.check_expr(arg)).collect();
+                let arg_tys = self.check_closure_args(args);
                 let target = match callee.kind {
                     ExprKind::Super => self.tcx.sig(self.owner).superclass.clone(),
                     _ => Some(self.tcx.self_ty(self.owner)),
@@ -95,6 +98,7 @@ impl FnCtxt<'_, '_> {
                     let name = Ident::new(self.type_name(def), callee.span);
                     self.check_ctor_call(def, &ty_args, args, &arg_tys, name);
                 }
+                self.finish_closure_args(args);
                 Ty::Void
             }
             ExprKind::Index { expr: base, index } => self.check_index(base, index),
@@ -156,31 +160,8 @@ impl FnCtxt<'_, '_> {
                 self.check_cast(&from, &to, expr.span);
                 to
             }
-            ExprKind::Lambda { params, body } => {
-                for param in params {
-                    let ty = param
-                        .ty
-                        .as_ref()
-                        .map_or(Ty::Unknown, |ty| self.lower_ty(ty));
-                    self.locals.insert(param.name.span, ty);
-                }
-                let outer_ret = std::mem::replace(&mut self.ret, Ty::Unknown);
-                match body.as_ref() {
-                    LambdaBody::Expr(body) => {
-                        self.check_expr(body);
-                    }
-                    LambdaBody::Block(block) => {
-                        self.check_block(block);
-                    }
-                }
-                self.ret = outer_ret;
-                Ty::Unknown
-            }
-            ExprKind::MethodRef { expr: target, .. } => {
-                if self.type_of_name(target).is_none() {
-                    self.check_expr(target);
-                }
-                Ty::Unknown
+            ExprKind::Lambda { .. } | ExprKind::MethodRef { .. } => {
+                self.check_closure(expr, &Ty::Unknown)
             }
             ExprKind::Switch { scrutinee, arms } => {
                 let scrutinee_ty = self.check_expr(scrutinee);
@@ -457,11 +438,23 @@ impl FnCtxt<'_, '_> {
         args: &[Expr],
         safe: bool,
     ) -> Ty {
+        let ty = self.method_call_ty(receiver, name, args, safe);
+        self.finish_closure_args(args);
+        ty
+    }
+
+    fn method_call_ty(
+        &mut self,
+        receiver: Option<&Expr>,
+        name: Ident,
+        args: &[Expr],
+        safe: bool,
+    ) -> Ty {
         let (receiver, nullable) = match receiver {
             Some(base) => self.receiver(base, safe),
             None => (Receiver::None, false),
         };
-        let arg_tys: Vec<Ty> = args.iter().map(|arg| self.check_expr(arg)).collect();
+        let arg_tys = self.check_closure_args(args);
 
         let ret = match receiver {
             Receiver::None => {
@@ -472,9 +465,10 @@ impl FnCtxt<'_, '_> {
                     .filter(|(method, _)| method.receiver.is_none())
                     .collect();
                 if statics.is_empty() {
-                    return Ty::Unknown;
+                    Ty::Unknown
+                } else {
+                    self.call(statics, args, &arg_tys, name, "method")
                 }
-                self.call(statics, args, &arg_tys, name, "method")
             }
             Receiver::Type(ty) => self.static_call(&ty, name, args, &arg_tys),
             Receiver::Value(ty) => self.instance_call(ty.strip_refs(), name, args, &arg_tys),
@@ -557,7 +551,7 @@ impl FnCtxt<'_, '_> {
         }
     }
 
-    fn receiver_adts(&self, ty: &Ty) -> Vec<(DefId, Vec<Ty>)> {
+    pub(crate) fn receiver_adts(&self, ty: &Ty) -> Vec<(DefId, Vec<Ty>)> {
         match ty {
             Ty::Adt { def, args, .. } => vec![(*def, args.clone())],
             Ty::Param(name) => {
@@ -585,7 +579,12 @@ impl FnCtxt<'_, '_> {
         );
     }
 
-    fn collect_methods(&self, def: DefId, args: &[Ty], name: Symbol) -> Vec<(MethodSig, Subst)> {
+    pub(crate) fn collect_methods(
+        &self,
+        def: DefId,
+        args: &[Ty],
+        name: Symbol,
+    ) -> Vec<(MethodSig, Subst)> {
         let mut out = Vec::new();
         self.find_methods(def, args, name, &mut out);
         if !out.is_empty() || self.tcx.sig(def).kind != AdtKind::Interface {
@@ -628,8 +627,14 @@ impl FnCtxt<'_, '_> {
     }
 
     fn check_new(&mut self, ty: &krelpin_ast::ast::Ty, args: &[Expr], span: Span) -> Ty {
+        let ty = self.new_object_ty(ty, args, span);
+        self.finish_closure_args(args);
+        ty
+    }
+
+    fn new_object_ty(&mut self, ty: &krelpin_ast::ast::Ty, args: &[Expr], span: Span) -> Ty {
         let ty = self.lower_ty(ty);
-        let arg_tys: Vec<Ty> = args.iter().map(|arg| self.check_expr(arg)).collect();
+        let arg_tys = self.check_closure_args(args);
 
         match &ty {
             Ty::Adt {
