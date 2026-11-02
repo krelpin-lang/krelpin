@@ -1,0 +1,48 @@
+package demo;
+
+import std.function.Function;
+
+@Derive(Equatable)
+struct Money {
+    long cents;
+}
+
+class Counter {
+    int count;
+
+    mut void bump() {
+        this.count++;
+    }
+
+    int read() {
+        return this.count;
+    }
+}
+
+class Main {
+    static long widen(int small, byte tiny) {
+        long total = small;
+        double ratio = small + 1.5;
+        total += tiny;
+        long[] values = {small, tiny};
+        return small * 2L + tiny;
+    }
+
+    static boolean compare(Money a, Money b, String? name) {
+        boolean same = a == b;
+        boolean different = a != b;
+        return same && name != null && 1 < 2L;
+    }
+
+    static int closures(List<int> numbers, Counter counter) {
+        int offset = 10;
+        int calls = 0;
+        numbers.forEach(n -> Console.println(n + offset));
+        numbers.forEach(n -> {
+            calls++;
+        });
+        Function<String, int> length = String::length;
+        Runnable bump = counter::bump;
+        return calls;
+    }
+}

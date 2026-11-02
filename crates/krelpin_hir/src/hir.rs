@@ -255,6 +255,44 @@ pub enum ExprKind {
         scrutinee: Box<Expr>,
         arms: Vec<Arm>,
     },
-    Closure,
+    Equals {
+        callee: Box<Callee>,
+        lhs: Box<Expr>,
+        rhs: Box<Expr>,
+        negated: bool,
+    },
+    Closure(Box<Closure>),
     Unresolved,
+}
+
+#[derive(Debug)]
+pub struct Closure {
+    pub kind: ClosureKind,
+    pub captures: Vec<Capture>,
+}
+
+#[derive(Debug)]
+pub enum ClosureKind {
+    Lambda {
+        params: Vec<LocalId>,
+        ret: Ty,
+        body: ClosureBody,
+    },
+    MethodRef {
+        callee: Option<Box<Callee>>,
+        bound: Option<Box<Expr>>,
+        constructs: bool,
+    },
+}
+
+#[derive(Debug)]
+pub enum ClosureBody {
+    Expr(Expr),
+    Block(Block),
+}
+
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub struct Capture {
+    pub local: LocalId,
+    pub mutable: bool,
 }

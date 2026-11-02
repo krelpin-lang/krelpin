@@ -1,3 +1,4 @@
+mod captures;
 mod hir;
 mod lower;
 mod print;

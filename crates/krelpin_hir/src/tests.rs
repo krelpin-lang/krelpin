@@ -116,8 +116,58 @@ fn structs_and_variants_are_constructed() {
          class A { static Payment pay() { return Payment.Cash(new Money(5)); } \
          static Payment free() { return Payment.Free; } }",
         &[
-            "return Payment::Cash(new Money(5));",
+            "return Payment::Cash(new Money((5 as long)));",
             "return Payment::Free;",
+        ],
+    );
+}
+
+#[test]
+fn implicit_conversions_are_explicit() {
+    assert_lowers_to(
+        "class A { static long f(int small, byte tiny) {\n\
+         \x20   long total = small;\n\
+         \x20   total += tiny;\n\
+         \x20   double ratio = small + 1.5;\n\
+         \x20   return small * 2L;\n\
+         } }",
+        &[
+            "let total_2: long = (small_0 as long);",
+            "total_2 += (tiny_1 as long);",
+            "let ratio_3: double = ((small_0 as double) + 1.5);",
+            "return ((small_0 as long) * 2L);",
+        ],
+    );
+}
+
+#[test]
+fn equality_of_objects_calls_equals() {
+    assert_lowers_to(
+        "@Derive(Equatable) struct Money { long cents; }\n\
+         class A { static boolean f(Money a, Money b, String? s) {\n\
+         \x20   return a != b || s == null;\n\
+         } }",
+        &["return (!Equatable::equals(&a_0, &b_1) || (s_2 == null));"],
+    );
+}
+
+#[test]
+fn closures_list_their_captures() {
+    assert_lowers_to(
+        "class Counter { int count; mut void bump() { this.count++; } }\n\
+         class A { static int f(List<int> numbers, Counter counter) {\n\
+         \x20   int offset = 1;\n\
+         \x20   int calls = 0;\n\
+         \x20   numbers.forEach(n -> Console.println(n + offset));\n\
+         \x20   numbers.forEach(n -> { calls++; });\n\
+         \x20   Runnable bump = counter::bump;\n\
+         \x20   return calls;\n\
+         } }",
+        &[
+            "Iterable::forEach(&numbers_0, |n_4: int| -> void [&offset_2] \
+             Console::println(((n_4 + offset_2) as Object?)));",
+            "Iterable::forEach(&numbers_0, |n_5: int| -> void [&mut calls_3] {",
+            "let bump_6: Runnable = ref Counter::bump on &mut counter_1;",
         ],
     );
 }

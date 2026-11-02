@@ -1,0 +1,38 @@
+fn Money.equals(this_0: &Money, other_1: &Money) -> boolean {
+    return (this_0.cents == other_1.cents);
+}
+
+fn Counter.bump(this_0: &mut Counter) -> void {
+    (this_0.count++);
+}
+
+fn Counter.read(this_0: &Counter) -> int {
+    return this_0.count;
+}
+
+fn Main.widen(small_0: int, tiny_1: byte) -> long {
+    let total_2: long = (small_0 as long);
+    let ratio_3: double = ((small_0 as double) + 1.5);
+    total_2 += (tiny_1 as long);
+    let values_4: long[] = [(small_0 as long), (tiny_1 as long)];
+    return (((small_0 as long) * 2L) + (tiny_1 as long));
+}
+
+fn Main.compare(a_0: Money, b_1: Money, name_2: String?) -> boolean {
+    let same_3: boolean = Equatable::equals(&a_0, &b_1);
+    let different_4: boolean = !Equatable::equals(&a_0, &b_1);
+    return ((same_3 && (name_2 != null)) && ((1 as long) < 2L));
+}
+
+fn Main.closures(numbers_0: List<int>, counter_1: Counter) -> int {
+    let offset_2: int = 10;
+    let calls_3: int = 0;
+    Iterable::forEach(&numbers_0, |n_4: int| -> void [&offset_2] Console::println(((n_4 + offset_2) as Object?)));
+    Iterable::forEach(&numbers_0, |n_5: int| -> void [&mut calls_3] {
+        (calls_3++);
+    });
+    let length_6: Function<String, int> = ref String::length;
+    let bump_7: Runnable = ref Counter::bump on &mut counter_1;
+    return calls_3;
+}
+

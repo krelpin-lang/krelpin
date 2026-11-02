@@ -4,8 +4,8 @@ use krelpin_ast::ast::UnOp;
 use krelpin_typeck::{Callee, Tcx, Ty};
 
 use crate::hir::{
-    Arm, ArmBody, Block, Body, BodyKind, BodyValue, Dispatch, Expr, ExprKind, LocalId, LoopKind,
-    Pat, PatKind, Stmt, StmtKind,
+    Arm, ArmBody, Block, Body, BodyKind, BodyValue, Closure, ClosureBody, ClosureKind, Dispatch,
+    Expr, ExprKind, LocalId, LoopKind, Pat, PatKind, Stmt, StmtKind,
 };
 
 pub fn print<'b>(bodies: impl IntoIterator<Item = &'b Body>, tcx: &Tcx<'_>) -> String {
@@ -252,6 +252,51 @@ impl Printer<'_, '_> {
         }
     }
 
+    fn closure(&mut self, closure: &Closure) {
+        let captures: Vec<String> = closure
+            .captures
+            .iter()
+            .map(|capture| {
+                let borrow = if capture.mutable { "&mut " } else { "&" };
+                format!("{borrow}{}", self.name(capture.local))
+            })
+            .collect();
+        match &closure.kind {
+            ClosureKind::Lambda { params, ret, body } => {
+                let params: Vec<String> = params
+                    .iter()
+                    .map(|&local| format!("{}: {}", self.name(local), self.body.local(local).ty))
+                    .collect();
+                let _ = write!(
+                    self.out,
+                    "|{}| -> {ret} [{}] ",
+                    params.join(", "),
+                    captures.join(", ")
+                );
+                match body {
+                    ClosureBody::Expr(expr) => self.expr(expr),
+                    ClosureBody::Block(block) => self.block(block),
+                }
+            }
+            ClosureKind::MethodRef {
+                callee,
+                bound,
+                constructs,
+            } => {
+                self.out
+                    .push_str(if *constructs { "ref new " } else { "ref " });
+                match callee {
+                    Some(callee) => self.callee(callee),
+                    None => self.out.push_str("<default>"),
+                }
+                if let Some(bound) = bound {
+                    self.out.push_str(" on ");
+                    self.expr(bound);
+                }
+            }
+        }
+    }
+
     fn exprs(&mut self, exprs: &[Expr]) {
         for (index, expr) in exprs.iter().enumerate() {
             if index > 0 {
@@ -406,9 +451,23 @@ impl Printer<'_, '_> {
                 let _ = write!(self.out, " as {})", expr.ty);
             }
             ExprKind::Switch { scrutinee, arms } => self.switch(scrutinee, arms),
-            ExprKind::Closure => {
-                let _ = write!(self.out, "<closure: {}>", expr.ty);
+            ExprKind::Equals {
+                callee,
+                lhs,
+                rhs,
+                negated,
+            } => {
+                if *negated {
+                    self.out.push('!');
+                }
+                self.callee(callee);
+                self.out.push('(');
+                self.expr(lhs);
+                self.out.push_str(", ");
+                self.expr(rhs);
+                self.out.push(')');
             }
+            ExprKind::Closure(closure) => self.closure(closure),
             ExprKind::Unresolved => self.out.push_str("<unresolved>"),
         }
     }

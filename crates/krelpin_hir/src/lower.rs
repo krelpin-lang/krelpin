@@ -1,17 +1,20 @@
 use std::collections::HashMap;
 
 use krelpin_ast::ast::{
-    self, CaseLabel, CompilationUnit, FieldStorage, FnRetTy, ItemKind, Member, MemberKind, Param,
-    ReceiverKind, SwitchExprBody,
+    self, BinOp, CaseLabel, CompilationUnit, FieldStorage, FnRetTy, Ident, ItemKind, LambdaBody,
+    LambdaParam, Member, MemberKind, Param, ReceiverKind, SwitchExprBody, UnOp,
 };
 use krelpin_resolve::{Res, ResolverOutput};
 use krelpin_span::def_id::DefId;
 use krelpin_span::{Span, Symbol, kw};
-use krelpin_typeck::{Callee, PatRes, Tcx, Ty, TypeckResults};
+use krelpin_typeck::ty::{promote, widens};
+use krelpin_typeck::{Callee, LangItem, PatRes, Tcx, Ty, TypeckResults};
+
+use crate::captures::{captures, expr_captures};
 
 use crate::hir::{
-    Arm, ArmBody, Block, Body, BodyKind, BodyValue, Catch, Dispatch, Expr, ExprKind, Hir,
-    LocalDecl, LocalId, LoopKind, Pat, PatKind, Stmt, StmtKind,
+    Arm, ArmBody, Block, Body, BodyKind, BodyValue, Catch, Closure, ClosureBody, ClosureKind,
+    Dispatch, Expr, ExprKind, Hir, LocalDecl, LocalId, LoopKind, Pat, PatKind, Stmt, StmtKind,
 };
 
 pub fn lower(
@@ -37,6 +40,8 @@ pub fn lower(
                 locals: Vec::new(),
                 by_decl: HashMap::new(),
                 this: None,
+                rets: Vec::new(),
+                yields: Vec::new(),
             };
             if let Some(body) = cx.lower_member(member) {
                 hir.bodies.push(body);
@@ -54,6 +59,8 @@ struct LoweringCtxt<'a, 'tcx> {
     locals: Vec<LocalDecl>,
     by_decl: HashMap<Span, LocalId>,
     this: Option<LocalId>,
+    rets: Vec<Ty>,
+    yields: Vec<Ty>,
 }
 
 impl LoweringCtxt<'_, '_> {
@@ -107,9 +114,13 @@ impl LoweringCtxt<'_, '_> {
             .map(|param| self.declare(param.name.name, param.name.span))
             .collect();
 
+        self.rets.push(ret.clone());
         let value = match &member.kind {
             MemberKind::Type(_) => return None,
-            MemberKind::Field(field) => BodyValue::Expr(self.lower_expr(field.init.as_ref()?)),
+            MemberKind::Field(field) => {
+                let init = self.lower_expr(field.init.as_ref()?);
+                BodyValue::Expr(coerce(init, &ret))
+            }
             MemberKind::Constructor(ctor) => BodyValue::Block(self.lower_block(&ctor.body)),
             MemberKind::Method(method) => BodyValue::Block(self.lower_block(method.body.as_ref()?)),
         };
@@ -170,9 +181,11 @@ impl LoweringCtxt<'_, '_> {
         let kind = match &stmt.kind {
             ast::StmtKind::Local(local) => {
                 let init = local.init.as_ref().map(|init| self.lower_expr(init));
+                let local = self.declare(local.name.name, local.name.span);
+                let ty = self.locals[local.index()].ty.clone();
                 StmtKind::Let {
-                    local: self.declare(local.name.name, local.name.span),
-                    init,
+                    local,
+                    init: init.map(|init| coerce(init, &ty)),
                 }
             }
             ast::StmtKind::Expr(expr) => StmtKind::Expr(self.lower_expr(expr)),
@@ -260,9 +273,17 @@ impl LoweringCtxt<'_, '_> {
                 finally: finally.as_ref().map(|block| self.lower_block(block)),
             },
             ast::StmtKind::Return(value) => {
-                StmtKind::Return(value.as_ref().map(|value| self.lower_expr(value)))
+                let target = self.rets.last().cloned().unwrap_or(Ty::Unknown);
+                StmtKind::Return(
+                    value
+                        .as_ref()
+                        .map(|value| coerce(self.lower_expr(value), &target)),
+                )
             }
-            ast::StmtKind::Yield(value) => StmtKind::Yield(self.lower_expr(value)),
+            ast::StmtKind::Yield(value) => {
+                let target = self.yields.last().cloned().unwrap_or(Ty::Unknown);
+                StmtKind::Yield(coerce(self.lower_expr(value), &target))
+            }
             ast::StmtKind::Throw(value) => StmtKind::Throw(self.lower_expr(value)),
             ast::StmtKind::Break => StmtKind::Break,
             ast::StmtKind::Continue => StmtKind::Continue,
@@ -427,13 +448,29 @@ impl LoweringCtxt<'_, '_> {
             ast::ExprKind::NewArray { len, .. } => ExprKind::NewArray {
                 len: Box::new(self.lower_expr(len)),
             },
-            ast::ExprKind::ArrayInit { elems, .. } => ExprKind::Array {
-                elems: self.lower_exprs(elems),
-            },
-            ast::ExprKind::Unary { op, expr: operand } => ExprKind::Unary {
-                op: *op,
-                expr: Box::new(self.lower_expr(operand)),
-            },
+            ast::ExprKind::ArrayInit { elems, .. } => {
+                let elem = match &ty {
+                    Ty::Array(elem) => elem.as_ref().clone(),
+                    _ => Ty::Unknown,
+                };
+                ExprKind::Array {
+                    elems: elems
+                        .iter()
+                        .map(|value| coerce(self.lower_expr(value), &elem))
+                        .collect(),
+                }
+            }
+            ast::ExprKind::Unary { op, expr: operand } => {
+                let operand = self.lower_expr(operand);
+                let operand = match op {
+                    UnOp::Neg | UnOp::BitNot => coerce(operand, &ty),
+                    _ => operand,
+                };
+                ExprKind::Unary {
+                    op: *op,
+                    expr: Box::new(operand),
+                }
+            }
             ast::ExprKind::Borrow {
                 mutable,
                 expr: operand,
@@ -441,20 +478,31 @@ impl LoweringCtxt<'_, '_> {
                 mutable: *mutable,
                 expr: Box::new(self.lower_expr(operand)),
             },
-            ast::ExprKind::Binary { op, lhs, rhs } => ExprKind::Binary {
-                op: *op,
-                lhs: Box::new(self.lower_expr(lhs)),
-                rhs: Box::new(self.lower_expr(rhs)),
-            },
-            ast::ExprKind::Assign { op, lhs, rhs } => ExprKind::Assign {
-                op: *op,
-                place: Box::new(self.lower_expr(lhs)),
-                value: Box::new(self.lower_expr(rhs)),
-            },
+            ast::ExprKind::Binary { op, lhs, rhs } => {
+                let lhs = self.lower_expr(lhs);
+                let rhs = self.lower_expr(rhs);
+                self.lower_binary(*op, lhs, rhs, &ty)
+            }
+            ast::ExprKind::Assign { op, lhs, rhs } => {
+                let place = self.lower_expr(lhs);
+                let value = self.lower_expr(rhs);
+                let value = match (op, &value.ty, &place.ty) {
+                    (None, _, _) => coerce(value, &place.ty),
+                    (Some(_), Ty::Primitive(from), Ty::Primitive(to)) if widens(*from, *to) => {
+                        coerce(value, &place.ty)
+                    }
+                    (Some(_), _, _) => value,
+                };
+                ExprKind::Assign {
+                    op: *op,
+                    place: Box::new(place),
+                    value: Box::new(value),
+                }
+            }
             ast::ExprKind::Ternary { cond, then, els } => ExprKind::If {
                 cond: Box::new(self.lower_expr(cond)),
-                then: Box::new(self.lower_expr(then)),
-                els: Box::new(self.lower_expr(els)),
+                then: Box::new(coerce(self.lower_expr(then), &ty)),
+                els: Box::new(coerce(self.lower_expr(els), &ty)),
             },
             ast::ExprKind::InstanceOf { expr: operand, pat } => ExprKind::Is {
                 expr: Box::new(self.lower_expr(operand)),
@@ -463,7 +511,8 @@ impl LoweringCtxt<'_, '_> {
             ast::ExprKind::Cast { expr: operand, .. } => ExprKind::Cast {
                 expr: Box::new(self.lower_expr(operand)),
             },
-            ast::ExprKind::Lambda { .. } | ast::ExprKind::MethodRef { .. } => ExprKind::Closure,
+            ast::ExprKind::Lambda { params, body } => self.lower_lambda(params, body, &ty),
+            ast::ExprKind::MethodRef { expr: target, name } => self.lower_method_ref(target, *name),
             ast::ExprKind::Switch { scrutinee, arms } => ExprKind::Switch {
                 scrutinee: Box::new(self.lower_expr(scrutinee)),
                 arms: arms
@@ -471,8 +520,15 @@ impl LoweringCtxt<'_, '_> {
                     .map(|arm| {
                         let (pats, guard) = self.lower_label(&arm.label);
                         let body = match &arm.body {
-                            SwitchExprBody::Expr(value) => ArmBody::Expr(self.lower_expr(value)),
-                            SwitchExprBody::Block(block) => ArmBody::Block(self.lower_block(block)),
+                            SwitchExprBody::Expr(value) => {
+                                ArmBody::Expr(coerce(self.lower_expr(value), &ty))
+                            }
+                            SwitchExprBody::Block(block) => {
+                                self.yields.push(ty.clone());
+                                let block = self.lower_block(block);
+                                self.yields.pop();
+                                ArmBody::Block(block)
+                            }
                             SwitchExprBody::Throw(value) => ArmBody::Throw(self.lower_expr(value)),
                         };
                         Arm {
@@ -527,6 +583,112 @@ impl LoweringCtxt<'_, '_> {
         }
     }
 
+    fn lower_binary(&mut self, op: BinOp, lhs: Expr, rhs: Expr, ty: &Ty) -> ExprKind {
+        let (lhs, rhs) = match op {
+            BinOp::Eq | BinOp::Ne => {
+                if let Some(callee) = self.equality_callee(&lhs.ty, &rhs.ty) {
+                    return ExprKind::Equals {
+                        callee,
+                        lhs: Box::new(auto_ref(lhs, ReceiverKind::Ref)),
+                        rhs: Box::new(auto_ref(rhs, ReceiverKind::Ref)),
+                        negated: op == BinOp::Ne,
+                    };
+                }
+                promote_operands(lhs, rhs)
+            }
+            BinOp::Lt | BinOp::Le | BinOp::Gt | BinOp::Ge => promote_operands(lhs, rhs),
+            BinOp::Add
+            | BinOp::Sub
+            | BinOp::Mul
+            | BinOp::Div
+            | BinOp::Rem
+            | BinOp::BitAnd
+            | BinOp::BitOr
+            | BinOp::BitXor
+                if ty.primitive().is_some() =>
+            {
+                (coerce(lhs, ty), coerce(rhs, ty))
+            }
+            BinOp::Shl | BinOp::Shr | BinOp::UShr => (coerce(lhs, ty), rhs),
+            BinOp::Elvis => (lhs, coerce(rhs, ty)),
+            _ => (lhs, rhs),
+        };
+        ExprKind::Binary {
+            op,
+            lhs: Box::new(lhs),
+            rhs: Box::new(rhs),
+        }
+    }
+
+    fn equality_callee(&self, lhs: &Ty, rhs: &Ty) -> Option<Box<Callee>> {
+        if matches!(lhs, Ty::Null) || matches!(rhs, Ty::Null) {
+            return None;
+        }
+        let operand = lhs.strip_refs().non_null();
+        if operand.primitive().is_some() || operand.is_unknown() {
+            return None;
+        }
+        let equatable = self.tcx.lang_items.get(LangItem::Equatable)?;
+        let method = self
+            .tcx
+            .sig(equatable)
+            .methods
+            .get(&Symbol::intern("equals"))?
+            .first()?
+            .clone();
+        Some(Box::new(Callee {
+            method,
+            params: vec![Ty::Ref {
+                mutable: false,
+                ty: Box::new(operand.clone()),
+            }],
+            ret: Ty::BOOLEAN,
+            packs_varargs: false,
+        }))
+    }
+
+    fn lower_lambda(&mut self, params: &[LambdaParam], body: &LambdaBody, ty: &Ty) -> ExprKind {
+        let first_inner = LocalId(self.locals.len() as u32);
+        let params = params
+            .iter()
+            .map(|param| self.declare(param.name.name, param.name.span))
+            .collect();
+        let ret = self.tcx.fn_sig(ty).map_or(Ty::Unknown, |sig| sig.ret);
+        self.rets.push(ret.clone());
+        let body = match body {
+            LambdaBody::Expr(expr) => ClosureBody::Expr(coerce(self.lower_expr(expr), &ret)),
+            LambdaBody::Block(block) => ClosureBody::Block(self.lower_block(block)),
+        };
+        self.rets.pop();
+        let captures = captures(&body, first_inner);
+        ExprKind::Closure(Box::new(Closure {
+            kind: ClosureKind::Lambda { params, ret, body },
+            captures,
+        }))
+    }
+
+    fn lower_method_ref(&mut self, target: &ast::Expr, name: Ident) -> ExprKind {
+        let callee = self.callee(name.span);
+        let receiver = callee.as_ref().and_then(|callee| callee.method.receiver);
+        let bound = match receiver {
+            Some(kind) if !self.is_type_name(target) => {
+                Some(Box::new(auto_ref(self.lower_expr(target), kind)))
+            }
+            _ => None,
+        };
+        let captures = bound.as_deref().map_or_else(Vec::new, |bound| {
+            expr_captures(bound, LocalId(self.locals.len() as u32))
+        });
+        ExprKind::Closure(Box::new(Closure {
+            kind: ClosureKind::MethodRef {
+                callee,
+                bound,
+                constructs: name.name == kw::New,
+            },
+            captures,
+        }))
+    }
+
     fn local_expr(&self, local: LocalId, span: Span) -> Expr {
         Expr {
             kind: ExprKind::Local(local),
@@ -536,12 +698,34 @@ impl LoweringCtxt<'_, '_> {
     }
 
     fn lower_args(&mut self, callee: &Callee, args: &[ast::Expr]) -> Vec<Expr> {
-        let mut lowered = self.lower_exprs(args);
+        let fixed = if callee.packs_varargs {
+            callee.params.len().saturating_sub(1)
+        } else {
+            callee.params.len()
+        };
+        let mut lowered: Vec<Expr> = args
+            .iter()
+            .enumerate()
+            .map(|(index, arg)| {
+                let arg = self.lower_expr(arg);
+                match callee.params.get(index) {
+                    Some(param) if index < fixed => coerce(arg, param),
+                    _ => arg,
+                }
+            })
+            .collect();
         if !callee.packs_varargs {
             return lowered;
         }
-        let fixed = callee.params.len().saturating_sub(1);
-        let rest: Vec<Expr> = lowered.split_off(fixed.min(lowered.len()));
+        let elem = match callee.params.last() {
+            Some(Ty::Array(elem)) => elem.as_ref().clone(),
+            _ => Ty::Unknown,
+        };
+        let rest: Vec<Expr> = lowered
+            .split_off(fixed.min(lowered.len()))
+            .into_iter()
+            .map(|arg| coerce(arg, &elem))
+            .collect();
         let span = match (rest.first(), rest.last()) {
             (Some(first), Some(last)) => first.span.to(last.span),
             _ => lowered
@@ -554,6 +738,36 @@ impl LoweringCtxt<'_, '_> {
             span,
         });
         lowered
+    }
+}
+
+fn coerce(expr: Expr, target: &Ty) -> Expr {
+    let converts = match (&expr.ty, target) {
+        (Ty::Primitive(from), Ty::Primitive(to)) => from != to,
+        (Ty::Primitive(from), Ty::Nullable(to)) => **to != Ty::Primitive(*from),
+        (Ty::Primitive(_), Ty::Adt { .. }) => true,
+        _ => false,
+    };
+    if !converts {
+        return expr;
+    }
+    Expr {
+        ty: target.clone(),
+        span: expr.span,
+        kind: ExprKind::Cast {
+            expr: Box::new(expr),
+        },
+    }
+}
+
+fn promote_operands(lhs: Expr, rhs: Expr) -> (Expr, Expr) {
+    let target = match (&lhs.ty, &rhs.ty) {
+        (Ty::Primitive(a), Ty::Primitive(b)) => promote(*a, *b),
+        _ => None,
+    };
+    match target {
+        Some(target) => (coerce(lhs, &target), coerce(rhs, &target)),
+        None => (lhs, rhs),
     }
 }
 
