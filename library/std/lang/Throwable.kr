@@ -11,7 +11,7 @@ class Throwable {
         this.message = message;
     }
 
-    String? getMessage(&this) {
+    String? getMessage() {
         return this.message;
     }
 }

@@ -105,15 +105,12 @@ fn hello_world() {
 fn methods_with_receivers() {
     use TokenKind::*;
     assert_eq!(
-        kinds("void rename(&mut this, String name)"),
+        kinds("mut void rename(String name)"),
         [
+            Ident(kw::Mut),
             Ident(kw::Void),
             ident("rename"),
             OpenParen,
-            And,
-            Ident(kw::Mut),
-            Ident(kw::This),
-            Comma,
             ident("String"),
             ident("name"),
             CloseParen,

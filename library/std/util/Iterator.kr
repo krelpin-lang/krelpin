@@ -1,7 +1,7 @@
 package std.util;
 
 interface Iterator<T> {
-    boolean hasNext(&this);
+    boolean hasNext();
 
-    T next(&mut this);
+    mut T next();
 }

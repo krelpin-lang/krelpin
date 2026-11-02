@@ -8,11 +8,11 @@ final class AtomicBool {
     }
 
     @Intrinsic
-    boolean get(&this);
+    boolean get();
 
     @Intrinsic
-    void set(&this, boolean value);
+    void set(boolean value);
 
     @Intrinsic
-    boolean compareAndSet(&this, boolean expected, boolean value);
+    boolean compareAndSet(boolean expected, boolean value);
 }

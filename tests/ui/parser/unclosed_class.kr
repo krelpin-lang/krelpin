@@ -1,4 +1,4 @@
 class Unclosed {
-    void method(&this) {
+    void method() {
         if (ready) {
     }

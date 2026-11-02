@@ -6,7 +6,7 @@ final class Float implements Comparable<float>, Hashable<float> {
 
     private Float() {}
 
-    int compareTo(&this, &float other) {
+    int compareTo(&float other) {
         if (this < other) {
             return -1;
         }
@@ -16,10 +16,10 @@ final class Float implements Comparable<float>, Hashable<float> {
     @Intrinsic
     static float parse(String text);
 
-    boolean equals(&this, &float other) {
+    boolean equals(&float other) {
         return this == other;
     }
 
     @Intrinsic
-    int hashCode(&this);
+    int hashCode();
 }

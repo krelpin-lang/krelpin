@@ -3,7 +3,7 @@ package shop;
 import shop.money.Price;
 
 interface Priced {
-    Price price(&this);
+    Price price();
 }
 
 enum Category {
@@ -26,15 +26,15 @@ class Item implements Priced {
         Item.created.increment();
     }
 
-    Price price(&this) {
+    Price price() {
         return this.cost;
     }
 
-    &[this] String label(&this) {
+    &[this] String label() {
         return &this.name;
     }
 
-    String describe(&this) {
+    String describe() {
         String kind = switch (this.category) {
             case FOOD -> "food";
             case TOOLS -> {

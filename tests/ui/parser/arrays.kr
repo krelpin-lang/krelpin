@@ -1,6 +1,6 @@
 class Main {
     static void main(String[] args) {}
     static int sum(&int[] values) { return 0; }
-    &String[]? names(&this) { return null; }
-    (&String)[] borrowed(&this) { return null; }
+    &String[]? names() { return null; }
+    (&String)[] borrowed() { return null; }
 }

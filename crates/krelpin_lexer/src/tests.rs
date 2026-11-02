@@ -77,18 +77,10 @@ fn class_and_method() {
 }
 
 #[test]
-fn method_receivers() {
+fn borrows_of_this() {
     use TokenKind::*;
-    assert_eq!(
-        kinds("&String getName(&this)"),
-        [And, Ident, Ident, OpenParen, And, Ident, CloseParen]
-    );
-    assert_eq!(
-        kinds("void rename(&mut this, String newName)"),
-        [
-            Ident, Ident, OpenParen, And, Ident, Ident, Comma, Ident, Ident, CloseParen,
-        ]
-    );
+    assert_eq!(kinds("&this.name"), [And, Ident, Dot, Ident]);
+    assert_eq!(kinds("&mut this.items"), [And, Ident, Ident, Dot, Ident]);
 }
 
 #[test]

@@ -1,17 +1,17 @@
 package std.util;
 
 interface Set<T> extends Iterable<T> {
-    int size(&this);
+    int size();
 
-    boolean isEmpty(&this) {
+    boolean isEmpty() {
         return this.size() == 0;
     }
 
-    boolean add(&mut this, T value);
+    mut boolean add(T value);
 
-    boolean remove(&mut this, T value);
+    mut boolean remove(T value);
 
-    boolean contains(&this, T value);
+    boolean contains(T value);
 
-    void clear(&mut this);
+    mut void clear();
 }

@@ -32,11 +32,11 @@ error: records cannot declare full constructors
   = note: a record is always created from its components
   = help: check the components in a compact constructor: `Point { ... }`
 
-error: record methods cannot take `&mut this`
- --> tests/ui/parser/declaration_errors.kr:8:15
+error: record methods cannot be `mut`
+ --> tests/ui/parser/declaration_errors.kr:8:5
   |
-8 |     void move(&mut this) {}
-  |               ^^^^^^^^^
+8 |     mut void shift() {}
+  |     ^^^
   |
   = note: the components of a record never change
   = help: return a changed copy with `with` instead
@@ -74,7 +74,7 @@ error: a class cannot be both `abstract` and `final`
 error: missing body for method `missingBody`
   --> tests/ui/parser/declaration_errors.kr:17:10
    |
-17 |     void missingBody(&this);
+17 |     void missingBody();
    |          ^^^^^^^^^^^
    |
    = help: add a body, or mark the method `abstract`
@@ -82,7 +82,7 @@ error: missing body for method `missingBody`
 error: abstract methods cannot have a body
   --> tests/ui/parser/declaration_errors.kr:18:5
    |
-18 |     abstract void withBody(&this) {}
+18 |     abstract void withBody() {}
    |     ^^^^^^^^
 
 error: enum variants declare fields, not arguments

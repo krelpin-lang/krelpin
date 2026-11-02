@@ -121,7 +121,7 @@ fn expansion_files_point_back_to_their_call_site() {
     let call_site = Span::new(user.start_pos, user.start_pos + 18);
     let generated = source_map.new_expansion_file(
         "<@Derive on A>",
-        "boolean equals(&this, &A other) {}".to_owned(),
+        "boolean equals(&A other) {}".to_owned(),
         Expansion {
             call_site,
             macro_name: "Derive".to_owned(),

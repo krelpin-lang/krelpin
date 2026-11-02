@@ -8,17 +8,17 @@ class Wallet {
         this.note = null;
     }
 
-    int total(&this) {
+    int total() {
         return this.cents;
     }
 
-    boolean empty(&this) {
+    boolean empty() {
         if (this.cents == 0) {
             return true;
         }
     }
 
-    void bump(&this) {
+    void bump() {
         Wallet.count++;
         int size = this.note.length();
         String text = null;

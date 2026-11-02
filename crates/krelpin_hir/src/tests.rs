@@ -44,9 +44,9 @@ fn receivers_are_borrowed_explicitly() {
     assert_lowers_to(
         "class Counter {\n\
          \x20   int count;\n\
-         \x20   void bump(&mut this) { this.count++; }\n\
-         \x20   int read(&this) { return this.count; }\n\
-         \x20   int twice(&mut this) { this.bump(); Counter other = new Counter(); \
+         \x20   mut void bump() { this.count++; }\n\
+         \x20   int read() { return this.count; }\n\
+         \x20   mut int twice() { this.bump(); Counter other = new Counter(); \
          other.bump(); return other.read(); }\n\
          }",
         &[
@@ -154,7 +154,7 @@ fn equality_of_objects_calls_equals() {
 #[test]
 fn closures_list_their_captures() {
     assert_lowers_to(
-        "class Counter { int count; void bump(&mut this) { this.count++; } }\n\
+        "class Counter { int count; mut void bump() { this.count++; } }\n\
          class A { static int f(List<int> numbers, Counter counter) {\n\
          \x20   int offset = 1;\n\
          \x20   int calls = 0;\n\

@@ -7,11 +7,11 @@ record Money(long cents) {}
 class Counter {
     int count;
 
-    void bump(&mut this) {
+    mut void bump() {
         this.count++;
     }
 
-    int read(&this) {
+    int read() {
         return this.count;
     }
 }

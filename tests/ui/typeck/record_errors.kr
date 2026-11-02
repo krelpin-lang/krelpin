@@ -25,7 +25,7 @@ class Main {
         };
     }
 
-    static void move(Point point) {
+    static void shift(Point point) {
         point.x = 1.0;
     }
 }

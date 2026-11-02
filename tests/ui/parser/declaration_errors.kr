@@ -5,7 +5,7 @@ struct Old {
 record Point(int x) extends Base {
     int y;
     Point(int x) {}
-    void move(&mut this) {}
+    mut void shift() {}
 }
 
 interface Named implements Other {
@@ -14,8 +14,8 @@ interface Named implements Other {
 }
 
 abstract final class Broken {
-    void missingBody(&this);
-    abstract void withBody(&this) {}
+    void missingBody();
+    abstract void withBody() {}
 }
 
 enum Level {

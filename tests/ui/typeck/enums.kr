@@ -11,7 +11,7 @@ enum Shape {
         return Rect(side, side);
     }
 
-    double area(&this) {
+    double area() {
         return switch (this) {
             case Circle(double r) -> Shape.PI * r * r;
             case Rect(double w, double h) -> w * h;
@@ -19,7 +19,7 @@ enum Shape {
         };
     }
 
-    String describe(&this) {
+    String describe() {
         return switch (this) {
             case Rect(double w, double h) when w == h -> "square";
             case Rect(_, _) -> "rectangle";
@@ -34,7 +34,7 @@ enum Tree<T> {
     Node(Tree<T> left, Tree<T> right),
     Empty;
 
-    boolean isLeaf(&this) {
+    boolean isLeaf() {
         return this instanceof Leaf(_);
     }
 }
@@ -51,7 +51,7 @@ enum Direction {
     South,
     West;
 
-    Direction turn(&this) {
+    Direction turn() {
         return switch (this) {
             case North -> Direction.East;
             case East -> Direction.South;

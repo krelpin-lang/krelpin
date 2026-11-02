@@ -20,12 +20,12 @@ class LinkedList<T> {
 
     record Entry(String key, int count) {}
 
-    void push(&mut this, int value) {
+    mut void push(int value) {
         Node node = Node.of(value);
         this.head = node;
     }
 
-    Kind kind(&this) {
+    Kind kind() {
         return Kind.Single;
     }
 }

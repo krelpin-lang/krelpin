@@ -10,7 +10,7 @@ class Inventory {
         Inventory.instances.increment();
     }
 
-    int total(&this) {
+    int total() {
         int sum = 0;
         for (&Item item : &this.items) {
             sum += item.price() * item.count();
@@ -18,7 +18,7 @@ class Inventory {
         return sum;
     }
 
-    &Item? find(&this, String name) {
+    &Item? find(String name) {
         for (int i = 0; i < this.items.size(); i++) {
             &Item item = &this.items[i];
             if (item.name() == name) {
@@ -28,7 +28,7 @@ class Inventory {
         return null;
     }
 
-    void describe(&this, Item? item) {
+    void describe(Item? item) {
         String label = item?.name() ?: "unknown";
         switch (this.items.size()) {
             case 0 -> Console.println("empty");

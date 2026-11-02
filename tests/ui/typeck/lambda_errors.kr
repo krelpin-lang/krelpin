@@ -1,5 +1,5 @@
 interface Transform<A, B> {
-    B apply(&this, A value);
+    B apply(A value);
 }
 
 class Main {

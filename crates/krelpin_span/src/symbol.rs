@@ -53,6 +53,7 @@ keywords! {
     Interface: "interface",
     Long: "long",
     Macro: "macro",
+    Move: "move",
     Mut: "mut",
     New: "new",
     Null: "null",

@@ -13,7 +13,7 @@ enum Order {
 }
 
 class Errors {
-    void create(&this) {
+    void create() {
         Shape a = Shape.Circle("wide");
         Shape b = Shape.Rect(1.0);
         Shape c = Shape.Circle;

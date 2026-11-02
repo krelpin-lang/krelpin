@@ -196,7 +196,7 @@ fn fields_equals(self_ty: &str, fields: &[Field]) -> String {
         comparisons.join("\n            && ")
     };
     format!(
-        "public boolean equals(&this, &{self_ty} other) {{\n    \
+        "public boolean equals(&{self_ty} other) {{\n    \
          return {body};\n\
          }}\n\n"
     )
@@ -208,7 +208,7 @@ fn fields_hash_code(fields: &[Field]) -> String {
         let hash = hash_of(&format!("this.{}", field.name), field);
         let _ = writeln!(body, "    hash = hash * 31 + {hash};");
     }
-    format!("public int hashCode(&this) {{\n{body}    return hash;\n}}\n\n")
+    format!("public int hashCode() {{\n{body}    return hash;\n}}\n\n")
 }
 
 fn fields_compare_to(self_ty: &str, fields: &[Field]) -> String {
@@ -222,7 +222,7 @@ fn fields_compare_to(self_ty: &str, fields: &[Field]) -> String {
         );
     }
     format!(
-        "public int compareTo(&this, &{self_ty} other) {{\n    \
+        "public int compareTo(&{self_ty} other) {{\n    \
          int order = 0;\n{body}    return order;\n\
          }}\n\n"
     )
@@ -245,7 +245,7 @@ fn variants_equals(self_ty: &str, variants: &[Variant]) -> String {
         );
     }
     format!(
-        "public boolean equals(&this, &{self_ty} other) {{\n    \
+        "public boolean equals(&{self_ty} other) {{\n    \
          return switch (this) {{\n{arms}    }};\n\
          }}\n\n"
     )
@@ -267,7 +267,7 @@ fn variants_hash_code(variants: &[Variant]) -> String {
         );
     }
     format!(
-        "public int hashCode(&this) {{\n    \
+        "public int hashCode() {{\n    \
          return switch (this) {{\n{arms}    }};\n\
          }}\n\n"
     )
@@ -299,7 +299,7 @@ fn variants_compare_to(self_ty: &str, variants: &[Variant]) -> String {
         );
     }
     format!(
-        "public int compareTo(&this, &{self_ty} other) {{\n    \
+        "public int compareTo(&{self_ty} other) {{\n    \
          int order = this.ordinal().compareTo(&other.ordinal());\n    \
          if (order != 0) {{\n        return order;\n    }}\n    \
          switch (this) {{\n{arms}    }}\n    \

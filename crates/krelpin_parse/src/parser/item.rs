@@ -1,6 +1,6 @@
 use krelpin_ast::ast::{
     Annotation, Class, CompilationUnit, Constructor, Enum, FieldStorage, FnRetTy, Generics, Ident,
-    Import, Inheritance, Interface, Item, ItemKind, MacroDef, Member, MemberKind, Path,
+    Import, Inheritance, Interface, Item, ItemKind, MacroDef, Member, MemberKind, Path, Receiver,
     ReceiverKind, Record, Ty, Variant, VariantField, Visibility, is_intrinsic,
 };
 use krelpin_ast::token::TokenKind;
@@ -38,6 +38,13 @@ struct Modifiers {
     vis: Visibility,
     storage: FieldStorage,
     inheritance: Inheritance,
+    receiver: Option<ReceiverModifier>,
+}
+
+#[derive(Clone, Copy)]
+struct ReceiverModifier {
+    keyword: Symbol,
+    receiver: Receiver,
 }
 
 impl Parser<'_> {
@@ -172,6 +179,7 @@ impl Parser<'_> {
         container: Container,
         lo: Span,
     ) -> PResult<Item> {
+        self.reject_receiver(modifiers.receiver, "types");
         self.bump();
 
         if container != Container::Class {
@@ -217,6 +225,7 @@ impl Parser<'_> {
         self.bump();
         self.reject_storage(modifiers.storage, "macros");
         self.reject_inheritance(modifiers.inheritance, "macros");
+        self.reject_receiver(modifiers.receiver, "macros");
         if let Some(span) = modifiers.vis.span() {
             self.error(span, "macros cannot have a visibility modifier");
         }
@@ -261,10 +270,7 @@ impl Parser<'_> {
     fn parse_record(&mut self, name: Ident) -> PResult<ItemKind> {
         let generics = self.parse_generics()?;
         let components = if self.token.kind == TokenKind::OpenParen {
-            let (receiver, components) = self.parse_params()?;
-            if let Some(receiver) = receiver {
-                self.error(receiver.span, "`this` cannot be a record component");
-            }
+            let components = self.parse_params()?;
             for component in components.iter().filter(|component| component.variadic) {
                 self.error(component.span, "record components cannot be variadic");
             }
@@ -541,6 +547,7 @@ impl Parser<'_> {
             vis: Visibility::Default,
             storage: FieldStorage::Instance,
             inheritance: Inheritance::default(),
+            receiver: None,
         };
 
         loop {
@@ -590,6 +597,21 @@ impl Parser<'_> {
                         *slot = Some(span);
                     }
                 }
+                kw::Mut | kw::Move => {
+                    let kind = if symbol == kw::Mut {
+                        ReceiverKind::RefMut
+                    } else {
+                        ReceiverKind::Owned
+                    };
+                    if modifiers.receiver.is_none() {
+                        modifiers.receiver = Some(ReceiverModifier {
+                            keyword: symbol,
+                            receiver: Receiver { kind, span },
+                        });
+                    } else {
+                        self.error(span, "only one of `mut` and `move` can be used");
+                    }
+                }
                 _ => return modifiers,
             }
             self.bump();
@@ -625,12 +647,37 @@ impl Parser<'_> {
         }
     }
 
-    fn method_is_static(&self, storage: FieldStorage) -> bool {
-        match storage {
-            FieldStorage::Static(_) => true,
-            storage => {
+    fn reject_receiver(&self, modifier: Option<ReceiverModifier>, what: &str) {
+        let Some(ReceiverModifier { keyword, receiver }) = modifier else {
+            return;
+        };
+        self.emit(
+            Diagnostic::error(format!("`{keyword}` cannot be used on {what}"))
+                .with_span(receiver.span)
+                .with_help("`mut` and `move` are only allowed on methods"),
+        );
+    }
+
+    fn method_receiver(&self, modifiers: &Modifiers, name: Ident) -> Option<Receiver> {
+        match (modifiers.storage, modifiers.receiver) {
+            (FieldStorage::Static(_), None) => None,
+            (FieldStorage::Static(_), Some(ReceiverModifier { keyword, receiver })) => {
+                self.emit(
+                    Diagnostic::error(format!("a `static` method cannot be `{keyword}`"))
+                        .with_span(receiver.span)
+                        .with_note("a `static` method has no object to change or take"),
+                );
+                None
+            }
+            (storage, receiver) => {
                 self.reject_storage(storage, "methods");
-                false
+                Some(receiver.map_or(
+                    Receiver {
+                        kind: ReceiverKind::Ref,
+                        span: name.span,
+                    },
+                    |modifier| modifier.receiver,
+                ))
             }
         }
     }
@@ -677,9 +724,9 @@ impl Parser<'_> {
             let generics = self.parse_generics()?;
             let ret = self.parse_ret_ty()?;
             let name = self.parse_ident()?;
-            let is_static = self.method_is_static(storage);
+            let receiver = self.method_receiver(modifiers, name);
             return self
-                .parse_method(generics, ret, name, is_static)
+                .parse_method(generics, ret, name, receiver)
                 .map(MemberKind::Method);
         }
 
@@ -691,6 +738,7 @@ impl Parser<'_> {
         };
         if let Some(name) = compact {
             self.reject_storage(storage, "constructors");
+            self.reject_receiver(modifiers.receiver, "constructors");
             let body = self.parse_block()?;
             return Ok(MemberKind::Constructor(Constructor {
                 compact: true,
@@ -710,6 +758,7 @@ impl Parser<'_> {
                 return Err(self.missing_return_type());
             }
             self.reject_storage(storage, "constructors");
+            self.reject_receiver(modifiers.receiver, "constructors");
             return self.parse_constructor().map(MemberKind::Constructor);
         }
 
@@ -717,9 +766,9 @@ impl Parser<'_> {
         let name = self.parse_ident()?;
 
         if self.check(TokenKind::OpenParen) {
-            let is_static = self.method_is_static(storage);
+            let receiver = self.method_receiver(modifiers, name);
             return self
-                .parse_method(Generics::default(), ret, name, is_static)
+                .parse_method(Generics::default(), ret, name, receiver)
                 .map(MemberKind::Method);
         }
 
@@ -729,6 +778,7 @@ impl Parser<'_> {
                 return Err(self.error(span, "fields cannot have type `void`"));
             }
         };
+        self.reject_receiver(modifiers.receiver, "fields");
         self.parse_field(storage, ty, name).map(MemberKind::Field)
     }
 
@@ -817,11 +867,11 @@ impl Parser<'_> {
             MemberKind::Method(method) => {
                 let changes_this = method
                     .receiver
-                    .is_some_and(|receiver| receiver.kind == ReceiverKind::RefMut);
-                if container == Container::Record && changes_this {
+                    .filter(|receiver| receiver.kind == ReceiverKind::RefMut);
+                if let (Container::Record, Some(receiver)) = (container, changes_this) {
                     self.emit(
-                        Diagnostic::error("record methods cannot take `&mut this`")
-                            .with_span(method.receiver.map_or(method.name.span, |r| r.span))
+                        Diagnostic::error("record methods cannot be `mut`")
+                            .with_span(receiver.span)
                             .with_note("the components of a record never change")
                             .with_help("return a changed copy with `with` instead"),
                     );

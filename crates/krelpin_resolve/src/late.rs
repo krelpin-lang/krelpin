@@ -802,7 +802,7 @@ impl<'a> Resolver<'a> {
             diagnostic.with_help(format!("call it on this object: `this.{}(...)`", name.name))
         } else {
             diagnostic.with_note(format!(
-                "`{}` takes `this`, but there is no object here",
+                "`{}` is not `static`, so it needs an object",
                 name.name
             ))
         };
@@ -817,7 +817,7 @@ impl<'a> Resolver<'a> {
         };
         let help = match self.static_context {
             None => return,
-            Some(StaticContext::Method) => "remove `static` from the method to give it a `this`",
+            Some(StaticContext::Method) => "remove `static` from the method to use `this` in it",
             Some(StaticContext::StaticField) => {
                 "a `static` field belongs to the class, not to a specific object"
             }

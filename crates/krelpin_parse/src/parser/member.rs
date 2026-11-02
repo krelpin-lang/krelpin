@@ -1,6 +1,6 @@
 use krelpin_ast::ast::{
-    Constructor, Field, FieldStorage, FnRetTy, Generics, Ident, Method, Param, Receiver,
-    ReceiverKind, Ty, Unparsed, WherePredicate,
+    Constructor, Field, FieldStorage, FnRetTy, Generics, Ident, Method, Param, Receiver, Ty,
+    Unparsed, WherePredicate,
 };
 use krelpin_ast::token::TokenKind;
 use krelpin_errors::Diagnostic;
@@ -49,14 +49,7 @@ impl Parser<'_> {
 
     pub(crate) fn parse_constructor(&mut self) -> PResult<Constructor> {
         let name = self.parse_ident()?;
-        let (receiver, params) = self.parse_params()?;
-        if let Some(receiver) = receiver {
-            self.emit(
-                Diagnostic::error("constructors cannot take `this` as a parameter")
-                    .with_span(receiver.span)
-                    .with_help("constructors always have access to the object being built"),
-            );
-        }
+        let params = self.parse_params()?;
         let throws = self.parse_throws()?;
         let body = self.parse_block()?;
 
@@ -74,10 +67,9 @@ impl Parser<'_> {
         generics: Generics,
         ret: FnRetTy,
         name: Ident,
-        is_static: bool,
+        receiver: Option<Receiver>,
     ) -> PResult<Method> {
-        let (receiver, params) = self.parse_params()?;
-        let receiver = self.check_static(is_static, receiver, name);
+        let params = self.parse_params()?;
         let throws = self.parse_throws()?;
         let where_clause = self.parse_where_clause()?;
         let body = if self.eat(TokenKind::Semi) {
@@ -129,88 +121,46 @@ impl Parser<'_> {
         }
     }
 
-    pub(crate) fn parse_params(&mut self) -> PResult<(Option<Receiver>, Vec<Param>)> {
+    pub(crate) fn parse_params(&mut self) -> PResult<Vec<Param>> {
         self.expect(TokenKind::OpenParen)?;
-        let mut receiver = None;
         let mut params = Vec::new();
 
         if self.eat(TokenKind::CloseParen) {
-            return Ok((receiver, params));
+            return Ok(params);
         }
 
         loop {
-            match self.parse_receiver() {
-                Some(found) if receiver.is_some() => {
-                    self.error(found.span, "`this` can only be taken once");
-                }
-                Some(found) => {
-                    if !params.is_empty() {
-                        self.emit(
-                            Diagnostic::error("`this` must be the first parameter")
-                                .with_span(found.span)
-                                .with_help("move `this` to the start of the parameter list"),
-                        );
-                    }
-                    receiver = Some(found);
-                }
-                None => params.push(self.parse_param()?),
+            if !self.reject_this_param() {
+                params.push(self.parse_param()?);
             }
 
             if self.eat(TokenKind::CloseParen) {
-                return Ok((receiver, params));
+                return Ok(params);
             }
             self.expect(TokenKind::Comma)?;
         }
     }
 
-    fn parse_receiver(&mut self) -> Option<Receiver> {
+    fn reject_this_param(&mut self) -> bool {
         let lo = self.token.span;
-        let (kind, len) = match (self.look_ahead(0), self.look_ahead(1), self.look_ahead(2)) {
-            (TokenKind::Ident(kw::This), _, _) => (ReceiverKind::Owned, 1),
-            (TokenKind::And, TokenKind::Ident(kw::This), _) => (ReceiverKind::Ref, 2),
-            (TokenKind::And, TokenKind::Ident(kw::Mut), TokenKind::Ident(kw::This)) => {
-                (ReceiverKind::RefMut, 3)
-            }
-            _ => return None,
+        let len = match (self.look_ahead(0), self.look_ahead(1), self.look_ahead(2)) {
+            (TokenKind::Ident(kw::This), _, _) => 1,
+            (TokenKind::And, TokenKind::Ident(kw::This), _) => 2,
+            (TokenKind::And, TokenKind::Ident(kw::Mut), TokenKind::Ident(kw::This)) => 3,
+            _ => return false,
         };
-
         for _ in 0..len {
             self.bump();
         }
-        Some(Receiver {
-            kind,
-            span: lo.to(self.prev_token.span),
-        })
-    }
-
-    fn check_static(
-        &self,
-        is_static: bool,
-        receiver: Option<Receiver>,
-        name: Ident,
-    ) -> Option<Receiver> {
-        match (is_static, receiver) {
-            (true, Some(receiver)) => {
-                self.emit(
-                    Diagnostic::error("a `static` method cannot take `this`")
-                        .with_span(receiver.span)
-                        .with_help("remove `static`, or remove the `this` parameter"),
-                );
-                None
-            }
-            (false, None) => {
-                self.emit(
-                    Diagnostic::error(format!(
-                        "the method `{}` has no `this` and must be `static`",
-                        name.name
-                    ))
-                    .with_span(name.span)
-                    .with_help("mark the method `static`, or add `&this` as its first parameter"),
-                );
-                None
-            }
-            (_, receiver) => receiver,
-        }
+        self.emit(
+            Diagnostic::error("`this` is not a parameter")
+                .with_span(lo.to(self.prev_token.span))
+                .with_note(
+                    "`this` is available in constructors and in every method that is not `static`",
+                )
+                .with_help("remove it, and mark the method `mut` if it changes the object"),
+        );
+        true
     }
 
     fn parse_param(&mut self) -> PResult<Param> {

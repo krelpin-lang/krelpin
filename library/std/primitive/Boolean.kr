@@ -3,7 +3,7 @@ package std.primitive;
 final class Boolean implements Comparable<boolean>, Hashable<boolean> {
     private Boolean() {}
 
-    int compareTo(&this, &boolean other) {
+    int compareTo(&boolean other) {
         if (this == other) {
             return 0;
         }
@@ -14,10 +14,10 @@ final class Boolean implements Comparable<boolean>, Hashable<boolean> {
         return text == "true";
     }
 
-    boolean equals(&this, &boolean other) {
+    boolean equals(&boolean other) {
         return this == other;
     }
 
     @Intrinsic
-    int hashCode(&this);
+    int hashCode();
 }

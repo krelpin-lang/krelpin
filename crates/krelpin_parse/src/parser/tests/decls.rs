@@ -23,7 +23,7 @@ fn records() {
     let unit = parse_ok(
         "record Point(int x, int y) implements Comparable<Point> {\n\
          \x20   Point { if (x < 0) { throw new IllegalArgumentException(\"x\"); } }\n\
-         \x20   int sum(&this) { return this.x + this.y; }\n\
+         \x20   int sum() { return this.x + this.y; }\n\
          }\n\
          record Pair<A, B>(A first, B second);",
     );
@@ -54,8 +54,8 @@ fn interfaces() {
     let unit = parse_ok(
         "interface Shape extends Drawable, Comparable<Shape> {\n\
          \x20   const int SIDES = 0;\n\
-         \x20   double area(&this);\n\
-         \x20   String describe(&this) { return \"shape\"; }\n\
+         \x20   double area();\n\
+         \x20   String describe() { return \"shape\"; }\n\
          }",
     );
     let ItemKind::Interface(shape) = &unit.items[0].kind else {
@@ -83,7 +83,7 @@ fn enums() {
          \x20   Empty,\n\
          \x20   ;\n\
          \x20   const double PI = 3.14;\n\
-         \x20   double area(&this) { return 0.0; }\n\
+         \x20   double area() { return 0.0; }\n\
          }",
     );
     let ItemKind::Enum(shape) = &unit.items[0].kind else {
@@ -147,11 +147,11 @@ fn enums_have_no_constructors() {
 fn abstract_and_final() {
     let unit = parse_ok(
         "abstract class Animal {\n\
-         \x20   abstract String sound(&this);\n\
-         \x20   final String name(&this) { return \"animal\"; }\n\
+         \x20   abstract String sound();\n\
+         \x20   final String name() { return \"animal\"; }\n\
          }\n\
          final class Dog extends Animal {\n\
-         \x20   String sound(&this) { return \"woof\"; }\n\
+         \x20   String sound() { return \"woof\"; }\n\
          }",
     );
     assert!(unit.items[0].inheritance.abstract_kw.is_some());
@@ -218,11 +218,11 @@ fn member_errors() {
         ["`struct` is not a Krelpin keyword"]
     );
     assert_eq!(
-        errors("record Point(int x) { int y; Point(int x) {} void grow(&mut this) {} }"),
+        errors("record Point(int x) { int y; Point(int x) {} mut void grow() {} }"),
         [
             "records cannot have instance fields",
             "records cannot declare full constructors",
-            "record methods cannot take `&mut this`"
+            "record methods cannot be `mut`"
         ]
     );
     assert_eq!(
@@ -237,7 +237,7 @@ fn member_errors() {
         ["missing body for method `f`"]
     );
     assert_eq!(
-        errors("class A { @Intrinsic int f(&this); }"),
+        errors("class A { @Intrinsic int f(); }"),
         Vec::<String>::new()
     );
     assert_eq!(
@@ -269,7 +269,7 @@ fn nested_types() {
          \x20   static class Node { int value; }\n\
          \x20   enum Kind { Single, Double }\n\
          \x20   record Entry(int count);\n\
-         \x20   interface Visitor { void visit(&this, Node node); }\n\
+         \x20   interface Visitor { void visit(Node node); }\n\
          }",
     );
     let ItemKind::Class(list) = &unit.items[0].kind else {

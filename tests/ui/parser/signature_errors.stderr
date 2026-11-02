@@ -4,18 +4,19 @@ error: fields cannot have type `void`
 2 |     void flag;
   |     ^^^^
 
-error: `this` must be the first parameter
+error: `this` is not a parameter
  --> tests/ui/parser/signature_errors.kr:3:22
   |
 3 |     void late(int a, &this) {}
   |                      ^^^^^
   |
-  = help: move `this` to the start of the parameter list
+  = note: `this` is available in constructors and in every method that is not `static`
+  = help: remove it, and mark the method `mut` if it changes the object
 
 error: `const` cannot be used on methods
  --> tests/ui/parser/signature_errors.kr:4:5
   |
-4 |     const void constant(&this) {}
+4 |     const void constant() {}
   |     ^^^^^
   |
   = help: `const` is only allowed on fields
@@ -28,21 +29,38 @@ error: multiple visibility modifiers
   |
   = help: remove all but one visibility modifier
 
-error: constructors cannot take `this` as a parameter
+error: `this` is not a parameter
  --> tests/ui/parser/signature_errors.kr:6:12
   |
 6 |     Broken(&this) {}
   |            ^^^^^
   |
-  = help: constructors always have access to the object being built
+  = note: `this` is available in constructors and in every method that is not `static`
+  = help: remove it, and mark the method `mut` if it changes the object
+
+error: a `static` method cannot be `mut`
+ --> tests/ui/parser/signature_errors.kr:7:12
+  |
+7 |     static mut void reset() {}
+  |            ^^^
+  |
+  = note: a `static` method has no object to change or take
+
+error: `mut` cannot be used on fields
+ --> tests/ui/parser/signature_errors.kr:8:5
+  |
+8 |     mut int count;
+  |     ^^^
+  |
+  = help: `mut` and `move` are only allowed on methods
 
 error: missing return type for method
- --> tests/ui/parser/signature_errors.kr:7:5
+ --> tests/ui/parser/signature_errors.kr:9:5
   |
-7 |     helper() {}
+9 |     helper() {}
   |     ^^^^^^ add a return type before the method name
   |
   = help: use `void` if the method does not return a value
 
-error: aborting due to 6 previous errors
+error: aborting due to 8 previous errors
 

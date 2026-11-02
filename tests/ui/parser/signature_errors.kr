@@ -1,8 +1,10 @@
 class Broken {
     void flag;
     void late(int a, &this) {}
-    const void constant(&this) {}
+    const void constant() {}
     public private int twice;
     Broken(&this) {}
+    static mut void reset() {}
+    mut int count;
     helper() {}
 }

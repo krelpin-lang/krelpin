@@ -1,5 +1,5 @@
 package std.function;
 
 interface Function<T, R> {
-    R apply(&this, T value);
+    R apply(T value);
 }

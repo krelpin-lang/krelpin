@@ -16,7 +16,7 @@ class Register {
         this.count = count;
     }
 
-    void track(&mut this, Payment payment) {
+    mut void track(Payment payment) {
         switch (payment) {
             case Card(String number, Money amount) when amount.cents > 0 -> {
                 this.history.add(amount);
@@ -28,7 +28,7 @@ class Register {
         this.count++;
     }
 
-    long total(&this) {
+    long total() {
         long sum = 0;
         for (Money money : this.history) {
             sum += money.cents;
@@ -41,7 +41,7 @@ class Register {
         return sum;
     }
 
-    String describe(&this, Payment payment) {
+    String describe(Payment payment) {
         return switch (payment) {
             case Card(_, Money amount) -> "card " + amount.currency.length();
             case Cash(_) -> "cash";
@@ -49,7 +49,7 @@ class Register {
         };
     }
 
-    String label(&this, String... parts) {
+    String label(String... parts) {
         int[] sizes = new int[parts.length];
         return parts.length > 0 ? parts[0] : "";
     }
