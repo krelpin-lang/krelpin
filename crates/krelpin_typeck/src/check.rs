@@ -23,7 +23,7 @@ pub(crate) struct FnCtxt<'a, 'tcx> {
     pub(crate) narrowed: Vec<HashMap<Span, Ty>>,
     pub(crate) yields: Vec<Vec<Ty>>,
     pub(crate) exceptions: ExceptionScope,
-    pub(crate) results: HashMap<Span, Ty>,
+    pub(crate) results: TypeckResults,
 }
 
 impl Tcx<'_> {
@@ -84,7 +84,7 @@ pub(crate) fn check_units(tcx: &Tcx<'_>, units: &[CompilationUnit]) -> TypeckRes
 
         for member in members {
             let fcx = check_member(tcx, owner, member);
-            results.expr_types.extend(fcx.results);
+            results.extend(fcx.results);
         }
     }
 
@@ -157,7 +157,7 @@ impl<'a, 'tcx> FnCtxt<'a, 'tcx> {
             narrowed: Vec::new(),
             yields: Vec::new(),
             exceptions: ExceptionScope::default(),
-            results: HashMap::new(),
+            results: TypeckResults::default(),
         }
     }
 

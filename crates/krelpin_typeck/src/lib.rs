@@ -35,6 +35,24 @@ pub use crate::ty::Ty;
 #[derive(Debug, Default)]
 pub struct TypeckResults {
     pub expr_types: HashMap<Span, Ty>,
+    pub callees: HashMap<Span, Callee>,
+    pub fields: HashMap<Span, FieldSig>,
+}
+
+impl TypeckResults {
+    fn extend(&mut self, other: TypeckResults) {
+        self.expr_types.extend(other.expr_types);
+        self.callees.extend(other.callees);
+        self.fields.extend(other.fields);
+    }
+}
+
+#[derive(Clone, Debug)]
+pub struct Callee {
+    pub method: MethodSig,
+    pub params: Vec<Ty>,
+    pub ret: Ty,
+    pub packs_varargs: bool,
 }
 
 pub fn check(

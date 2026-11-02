@@ -145,7 +145,7 @@ impl FnCtxt<'_, '_> {
             }
             _ => return self.check_expr_coerce(expr, expected),
         }
-        self.results.insert(expr.span, ty.clone());
+        self.results.expr_types.insert(expr.span, ty.clone());
         ty
     }
 
@@ -163,7 +163,7 @@ impl FnCtxt<'_, '_> {
 
     pub(crate) fn finish_closure_args(&mut self, args: &[Expr]) {
         for arg in args {
-            if is_closure(arg) && !self.results.contains_key(&arg.span) {
+            if is_closure(arg) && !self.results.expr_types.contains_key(&arg.span) {
                 self.check_closure(arg, &Ty::Unknown);
             }
         }

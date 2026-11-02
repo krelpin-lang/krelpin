@@ -23,7 +23,7 @@ enum Receiver {
 impl FnCtxt<'_, '_> {
     pub(crate) fn check_expr(&mut self, expr: &Expr) -> Ty {
         let ty = self.check_expr_kind(expr);
-        self.results.insert(expr.span, ty.clone());
+        self.results.expr_types.insert(expr.span, ty.clone());
         ty
     }
 
@@ -45,7 +45,7 @@ impl FnCtxt<'_, '_> {
             for value in elems {
                 self.check_expr_coerce(value, &elem);
             }
-            self.results.insert(expr.span, expected.clone());
+            self.results.expr_types.insert(expr.span, expected.clone());
             return expected.clone();
         }
 
@@ -297,6 +297,9 @@ impl FnCtxt<'_, '_> {
             Receiver::None => (Ty::Unknown, None),
         };
         let ty = if nullable { ty.nullable() } else { ty };
+        if let Some(field) = &field {
+            self.results.fields.insert(name.span, field.clone());
+        }
         (ty, field)
     }
 
@@ -927,7 +930,7 @@ impl FnCtxt<'_, '_> {
             ExprKind::Name(name) => match self.tcx.resolutions.get(name.span) {
                 Some(Res::Local(decl)) => {
                     let ty = self.locals.get(&decl).cloned().unwrap_or(Ty::Unknown);
-                    self.results.insert(expr.span, ty.clone());
+                    self.results.expr_types.insert(expr.span, ty.clone());
                     ty
                 }
                 _ => self.check_expr(expr),
@@ -942,7 +945,7 @@ impl FnCtxt<'_, '_> {
                     self.error(expr.span, "cannot assign through `?.`");
                 }
                 let (ty, field) = self.field_access(base, *name, *safe);
-                self.results.insert(expr.span, ty.clone());
+                self.results.expr_types.insert(expr.span, ty.clone());
                 if let Some(field) = field {
                     self.check_field_assignable(&field, *name);
                 }

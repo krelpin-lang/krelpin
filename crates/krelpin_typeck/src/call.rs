@@ -2,6 +2,7 @@ use krelpin_ast::ast::{Expr, Ident};
 use krelpin_errors::Diagnostic;
 use krelpin_span::Symbol;
 
+use crate::Callee;
 use crate::check::{FnCtxt, plural};
 use crate::closure::is_closure;
 use crate::sig::MethodSig;
@@ -111,6 +112,15 @@ impl FnCtxt<'_, '_> {
         };
         self.check_call_bounds(chosen, name);
         self.check_vis(chosen.method.vis, chosen.method.owner, false, what, name);
+        self.results.callees.insert(
+            name.span,
+            Callee {
+                method: chosen.method.clone(),
+                params: chosen.params.clone(),
+                ret: chosen.ret.clone(),
+                packs_varargs: phase == Phase::Variadic,
+            },
+        );
         for thrown in &chosen.method.throws {
             self.raise(thrown.subst(&chosen.subst), name.span);
         }

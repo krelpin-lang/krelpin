@@ -11,6 +11,10 @@ fn test_sysroot() -> Sysroot {
 }
 
 fn diagnostics(src: &str) -> Vec<Diagnostic> {
+    check_str(src).1
+}
+
+fn check_str(src: &str) -> (crate::TypeckResults, Vec<Diagnostic>, SourceMap) {
     let source_map = SourceMap::new();
     let file = source_map.new_source_file("test.kr", src.to_owned());
     let buffer = DiagnosticBuffer::default();
@@ -27,8 +31,8 @@ fn diagnostics(src: &str) -> Vec<Diagnostic> {
         "parse, expansion or resolve errors in {src:?}"
     );
 
-    crate::check(&units, &resolved, &dcx);
-    buffer.diagnostics()
+    let results = crate::check(&units, &resolved, &dcx);
+    (results, buffer.diagnostics(), source_map)
 }
 
 fn errors(src: &str) -> Vec<String> {
@@ -1701,4 +1705,38 @@ fn structs_are_built_from_their_fields() {
         errors("class Handle {}\n@Derive(Comparable) struct Holder { Handle handle; }"),
         ["no method named `compareTo` found for `Handle`"]
     );
+}
+
+#[test]
+fn results_record_callees_and_fields() {
+    let src = "struct Money { long cents; String currency; }\n\
+               class Main { long run(&this, Money m, String... tags) {\n\
+               \x20   this.log(\"a\", \"b\");\n\
+               \x20   return m.cents + m.currency.length();\n\
+               }\n\
+               void log(&this, String... tags) {} }";
+    let (results, diagnostics, source_map) = check_str(src);
+    assert!(diagnostics.is_empty(), "{diagnostics:?}");
+    let named = |name: &str| {
+        let mut spans: Vec<_> = results
+            .callees
+            .iter()
+            .filter(|(span, _)| (span.hi.0 as usize) <= src.len())
+            .filter(|(span, _)| source_map.span_to_snippet(**span).as_deref() == Some(name))
+            .map(|(_, callee)| callee.clone())
+            .collect();
+        assert_eq!(spans.len(), 1, "one call to `{name}`");
+        spans.remove(0)
+    };
+    assert!(named("log").packs_varargs);
+    assert_eq!(named("length").ret, crate::Ty::INT);
+    let fields: Vec<String> = results
+        .fields
+        .iter()
+        .filter(|(span, _)| (span.hi.0 as usize) <= src.len())
+        .map(|(_, field)| field.name.name.as_str().to_owned())
+        .collect::<std::collections::BTreeSet<_>>()
+        .into_iter()
+        .collect();
+    assert_eq!(fields, ["cents", "currency"]);
 }
