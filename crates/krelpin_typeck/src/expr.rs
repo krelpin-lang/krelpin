@@ -199,8 +199,12 @@ impl FnCtxt<'_, '_> {
     }
 
     pub(crate) fn type_of_name(&self, expr: &Expr) -> Option<Ty> {
-        match expr.kind {
-            ExprKind::Name(name) => self.type_of_ident(name),
+        match &expr.kind {
+            ExprKind::Name(name) => self.type_of_ident(*name),
+            ExprKind::Field { name, .. } => match self.tcx.resolutions.get(name.span)? {
+                Res::Item(_) => self.type_of_ident(*name),
+                _ => None,
+            },
             _ => None,
         }
     }

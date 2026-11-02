@@ -1,0 +1,49 @@
+package demo;
+
+class LinkedList<T> {
+    Node? head;
+
+    static class Node {
+        int value;
+        Node? next;
+
+        Node(int value) {
+            this.value = value;
+        }
+
+        static Node of(int value) {
+            return new Node(value);
+        }
+    }
+
+    enum Kind { Single, Double }
+
+    @Derive(Equatable)
+    struct Entry {
+        String key;
+        int count;
+    }
+
+    mut void push(int value) {
+        Node node = Node.of(value);
+        this.head = node;
+    }
+
+    Kind kind() {
+        return Kind.Single;
+    }
+}
+
+class Main {
+    static void run() {
+        LinkedList.Node node = LinkedList.Node.of(3);
+        LinkedList.Node other = new LinkedList.Node(4);
+        LinkedList.Entry entry = new LinkedList.Entry("a", 1);
+        boolean same = entry == new LinkedList.Entry("a", 1);
+        LinkedList.Kind kind = LinkedList.Kind.Double;
+        int code = switch (kind) {
+            case LinkedList.Kind.Single -> 1;
+            case Double -> 2;
+        };
+    }
+}

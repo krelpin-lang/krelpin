@@ -303,8 +303,8 @@ impl FnCtxt<'_, '_> {
     fn pat_path(&mut self, path: &Path, expected: &Ty) -> PatPath {
         match path.segments.as_slice() {
             [name] => self.single_pat_path(*name, expected),
-            [owner, name] => self.qualified_pat_path(*owner, *name, expected),
-            _ => PatPath::Error,
+            [.., owner, name] => self.qualified_pat_path(*owner, *name, expected),
+            [] => PatPath::Error,
         }
     }
 

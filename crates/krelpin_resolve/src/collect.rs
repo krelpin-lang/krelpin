@@ -24,7 +24,9 @@ pub struct TypeDef {
     pub name: Ident,
     pub package: PackagePath,
     pub unit: usize,
-    pub item: usize,
+    pub path: Vec<usize>,
+    pub parent: Option<DefId>,
+    pub nested: HashMap<Symbol, DefId>,
     pub fields: HashMap<Symbol, FieldDef>,
     pub methods: HashMap<Symbol, Vec<MethodDef>>,
 }
@@ -69,7 +71,11 @@ impl ItemTable {
     ) -> impl Iterator<Item = (&TypeDef, &'u Item)> {
         self.defs
             .iter()
-            .map(move |def| (def, &units[def.unit].items[def.item]))
+            .map(move |def| (def, item_at(&units[def.unit], &def.path)))
+    }
+
+    pub fn nested(&self, def: DefId, name: Symbol) -> Option<DefId> {
+        self.def(def).nested.get(&name).copied()
     }
 }
 
@@ -80,7 +86,15 @@ pub(crate) fn collect(units: &[CompilationUnit], dcx: &DiagCtxt) -> ItemTable {
         let package = PackagePath::of_unit(unit);
 
         for (item_index, item) in unit.items.iter().enumerate() {
-            let def = DefId::from_index(table.defs.len());
+            let def = collect_type(
+                &mut table,
+                dcx,
+                &package,
+                unit_index,
+                vec![item_index],
+                item,
+                None,
+            );
             let names = table.packages.entry(package.clone()).or_default();
             match names.entry(item.name.name) {
                 Entry::Occupied(_) => report_redefinition(dcx, "name", item.name),
@@ -88,8 +102,6 @@ pub(crate) fn collect(units: &[CompilationUnit], dcx: &DiagCtxt) -> ItemTable {
                     entry.insert(def);
                 }
             }
-            let type_def = collect_type(dcx, def, &package, unit_index, item_index, item);
-            table.defs.push(type_def);
         }
     }
 
@@ -101,19 +113,23 @@ pub(crate) fn collect(units: &[CompilationUnit], dcx: &DiagCtxt) -> ItemTable {
 }
 
 fn collect_type(
+    table: &mut ItemTable,
     dcx: &DiagCtxt,
-    def: DefId,
     package: &PackagePath,
     unit: usize,
-    item_index: usize,
+    path: Vec<usize>,
     item: &Item,
-) -> TypeDef {
+    parent: Option<DefId>,
+) -> DefId {
+    let def = DefId::from_index(table.defs.len());
     let mut type_def = TypeDef {
         def,
         name: item.name,
         package: package.clone(),
         unit,
-        item: item_index,
+        path: path.clone(),
+        parent,
+        nested: HashMap::new(),
         fields: HashMap::new(),
         methods: HashMap::new(),
     };
@@ -141,14 +157,46 @@ fn collect_type(
                 }
                 add_method(&mut type_def, method);
             }
-            MemberKind::Constructor(_) => {}
+            MemberKind::Constructor(_) | MemberKind::Type(_) => {}
         }
     }
 
     if let ItemKind::Enum(enum_def) = &item.kind {
         add_variants(dcx, &mut type_def, &enum_def.variants);
     }
-    type_def
+    table.defs.push(type_def);
+
+    for (index, member) in members.iter().enumerate() {
+        let MemberKind::Type(nested) = &member.kind else {
+            continue;
+        };
+        let mut nested_path = path.clone();
+        nested_path.push(index);
+        let child = collect_type(table, dcx, package, unit, nested_path, nested, Some(def));
+        match table.defs[def.index()].nested.entry(nested.name.name) {
+            Entry::Occupied(_) => report_redefinition(dcx, "type", nested.name),
+            Entry::Vacant(entry) => {
+                entry.insert(child);
+            }
+        }
+    }
+    def
+}
+
+fn item_at<'u>(unit: &'u CompilationUnit, path: &[usize]) -> &'u Item {
+    let mut item = &unit.items[path[0]];
+    for &index in &path[1..] {
+        let members = match &item.kind {
+            ItemKind::Class(class) => &class.members,
+            ItemKind::Struct(def) => &def.members,
+            ItemKind::Interface(interface) => &interface.members,
+            ItemKind::Enum(def) => &def.members,
+        };
+        if let MemberKind::Type(nested) = &members[index].kind {
+            item = nested;
+        }
+    }
+    item
 }
 
 fn add_variants(dcx: &DiagCtxt, def: &mut TypeDef, variants: &[Variant]) {

@@ -6,6 +6,7 @@ use krelpin_ast::ast::{
     Pat, PatKind, Path, PrimitiveTy, Stmt, StmtKind, SwitchExprBody, Ty, TyKind, WherePredicate,
 };
 use krelpin_errors::{DiagCtxt, Diagnostic};
+use krelpin_span::def_id::DefId;
 use krelpin_span::{Span, Symbol, kw};
 
 use crate::collect::{ItemTable, TypeDef, UnitScope};
@@ -146,6 +147,7 @@ impl<'a> Resolver<'a> {
                 MemberKind::Field(field) => self.resolve_field(field),
                 MemberKind::Constructor(constructor) => self.resolve_constructor(constructor),
                 MemberKind::Method(method) => self.resolve_method(method),
+                MemberKind::Type(_) => {}
             }
         }
     }
@@ -240,8 +242,11 @@ impl<'a> Resolver<'a> {
         match &ty.kind {
             TyKind::Primitive(_) => {}
             TyKind::Path { path, args } => {
-                if let [segment] = path.segments.as_slice() {
-                    self.resolve_type_name(*segment);
+                match path.segments.as_slice() {
+                    [segment] => self.resolve_type_name(*segment),
+                    segments => {
+                        self.resolve_type_path(segments);
+                    }
                 }
                 self.resolve_tys(args.iter());
             }
@@ -318,6 +323,13 @@ impl<'a> Resolver<'a> {
         }
         if let Some(&(_, span)) = self.type_params.iter().rev().find(|&&(p, _)| p == name) {
             return Some(Res::TypeParam(span));
+        }
+        let mut enclosing = Some(self.owner.def);
+        while let Some(def) = enclosing {
+            if let Some(nested) = self.table.nested(def, name) {
+                return Some(Res::Item(nested));
+            }
+            enclosing = self.table.def(def).parent;
         }
         if let Some(&res) = self.scope.imports.get(&name) {
             return Some(res);
@@ -553,8 +565,58 @@ impl<'a> Resolver<'a> {
                     self.resolutions.record(name.span, res);
                 }
             }
-            [owner, _] => self.resolve_type_name(*owner),
-            _ => {}
+            [owner @ .., _] => {
+                self.resolve_type_path(owner);
+            }
+            [] => {}
+        }
+    }
+
+    fn resolve_type_path(&mut self, segments: &[Ident]) -> Option<DefId> {
+        let (first, rest) = segments.split_first()?;
+        let mut def = match self.lookup_type(first.name) {
+            Some(Res::Item(def)) => {
+                self.resolutions.record(first.span, Res::Item(def));
+                def
+            }
+            Some(res) if rest.is_empty() => {
+                self.resolutions.record(first.span, res);
+                return None;
+            }
+            _ if rest.is_empty() => {
+                self.resolve_type_name(*first);
+                return None;
+            }
+            _ => return None,
+        };
+        for segment in rest {
+            let Some(nested) = self.table.nested(def, segment.name) else {
+                self.emit(
+                    Diagnostic::error(format!(
+                        "cannot find type `{}` in `{}`",
+                        segment.name,
+                        self.table.def(def).name.name
+                    ))
+                    .with_span(segment.span)
+                    .with_label("not found in this type"),
+                );
+                return None;
+            };
+            self.resolutions.record(segment.span, Res::Item(nested));
+            def = nested;
+        }
+        Some(def)
+    }
+
+    fn type_def_of_expr(&self, expr: &Expr) -> Option<DefId> {
+        let span = match &expr.kind {
+            ExprKind::Name(name) => name.span,
+            ExprKind::Field { name, .. } => name.span,
+            _ => return None,
+        };
+        match self.resolutions.get(span) {
+            Some(Res::Item(def)) => Some(def),
+            _ => None,
         }
     }
 
@@ -563,7 +625,15 @@ impl<'a> Resolver<'a> {
             ExprKind::Lit(_) | ExprKind::Bool(_) | ExprKind::Null => {}
             ExprKind::This | ExprKind::Super => self.check_this(expr),
             ExprKind::Name(name) => self.resolve_value_name(*name),
-            ExprKind::Field { expr, .. } => self.resolve_expr(expr),
+            ExprKind::Field { expr, name, .. } => {
+                self.resolve_expr(expr);
+                let nested = self
+                    .type_def_of_expr(expr)
+                    .and_then(|owner| self.table.nested(owner, name.name));
+                if let Some(nested) = nested {
+                    self.resolutions.record(name.span, Res::Item(nested));
+                }
+            }
             ExprKind::MethodCall {
                 receiver,
                 name,
@@ -777,7 +847,7 @@ fn member_static_context(kind: &MemberKind) -> Option<StaticContext> {
             FieldStorage::Static(_) => Some(StaticContext::StaticField),
             FieldStorage::Const(_) => Some(StaticContext::ConstField),
         },
-        MemberKind::Constructor(_) => None,
+        MemberKind::Constructor(_) | MemberKind::Type(_) => None,
         MemberKind::Method(method) => method.receiver.is_none().then_some(StaticContext::Method),
     }
 }

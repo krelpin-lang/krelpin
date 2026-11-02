@@ -290,7 +290,7 @@ fn modifier_errors() {
     );
     assert_eq!(
         errors("static class A {}"),
-        ["`static` cannot be used on type declarations"]
+        ["`static` cannot be used on top-level types"]
     );
     assert_eq!(
         errors("class A { static mut void f() {} mut int x; mut A() {} }"),

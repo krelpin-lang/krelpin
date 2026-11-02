@@ -440,3 +440,24 @@ fn pattern_bindings_are_scoped_to_their_case() {
         ["cannot find value `x` in this scope"]
     );
 }
+
+#[test]
+fn nested_types_resolve_inside_and_through_their_outer_type() {
+    ok("class List {\n\
+        \x20   static class Node { Node? next; }\n\
+        \x20   Node? head;\n\
+        }\n\
+        class Main { static void run() { List.Node node = null; } }");
+    assert_eq!(
+        errors("class List { static class Node {} }\nclass Main { Node node; }"),
+        ["cannot find type `Node` in this scope"]
+    );
+    assert_eq!(
+        errors("class List {}\nclass Main { List.Node node; }"),
+        ["cannot find type `Node` in `List`"]
+    );
+    assert_eq!(
+        errors("class List { static class Node {} enum Node { A } }"),
+        ["the type `Node` is defined multiple times"]
+    );
+}

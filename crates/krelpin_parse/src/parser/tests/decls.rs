@@ -231,3 +231,35 @@ fn member_errors() {
         ["duplicate `final` modifier"]
     );
 }
+
+#[test]
+fn nested_types() {
+    let unit = parse_ok(
+        "class List {\n\
+         \x20   static class Node { int value; }\n\
+         \x20   enum Kind { Single, Double }\n\
+         \x20   struct Entry { int count; }\n\
+         \x20   interface Visitor { void visit(Node node); }\n\
+         }",
+    );
+    let ItemKind::Class(list) = &unit.items[0].kind else {
+        panic!("expected a class");
+    };
+    let nested: Vec<&str> = list
+        .members
+        .iter()
+        .filter_map(|member| match &member.kind {
+            MemberKind::Type(item) => Some(item.name.name.as_str()),
+            _ => None,
+        })
+        .collect();
+    assert_eq!(nested, ["Node", "Kind", "Entry", "Visitor"]);
+    assert_eq!(
+        errors("class A { class B {} }"),
+        ["inner classes are not supported"]
+    );
+    assert_eq!(
+        errors("class A { mut static class B {} }"),
+        ["`mut` cannot be used on types"]
+    );
+}

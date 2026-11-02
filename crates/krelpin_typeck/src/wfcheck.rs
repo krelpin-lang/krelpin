@@ -47,6 +47,7 @@ impl Tcx<'_> {
 
     fn check_member_wf(&self, env: &ParamEnv, member: &Member) {
         match &member.kind {
+            MemberKind::Type(_) => {}
             MemberKind::Field(field) => self.check_wf(env, &field.ty),
             MemberKind::Constructor(ctor) => {
                 for param in &ctor.params {

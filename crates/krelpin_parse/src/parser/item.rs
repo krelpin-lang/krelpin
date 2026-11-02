@@ -125,18 +125,52 @@ impl Parser<'_> {
                 .parse_macro(docs, annotations, &modifiers, lo)
                 .map(Declaration::Macro);
         }
-        self.reject_storage(modifiers.storage, "type declarations");
-
-        let container = match self.token.kind {
-            TokenKind::Ident(kw::Class) => Container::Class,
-            TokenKind::Ident(kw::Struct) => Container::Struct,
-            TokenKind::Ident(kw::Interface) => Container::Interface,
-            TokenKind::Ident(kw::Enum) => Container::Enum,
-            _ => {
-                self.expected = vec![Expected::Item];
-                return Err(self.unexpected());
-            }
+        self.reject_storage(modifiers.storage, "top-level types");
+        let Some(container) = type_container(self.token.kind) else {
+            self.expected = vec![Expected::Item];
+            return Err(self.unexpected());
         };
+        self.parse_item(docs, annotations, &modifiers, container, lo)
+            .map(Declaration::Item)
+    }
+
+    fn parse_nested_type(
+        &mut self,
+        docs: Vec<Symbol>,
+        annotations: Vec<Annotation>,
+        modifiers: &Modifiers,
+        container: Container,
+        lo: Span,
+    ) -> PResult<Item> {
+        self.reject_receiver(modifiers.receiver, "types");
+        match (container, modifiers.storage) {
+            (Container::Class, FieldStorage::Instance) => {
+                self.emit(
+                    Diagnostic::error("inner classes are not supported")
+                        .with_span(self.token.span)
+                        .with_note(
+                            "a nested class does not keep a hidden reference to an outer object",
+                        )
+                        .with_help(
+                            "mark it `static`, and pass the outer object to its constructor \
+                             if it needs one",
+                        ),
+                );
+            }
+            (_, FieldStorage::Const(_)) => self.reject_storage(modifiers.storage, "types"),
+            _ => {}
+        }
+        self.parse_item(docs, annotations, modifiers, container, lo)
+    }
+
+    fn parse_item(
+        &mut self,
+        docs: Vec<Symbol>,
+        annotations: Vec<Annotation>,
+        modifiers: &Modifiers,
+        container: Container,
+        lo: Span,
+    ) -> PResult<Item> {
         self.bump();
 
         if container != Container::Class {
@@ -161,7 +195,7 @@ impl Parser<'_> {
             Container::Enum => self.parse_enum(name)?,
         };
 
-        Ok(Declaration::Item(Item {
+        Ok(Item {
             docs,
             annotations,
             vis: modifiers.vis,
@@ -169,7 +203,7 @@ impl Parser<'_> {
             name,
             kind,
             span: lo.to(self.prev_token.span),
-        }))
+        })
     }
 
     fn parse_macro(
@@ -603,6 +637,17 @@ impl Parser<'_> {
         let lo = self.token.span;
         let annotations = self.parse_annotations()?;
         let modifiers = self.parse_modifiers();
+        if let Some(nested) = type_container(self.token.kind) {
+            let item = self.parse_nested_type(docs, annotations, &modifiers, nested, lo)?;
+            return Ok(Member {
+                docs: Vec::new(),
+                annotations: Vec::new(),
+                vis: item.vis,
+                inheritance: Inheritance::default(),
+                span: item.span,
+                kind: MemberKind::Type(Box::new(item)),
+            });
+        }
         let kind = self.parse_member_kind(owner, &modifiers)?;
         self.validate_member(container, &annotations, &modifiers, &kind);
 
@@ -674,6 +719,7 @@ impl Parser<'_> {
         } = modifiers.inheritance;
 
         match kind {
+            MemberKind::Type(_) => {}
             MemberKind::Field(field) => {
                 if let Some(span) = abstract_kw {
                     self.error(span, "`abstract` cannot be used on fields");
@@ -760,5 +806,15 @@ fn receiver_keyword(kind: ReceiverKind) -> &'static str {
         ReceiverKind::RefMut => "mut",
         ReceiverKind::Owned => "consume",
         ReceiverKind::Ref => "this",
+    }
+}
+
+fn type_container(kind: TokenKind) -> Option<Container> {
+    match kind {
+        TokenKind::Ident(kw::Class) => Some(Container::Class),
+        TokenKind::Ident(kw::Struct) => Some(Container::Struct),
+        TokenKind::Ident(kw::Interface) => Some(Container::Interface),
+        TokenKind::Ident(kw::Enum) => Some(Container::Enum),
+        _ => None,
     }
 }

@@ -94,6 +94,7 @@ pub(crate) fn check_units(tcx: &Tcx<'_>, units: &[CompilationUnit]) -> TypeckRes
 
 fn check_member<'a, 'tcx>(tcx: &'a Tcx<'tcx>, owner: DefId, member: &Member) -> FnCtxt<'a, 'tcx> {
     match &member.kind {
+        MemberKind::Type(_) => FnCtxt::new(tcx, owner, Ty::Void),
         MemberKind::Field(field) => {
             let mut fcx = FnCtxt::new(tcx, owner, Ty::Void);
             if let Some(init) = &field.init {

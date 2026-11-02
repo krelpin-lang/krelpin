@@ -5,7 +5,7 @@ mod table;
 #[cfg(test)]
 mod tests;
 
-use krelpin_ast::ast::{Annotation, CompilationUnit, Item, ItemKind, Member};
+use krelpin_ast::ast::{Annotation, CompilationUnit, Item, ItemKind, Member, MemberKind};
 use krelpin_errors::{DiagCtxt, Diagnostic};
 use krelpin_span::SourceMap;
 
@@ -65,6 +65,9 @@ impl ExpandCtxt<'_> {
         };
         for member in members {
             self.reject_macros(&mut member.annotations, "members");
+            if let MemberKind::Type(nested) = &mut member.kind {
+                self.expand_item(nested);
+            }
         }
     }
 

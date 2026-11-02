@@ -59,6 +59,7 @@ struct LoweringCtxt<'a, 'tcx> {
 impl LoweringCtxt<'_, '_> {
     fn lower_member(mut self, member: &Member) -> Option<Body> {
         let (name, kind, receiver, params, ret): (_, _, _, &[Param], _) = match &member.kind {
+            MemberKind::Type(_) => return None,
             MemberKind::Field(field) => {
                 field.init.as_ref()?;
                 let receiver =
@@ -107,6 +108,7 @@ impl LoweringCtxt<'_, '_> {
             .collect();
 
         let value = match &member.kind {
+            MemberKind::Type(_) => return None,
             MemberKind::Field(field) => BodyValue::Expr(self.lower_expr(field.init.as_ref()?)),
             MemberKind::Constructor(ctor) => BodyValue::Block(self.lower_block(&ctor.body)),
             MemberKind::Method(method) => BodyValue::Block(self.lower_block(method.body.as_ref()?)),
@@ -335,8 +337,9 @@ impl LoweringCtxt<'_, '_> {
     }
 
     fn is_type_name(&self, expr: &ast::Expr) -> bool {
-        let ast::ExprKind::Name(name) = expr.kind else {
-            return false;
+        let name = match &expr.kind {
+            ast::ExprKind::Name(name) | ast::ExprKind::Field { name, .. } => name,
+            _ => return false,
         };
         matches!(
             self.resolved.resolutions.get(name.span),

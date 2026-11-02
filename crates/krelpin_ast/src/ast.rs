@@ -190,6 +190,7 @@ pub enum MemberKind {
     Field(Field),
     Constructor(Constructor),
     Method(Method),
+    Type(Box<Item>),
 }
 
 #[derive(Clone, Debug, PartialEq, Eq)]

@@ -147,9 +147,8 @@ impl<'a> Tcx<'a> {
             TyKind::Primitive(primitive) => Ty::Primitive(*primitive),
             TyKind::Path { path, args } => {
                 let args: Vec<Ty> = args.iter().map(|arg| self.lower_ty(arg)).collect();
-                let last = path.segments.last().map(|segment| segment.name);
-                let [segment] = path.segments.as_slice() else {
-                    return last.map_or(Ty::Unknown, |name| Ty::External { name, args });
+                let Some(segment) = path.segments.last() else {
+                    return Ty::Unknown;
                 };
                 match self.resolutions.get(segment.span) {
                     Some(Res::Item(def)) => self.def_ty(def, args),
@@ -158,6 +157,10 @@ impl<'a> Tcx<'a> {
                         args,
                     },
                     Some(Res::TypeParam(_)) => Ty::Param(segment.name),
+                    None if path.segments.len() > 1 => Ty::External {
+                        name: segment.name,
+                        args,
+                    },
                     _ => Ty::Unknown,
                 }
             }
@@ -358,6 +361,7 @@ impl<'a> Tcx<'a> {
                 vis => vis,
             };
             match &member.kind {
+                MemberKind::Type(_) => {}
                 MemberKind::Field(field) => {
                     sig.fields.entry(field.name.name).or_insert(FieldSig {
                         name: field.name,
