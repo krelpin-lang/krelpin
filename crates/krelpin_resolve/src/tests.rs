@@ -412,3 +412,28 @@ fn where_clauses_constrain_generic_parameters() {
         ["cannot find generic parameter `U`"]
     );
 }
+
+#[test]
+fn several_patterns_cannot_bind() {
+    assert_eq!(
+        errors(
+            "enum E { A(int x), B }\n\
+             class C { int f(E e) { return switch (e) { case A(int x), B -> 1; }; } }"
+        ),
+        ["a case with several patterns cannot bind variables"]
+    );
+}
+
+#[test]
+fn pattern_bindings_are_scoped_to_their_case() {
+    assert_eq!(
+        errors(
+            "enum E { A(int x), B }\n\
+             class C { int f(E e) {\n\
+             \x20   int y = switch (e) { case A(int x) when x > 0 -> x; default -> 0; };\n\
+             \x20   return x;\n\
+             } }"
+        ),
+        ["cannot find value `x` in this scope"]
+    );
+}

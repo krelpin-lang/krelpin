@@ -7,9 +7,11 @@ mod expr;
 mod inherit;
 mod lang_items;
 mod param_env;
+mod pat;
 mod sig;
 mod stmt;
 pub mod ty;
+mod usefulness;
 mod wfcheck;
 
 #[cfg(test)]

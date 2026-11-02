@@ -1,0 +1,59 @@
+package geometry;
+
+enum Shape {
+    Circle(double radius),
+    Rect(double width, double height),
+    Empty;
+}
+
+enum Option<T> {
+    Some(T value),
+    None;
+}
+
+class Errors {
+    void create(&this) {
+        Shape a = Shape.Circle("wide");
+        Shape b = Shape.Rect(1.0);
+        Shape c = Shape.Circle;
+        Shape d = Shape.Empty();
+        Option<String> e = Option.Some(5);
+        boolean same = a == b;
+    }
+
+    double area(Shape shape) {
+        return switch (shape) {
+            case Circle(int r) -> r;
+            case Rect(double w) -> w;
+            case Empty(double e) -> e;
+            case Square -> 0.0;
+            case Circle -> 0.0;
+        };
+    }
+
+    String name(Option<Shape> shape) {
+        return switch (shape) {
+            case Some(Circle(_)) -> "circle";
+            case None -> "none";
+        };
+    }
+
+    void check(Shape shape, int n, boolean flag) {
+        switch (shape) {
+            case Circle(double r) when r > 1.0 -> {}
+            case Rect(_, _) -> {}
+        }
+        String size = switch (n) {
+            case 1, 2 -> "small";
+            case 2 -> "two";
+            default -> "big";
+        };
+        String answer = switch (flag) {
+            case true -> "yes";
+        };
+        String kind = switch (shape) {
+            default -> "any";
+            case Empty -> "empty";
+        };
+    }
+}

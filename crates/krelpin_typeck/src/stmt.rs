@@ -4,11 +4,10 @@ use krelpin_ast::ast::{BinOp, Block, Expr, ExprKind, Stmt, StmtKind, UnOp};
 use krelpin_errors::Diagnostic;
 use krelpin_resolve::Res;
 use krelpin_span::Span;
-use krelpin_span::def_id::DefId;
 
 use crate::check::FnCtxt;
 use crate::lang_items::LangItem;
-use crate::sig::AdtKind;
+use crate::pat::Coverage;
 use crate::ty::Ty;
 
 impl FnCtxt<'_, '_> {
@@ -100,12 +99,18 @@ impl FnCtxt<'_, '_> {
             StmtKind::Switch { scrutinee, arms } => {
                 let scrutinee_ty = self.check_expr(scrutinee);
                 let mut all_diverge = true;
+                let mut match_arms = Vec::new();
                 for arm in arms {
-                    self.check_case_labels(arm.labels.as_deref(), &scrutinee_ty);
+                    match_arms.extend(self.check_case_label(&arm.label, &scrutinee_ty));
                     all_diverge &= self.check_stmt(&arm.body) && !contains_break(&arm.body);
                 }
-                let has_default = arms.iter().any(|arm| arm.labels.is_none());
-                has_default && all_diverge
+                let coverage = if self.is_enum(&scrutinee_ty) {
+                    Coverage::Required("this `switch` statement")
+                } else {
+                    Coverage::Optional
+                };
+                let exhaustive = self.check_match(&scrutinee_ty, &match_arms, coverage, stmt.span);
+                exhaustive && all_diverge
             }
             StmtKind::Try {
                 body,
@@ -209,94 +214,6 @@ impl FnCtxt<'_, '_> {
                 .with_span(span)
                 .with_note("`for` loops work with arrays and types that implement `Iterable`"),
         );
-    }
-
-    pub(crate) fn check_case_labels(&mut self, labels: Option<&[Expr]>, scrutinee: &Ty) {
-        let Some(labels) = labels else {
-            return;
-        };
-        let enum_def = self.enum_def(scrutinee);
-
-        for label in labels {
-            let unresolved = match &label.kind {
-                ExprKind::Name(name) if self.tcx.resolutions.get(name.span).is_none() => {
-                    Some(*name)
-                }
-                _ => None,
-            };
-            if let Some(name) = unresolved {
-                match enum_def {
-                    Some(def) if self.tcx.sig(def).variant(name.name).is_some() => {}
-                    Some(def) => self.error(
-                        name.span,
-                        format!(
-                            "no variant `{}` in enum `{}`",
-                            name.name,
-                            self.type_name(def)
-                        ),
-                    ),
-                    None => self.error(
-                        name.span,
-                        format!("cannot find value `{}` in this scope", name.name),
-                    ),
-                }
-                continue;
-            }
-
-            let ty = self.check_expr(label);
-            if !self.is_assignable(&ty, scrutinee.strip_refs()) {
-                self.mismatch(label.span, scrutinee.strip_refs(), &ty);
-            }
-        }
-    }
-
-    pub(crate) fn check_switch_exhaustive<'e>(
-        &self,
-        arms: impl Iterator<Item = Option<&'e [Expr]>>,
-        scrutinee: &Ty,
-        span: Span,
-    ) {
-        let mut covered = Vec::new();
-        for labels in arms {
-            let Some(labels) = labels else {
-                return;
-            };
-            for label in labels {
-                if let ExprKind::Name(name) = label.kind {
-                    covered.push(name.name);
-                }
-            }
-        }
-
-        let missing: Vec<String> = match self.enum_def(scrutinee) {
-            Some(def) => self
-                .tcx
-                .sig(def)
-                .variants
-                .iter()
-                .filter(|variant| !covered.contains(&variant.name.name))
-                .map(|variant| format!("`{}`", variant.name.name))
-                .collect(),
-            None if scrutinee.is_unknown() => Vec::new(),
-            None => vec!["other values".to_owned()],
-        };
-        if missing.is_empty() {
-            return;
-        }
-
-        self.emit(
-            Diagnostic::error("this `switch` expression does not cover every case")
-                .with_span(span)
-                .with_note(format!("not covered: {}", missing.join(", ")))
-                .with_help("add the missing cases, or a `default` case"),
-        );
-    }
-
-    fn enum_def(&self, ty: &Ty) -> Option<DefId> {
-        match ty.strip_refs() {
-            Ty::Adt { def, .. } if self.tcx.sig(*def).kind == AdtKind::Enum => Some(*def),
-            _ => None,
-        }
     }
 
     pub(crate) fn null_checks(&self, cond: &Expr) -> (Vec<Span>, Vec<Span>) {

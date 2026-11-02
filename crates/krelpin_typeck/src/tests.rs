@@ -1502,3 +1502,147 @@ fn only_enums_without_data_are_hashable() {
         ["no method named `values` found for `Shape`"]
     );
 }
+
+fn variants(code: &str) -> String {
+    format!(
+        "enum Shape {{\n\
+         \x20   Circle(double radius),\n\
+         \x20   Rect(double width, double height),\n\
+         \x20   Empty;\n\
+         }}\n\
+         enum Option<T> {{ Some(T value), None }}\n\
+         class Main {{ {code} }}"
+    )
+}
+
+#[test]
+fn patterns_destructure_variants() {
+    ok(&variants(
+        "double area(Shape shape) {\n\
+         \x20   return switch (shape) {\n\
+         \x20       case Circle(double r) -> 3.14 * r * r;\n\
+         \x20       case Rect(double w, double h) when w == h -> w * w;\n\
+         \x20       case Shape.Rect(double w, double h) -> w * h;\n\
+         \x20       case Empty -> 0.0;\n\
+         \x20   };\n\
+         }\n\
+         boolean round(Option<Shape> shape) {\n\
+         \x20   return shape instanceof Some(Circle(_));\n\
+         }\n\
+         String first(Option<String> name) {\n\
+         \x20   if (name instanceof Some(String value) && value.length() > 0) {\n\
+         \x20       return value;\n\
+         \x20   }\n\
+         \x20   return \"\";\n\
+         }",
+    ));
+    assert_eq!(
+        errors(&variants(
+            "double f(Shape s) { return switch (s) { \
+             case Circle(int r) -> 1.0; default -> 0.0; }; }"
+        )),
+        ["mismatched types"]
+    );
+    assert_eq!(
+        errors(&variants(
+            "int f(Shape s) { return switch (s) { case Rect(double w) -> 1; default -> 0; }; }"
+        )),
+        ["this pattern has 1 field, but the variant `Shape.Rect` has 2 fields"]
+    );
+    assert_eq!(
+        errors(&variants(
+            "int f(Shape s) { return switch (s) { case Circle -> 1; default -> 0; }; }"
+        )),
+        ["the variant `Shape.Circle` has fields"]
+    );
+    assert_eq!(
+        errors(&variants(
+            "int f(Shape s) { return switch (s) { case Empty(_) -> 1; default -> 0; }; }"
+        )),
+        ["the variant `Shape.Empty` has no fields"]
+    );
+    assert_eq!(
+        errors(&variants(
+            "int f(Shape s) { return switch (s) { case Square -> 1; default -> 0; }; }"
+        )),
+        ["no variant `Square` in enum `Shape`"]
+    );
+    assert_eq!(
+        errors(&variants(
+            "int f(Object o) { return switch (o) { case Main(int x) -> 1; default -> 0; }; }"
+        )),
+        ["`Main` is not an enum variant"]
+    );
+}
+
+#[test]
+fn switches_on_enums_cover_every_case() {
+    let notes = |code: &str| -> Vec<String> {
+        diagnostics(&variants(code))
+            .into_iter()
+            .flat_map(|d| d.children.into_iter().map(|child| child.message))
+            .filter(|message| message.starts_with("not covered"))
+            .collect()
+    };
+    assert_eq!(
+        notes("int f(Shape s) { return switch (s) { case Circle(_) -> 1; }; }"),
+        ["not covered: `Rect(_, _)` and `Empty`"]
+    );
+    assert_eq!(
+        notes(
+            "int f(Option<Shape> s) { return switch (s) { \
+             case Some(Circle(_)) -> 1; case None -> 0; }; }"
+        ),
+        ["not covered: `Some(Rect(_, _))` and `Some(Empty)`"]
+    );
+    assert_eq!(
+        notes(
+            "int f(Shape s) { return switch (s) { case Circle(_) -> 1; \
+             case Rect(_, _) when true -> 2; case Empty -> 3; }; }"
+        ),
+        ["not covered: `Rect(_, _)`"]
+    );
+    assert_eq!(
+        notes("int f(boolean b) { return switch (b) { case true -> 1; }; }"),
+        ["not covered: `false`"]
+    );
+    assert_eq!(
+        errors(&variants(
+            "void f(Shape s) { switch (s) { case Empty -> {} } }"
+        )),
+        ["this `switch` statement does not cover every case"]
+    );
+    ok(&variants(
+        "void f(Shape s, int n) { switch (n) { case 1 -> {} } switch (s) { default -> {} } }",
+    ));
+    ok(&variants(
+        "int f(Shape s) { switch (s) { case Circle(_) -> { return 1; } \
+         case Rect(_, _) -> { return 2; } case Empty -> { return 3; } } }",
+    ));
+}
+
+#[test]
+fn unreachable_patterns_are_reported() {
+    assert_eq!(
+        errors(&variants(
+            "int f(Shape s) { return switch (s) { case Circle(_) -> 1; default -> 0; \
+             case Empty -> 2; }; }"
+        )),
+        ["unreachable pattern"]
+    );
+    assert_eq!(
+        errors(&variants(
+            "int f(int n) { return switch (n) { case 1, 2 -> 1; case 1 -> 2; default -> 0; }; }"
+        )),
+        ["unreachable pattern"]
+    );
+    assert_eq!(
+        errors(&variants(
+            "int f(Object o) { return switch (o) { case Object any -> 1; case String s -> 2; }; }"
+        )),
+        ["unreachable pattern"]
+    );
+    ok(&variants(
+        "int f(Object o) { return switch (o) { case String s -> 1; case Object any -> 2; }; }",
+    ));
+}

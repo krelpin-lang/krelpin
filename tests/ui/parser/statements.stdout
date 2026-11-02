@@ -780,20 +780,26 @@ CompilationUnit {
                                                         },
                                                         arms: [
                                                             SwitchArm {
-                                                                labels: Some(
-                                                                    [
-                                                                        Expr {
+                                                                label: Case {
+                                                                    pats: [
+                                                                        Pat {
                                                                             kind: Lit(
-                                                                                Lit {
-                                                                                    kind: Integer,
-                                                                                    symbol: "0",
-                                                                                    suffix: None,
+                                                                                Expr {
+                                                                                    kind: Lit(
+                                                                                        Lit {
+                                                                                            kind: Integer,
+                                                                                            symbol: "0",
+                                                                                            suffix: None,
+                                                                                        },
+                                                                                    ),
+                                                                                    span: 783..784,
                                                                                 },
                                                                             ),
                                                                             span: 783..784,
                                                                         },
                                                                     ],
-                                                                ),
+                                                                    guard: None,
+                                                                },
                                                                 body: Stmt {
                                                                     kind: Expr(
                                                                         Expr {
@@ -829,30 +835,41 @@ CompilationUnit {
                                                                 span: 778..813,
                                                             },
                                                             SwitchArm {
-                                                                labels: Some(
-                                                                    [
-                                                                        Expr {
+                                                                label: Case {
+                                                                    pats: [
+                                                                        Pat {
                                                                             kind: Lit(
-                                                                                Lit {
-                                                                                    kind: Integer,
-                                                                                    symbol: "1",
-                                                                                    suffix: None,
+                                                                                Expr {
+                                                                                    kind: Lit(
+                                                                                        Lit {
+                                                                                            kind: Integer,
+                                                                                            symbol: "1",
+                                                                                            suffix: None,
+                                                                                        },
+                                                                                    ),
+                                                                                    span: 831..832,
                                                                                 },
                                                                             ),
                                                                             span: 831..832,
                                                                         },
-                                                                        Expr {
+                                                                        Pat {
                                                                             kind: Lit(
-                                                                                Lit {
-                                                                                    kind: Integer,
-                                                                                    symbol: "2",
-                                                                                    suffix: None,
+                                                                                Expr {
+                                                                                    kind: Lit(
+                                                                                        Lit {
+                                                                                            kind: Integer,
+                                                                                            symbol: "2",
+                                                                                            suffix: None,
+                                                                                        },
+                                                                                    ),
+                                                                                    span: 834..835,
                                                                                 },
                                                                             ),
                                                                             span: 834..835,
                                                                         },
                                                                     ],
-                                                                ),
+                                                                    guard: None,
+                                                                },
                                                                 body: Stmt {
                                                                     kind: Expr(
                                                                         Expr {
@@ -888,7 +905,9 @@ CompilationUnit {
                                                                 span: 826..862,
                                                             },
                                                             SwitchArm {
-                                                                labels: None,
+                                                                label: Default(
+                                                                    875..882,
+                                                                ),
                                                                 body: Stmt {
                                                                     kind: Block(
                                                                         Block {

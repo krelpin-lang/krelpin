@@ -3,6 +3,7 @@ mod expr;
 mod item;
 mod lookahead;
 mod member;
+mod pat;
 mod stmt;
 mod ty;
 

@@ -1,0 +1,89 @@
+package geometry;
+
+enum Shape {
+    Circle(double radius),
+    Rect(double width, double height),
+    Empty;
+
+    const double PI = 3.14159;
+
+    Shape square(double side) {
+        return Rect(side, side);
+    }
+
+    double area(&this) {
+        return switch (this) {
+            case Circle(double r) -> Shape.PI * r * r;
+            case Rect(double w, double h) -> w * h;
+            case Empty -> 0.0;
+        };
+    }
+
+    String describe(&this) {
+        return switch (this) {
+            case Rect(double w, double h) when w == h -> "square";
+            case Rect(_, _) -> "rectangle";
+            case Circle(_) -> "circle";
+            case Empty -> "nothing";
+        };
+    }
+}
+
+enum Option<T> {
+    Some(T value),
+    None;
+
+    boolean isSome(&this) {
+        return this instanceof Some(_);
+    }
+}
+
+enum Direction {
+    North,
+    East,
+    South,
+    West;
+
+    Direction turn(&this) {
+        return switch (this) {
+            case North -> Direction.East;
+            case East -> Direction.South;
+            case South -> Direction.West;
+            case West -> Direction.North;
+        };
+    }
+}
+
+class Drawing {
+    Option<Shape> largest(Shape[] shapes) {
+        Option<Shape> best = Option.None;
+        double bestArea = 0.0;
+        for (Shape shape : shapes) {
+            if (shape.area() > bestArea) {
+                best = Option.Some(shape);
+                bestArea = shape.area();
+            }
+        }
+        return best;
+    }
+
+    String report(Option<Shape> shape) {
+        switch (shape) {
+            case Some(Shape.Circle(double r)) when r > 10.0 -> {
+                return "a big circle";
+            }
+            case Some(Shape value) -> {
+                return value.describe();
+            }
+            case None -> {
+                return "no shapes";
+            }
+        }
+    }
+
+    boolean sameWay(Direction a, Direction b) {
+        HashSet<Direction> seen = new HashSet<>();
+        seen.add(a);
+        return a == b && seen.contains(b);
+    }
+}

@@ -1,0 +1,117 @@
+error: mismatched types
+  --> tests/ui/typeck/enum_errors.kr:16:32
+   |
+16 |         Shape a = Shape.Circle("wide");
+   |                                ^^^^^^ expected `double`, found `String`
+
+error: this variant takes 2 arguments but 1 argument was supplied
+  --> tests/ui/typeck/enum_errors.kr:17:25
+   |
+17 |         Shape b = Shape.Rect(1.0);
+   |                         ^^^^
+
+error: the variant `Shape.Circle` has fields
+  --> tests/ui/typeck/enum_errors.kr:18:25
+   |
+18 |         Shape c = Shape.Circle;
+   |                         ^^^^^^
+   |
+   = help: create it with `Shape.Circle(...)`
+
+error: the variant `Shape.Empty` has no fields
+  --> tests/ui/typeck/enum_errors.kr:19:25
+   |
+19 |         Shape d = Shape.Empty();
+   |                         ^^^^^
+   |
+   = help: write `Shape.Empty` without parentheses
+
+error: mismatched types
+  --> tests/ui/typeck/enum_errors.kr:20:28
+   |
+20 |         Option<String> e = Option.Some(5);
+   |                            ^^^^^^^^^^^^^^ expected `Option<String>`, found `Option<int>`
+
+error: values of type `Shape` cannot be compared with `==`
+  --> tests/ui/typeck/enum_errors.kr:21:24
+   |
+21 |         boolean same = a == b;
+   |                        ^^^^^^
+   |
+   = help: implement `Equatable<Shape>` for `Shape`
+
+error: mismatched types
+  --> tests/ui/typeck/enum_errors.kr:26:25
+   |
+26 |             case Circle(int r) -> r;
+   |                         ^^^ expected `double`, found `int`
+
+error: this pattern has 1 field, but the variant `Shape.Rect` has 2 fields
+  --> tests/ui/typeck/enum_errors.kr:27:18
+   |
+27 |             case Rect(double w) -> w;
+   |                  ^^^^ expected 2 fields
+
+error: the variant `Shape.Empty` has no fields
+  --> tests/ui/typeck/enum_errors.kr:28:18
+   |
+28 |             case Empty(double e) -> e;
+   |                  ^^^^^^^^^^^^^^^
+   |
+   = help: write `Empty` without parentheses
+
+error: no variant `Square` in enum `Shape`
+  --> tests/ui/typeck/enum_errors.kr:29:18
+   |
+29 |             case Square -> 0.0;
+   |                  ^^^^^^
+
+error: the variant `Shape.Circle` has fields
+  --> tests/ui/typeck/enum_errors.kr:30:18
+   |
+30 |             case Circle -> 0.0;
+   |                  ^^^^^^
+   |
+   = help: match its fields with `Circle(...)`, or ignore them with `Circle(_)`
+
+error: this `switch` expression does not cover every case
+  --> tests/ui/typeck/enum_errors.kr:35:16
+   |
+35 |         return switch (shape) {
+   |                ^^^^^^^^^^^^^^^^
+   |
+   = note: not covered: `Some(Rect(_, _))` and `Some(Empty)`
+   = help: add the missing cases, or a `default` case
+
+error: this `switch` statement does not cover every case
+  --> tests/ui/typeck/enum_errors.kr:42:9
+   |
+42 |         switch (shape) {
+   |         ^^^^^^^^^^^^^^^^
+   |
+   = note: not covered: `Circle(_)` and `Empty`
+   = help: add the missing cases, or a `default` case
+
+warning: unreachable pattern
+  --> tests/ui/typeck/enum_errors.kr:48:18
+   |
+48 |             case 2 -> "two";
+   |                  ^ the cases above already match every value of this pattern
+
+error: this `switch` expression does not cover every case
+  --> tests/ui/typeck/enum_errors.kr:51:25
+   |
+51 |         String answer = switch (flag) {
+   |                         ^^^^^^^^^^^^^^^
+   |
+   = note: not covered: `false`
+   = help: add the missing cases, or a `default` case
+
+warning: unreachable pattern
+  --> tests/ui/typeck/enum_errors.kr:56:18
+   |
+56 |             case Empty -> "empty";
+   |                  ^^^^^ the cases above already match every value of this pattern
+
+error: aborting due to 14 previous errors
+

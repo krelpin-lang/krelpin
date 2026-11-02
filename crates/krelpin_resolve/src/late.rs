@@ -1,9 +1,9 @@
 use std::collections::HashMap;
 
 use krelpin_ast::ast::{
-    Block, CompilationUnit, Constructor, Expr, ExprKind, Field, FieldStorage, FnRetTy,
+    Block, CaseLabel, CompilationUnit, Constructor, Expr, ExprKind, Field, FieldStorage, FnRetTy,
     GenericParamKind, Generics, Ident, ItemKind, LambdaBody, Member, MemberKind, Method, Param,
-    PrimitiveTy, Stmt, StmtKind, SwitchExprBody, Ty, TyKind, WherePredicate,
+    Pat, PatKind, Path, PrimitiveTy, Stmt, StmtKind, SwitchExprBody, Ty, TyKind, WherePredicate,
 };
 use krelpin_errors::{DiagCtxt, Diagnostic};
 use krelpin_span::{Span, Symbol, kw};
@@ -38,7 +38,6 @@ struct Resolver<'a> {
     scopes: Vec<HashMap<Symbol, Span>>,
     static_context: Option<StaticContext>,
     jumps: Jumps,
-    in_case_label: bool,
 }
 
 pub(crate) fn resolve_bodies(
@@ -62,7 +61,6 @@ pub(crate) fn resolve_bodies(
         scopes: Vec::new(),
         static_context: None,
         jumps: Jumps::default(),
-        in_case_label: false,
     };
 
     for (type_def, item) in table.items(units) {
@@ -431,8 +429,10 @@ impl<'a> Resolver<'a> {
                 self.resolve_expr(scrutinee);
                 self.jumps.breakable += 1;
                 for arm in arms {
-                    self.resolve_case_labels(arm.labels.as_deref());
-                    self.with_scope(|this| this.resolve_stmt(&arm.body));
+                    self.with_scope(|this| {
+                        this.resolve_case_label(&arm.label);
+                        this.resolve_stmt(&arm.body);
+                    });
                 }
                 self.jumps.breakable -= 1;
             }
@@ -505,15 +505,57 @@ impl<'a> Resolver<'a> {
         self.jumps.breakable -= 1;
     }
 
-    fn resolve_case_labels(&mut self, labels: Option<&[Expr]>) {
-        let Some(labels) = labels else {
+    fn resolve_case_label(&mut self, label: &CaseLabel) {
+        let CaseLabel::Case { pats, guard } = label else {
             return;
         };
-        self.in_case_label = true;
-        for label in labels {
-            self.resolve_expr(label);
+        for pat in pats {
+            self.resolve_pat(pat);
         }
-        self.in_case_label = false;
+        if pats.len() > 1 {
+            for binding in pats.iter().filter_map(first_binding) {
+                self.emit(
+                    Diagnostic::error("a case with several patterns cannot bind variables")
+                        .with_span(binding.span)
+                        .with_help("give each pattern its own `case`"),
+                );
+            }
+        }
+        if let Some(guard) = guard {
+            self.resolve_expr(guard);
+        }
+    }
+
+    fn resolve_pat(&mut self, pat: &Pat) {
+        match &pat.kind {
+            PatKind::Wild => {}
+            PatKind::Lit(expr) => self.resolve_expr(expr),
+            PatKind::Path(path) => self.resolve_pat_path(path),
+            PatKind::Ty { ty, binding } => {
+                self.resolve_ty(ty);
+                if let Some(binding) = binding {
+                    self.declare(*binding);
+                }
+            }
+            PatKind::Variant { path, fields } => {
+                self.resolve_pat_path(path);
+                for field in fields {
+                    self.resolve_pat(field);
+                }
+            }
+        }
+    }
+
+    fn resolve_pat_path(&mut self, path: &Path) {
+        match path.segments.as_slice() {
+            [name] => {
+                if let Some(res) = self.lookup_type(name.name) {
+                    self.resolutions.record(name.span, res);
+                }
+            }
+            [owner, _] => self.resolve_type_name(*owner),
+            _ => {}
+        }
     }
 
     fn resolve_expr(&mut self, expr: &Expr) {
@@ -568,12 +610,9 @@ impl<'a> Resolver<'a> {
                 self.resolve_expr(then);
                 self.resolve_expr(els);
             }
-            ExprKind::InstanceOf { expr, ty, binding } => {
+            ExprKind::InstanceOf { expr, pat } => {
                 self.resolve_expr(expr);
-                self.resolve_ty(ty);
-                if let Some(binding) = binding {
-                    self.declare(*binding);
-                }
+                self.resolve_pat(pat);
             }
             ExprKind::Cast { ty, expr } => {
                 self.resolve_ty(ty);
@@ -604,13 +643,15 @@ impl<'a> Resolver<'a> {
                     ..Jumps::default()
                 };
                 for arm in arms {
-                    self.resolve_case_labels(arm.labels.as_deref());
-                    match &arm.body {
-                        SwitchExprBody::Expr(expr) | SwitchExprBody::Throw(expr) => {
-                            self.resolve_expr(expr);
+                    self.with_scope(|this| {
+                        this.resolve_case_label(&arm.label);
+                        match &arm.body {
+                            SwitchExprBody::Expr(expr) | SwitchExprBody::Throw(expr) => {
+                                this.resolve_expr(expr);
+                            }
+                            SwitchExprBody::Block(block) => this.resolve_block(block),
                         }
-                        SwitchExprBody::Block(block) => self.resolve_block(block),
-                    }
+                    });
                 }
                 self.jumps = outer_jumps;
             }
@@ -632,7 +673,7 @@ impl<'a> Resolver<'a> {
             self.resolutions.record(name.span, res);
             return;
         }
-        if self.in_case_label || self.scope.has_unknown_glob {
+        if self.scope.has_unknown_glob {
             return;
         }
 
@@ -740,5 +781,13 @@ fn member_static_context(kind: &MemberKind) -> Option<StaticContext> {
         },
         MemberKind::Constructor(_) => None,
         MemberKind::Method(method) => method.receiver.is_none().then_some(StaticContext::Method),
+    }
+}
+
+fn first_binding(pat: &Pat) -> Option<Ident> {
+    match &pat.kind {
+        PatKind::Ty { binding, .. } => *binding,
+        PatKind::Variant { fields, .. } => fields.iter().find_map(first_binding),
+        PatKind::Wild | PatKind::Lit(_) | PatKind::Path(_) => None,
     }
 }

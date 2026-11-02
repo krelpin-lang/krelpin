@@ -3,8 +3,8 @@ use std::fmt;
 use crate::token::{Lit, LitKind};
 
 use super::{
-    Expr, ExprKind, Ident, LambdaBody, LambdaParam, Path, SwitchExprArm, SwitchExprBody, Ty,
-    TyKind, UnOp,
+    CaseLabel, Expr, ExprKind, Ident, LambdaBody, LambdaParam, Pat, PatKind, Path, SwitchExprArm,
+    SwitchExprBody, Ty, TyKind, UnOp,
 };
 
 impl fmt::Debug for Ident {
@@ -130,10 +130,7 @@ impl fmt::Display for Expr {
                 write!(f, "({lhs} {op}= {rhs})")
             }
             ExprKind::Ternary { cond, then, els } => write!(f, "({cond} ? {then} : {els})"),
-            ExprKind::InstanceOf { expr, ty, binding } => match binding {
-                Some(binding) => write!(f, "({expr} instanceof {ty} {})", binding.name),
-                None => write!(f, "({expr} instanceof {ty})"),
-            },
+            ExprKind::InstanceOf { expr, pat } => write!(f, "({expr} instanceof {pat})"),
             ExprKind::Cast { ty, expr } => write!(f, "(({ty}) {expr})"),
             ExprKind::Lambda { params, body } => {
                 let params: Vec<String> = params.iter().map(LambdaParam::to_string).collect();
@@ -153,14 +150,41 @@ impl fmt::Display for Expr {
 
 impl fmt::Display for SwitchExprArm {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        match &self.labels {
-            Some(labels) => write!(f, "case {} -> ", list(labels))?,
-            None => f.write_str("default -> ")?,
-        }
+        write!(f, "{} -> ", self.label)?;
         match &self.body {
             SwitchExprBody::Expr(expr) => write!(f, "{expr};"),
             SwitchExprBody::Block(_) => f.write_str("{ ... }"),
             SwitchExprBody::Throw(expr) => write!(f, "throw {expr};"),
+        }
+    }
+}
+
+impl fmt::Display for CaseLabel {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            CaseLabel::Default(_) => f.write_str("default"),
+            CaseLabel::Case { pats, guard } => {
+                write!(f, "case {}", list(pats))?;
+                match guard {
+                    Some(guard) => write!(f, " when {guard}"),
+                    None => Ok(()),
+                }
+            }
+        }
+    }
+}
+
+impl fmt::Display for Pat {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match &self.kind {
+            PatKind::Wild => f.write_str("_"),
+            PatKind::Lit(expr) => write!(f, "{expr}"),
+            PatKind::Path(path) => write!(f, "{path}"),
+            PatKind::Ty { ty, binding } => match binding {
+                Some(binding) => write!(f, "{ty} {}", binding.name),
+                None => write!(f, "{ty}"),
+            },
+            PatKind::Variant { path, fields } => write!(f, "{path}({})", list(fields)),
         }
     }
 }
@@ -178,7 +202,7 @@ fn access(safe: bool) -> &'static str {
     if safe { "?." } else { "." }
 }
 
-fn list(exprs: &[Expr]) -> String {
-    let parts: Vec<String> = exprs.iter().map(Expr::to_string).collect();
+fn list<T: fmt::Display>(items: &[T]) -> String {
+    let parts: Vec<String> = items.iter().map(T::to_string).collect();
     parts.join(", ")
 }

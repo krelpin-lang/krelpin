@@ -9,6 +9,7 @@ use crate::{lexer, parser};
 mod decls;
 mod exprs;
 mod items;
+mod pats;
 mod stmts;
 
 pub(super) struct Parsed {

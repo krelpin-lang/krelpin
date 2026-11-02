@@ -126,17 +126,12 @@ impl Parser<'_> {
                     return Ok(lhs);
                 }
                 self.bump();
-                let ty = self.parse_ty()?;
-                let binding = match self.token.ident() {
-                    Some(_) => Some(self.parse_ident()?),
-                    None => None,
-                };
+                let pat = self.parse_instanceof_pat()?;
                 lhs = self.mk_expr(
                     lo,
                     ExprKind::InstanceOf {
                         expr: Box::new(lhs),
-                        ty,
-                        binding,
+                        pat: Box::new(pat),
                     },
                 );
                 continue;
@@ -399,7 +394,7 @@ impl Parser<'_> {
 
     fn parse_switch_expr_arm(&mut self) -> PResult<SwitchExprArm> {
         let lo = self.token.span;
-        let labels = self.parse_switch_labels()?;
+        let label = self.parse_case_label()?;
 
         let body = if self.token.kind == TokenKind::OpenBrace {
             SwitchExprBody::Block(self.parse_block()?)
@@ -414,7 +409,7 @@ impl Parser<'_> {
         };
 
         Ok(SwitchExprArm {
-            labels,
+            label,
             body,
             span: lo.to(self.prev_token.span),
         })

@@ -1,4 +1,4 @@
-use krelpin_ast::ast::{Stmt, StmtKind};
+use krelpin_ast::ast::{CaseLabel, Stmt, StmtKind};
 
 use super::{body, body_errors, parse_str};
 
@@ -118,7 +118,10 @@ fn switch_with_arrows() {
     };
     let labels: Vec<Option<usize>> = arms
         .iter()
-        .map(|arm| arm.labels.as_ref().map(Vec::len))
+        .map(|arm| match &arm.label {
+            CaseLabel::Case { pats, .. } => Some(pats.len()),
+            CaseLabel::Default(_) => None,
+        })
         .collect();
     assert_eq!(labels, [Some(2), Some(1), None]);
 }

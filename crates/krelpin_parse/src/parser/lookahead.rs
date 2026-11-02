@@ -51,6 +51,10 @@ impl Parser<'_> {
             }
     }
 
+    pub(crate) fn ty_pat_ahead(&self) -> bool {
+        self.scan_type(0).is_some()
+    }
+
     pub(crate) fn variant_field_ahead(&self, start: usize) -> bool {
         let Some(end) = self.scan_type(start) else {
             return false;

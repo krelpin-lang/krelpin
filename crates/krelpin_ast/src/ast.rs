@@ -390,9 +390,30 @@ pub struct Local {
 
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct SwitchArm {
-    pub labels: Option<Vec<Expr>>,
+    pub label: CaseLabel,
     pub body: Box<Stmt>,
     pub span: Span,
+}
+
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub enum CaseLabel {
+    Default(Span),
+    Case { pats: Vec<Pat>, guard: Option<Expr> },
+}
+
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct Pat {
+    pub kind: PatKind,
+    pub span: Span,
+}
+
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub enum PatKind {
+    Wild,
+    Lit(Expr),
+    Path(Path),
+    Ty { ty: Ty, binding: Option<Ident> },
+    Variant { path: Path, fields: Vec<Pat> },
 }
 
 #[derive(Clone, Debug, PartialEq, Eq)]
@@ -473,8 +494,7 @@ pub enum ExprKind {
     },
     InstanceOf {
         expr: Box<Expr>,
-        ty: Ty,
-        binding: Option<Ident>,
+        pat: Box<Pat>,
     },
     Cast {
         ty: Ty,
@@ -496,7 +516,7 @@ pub enum ExprKind {
 
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct SwitchExprArm {
-    pub labels: Option<Vec<Expr>>,
+    pub label: CaseLabel,
     pub body: SwitchExprBody,
     pub span: Span,
 }

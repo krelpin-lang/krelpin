@@ -10,6 +10,7 @@ use krelpin_span::{Span, Symbol};
 use crate::check::{FnCtxt, plural};
 use crate::closure::is_closure;
 use crate::lang_items::LangItem;
+use crate::pat::Coverage;
 use crate::sig::{AdtKind, FieldSig};
 use crate::ty::{Ty, promote, promote_unary};
 
@@ -141,16 +142,9 @@ impl FnCtxt<'_, '_> {
                 let els_ty = self.with_narrowing(&when_false, |fcx| fcx.check_expr(els));
                 self.common_or_error(&then_ty, &els_ty, expr.span, "the branches of `?`")
             }
-            ExprKind::InstanceOf {
-                expr: operand,
-                ty,
-                binding,
-            } => {
-                self.check_expr(operand);
-                let ty = self.lower_ty(ty);
-                if let Some(binding) = binding {
-                    self.locals.insert(binding.span, ty);
-                }
+            ExprKind::InstanceOf { expr: operand, pat } => {
+                let ty = self.check_expr(operand);
+                self.check_pat(pat, &ty);
                 Ty::BOOLEAN
             }
             ExprKind::Cast { ty, expr: operand } => {
@@ -165,8 +159,9 @@ impl FnCtxt<'_, '_> {
             ExprKind::Switch { scrutinee, arms } => {
                 let scrutinee_ty = self.check_expr(scrutinee);
                 let mut arm_tys = Vec::new();
+                let mut match_arms = Vec::new();
                 for arm in arms {
-                    self.check_case_labels(arm.labels.as_deref(), &scrutinee_ty);
+                    match_arms.extend(self.check_case_label(&arm.label, &scrutinee_ty));
                     match &arm.body {
                         SwitchExprBody::Expr(value) => {
                             arm_tys.push((value.span, self.check_expr(value)))
@@ -182,9 +177,10 @@ impl FnCtxt<'_, '_> {
                         }
                     }
                 }
-                self.check_switch_exhaustive(
-                    arms.iter().map(|arm| arm.labels.as_deref()),
+                self.check_match(
                     &scrutinee_ty,
+                    &match_arms,
+                    Coverage::Required("this `switch` expression"),
                     expr.span,
                 );
 
@@ -203,9 +199,13 @@ impl FnCtxt<'_, '_> {
     }
 
     pub(crate) fn type_of_name(&self, expr: &Expr) -> Option<Ty> {
-        let ExprKind::Name(name) = expr.kind else {
-            return None;
-        };
+        match expr.kind {
+            ExprKind::Name(name) => self.type_of_ident(name),
+            _ => None,
+        }
+    }
+
+    pub(crate) fn type_of_ident(&self, name: Ident) -> Option<Ty> {
         match self.tcx.resolutions.get(name.span)? {
             Res::Item(def) => Some(Ty::Adt {
                 def,

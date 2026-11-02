@@ -292,39 +292,14 @@ impl Parser<'_> {
 
     fn parse_switch_arm(&mut self) -> PResult<SwitchArm> {
         let lo = self.token.span;
-        let labels = self.parse_switch_labels()?;
+        let label = self.parse_case_label()?;
         let body = Box::new(self.parse_stmt()?);
 
         Ok(SwitchArm {
-            labels,
+            label,
             body,
             span: lo.to(self.prev_token.span),
         })
-    }
-
-    pub(crate) fn parse_switch_labels(&mut self) -> PResult<Option<Vec<Expr>>> {
-        let labels = if self.eat_keyword(kw::Default) {
-            None
-        } else if self.eat_keyword(kw::Case) {
-            let mut labels = vec![self.parse_ternary()?];
-            while self.eat(TokenKind::Comma) {
-                labels.push(self.parse_ternary()?);
-            }
-            Some(labels)
-        } else {
-            return Err(self.unexpected());
-        };
-
-        if self.token.kind == TokenKind::Colon {
-            return Err(self.emit(
-                Diagnostic::error("switch cases must use `->`")
-                    .with_span(self.token.span)
-                    .with_note("switch cases in Krelpin never fall through to the next case")
-                    .with_help("write the case as `case 1 -> ...`"),
-            ));
-        }
-        self.expect(TokenKind::Arrow)?;
-        Ok(labels)
     }
 
     fn parse_try(&mut self) -> PResult<StmtKind> {
