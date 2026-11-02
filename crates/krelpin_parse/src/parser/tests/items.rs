@@ -110,9 +110,9 @@ fn constructors() {
 fn method_receivers() {
     let members = members(
         "class Person {\n\
-         \x20   &String getName() { return &this.name; }\n\
-         \x20   mut void rename(String newName) {}\n\
-         \x20   consume String intoName() { return this.name; }\n\
+         \x20   &String getName(&this) { return &this.name; }\n\
+         \x20   void rename(&mut this, String newName) {}\n\
+         \x20   String intoName(this) { return this.name; }\n\
          \x20   static int max(int a, int b) { return a; }\n\
          }",
     );
@@ -142,7 +142,7 @@ fn reference_types() {
         ret_ty("static &mut [a, b] String f() {}"),
         "&mut [a, b] String"
     );
-    assert_eq!(ret_ty("&[this] String f() {}"), "&[this] String");
+    assert_eq!(ret_ty("&[this] String f(&this) {}"), "&[this] String");
     assert_eq!(ret_ty("static &String? f() {}"), "&String?");
     assert_eq!(ret_ty("static &(String?) f() {}"), "&(String?)");
     assert_eq!(ret_ty("static &&String f() {}"), "&&String");
@@ -224,12 +224,13 @@ fn generic_methods_varargs_throws_and_abstract_methods() {
     };
     assert!(log.params[0].variadic);
 
-    let MemberKind::Method(read) = only_member("void read() throws IOException, Bad {}") else {
+    let MemberKind::Method(read) = only_member("void read(&this) throws IOException, Bad {}")
+    else {
         panic!("expected a method");
     };
     assert_eq!(read.throws.len(), 2);
 
-    let MemberKind::Method(run) = only_member("abstract void run();") else {
+    let MemberKind::Method(run) = only_member("abstract void run(&this);") else {
         panic!("expected a method");
     };
     assert!(run.body.is_none());
@@ -237,7 +238,8 @@ fn generic_methods_varargs_throws_and_abstract_methods() {
 
 #[test]
 fn docs_and_annotations() {
-    let members = members("class A { /** Docs */ @Override @Since(\"1.0\") String text() {} }");
+    let members =
+        members("class A { /** Docs */ @Override @Since(\"1.0\") String text(&this) {} }");
     assert_eq!(members[0].docs.len(), 1);
     assert_eq!(members[0].docs[0].as_str(), " Docs ");
 
@@ -270,14 +272,18 @@ fn signature_errors() {
         ["fields cannot have type `void`"]
     );
     assert_eq!(
-        errors("class A { void f(&this, int a) {} }"),
-        ["`&this` is not written as a parameter"]
+        errors("class A { void f(int a, &this) {} }"),
+        ["`this` must be the first parameter"]
     );
     assert_eq!(
-        errors("class A { void f(&mut this) {} void g(this) {} }"),
+        errors("class A { A(&this) {} }"),
+        ["constructors cannot take `this` as a parameter"]
+    );
+    assert_eq!(
+        errors("class A { void f() {} static void g(&this) {} }"),
         [
-            "`&mut this` is not written as a parameter",
-            "`this` is not written as a parameter"
+            "the method `f` has no `this` and must be `static`",
+            "a `static` method cannot take `this`"
         ]
     );
 }
@@ -285,24 +291,12 @@ fn signature_errors() {
 #[test]
 fn modifier_errors() {
     assert_eq!(
-        errors("class A { const void f() {} }"),
+        errors("class A { const void f(&this) {} }"),
         ["`const` cannot be used on methods"]
     );
     assert_eq!(
         errors("static class A {}"),
         ["`static` cannot be used on top-level types"]
-    );
-    assert_eq!(
-        errors("class A { static mut void f() {} mut int x; mut A() {} }"),
-        [
-            "a `static` method cannot be `mut`",
-            "`mut` cannot be used on fields",
-            "`mut` cannot be used on constructors"
-        ]
-    );
-    assert_eq!(
-        errors("class A { mut consume void f() {} }"),
-        ["only one of `mut` and `consume` can be used"]
     );
     assert_eq!(
         errors("class A { public private int x; }"),
@@ -341,7 +335,7 @@ fn unclosed_class() {
         ["this file contains an unclosed delimiter"]
     );
     assert_eq!(
-        errors("class A { void f() { if (x) { }"),
+        errors("class A { void f(&this) { if (x) { }"),
         ["this file contains an unclosed delimiter"]
     );
 }
@@ -417,7 +411,7 @@ fn files_are_parsed_in_parallel() {
 #[test]
 fn where_clauses() {
     let MemberKind::Method(method) = only_member(
-        "boolean has(T value) \
+        "boolean has(&this, T value) \
          where T extends Comparable<T> & Cloneable, U extends Object {}",
     ) else {
         panic!("expected a method");

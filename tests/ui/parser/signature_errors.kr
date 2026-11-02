@@ -1,7 +1,7 @@
 class Broken {
     void flag;
     void late(int a, &this) {}
-    const void constant() {}
+    const void constant(&this) {}
     public private int twice;
     Broken(&this) {}
     helper() {}

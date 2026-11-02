@@ -2,20 +2,20 @@ package std.util;
 
 class HashSet<T extends Hashable<T>> implements Set<T> {
     @Intrinsic
-    int size();
+    int size(&this);
 
     @Intrinsic
-    mut boolean add(T value);
+    boolean add(&mut this, T value);
 
     @Intrinsic
-    mut boolean remove(T value);
+    boolean remove(&mut this, T value);
 
     @Intrinsic
-    boolean contains(T value);
+    boolean contains(&this, T value);
 
     @Intrinsic
-    mut void clear();
+    void clear(&mut this);
 
     @Intrinsic
-    Iterator<T> iterator();
+    Iterator<T> iterator(&this);
 }

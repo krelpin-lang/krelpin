@@ -2,60 +2,60 @@ package std.lang;
 
 final class String implements Comparable<String>, Hashable<String> {
     @Intrinsic
-    int length();
+    int length(&this);
 
-    boolean isEmpty() {
+    boolean isEmpty(&this) {
         return this.length() == 0;
     }
 
     @Intrinsic
-    char[] chars();
+    char[] chars(&this);
 
     @Intrinsic
-    String substring(int begin);
+    String substring(&this, int begin);
 
     @Intrinsic
-    String substring(int begin, int end);
+    String substring(&this, int begin, int end);
 
     @Intrinsic
-    int indexOf(String text);
+    int indexOf(&this, String text);
 
-    boolean contains(String text) {
+    boolean contains(&this, String text) {
         return this.indexOf(text) >= 0;
     }
 
     @Intrinsic
-    boolean startsWith(String prefix);
+    boolean startsWith(&this, String prefix);
 
     @Intrinsic
-    boolean endsWith(String suffix);
+    boolean endsWith(&this, String suffix);
 
     @Intrinsic
-    String toUpperCase();
+    String toUpperCase(&this);
 
     @Intrinsic
-    String toLowerCase();
+    String toLowerCase(&this);
 
     @Intrinsic
-    String trim();
+    String trim(&this);
 
     @Intrinsic
-    String replace(String target, String replacement);
+    String replace(&this, String target, String replacement);
 
     @Intrinsic
-    String repeat(int count);
+    String repeat(&this, int count);
 
     @Intrinsic
-    String[] split(String separator);
+    String[] split(&this, String separator);
 
     @Intrinsic
-    int compareTo(&String other);
+    int compareTo(&this, &String other);
 
     @Intrinsic
-    boolean equals(&String other);
+    boolean equals(&this, &String other);
 
     @Intrinsic
-    int hashCode();
+    int hashCode(&this);
 
     @Intrinsic
     static String join(String separator, String... parts);

@@ -61,7 +61,7 @@ error: `break` outside of a loop or switch
 error: cannot find borrow source `other`
   --> tests/ui/resolve/resolve_errors.kr:22:7
    |
-22 |     &[other] String name() {
+22 |     &[other] String name(&this) {
    |       ^^^^^
    |
    = help: a borrow source must name a parameter of the method, `this`, or a `&` generic parameter of the class

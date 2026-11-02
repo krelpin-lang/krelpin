@@ -8,20 +8,20 @@ final class AtomicLong {
     }
 
     @Intrinsic
-    long get();
+    long get(&this);
 
     @Intrinsic
-    void set(long value);
+    void set(&this, long value);
 
     @Intrinsic
-    boolean compareAndSet(long expected, long value);
+    boolean compareAndSet(&this, long expected, long value);
 
     @Intrinsic
-    long increment();
+    long increment(&this);
 
     @Intrinsic
-    long decrement();
+    long decrement(&this);
 
     @Intrinsic
-    long addAndGet(long delta);
+    long addAndGet(&this, long delta);
 }

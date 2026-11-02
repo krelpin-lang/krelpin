@@ -6,7 +6,7 @@ final class Byte implements Comparable<byte>, Hashable<byte> {
 
     private Byte() {}
 
-    int compareTo(&byte other) {
+    int compareTo(&this, &byte other) {
         if (this < other) {
             return -1;
         }
@@ -16,10 +16,10 @@ final class Byte implements Comparable<byte>, Hashable<byte> {
     @Intrinsic
     static byte parse(String text);
 
-    boolean equals(&byte other) {
+    boolean equals(&this, &byte other) {
         return this == other;
     }
 
     @Intrinsic
-    int hashCode();
+    int hashCode(&this);
 }

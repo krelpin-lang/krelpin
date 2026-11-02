@@ -5,7 +5,7 @@ macro Builder;
 @Builder
 class Order {
     @Derive(Equatable)
-    int total() {
+    int total(&this) {
         return 0;
     }
 }

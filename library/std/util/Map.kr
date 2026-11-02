@@ -1,23 +1,23 @@
 package std.util;
 
 interface Map<K, V> {
-    int size();
+    int size(&this);
 
-    boolean isEmpty() {
+    boolean isEmpty(&this) {
         return this.size() == 0;
     }
 
-    V? get(K key);
+    V? get(&this, K key);
 
-    mut V? put(K key, V value);
+    V? put(&mut this, K key, V value);
 
-    mut V? remove(K key);
+    V? remove(&mut this, K key);
 
-    boolean containsKey(K key);
+    boolean containsKey(&this, K key);
 
-    mut void clear();
+    void clear(&mut this);
 
-    Set<K> keySet();
+    Set<K> keySet(&this);
 
-    List<V> values();
+    List<V> values(&this);
 }

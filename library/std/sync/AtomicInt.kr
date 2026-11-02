@@ -8,20 +8,20 @@ final class AtomicInt {
     }
 
     @Intrinsic
-    int get();
+    int get(&this);
 
     @Intrinsic
-    void set(int value);
+    void set(&this, int value);
 
     @Intrinsic
-    boolean compareAndSet(int expected, int value);
+    boolean compareAndSet(&this, int expected, int value);
 
     @Intrinsic
-    int increment();
+    int increment(&this);
 
     @Intrinsic
-    int decrement();
+    int decrement(&this);
 
     @Intrinsic
-    int addAndGet(int delta);
+    int addAndGet(&this, int delta);
 }

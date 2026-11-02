@@ -3,9 +3,9 @@ package shapes;
 interface Shape extends Comparable<Shape> {
     const int MAX_SIDES = 12;
 
-    double area();
+    double area(&this);
 
-    String describe() {
+    String describe(&this) {
         return switch (this.sides()) {
             case 3 -> "triangle";
             case 4 -> "quadrilateral";
@@ -15,7 +15,7 @@ interface Shape extends Comparable<Shape> {
         };
     }
 
-    int sides();
+    int sides(&this);
 }
 
 struct Point {
@@ -31,7 +31,7 @@ enum Paint {
 
     const String DEFAULT = "#000000";
 
-    boolean isClear() {
+    boolean isClear(&this) {
         return this.ordinal() == 2;
     }
 }
@@ -47,9 +47,9 @@ abstract class Polygon implements Shape {
 
     Point[] points;
 
-    abstract double area();
+    abstract double area(&this);
 
-    final int sides() {
+    final int sides(&this) {
         return this.points.length;
     }
 }

@@ -1,5 +1,5 @@
 package std.function;
 
 interface Consumer<T> {
-    void accept(T value);
+    void accept(&this, T value);
 }

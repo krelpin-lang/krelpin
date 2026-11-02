@@ -24,12 +24,12 @@ class LinkedList<T> {
         int count;
     }
 
-    mut void push(int value) {
+    void push(&mut this, int value) {
         Node node = Node.of(value);
         this.head = node;
     }
 
-    Kind kind() {
+    Kind kind(&this) {
         return Kind.Single;
     }
 }

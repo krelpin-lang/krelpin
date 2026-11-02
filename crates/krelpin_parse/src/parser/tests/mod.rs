@@ -73,7 +73,7 @@ pub(super) fn ret_ty(src: &str) -> String {
 }
 
 pub(super) fn body(src: &str) -> Vec<Stmt> {
-    let members = members(&format!("class A {{ void f() {{ {src} }} }}"));
+    let members = members(&format!("class A {{ void f(&this) {{ {src} }} }}"));
     match &members[0].kind {
         MemberKind::Method(method) => method.body.clone().expect("method has a body").stmts,
         other => panic!("expected a method, found {other:?}"),
@@ -81,7 +81,7 @@ pub(super) fn body(src: &str) -> Vec<Stmt> {
 }
 
 pub(super) fn body_errors(src: &str) -> Vec<String> {
-    errors(&format!("class A {{ void f() {{ {src} }} }}"))
+    errors(&format!("class A {{ void f(&this) {{ {src} }} }}"))
 }
 
 pub(super) fn expr(src: &str) -> String {

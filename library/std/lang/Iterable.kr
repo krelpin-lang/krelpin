@@ -4,9 +4,9 @@ import std.function.Consumer;
 import std.util.Iterator;
 
 interface Iterable<T> {
-    Iterator<T> iterator();
+    Iterator<T> iterator(&this);
 
-    void forEach(Consumer<T> action) {
+    void forEach(&this, Consumer<T> action) {
         Iterator<T> values = this.iterator();
         while (values.hasNext()) {
             action.accept(values.next());

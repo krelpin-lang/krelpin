@@ -16,15 +16,15 @@ class Person {
         Person.created.increment();
     }
 
-    &String getName() {
+    &String getName(&this) {
         return &this.name;
     }
 
-    mut void rename(String newName) {
+    void rename(&mut this, String newName) {
         this.name = newName;
     }
 
-    int nicknameLength() {
+    int nicknameLength(&this) {
         return this.nickname?.length() ?: 0;
     }
 }

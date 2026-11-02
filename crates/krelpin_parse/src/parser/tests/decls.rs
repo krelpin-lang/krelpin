@@ -24,7 +24,7 @@ fn structs() {
         "struct Point implements Comparable<Point> {\n\
          \x20   int x;\n\
          \x20   int y;\n\
-         \x20   double length() { return Math.sqrt(this.x * this.x + this.y * this.y); }\n\
+         \x20   double length(&this) { return Math.sqrt(this.x * this.x + this.y * this.y); }\n\
          }",
     );
     let ItemKind::Struct(point) = &unit.items[0].kind else {
@@ -39,8 +39,8 @@ fn interfaces() {
     let unit = parse_ok(
         "interface Shape extends Drawable, Comparable<Shape> {\n\
          \x20   const int SIDES = 0;\n\
-         \x20   double area();\n\
-         \x20   String describe() { return \"shape\"; }\n\
+         \x20   double area(&this);\n\
+         \x20   String describe(&this) { return \"shape\"; }\n\
          }",
     );
     let ItemKind::Interface(shape) = &unit.items[0].kind else {
@@ -68,7 +68,7 @@ fn enums() {
          \x20   Empty,\n\
          \x20   ;\n\
          \x20   const double PI = 3.14;\n\
-         \x20   double area() { return 0.0; }\n\
+         \x20   double area(&this) { return 0.0; }\n\
          }",
     );
     let ItemKind::Enum(shape) = &unit.items[0].kind else {
@@ -132,11 +132,11 @@ fn enums_have_no_constructors() {
 fn abstract_and_final() {
     let unit = parse_ok(
         "abstract class Animal {\n\
-         \x20   abstract String sound();\n\
-         \x20   final String name() { return \"animal\"; }\n\
+         \x20   abstract String sound(&this);\n\
+         \x20   final String name(&this) { return \"animal\"; }\n\
          }\n\
          final class Dog extends Animal {\n\
-         \x20   String sound() { return \"woof\"; }\n\
+         \x20   String sound(&this) { return \"woof\"; }\n\
          }",
     );
     assert!(unit.items[0].inheritance.abstract_kw.is_some());
@@ -207,7 +207,7 @@ fn member_errors() {
         ["missing body for method `f`"]
     );
     assert_eq!(
-        errors("class A { @Intrinsic int f(); }"),
+        errors("class A { @Intrinsic int f(&this); }"),
         Vec::<String>::new()
     );
     assert_eq!(
@@ -239,7 +239,7 @@ fn nested_types() {
          \x20   static class Node { int value; }\n\
          \x20   enum Kind { Single, Double }\n\
          \x20   struct Entry { int count; }\n\
-         \x20   interface Visitor { void visit(Node node); }\n\
+         \x20   interface Visitor { void visit(&this, Node node); }\n\
          }",
     );
     let ItemKind::Class(list) = &unit.items[0].kind else {
@@ -257,9 +257,5 @@ fn nested_types() {
     assert_eq!(
         errors("class A { class B {} }"),
         ["inner classes are not supported"]
-    );
-    assert_eq!(
-        errors("class A { mut static class B {} }"),
-        ["`mut` cannot be used on types"]
     );
 }

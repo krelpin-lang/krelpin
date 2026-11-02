@@ -10,11 +10,11 @@ struct Money {
 class Counter {
     int count;
 
-    mut void bump() {
+    void bump(&mut this) {
         this.count++;
     }
 
-    int read() {
+    int read(&this) {
         return this.count;
     }
 }

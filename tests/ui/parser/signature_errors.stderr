@@ -4,19 +4,18 @@ error: fields cannot have type `void`
 2 |     void flag;
   |     ^^^^
 
-error: `&this` is not written as a parameter
+error: `this` must be the first parameter
  --> tests/ui/parser/signature_errors.kr:3:22
   |
 3 |     void late(int a, &this) {}
   |                      ^^^^^
   |
-  = note: every method that is not `static` can use `this`
-  = help: remove it; methods read `this` without changing it by default
+  = help: move `this` to the start of the parameter list
 
 error: `const` cannot be used on methods
  --> tests/ui/parser/signature_errors.kr:4:5
   |
-4 |     const void constant() {}
+4 |     const void constant(&this) {}
   |     ^^^^^
   |
   = help: `const` is only allowed on fields
@@ -29,14 +28,13 @@ error: multiple visibility modifiers
   |
   = help: remove all but one visibility modifier
 
-error: `&this` is not written as a parameter
+error: constructors cannot take `this` as a parameter
  --> tests/ui/parser/signature_errors.kr:6:12
   |
 6 |     Broken(&this) {}
   |            ^^^^^
   |
-  = note: every method that is not `static` can use `this`
-  = help: remove it; methods read `this` without changing it by default
+  = help: constructors always have access to the object being built
 
 error: missing return type for method
  --> tests/ui/parser/signature_errors.kr:7:5

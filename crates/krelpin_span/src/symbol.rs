@@ -33,7 +33,6 @@ keywords! {
     Char: "char",
     Class: "class",
     Const: "const",
-    Consume: "consume",
     Continue: "continue",
     Default: "default",
     Do: "do",

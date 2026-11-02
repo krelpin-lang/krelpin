@@ -10,11 +10,11 @@ class Files {
 }
 
 class Base {
-    void save() {}
+    void save(&this) {}
 }
 
 class Cache extends Base {
-    void save() throws IOException {}
+    void save(&this) throws IOException {}
 }
 
 class Main {

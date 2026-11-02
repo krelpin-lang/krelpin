@@ -3,19 +3,19 @@ package geometry;
 import std.function.Consumer;
 
 interface Shape extends Comparable<Shape> {
-    double area();
+    double area(&this);
 
-    String describe() {
+    String describe(&this) {
         return "a shape with area " + this.area();
     }
 
-    int compareTo(&Shape other) {
+    int compareTo(&this, &Shape other) {
         return this.area().compareTo(&other.area());
     }
 }
 
 interface Transform<A, B> {
-    B apply(A value);
+    B apply(&this, A value);
 }
 
 abstract class Polygon implements Shape {
@@ -34,11 +34,11 @@ class Square extends Polygon {
         this.side = side;
     }
 
-    double area() {
+    double area(&this) {
         return this.side * this.side;
     }
 
-    String describe() {
+    String describe(&this) {
         return "a square with side " + this.side;
     }
 }
@@ -50,7 +50,7 @@ class Circle implements Shape {
         this.radius = radius;
     }
 
-    double area() {
+    double area(&this) {
         return Math.PI * this.radius * this.radius;
     }
 }

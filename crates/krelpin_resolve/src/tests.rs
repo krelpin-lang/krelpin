@@ -73,7 +73,7 @@ fn errors(src: &str) -> Vec<String> {
 
 fn in_method(body: &str) -> Vec<String> {
     errors(&format!(
-        "class A {{ int count; mut void run(int arg) {{ {body} }} }}"
+        "class A {{ int count; void run(&mut this, int arg) {{ {body} }} }}"
     ))
 }
 
@@ -101,7 +101,7 @@ fn locals_params_and_types_resolve() {
         "class Person {\n\
          \x20   String name;\n\
          \x20   Person(String name) { this.name = name; }\n\
-         \x20   void greet(Person other) {\n\
+         \x20   void greet(&this, Person other) {\n\
          \x20       String text = other.name;\n\
          \x20       Console.println(text);\n\
          \x20   }\n\
@@ -139,14 +139,14 @@ fn unknown_names() {
 
 #[test]
 fn fields_need_explicit_this() {
-    let resolved = resolve_str("class A { int count; mut void run() { count = 1; } }");
+    let resolved = resolve_str("class A { int count; void run(&mut this) { count = 1; } }");
     assert_eq!(resolved.errors, ["cannot find value `count` in this scope"]);
     assert_eq!(
         resolved.helps,
         ["to use the field of this object, write `this.count`"]
     );
 
-    let resolved = resolve_str("class A { const int MAX = 1; int f() { return MAX; } }");
+    let resolved = resolve_str("class A { const int MAX = 1; int f(&this) { return MAX; } }");
     assert_eq!(
         resolved.helps,
         ["to use the field of the class, write `A.MAX`"]
@@ -155,7 +155,7 @@ fn fields_need_explicit_this() {
 
 #[test]
 fn this_is_only_available_with_a_receiver() {
-    ok("class A { int x; A() { this.x = 1; } int get() { return this.x; } }");
+    ok("class A { int x; A() { this.x = 1; } int get(&this) { return this.x; } }");
     assert_eq!(
         errors("class A { int x; static int get() { return this.x; } }"),
         ["`this` is not available here"]
@@ -168,10 +168,10 @@ fn this_is_only_available_with_a_receiver() {
 
 #[test]
 fn instance_methods_need_an_object() {
-    ok("class A { void helper() {} void run() { this.helper(); } }");
-    ok("class A { static int twice(int x) { return x * 2; } int run() { return twice(2); } }");
+    ok("class A { void helper(&this) {} void run(&this) { this.helper(); } }");
+    ok("class A { static int twice(int x) { return x * 2; } int run(&this) { return twice(2); } }");
 
-    let resolved = resolve_str("class A { void helper() {} void run() { helper(); } }");
+    let resolved = resolve_str("class A { void helper(&this) {} void run(&this) { helper(); } }");
     assert_eq!(
         resolved.errors,
         ["method `helper` needs an object to be called on"]
@@ -212,7 +212,7 @@ fn duplicate_definitions() {
 
 #[test]
 fn methods_can_be_overloaded() {
-    ok("class A { void f() {} void f(int x) {} }");
+    ok("class A { void f(&this) {} void f(&this, int x) {} }");
 }
 
 #[test]
@@ -261,10 +261,10 @@ fn instanceof_bindings_are_scoped_to_the_if() {
 
 #[test]
 fn generics_and_borrow_sources() {
-    ok("class Box<T> { T value; <U> U map(U other) { return other; } }");
+    ok("class Box<T> { T value; <U> U map(&this, U other) { return other; } }");
     ok("class Parser<&src> { &[src] String input; }");
     ok("class A { static &[a, b] String longer(&String a, &String b) { return a; } }");
-    ok("class A { String text; &[this] String get() { return &this.text; } }");
+    ok("class A { String text; &[this] String get(&this) { return &this.text; } }");
 
     assert_eq!(
         errors("class A { static &[c] String f(&String a) { return a; } }"),
@@ -398,7 +398,7 @@ fn local_types_shadow_the_prelude() {
 
 #[test]
 fn only_the_standard_library_declares_intrinsics() {
-    let resolved = resolve_str("class A { @Intrinsic int f(); }");
+    let resolved = resolve_str("class A { @Intrinsic int f(&this); }");
     assert_eq!(
         resolved.errors,
         ["only the standard library can declare intrinsics"]
@@ -408,10 +408,10 @@ fn only_the_standard_library_declares_intrinsics() {
 #[test]
 fn where_clauses_constrain_generic_parameters() {
     ok("class Bag<T> {\n\
-        \x20   boolean has(T value) where T extends Comparable<T> { return true; }\n\
+        \x20   boolean has(&this, T value) where T extends Comparable<T> { return true; }\n\
         }");
     assert_eq!(
-        errors("class Bag<T> { boolean has(T value) where U extends Comparable<U> {} }"),
+        errors("class Bag<T> { boolean has(&this, T value) where U extends Comparable<U> {} }"),
         ["cannot find generic parameter `U`"]
     );
 }

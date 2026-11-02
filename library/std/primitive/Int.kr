@@ -6,7 +6,7 @@ final class Int implements Comparable<int>, Hashable<int> {
 
     private Int() {}
 
-    int compareTo(&int other) {
+    int compareTo(&this, &int other) {
         if (this < other) {
             return -1;
         }
@@ -16,10 +16,10 @@ final class Int implements Comparable<int>, Hashable<int> {
     @Intrinsic
     static int parse(String text);
 
-    boolean equals(&int other) {
+    boolean equals(&this, &int other) {
         return this == other;
     }
 
     @Intrinsic
-    int hashCode();
+    int hashCode(&this);
 }

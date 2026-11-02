@@ -1,5 +1,5 @@
 package std.function;
 
 interface Predicate<T> {
-    boolean test(T value);
+    boolean test(&this, T value);
 }

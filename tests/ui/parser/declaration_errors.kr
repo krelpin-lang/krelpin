@@ -1,5 +1,5 @@
 struct Point extends Base {
-    abstract mut void move();
+    abstract void move(&mut this);
 }
 
 interface Named implements Other {
@@ -8,8 +8,8 @@ interface Named implements Other {
 }
 
 abstract final class Broken {
-    void missingBody();
-    abstract void withBody() {}
+    void missingBody(&this);
+    abstract void withBody(&this) {}
 }
 
 enum Level {

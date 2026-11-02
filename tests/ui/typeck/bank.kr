@@ -1,7 +1,7 @@
 package bank;
 
 interface Account {
-    long balance();
+    long balance(&this);
 }
 
 enum Kind {
@@ -26,11 +26,11 @@ class BankAccount implements Account {
         BankAccount.opened.increment();
     }
 
-    long balance() {
+    long balance(&this) {
         return this.cents;
     }
 
-    mut boolean withdraw(long amount) {
+    boolean withdraw(&mut this, long amount) {
         if (this.cents + BankAccount.OVERDRAFT < amount) {
             return false;
         }
@@ -38,7 +38,7 @@ class BankAccount implements Account {
         return true;
     }
 
-    String label() {
+    String label(&this) {
         String? nick = this.nickname;
         if (nick != null && nick.length() > 0) {
             return nick;

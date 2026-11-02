@@ -6,20 +6,20 @@ class Account {
         return this.balance;
     }
 
-    mut void deposit(int amount) {
+    void deposit(&mut this, int amount) {
         balance = balance + amount;
         audit();
         Strin note = null;
         int amount = 0;
     }
 
-    void audit() {
+    void audit(&this) {
         if (LIMIT > 0) {
             break;
         }
     }
 
-    &[other] String name() {
+    &[other] String name(&this) {
         return null;
     }
 }

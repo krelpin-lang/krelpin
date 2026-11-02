@@ -8,10 +8,10 @@ final class Thread {
     }
 
     @Intrinsic
-    mut void start();
+    void start(&mut this);
 
     @Intrinsic
-    mut void join();
+    void join(&mut this);
 
     @Intrinsic
     static void sleep(long millis);

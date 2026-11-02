@@ -1,5 +1,5 @@
 package std.lang;
 
 interface Comparable<T> {
-    int compareTo(&T other);
+    int compareTo(&this, &T other);
 }

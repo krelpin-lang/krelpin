@@ -1,5 +1,5 @@
 class Errors {
-    mut void run() {
+    void run(&mut this) {
         int count = 1
         count + 1;
         switch (count) {

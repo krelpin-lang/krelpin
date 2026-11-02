@@ -1,7 +1,7 @@
 error: `save` cannot throw `IOException` because `Base.save` does not
   --> tests/ui/typeck/checked_exceptions.kr:17:10
    |
-17 |     void save() throws IOException {}
+17 |     void save(&this) throws IOException {}
    |          ^^^^
    |
    = help: an overriding method can only throw the checked exceptions of the method it overrides

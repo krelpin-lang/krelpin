@@ -178,7 +178,7 @@ fn statement_errors() {
 #[test]
 fn unclosed_nested_block_reports_once() {
     assert_eq!(
-        super::errors("class A { void f() { if (x) { y(); }"),
+        super::errors("class A { void f(&this) { if (x) { y(); }"),
         ["this file contains an unclosed delimiter"]
     );
 }
