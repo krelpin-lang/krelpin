@@ -43,6 +43,17 @@ impl Ty {
         matches!(self, Ty::Unknown)
     }
 
+    pub fn references_unknown(&self) -> bool {
+        match self {
+            Ty::Unknown => true,
+            Ty::Adt { args, .. } | Ty::External { args, .. } => {
+                args.iter().any(Ty::references_unknown)
+            }
+            Ty::Ref { ty, .. } | Ty::Nullable(ty) | Ty::Array(ty) => ty.references_unknown(),
+            Ty::Primitive(_) | Ty::Void | Ty::Null | Ty::Param(_) => false,
+        }
+    }
+
     pub fn is_boolean(&self) -> bool {
         *self == Ty::BOOLEAN
     }

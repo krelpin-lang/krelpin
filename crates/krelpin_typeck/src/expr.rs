@@ -9,6 +9,7 @@ use krelpin_span::def_id::DefId;
 use krelpin_span::{Span, Symbol};
 
 use crate::check::{FnCtxt, plural};
+use crate::coerce::Coercion;
 use crate::lang_items::LangItem;
 use crate::sig::{AdtKind, FieldSig, MethodSig};
 use crate::ty::{Subst, Ty, promote};
@@ -51,19 +52,10 @@ impl FnCtxt<'_, '_> {
     }
 
     pub(crate) fn require_assignable(&self, expr: &Expr, actual: &Ty, expected: &Ty) {
-        if self.accepts(expr, actual, expected) {
+        if self.accepts(expr, actual, expected, Coercion::Boxing) {
             return;
         }
         self.mismatch(expr.span, expected, actual);
-    }
-
-    fn accepts(&self, expr: &Expr, actual: &Ty, expected: &Ty) -> bool {
-        self.is_assignable(actual, expected)
-            || (is_int_literal(expr)
-                && matches!(
-                    expected.non_null(),
-                    Ty::Primitive(PrimitiveTy::Byte | PrimitiveTy::Short | PrimitiveTy::Char)
-                ))
     }
 
     fn check_expr_kind(&mut self, expr: &Expr) -> Ty {
@@ -635,98 +627,6 @@ impl FnCtxt<'_, '_> {
         self.call(candidates, args, arg_tys, name, "constructor");
     }
 
-    fn call(
-        &mut self,
-        candidates: Vec<(MethodSig, Subst)>,
-        args: &[Expr],
-        arg_tys: &[Ty],
-        name: Ident,
-        what: &str,
-    ) -> Ty {
-        let instantiated: Vec<(MethodSig, Vec<Ty>, Ty)> = candidates
-            .into_iter()
-            .map(|(method, mut subst)| {
-                for generic in &method.generics {
-                    subst.insert(generic.name, Ty::Unknown);
-                }
-                let params = method.params.iter().map(|p| p.subst(&subst)).collect();
-                let ret = method.ret.subst(&subst);
-                (method, params, ret)
-            })
-            .collect();
-
-        let arity_ok: Vec<&(MethodSig, Vec<Ty>, Ty)> = instantiated
-            .iter()
-            .filter(|(method, params, _)| arity_matches(method.variadic, params.len(), args.len()))
-            .collect();
-
-        let Some(first) = arity_ok.first() else {
-            let message = match instantiated.as_slice() {
-                [(method, params, _)] => format!(
-                    "this {what} takes {} but {} {} supplied",
-                    plural_args(params.len(), method.variadic),
-                    plural(args.len(), "argument"),
-                    if args.len() == 1 { "was" } else { "were" },
-                ),
-                _ => format!(
-                    "no overload of `{}` takes {}",
-                    name.name,
-                    plural(args.len(), "argument")
-                ),
-            };
-            self.error(name.span, message);
-            return Ty::Unknown;
-        };
-
-        let chosen = arity_ok
-            .iter()
-            .find(|(method, params, _)| self.args_fit(method.variadic, params, args, arg_tys));
-
-        let (method, _, ret) = match chosen {
-            Some(chosen) => *chosen,
-            None if arity_ok.len() == 1 => {
-                let (method, params, _) = first;
-                self.report_arg_mismatches(method.variadic, params, args, arg_tys);
-                *first
-            }
-            None => {
-                let found: Vec<String> = arg_tys.iter().map(Ty::to_string).collect();
-                self.error(
-                    name.span,
-                    format!(
-                        "no overload of `{}` accepts arguments of type ({})",
-                        name.name,
-                        found.join(", ")
-                    ),
-                );
-                return Ty::Unknown;
-            }
-        };
-
-        self.check_vis(method.vis, method.owner, false, what, name);
-        ret.clone()
-    }
-
-    fn args_fit(&self, variadic: bool, params: &[Ty], args: &[Expr], arg_tys: &[Ty]) -> bool {
-        (0..args.len()).all(|index| {
-            param_options(variadic, params, index, args.len())
-                .iter()
-                .any(|expected| self.accepts(&args[index], &arg_tys[index], expected))
-        })
-    }
-
-    fn report_arg_mismatches(&self, variadic: bool, params: &[Ty], args: &[Expr], arg_tys: &[Ty]) {
-        for index in 0..args.len() {
-            let options = param_options(variadic, params, index, args.len());
-            let fits = options
-                .iter()
-                .any(|expected| self.accepts(&args[index], &arg_tys[index], expected));
-            if let (false, Some(expected)) = (fits, options.last()) {
-                self.mismatch(args[index].span, expected, &arg_tys[index]);
-            }
-        }
-    }
-
     fn check_new(&mut self, ty: &krelpin_ast::ast::Ty, args: &[Expr], span: Span) -> Ty {
         let ty = self.lower_ty(ty);
         let arg_tys: Vec<Ty> = args.iter().map(|arg| self.check_expr(arg)).collect();
@@ -1076,51 +976,9 @@ impl FnCtxt<'_, '_> {
     }
 }
 
-fn is_int_literal(expr: &Expr) -> bool {
-    match &expr.kind {
-        ExprKind::Lit(lit) => lit.kind == LitKind::Integer && lit.suffix.is_none(),
-        ExprKind::Unary {
-            op: UnOp::Neg,
-            expr,
-        } => is_int_literal(expr),
-        _ => false,
-    }
-}
-
 fn numeric_result(l: &Ty, r: &Ty) -> Option<Ty> {
     match (l.primitive(), r.primitive()) {
         (Some(a), Some(b)) if l.is_numeric() && r.is_numeric() => Some(promote(a, b)),
         _ => None,
-    }
-}
-
-fn arity_matches(variadic: bool, params: usize, args: usize) -> bool {
-    if variadic {
-        args + 1 >= params
-    } else {
-        args == params
-    }
-}
-
-fn param_options(variadic: bool, params: &[Ty], index: usize, arg_count: usize) -> Vec<Ty> {
-    let last = params.len().saturating_sub(1);
-    match params.get(last) {
-        Some(Ty::Array(elem)) if variadic && index >= last => {
-            let elem = elem.as_ref().clone();
-            if arg_count == params.len() && index == last {
-                vec![params[last].clone(), elem]
-            } else {
-                vec![elem]
-            }
-        }
-        _ => vec![params.get(index).cloned().unwrap_or(Ty::Unknown)],
-    }
-}
-
-fn plural_args(count: usize, variadic: bool) -> String {
-    if variadic {
-        format!("at least {}", plural(count.saturating_sub(1), "argument"))
-    } else {
-        plural(count, "argument")
     }
 }

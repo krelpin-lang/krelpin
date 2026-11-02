@@ -1,3 +1,4 @@
+mod call;
 mod check;
 mod coerce;
 mod expr;

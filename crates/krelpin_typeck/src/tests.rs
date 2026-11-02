@@ -638,11 +638,15 @@ fn console_prints_values_and_borrows() {
         "Console.println(); Console.println(1); Console.println(2L); Console.println('c'); \
          Console.println(true); Console.println(1.5); Console.println(\"text\"); \
          Console.println(new Point(1, 2)); String s = \"x\"; Console.println(&s); \
-         Console.print(null); String? line = Console.readLine();",
+         String? maybe = null; Console.print(maybe); String? line = Console.readLine();",
     );
     assert_eq!(
         in_body("String line = Console.readLine();"),
         ["mismatched types"]
+    );
+    assert_eq!(
+        in_body("Console.print(null);"),
+        ["call to `print` is ambiguous"]
     );
 }
 
@@ -744,5 +748,111 @@ fn type_parameters_have_the_methods_of_their_bounds() {
     assert_eq!(
         errors("class View<T> { Comparable<T> view(&this, T value) { return value; } }"),
         ["mismatched types"]
+    );
+}
+
+fn pick(code: &str) -> String {
+    format!(
+        "class Pick {{\n\
+         \x20   int f(long x) {{ return 1; }}\n\
+         \x20   String f(int x) {{ return \"\"; }}\n\
+         \x20   boolean g(Object? x) {{ return true; }}\n\
+         \x20   char g(String? x) {{ return 'c'; }}\n\
+         \x20   double h(Integer x) {{ return 1.0; }}\n\
+         \x20   long h(long x) {{ return 1L; }}\n\
+         \x20   int v(String... xs) {{ return 0; }}\n\
+         \x20   String v(String x) {{ return x; }}\n\
+         \x20   void amb(Integer a, long b) {{}}\n\
+         \x20   void amb(long a, Integer b) {{}}\n\
+         }}\n\
+         class Main {{ void run(&this) {{ {code} }} }}"
+    )
+}
+
+#[test]
+fn the_most_specific_overload_is_chosen() {
+    ok(&pick(
+        "String a = Pick.f(1); int b = Pick.f(1L); char c = Pick.g(\"x\"); \
+         boolean d = Pick.g(new Pick());",
+    ));
+    assert_eq!(errors(&pick("int a = Pick.f(1);")), ["mismatched types"]);
+    assert_eq!(
+        errors(&pick("char d = Pick.g(new Pick());")),
+        ["mismatched types"]
+    );
+}
+
+#[test]
+fn boxing_is_only_used_when_needed() {
+    ok(&pick(
+        "long a = Pick.h(1); double b = Pick.h(Integer.valueOf(1));",
+    ));
+}
+
+#[test]
+fn variadic_methods_are_the_last_resort() {
+    ok(&pick(
+        "String a = Pick.v(\"x\"); int b = Pick.v(\"x\", \"y\"); int c = Pick.v();",
+    ));
+}
+
+#[test]
+fn ambiguous_calls() {
+    assert_eq!(
+        errors(&pick("Pick.amb(1, 2);")),
+        ["call to `amb` is ambiguous"]
+    );
+    assert_eq!(
+        helps(&pick("Pick.amb(1, 2);")),
+        [
+            "it could call `Pick.amb(Integer, long)` or `Pick.amb(long, Integer)`",
+            "cast the arguments to the types of the method you want to call",
+        ]
+    );
+}
+
+fn util(code: &str) -> String {
+    format!(
+        "class Util {{\n\
+         \x20   <T> T first(List<T> xs) {{ return xs.get(0); }}\n\
+         \x20   <T> T either(T a, T b) {{ return a; }}\n\
+         \x20   <T extends Comparable<T>> T max(T a, T b) {{\n\
+         \x20       return a.compareTo(b) >= 0 ? a : b;\n\
+         \x20   }}\n\
+         \x20   <T> List<T> listOf(T... xs) {{ return new ArrayList<>(); }}\n\
+         }}\n\
+         class Thing {{}}\n\
+         class Main {{ void run(&this) {{ {code} }} }}"
+    )
+}
+
+#[test]
+fn generic_methods_infer_their_type_arguments() {
+    ok(&util(
+        "List<String> names = new ArrayList<>(); String s = Util.first(names); \
+         Integer i = Util.either(1, 2); String m = Util.max(\"a\", \"b\"); \
+         List<String> xs = Util.listOf(\"a\", \"b\");",
+    ));
+    assert_eq!(
+        errors(&util(
+            "List<String> names = new ArrayList<>(); int n = Util.first(names);"
+        )),
+        ["mismatched types"]
+    );
+    assert_eq!(
+        labels(&util("List<Integer> xs = Util.listOf(\"a\");")),
+        ["expected `List<Integer>`, found `List<String>`"]
+    );
+    assert_eq!(
+        errors(&util("Object o = Util.either(\"a\", 1);")),
+        ["mismatched types"]
+    );
+}
+
+#[test]
+fn inferred_type_arguments_satisfy_bounds() {
+    assert_eq!(
+        errors(&util("Thing t = Util.max(new Thing(), new Thing());")),
+        ["type `Thing` does not satisfy the bound of `T`"]
     );
 }
