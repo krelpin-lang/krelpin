@@ -451,6 +451,18 @@ impl Printer<'_, '_> {
                 let _ = write!(self.out, " as {})", expr.ty);
             }
             ExprKind::Switch { scrutinee, arms } => self.switch(scrutinee, arms),
+            ExprKind::With { base, fields } => {
+                self.expr(base);
+                self.out.push_str(" with { ");
+                for (index, field) in fields.iter().enumerate() {
+                    if index > 0 {
+                        self.out.push_str(", ");
+                    }
+                    let _ = write!(self.out, "{} = ", field.name);
+                    self.expr(&field.value);
+                }
+                self.out.push_str(" }");
+            }
             ExprKind::Equals {
                 callee,
                 lhs,

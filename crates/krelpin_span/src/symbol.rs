@@ -76,6 +76,7 @@ keywords! {
     When: "when",
     Where: "where",
     While: "while",
+    With: "with",
     Yield: "yield",
 }
 

@@ -1,8 +1,9 @@
 use krelpin_ast::ast::{
-    BinOp, Expr, ExprKind, Ident, LambdaBody, LambdaParam, PrimitiveTy, SwitchExprArm,
+    BinOp, Expr, ExprKind, FieldInit, Ident, LambdaBody, LambdaParam, PrimitiveTy, SwitchExprArm,
     SwitchExprBody, TyKind, UnOp,
 };
 use krelpin_ast::token::TokenKind;
+use krelpin_errors::Diagnostic;
 use krelpin_span::{Span, kw};
 
 use super::{Expected, PResult, Parser};
@@ -325,6 +326,13 @@ impl Parser<'_> {
                         expr: Box::new(expr),
                     }
                 }
+                TokenKind::Ident(kw::With) if self.look_ahead(1) == TokenKind::OpenBrace => {
+                    self.bump();
+                    ExprKind::With {
+                        base: Box::new(expr),
+                        fields: self.parse_field_inits()?,
+                    }
+                }
                 TokenKind::PathSep => {
                     self.bump();
                     let name = if self.eat_keyword_noexpect(kw::New) {
@@ -341,6 +349,37 @@ impl Parser<'_> {
             };
             expr = self.mk_expr(lo, kind);
         }
+    }
+
+    fn parse_field_inits(&mut self) -> PResult<Vec<FieldInit>> {
+        let open = self.expect(TokenKind::OpenBrace)?;
+        let mut fields = Vec::new();
+        loop {
+            if self.eat(TokenKind::CloseBrace) {
+                break;
+            }
+            let lo = self.token.span;
+            let name = self.parse_ident()?;
+            self.expect(TokenKind::Eq)?;
+            let value = self.parse_expr()?;
+            fields.push(FieldInit {
+                name,
+                value,
+                span: lo.to(self.prev_token.span),
+            });
+            if !self.eat(TokenKind::Comma) {
+                self.expect(TokenKind::CloseBrace)?;
+                break;
+            }
+        }
+        if fields.is_empty() {
+            self.emit(
+                Diagnostic::error("`with` needs at least one field")
+                    .with_span(open.to(self.prev_token.span))
+                    .with_help("write the fields to change, like `with { email = \"...\" }`"),
+            );
+        }
+        Ok(fields)
     }
 
     pub(crate) fn parse_args(&mut self) -> PResult<Vec<Expr>> {

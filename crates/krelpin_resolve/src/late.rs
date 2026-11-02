@@ -705,6 +705,12 @@ impl<'a> Resolver<'a> {
                 self.jumps = outer_jumps;
             }
             ExprKind::MethodRef { expr, .. } => self.resolve_expr(expr),
+            ExprKind::With { base, fields } => {
+                self.resolve_expr(base);
+                for field in fields {
+                    self.resolve_expr(&field.value);
+                }
+            }
             ExprKind::Switch { scrutinee, arms } => {
                 self.resolve_expr(scrutinee);
                 let outer_jumps = self.jumps;

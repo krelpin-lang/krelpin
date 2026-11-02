@@ -1,5 +1,6 @@
 use krelpin_ast::ast::{
-    BinOp, Expr, ExprKind, FieldStorage, Ident, PrimitiveTy, SwitchExprBody, UnOp, Visibility,
+    BinOp, Expr, ExprKind, FieldInit, FieldStorage, Ident, PrimitiveTy, SwitchExprBody, UnOp,
+    Visibility,
 };
 use krelpin_ast::token::{Lit, LitKind};
 use krelpin_errors::Diagnostic;
@@ -153,6 +154,7 @@ impl FnCtxt<'_, '_> {
                 self.check_cast(&from, &to, expr.span);
                 to
             }
+            ExprKind::With { base, fields } => self.check_with(base, fields),
             ExprKind::Lambda { .. } | ExprKind::MethodRef { .. } => {
                 self.check_closure(expr, &Ty::Unknown)
             }
@@ -196,6 +198,55 @@ impl FnCtxt<'_, '_> {
                 result.unwrap_or(Ty::Unknown)
             }
         }
+    }
+
+    fn check_with(&mut self, base: &Expr, fields: &[FieldInit]) -> Ty {
+        let base_ty = self.check_expr(base);
+        let ty = base_ty.strip_refs().clone();
+        let struct_ty = match &ty {
+            Ty::Adt { def, args, .. } if self.tcx.sig(*def).kind == AdtKind::Struct => {
+                Some((*def, args.clone()))
+            }
+            Ty::Unknown | Ty::External { .. } => None,
+            other => {
+                self.emit(
+                    Diagnostic::error(format!("`with` cannot be used on `{other}`"))
+                        .with_span(base.span)
+                        .with_note("only structs can be copied with some of their fields changed")
+                        .with_help(
+                            "a class keeps its rules in its constructor; create a new object",
+                        ),
+                );
+                None
+            }
+        };
+
+        let mut seen: Vec<Symbol> = Vec::new();
+        for field in fields {
+            let name = field.name;
+            let expected = match &struct_ty {
+                Some((def, args)) => match self.find_field(*def, args, name.name) {
+                    Some((sig, field_ty)) if sig.storage == FieldStorage::Instance => {
+                        self.results.fields.insert(name.span, sig);
+                        field_ty
+                    }
+                    _ => {
+                        self.no_field(&ty, name);
+                        Ty::Unknown
+                    }
+                },
+                None => Ty::Unknown,
+            };
+            if seen.contains(&name.name) {
+                self.error(
+                    name.span,
+                    format!("the field `{}` is set more than once", name.name),
+                );
+            }
+            seen.push(name.name);
+            self.check_expr_coerce(&field.value, &expected);
+        }
+        ty
     }
 
     pub(crate) fn type_of_name(&self, expr: &Expr) -> Option<Ty> {

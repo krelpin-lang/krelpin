@@ -255,6 +255,10 @@ pub enum ExprKind {
         scrutinee: Box<Expr>,
         arms: Vec<Arm>,
     },
+    With {
+        base: Box<Expr>,
+        fields: Vec<WithField>,
+    },
     Equals {
         callee: Box<Callee>,
         lhs: Box<Expr>,
@@ -263,6 +267,12 @@ pub enum ExprKind {
     },
     Closure(Box<Closure>),
     Unresolved,
+}
+
+#[derive(Debug)]
+pub struct WithField {
+    pub name: Symbol,
+    pub value: Expr,
 }
 
 #[derive(Debug)]

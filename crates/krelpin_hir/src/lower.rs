@@ -15,6 +15,7 @@ use crate::captures::{captures, expr_captures};
 use crate::hir::{
     Arm, ArmBody, Block, Body, BodyKind, BodyValue, Catch, Closure, ClosureBody, ClosureKind,
     Dispatch, Expr, ExprKind, Hir, LocalDecl, LocalId, LoopKind, Pat, PatKind, Stmt, StmtKind,
+    WithField,
 };
 
 pub fn lower(
@@ -511,6 +512,31 @@ impl LoweringCtxt<'_, '_> {
             ast::ExprKind::Cast { expr: operand, .. } => ExprKind::Cast {
                 expr: Box::new(self.lower_expr(operand)),
             },
+            ast::ExprKind::With { base, fields } => {
+                let base = self.lower_expr(base);
+                let subst = match base.ty.strip_refs() {
+                    Ty::Adt { def, args, .. } => self.tcx.subst_for(*def, args),
+                    _ => Default::default(),
+                };
+                let fields = fields
+                    .iter()
+                    .map(|field| {
+                        let value = self.lower_expr(&field.value);
+                        let value = match self.results.fields.get(&field.name.span) {
+                            Some(sig) => coerce(value, &sig.ty.subst(&subst)),
+                            None => value,
+                        };
+                        WithField {
+                            name: field.name.name,
+                            value,
+                        }
+                    })
+                    .collect();
+                ExprKind::With {
+                    base: Box::new(base),
+                    fields,
+                }
+            }
             ast::ExprKind::Lambda { params, body } => self.lower_lambda(params, body, &ty),
             ast::ExprKind::MethodRef { expr: target, name } => self.lower_method_ref(target, *name),
             ast::ExprKind::Switch { scrutinee, arms } => ExprKind::Switch {

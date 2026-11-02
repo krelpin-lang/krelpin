@@ -1,0 +1,19 @@
+package demo;
+
+struct User {
+    String name;
+    String email;
+    long visits;
+}
+
+class Account {
+    String owner;
+}
+
+class Main {
+    static User rename(User user) {
+        User renamed = user with { email = "another@example.com", visits = 1 };
+        return renamed;
+    }
+
+}

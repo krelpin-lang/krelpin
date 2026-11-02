@@ -1745,3 +1745,35 @@ fn results_record_callees_and_fields() {
         .collect();
     assert_eq!(fields, ["cents", "currency"]);
 }
+
+#[test]
+fn with_copies_a_struct_with_some_fields_changed() {
+    let src = |code: &str| {
+        format!(
+            "struct User {{ String name; String email; long visits; }}\n\
+             class Account {{ String owner; }}\n\
+             class Main {{ static void run(User user, Account account) {{ {code} }} }}"
+        )
+    };
+    ok(&src(
+        "User other = user with { email = \"x@example.com\", visits = 1 };",
+    ));
+    assert_eq!(
+        errors(&src("User other = user with { phone = \"1\" };")),
+        ["no field `phone` on type `User`"]
+    );
+    assert_eq!(
+        errors(&src("User other = user with { visits = \"x\" };")),
+        ["mismatched types"]
+    );
+    assert_eq!(
+        errors(&src(
+            "User other = user with { name = \"a\", name = \"b\" };"
+        )),
+        ["the field `name` is set more than once"]
+    );
+    assert_eq!(
+        errors(&src("Account other = account with { owner = \"x\" };")),
+        ["`with` cannot be used on `Account`"]
+    );
+}

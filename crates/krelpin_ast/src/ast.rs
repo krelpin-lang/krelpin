@@ -534,6 +534,17 @@ pub enum ExprKind {
         scrutinee: Box<Expr>,
         arms: Vec<SwitchExprArm>,
     },
+    With {
+        base: Box<Expr>,
+        fields: Vec<FieldInit>,
+    },
+}
+
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct FieldInit {
+    pub name: Ident,
+    pub value: Expr,
+    pub span: Span,
 }
 
 #[derive(Clone, Debug, PartialEq, Eq)]

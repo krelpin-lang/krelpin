@@ -146,3 +146,15 @@ fn switch_expressions() {
         "switch (x) { case 0 -> { ... } default -> throw new Error(); }"
     );
 }
+
+#[test]
+fn with_expressions() {
+    assert_eq!(
+        expr("user with { email = \"a\", visits = 1 }"),
+        "(user with { email = \"a\", visits = 1 })"
+    );
+    assert_eq!(
+        expr("users[0] with { visits = n + 1, }"),
+        "(users[0] with { visits = (n + 1) })"
+    );
+}

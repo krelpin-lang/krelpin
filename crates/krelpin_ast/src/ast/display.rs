@@ -140,6 +140,13 @@ impl fmt::Display for Expr {
                 }
             }
             ExprKind::MethodRef { expr, name } => write!(f, "{expr}::{}", name.name),
+            ExprKind::With { base, fields } => {
+                let fields: Vec<String> = fields
+                    .iter()
+                    .map(|field| format!("{} = {}", field.name.name, field.value))
+                    .collect();
+                write!(f, "({base} with {{ {} }})", fields.join(", "))
+            }
             ExprKind::Switch { scrutinee, arms } => {
                 let arms: Vec<String> = arms.iter().map(SwitchExprArm::to_string).collect();
                 write!(f, "switch ({scrutinee}) {{ {} }}", arms.join(" "))
