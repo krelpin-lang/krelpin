@@ -31,7 +31,7 @@ fn check_str(src: &str) -> (crate::TypeckResults, Vec<Diagnostic>, SourceMap) {
         "parse, expansion or resolve errors in {src:?}"
     );
 
-    let results = crate::check(&units, &resolved, &dcx);
+    let results = crate::check(&units, &resolved, &dcx).results;
     (results, buffer.diagnostics(), source_map)
 }
 

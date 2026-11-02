@@ -216,6 +216,7 @@ pub enum Edition {
 pub enum Emit {
     Tokens,
     Ast,
+    Hir,
     Ir,
     Asm,
     Obj,

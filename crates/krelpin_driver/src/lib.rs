@@ -100,14 +100,25 @@ pub fn run(args: &Args, sess: &Session) {
         return;
     }
 
-    krelpin_typeck::check(&units, &resolved, &sess.dcx);
+    let typeck = krelpin_typeck::check(&units, &resolved, &sess.dcx);
     if sess.dcx.has_errors() {
         return;
     }
 
+    let hir = krelpin_hir::lower(&units, &resolved, &typeck.tcx, &typeck.results);
+    let user_unit = units.len() - 1;
+    for emit in emits.iter().filter(|emit| emit.kind == Emit::Hir) {
+        let bodies = hir
+            .bodies
+            .iter()
+            .filter(|body| resolved.items.def(body.owner).unit == user_unit);
+        let rendered = krelpin_hir::print(bodies, &typeck.tcx);
+        write_output(sess, emit.path.as_deref(), &rendered);
+    }
+
     for emit in &emits {
         match emit.kind {
-            Emit::Tokens | Emit::Ast | Emit::Metadata => {}
+            Emit::Tokens | Emit::Ast | Emit::Hir | Emit::Metadata => {}
             kind => sess.dcx.emit(Diagnostic::error(format!(
                 "`--emit={}` is not supported yet",
                 value_name(kind)

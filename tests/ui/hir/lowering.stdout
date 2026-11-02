@@ -1,0 +1,55 @@
+fn Money.equals(this_0: &Money, other_1: &Money) -> boolean {
+    return ((this_0.cents == other_1.cents) && (this_0.currency == other_1.currency));
+}
+
+field Register.history(this_0: &mut Register) -> ArrayList<Money> = new ArrayList();
+
+ctor Register.Register(this_0: &mut Register, count_1: int) -> void {
+    this_0.count = count_1;
+}
+
+fn Register.record(this_0: &mut Register, payment_1: Payment) -> void {
+    switch payment_1 {
+        Payment::Card(number_2: String, amount_3: Money) if (amount_3.cents > 0) => {
+            ArrayList::add(&mut this_0.history, amount_3);
+        }
+        Payment::Card(_, _) => {
+        }
+        Payment::Cash(amount_4: Money) => {
+            ArrayList::add(&mut this_0.history, amount_4);
+        }
+        Payment::Free => {
+        }
+    }
+    (this_0.count++);
+}
+
+fn Register.total(this_0: &Register) -> long {
+    let sum_1: long = 0;
+    for money_2 in this_0.history {
+        sum_1 += money_2.cents;
+    }
+    {
+        let i_3: int = 0;
+        while (i_3 < this_0.count) then (i_3++) {
+            if (i_3 > 10) {
+                break;
+            }
+        }
+    }
+    return sum_1;
+}
+
+fn Register.describe(this_0: &Register, payment_1: Payment) -> String {
+    return switch payment_1 {
+        Payment::Card(_, amount_2: Money) => ("card " + String::length(&amount_2.currency))
+        Payment::Cash(_) => "cash"
+        Payment::Free => Register::label(this_0, ["free", "no", "charge"])
+    };
+}
+
+fn Register.label(this_0: &Register, parts_1: String[]) -> String {
+    let sizes_2: int[] = new int[len(parts_1)];
+    return if (len(parts_1) > 0) { parts_1[0] } else { "" };
+}
+

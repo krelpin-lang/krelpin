@@ -67,12 +67,18 @@ pub struct Callee {
     pub packs_varargs: bool,
 }
 
-pub fn check(
+pub struct TypeckOutput<'a> {
+    pub tcx: Tcx<'a>,
+    pub results: TypeckResults,
+}
+
+pub fn check<'a>(
     units: &[CompilationUnit],
-    resolved: &ResolverOutput,
-    dcx: &DiagCtxt,
-) -> TypeckResults {
+    resolved: &'a ResolverOutput,
+    dcx: &'a DiagCtxt,
+) -> TypeckOutput<'a> {
     let mut tcx = Tcx::new(units, resolved, dcx);
     tcx.break_inheritance_cycles();
-    check::check_units(&tcx, units)
+    let results = check::check_units(&tcx, units);
+    TypeckOutput { tcx, results }
 }

@@ -55,6 +55,8 @@ fn run_test(root: &Path, file: &Path, bless: bool) -> Option<String> {
         "--emit=tokens"
     } else if relative.starts_with("tests/ui/parser") {
         "--emit=ast"
+    } else if relative.starts_with("tests/ui/hir") {
+        "--emit=hir"
     } else {
         "--emit=metadata"
     };
