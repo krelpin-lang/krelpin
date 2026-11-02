@@ -20,7 +20,7 @@ class ArrayList<T> implements List<T> {
     T remove(&mut this, int index);
 
     @Intrinsic
-    int indexOf(&this, T value);
+    int indexOf(&this, T value) where T extends Equatable<T>;
 
     @Intrinsic
     void clear(&mut this);

@@ -1,12 +1,12 @@
 package std.primitive;
 
-final class Byte implements Comparable<byte> {
+final class Byte implements Comparable<byte>, Hashable<byte> {
     public const byte MIN_VALUE = -128;
     public const byte MAX_VALUE = 127;
 
     private Byte() {}
 
-    int compareTo(&this, byte other) {
+    int compareTo(&this, &byte other) {
         if (this < other) {
             return -1;
         }
@@ -15,4 +15,11 @@ final class Byte implements Comparable<byte> {
 
     @Intrinsic
     byte parse(String text);
+
+    boolean equals(&this, &byte other) {
+        return this == other;
+    }
+
+    @Intrinsic
+    int hashCode(&this);
 }

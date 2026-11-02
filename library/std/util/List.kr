@@ -17,11 +17,11 @@ interface List<T> extends Iterable<T> {
 
     T remove(&mut this, int index);
 
-    boolean contains(&this, T value) {
+    boolean contains(&this, T value) where T extends Equatable<T> {
         return this.indexOf(value) >= 0;
     }
 
-    int indexOf(&this, T value);
+    int indexOf(&this, T value) where T extends Equatable<T>;
 
     void clear(&mut this);
 }

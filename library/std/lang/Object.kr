@@ -3,10 +3,4 @@ package std.lang;
 class Object {
     @Intrinsic
     String toString(&this);
-
-    @Intrinsic
-    boolean equals(&this, Object? other);
-
-    @Intrinsic
-    int hashCode(&this);
 }

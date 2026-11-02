@@ -1,12 +1,12 @@
 package std.primitive;
 
-final class Short implements Comparable<short> {
+final class Short implements Comparable<short>, Hashable<short> {
     public const short MIN_VALUE = -32768;
     public const short MAX_VALUE = 32767;
 
     private Short() {}
 
-    int compareTo(&this, short other) {
+    int compareTo(&this, &short other) {
         if (this < other) {
             return -1;
         }
@@ -15,4 +15,11 @@ final class Short implements Comparable<short> {
 
     @Intrinsic
     short parse(String text);
+
+    boolean equals(&this, &short other) {
+        return this == other;
+    }
+
+    @Intrinsic
+    int hashCode(&this);
 }

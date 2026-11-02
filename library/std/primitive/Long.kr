@@ -1,12 +1,12 @@
 package std.primitive;
 
-final class Long implements Comparable<long> {
+final class Long implements Comparable<long>, Hashable<long> {
     public const long MIN_VALUE = -9223372036854775808L;
     public const long MAX_VALUE = 9223372036854775807L;
 
     private Long() {}
 
-    int compareTo(&this, long other) {
+    int compareTo(&this, &long other) {
         if (this < other) {
             return -1;
         }
@@ -15,4 +15,11 @@ final class Long implements Comparable<long> {
 
     @Intrinsic
     long parse(String text);
+
+    boolean equals(&this, &long other) {
+        return this == other;
+    }
+
+    @Intrinsic
+    int hashCode(&this);
 }

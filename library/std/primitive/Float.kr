@@ -1,12 +1,12 @@
 package std.primitive;
 
-final class Float implements Comparable<float> {
+final class Float implements Comparable<float>, Hashable<float> {
     public const float MIN_VALUE = 1.4e-45f;
     public const float MAX_VALUE = 3.4028235e38f;
 
     private Float() {}
 
-    int compareTo(&this, float other) {
+    int compareTo(&this, &float other) {
         if (this < other) {
             return -1;
         }
@@ -15,4 +15,11 @@ final class Float implements Comparable<float> {
 
     @Intrinsic
     float parse(String text);
+
+    boolean equals(&this, &float other) {
+        return this == other;
+    }
+
+    @Intrinsic
+    int hashCode(&this);
 }

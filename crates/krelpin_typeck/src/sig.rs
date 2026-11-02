@@ -337,6 +337,7 @@ impl<'a> Tcx<'a> {
                     },
                 );
             }
+            self.synthesize_enum_members(&mut sig, def_id);
         }
 
         for member in members {
@@ -369,6 +370,50 @@ impl<'a> Tcx<'a> {
         }
 
         sig
+    }
+
+    fn synthesize_enum_members(&self, sig: &mut TypeSig, def: DefId) {
+        let self_ty = self.def_ty(def, Vec::new());
+        if let Some(hashable) = self.lang_items.get(LangItem::Hashable) {
+            sig.interfaces
+                .push(self.def_ty(hashable, vec![self_ty.clone()]));
+        }
+
+        let span = sig.name.span;
+        let method = |name: &str, receiver, params, ret| MethodSig {
+            name: Ident::new(Symbol::intern(name), span),
+            params,
+            variadic: false,
+            ret,
+            receiver,
+            vis: Visibility::Public(span),
+            owner: def,
+            generics: Vec::new(),
+            where_bounds: Vec::new(),
+            throws: Vec::new(),
+            is_abstract: false,
+            is_final: true,
+        };
+        let borrowed_self = Ty::Ref {
+            mutable: false,
+            ty: Box::new(self_ty.clone()),
+        };
+        let methods = [
+            method("values", None, Vec::new(), Ty::Array(Box::new(self_ty))),
+            method(
+                "equals",
+                Some(ReceiverKind::Ref),
+                vec![borrowed_self],
+                Ty::BOOLEAN,
+            ),
+            method("hashCode", Some(ReceiverKind::Ref), Vec::new(), Ty::INT),
+        ];
+        for method in methods {
+            sig.methods
+                .entry(method.name.name)
+                .or_default()
+                .push(method);
+        }
     }
 
     fn method_sig(

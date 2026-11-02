@@ -535,10 +535,7 @@ fn string_methods_are_checked() {
 
 #[test]
 fn every_object_has_the_methods_of_object() {
-    body_ok(
-        "Point p = new Point(1, 2); String text = p.toString(); int hash = p.hashCode(); \
-         boolean same = p.equals(new Point(1, 2)); Object any = p;",
-    );
+    body_ok("Point p = new Point(1, 2); String text = p.toString(); Object any = p;");
     ok("interface Shape { double area(&this); }\n\
         class Main { String f(Shape shape) { return shape.toString(); } }");
     ok("enum Color { RED, GREEN }\n\
@@ -623,7 +620,7 @@ fn primitives_are_the_only_number_types() {
 fn primitives_have_members() {
     body_ok(
         "int big = int.MAX_VALUE; long small = long.MIN_VALUE; int parsed = int.parse(\"42\"); \
-         int order = 5.compareTo(6); String text = 5.toString(); boolean digit = 'x'.isDigit();",
+         int order = 5.compareTo(&6); String text = 5.toString(); boolean digit = 'x'.isDigit();",
     );
     assert_eq!(
         in_body("int x = 5; int n = x.lenght();"),
@@ -743,7 +740,7 @@ fn generic_arguments_satisfy_bounds() {
 fn type_parameters_have_the_methods_of_their_bounds() {
     ok("class Max {\n\
         \x20   <T extends Comparable<T>> T max(T a, T b) {\n\
-        \x20       return a.compareTo(b) >= 0 ? a : b;\n\
+        \x20       return a.compareTo(&b) >= 0 ? a : b;\n\
         \x20   }\n\
         }");
     ok("class Show<T> { String show(&this, T value) { return value.toString(); } }");
@@ -817,7 +814,7 @@ fn util(code: &str) -> String {
          \x20   <T> T first(List<T> xs) {{ return xs.get(0); }}\n\
          \x20   <T> T either(T a, T b) {{ return a; }}\n\
          \x20   <T extends Comparable<T>> T max(T a, T b) {{\n\
-         \x20       return a.compareTo(b) >= 0 ? a : b;\n\
+         \x20       return a.compareTo(&b) >= 0 ? a : b;\n\
          \x20   }}\n\
          \x20   <T> List<T> listOf(T... xs) {{ return new ArrayList<>(); }}\n\
          }}\n\
@@ -1305,7 +1302,7 @@ fn bag(code: &str) -> String {
          \x20   T first;\n\
          \x20   Bag(T first) {{ this.first = first; }}\n\
          \x20   boolean isSmall(&this, T limit) where T extends Comparable<T> {{\n\
-         \x20       return this.first.compareTo(limit) < 0;\n\
+         \x20       return this.first.compareTo(&limit) < 0;\n\
          \x20   }}\n\
          }}\n\
          class Thing {{}}\n\
@@ -1328,8 +1325,84 @@ fn where_clauses_are_checked_at_the_call() {
     assert_eq!(
         errors(
             "class Bag<T> { T first; boolean bad(&this, T other) { \
-             return this.first.compareTo(other) < 0; } }"
+             return this.first.compareTo(&other) < 0; } }"
         ),
         ["no method named `compareTo` found for `T`"]
+    );
+}
+
+fn points(code: &str) -> String {
+    format!(
+        "class Point implements Hashable<Point> {{\n\
+         \x20   int x;\n\
+         \x20   Point(int x) {{ this.x = x; }}\n\
+         \x20   boolean equals(&this, &Point other) {{ return this.x == other.x; }}\n\
+         \x20   int hashCode(&this) {{ return this.x; }}\n\
+         }}\n\
+         class Thing {{}}\n\
+         enum Color {{ RED, GREEN }}\n\
+         class Main {{ void run(&this) {{ {code} }} }}"
+    )
+}
+
+#[test]
+fn equality_needs_equatable() {
+    ok(&points(
+        "Point a = new Point(1); Point b = new Point(2); boolean same = a == b; \
+         boolean text = \"a\" != \"b\"; boolean number = 1 == 1L; \
+         boolean color = Color.RED == Color.GREEN; Point? maybe = null; \
+         boolean missing = maybe == null; boolean found = maybe == a;",
+    ));
+    let src = points("Thing a = new Thing(); boolean same = a == new Thing();");
+    assert_eq!(
+        errors(&src),
+        ["values of type `Thing` cannot be compared with `==`"]
+    );
+    assert_eq!(helps(&src), ["implement `Equatable<Thing>` for `Thing`"]);
+    assert_eq!(
+        errors(&points("boolean wrong = \"a\" == 1;")),
+        ["cannot compare `String` with `int`"]
+    );
+    assert_eq!(
+        errors(&points("int x = 1; boolean wrong = x == null;")),
+        ["cannot compare `int` with `null`"]
+    );
+}
+
+#[test]
+fn generic_equality_needs_a_bound() {
+    ok("class Box<T extends Equatable<T>> { boolean same(&this, T a, T b) { return a == b; } }");
+    let src = "class Box<T> { boolean same(&this, T a, T b) { return a == b; } }";
+    assert_eq!(
+        errors(src),
+        ["values of type `T` cannot be compared with `==`"]
+    );
+    assert_eq!(helps(src), ["add the bound `T extends Equatable<T>`"]);
+}
+
+#[test]
+fn hash_collections_need_hashable_keys() {
+    ok(&points(
+        "Map<Point, String> names = new HashMap<Point, String>(); \
+         Set<Color> colors = new HashSet<Color>(); Set<String> words = new HashSet<String>();",
+    ));
+    assert_eq!(
+        errors(&points(
+            "Map<Thing, int> counts = new HashMap<Thing, int>();"
+        )),
+        ["type `Thing` does not satisfy the bound of `K`"]
+    );
+}
+
+#[test]
+fn list_lookups_need_equatable_elements() {
+    ok(&points(
+        "List<Point> points = new ArrayList<>(); boolean has = points.contains(new Point(1));",
+    ));
+    assert_eq!(
+        errors(&points(
+            "List<Thing> things = new ArrayList<>(); things.contains(new Thing());"
+        )),
+        ["type `Thing` does not satisfy the bound of `T`"]
     );
 }

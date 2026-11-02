@@ -1,12 +1,12 @@
 package std.primitive;
 
-final class Char implements Comparable<char> {
+final class Char implements Comparable<char>, Hashable<char> {
     public const char MIN_VALUE = '\u0000';
     public const char MAX_VALUE = '￿';
 
     private Char() {}
 
-    int compareTo(&this, char other) {
+    int compareTo(&this, &char other) {
         if (this < other) {
             return -1;
         }
@@ -36,4 +36,11 @@ final class Char implements Comparable<char> {
 
     @Intrinsic
     char toLowerCase(&this);
+
+    boolean equals(&this, &char other) {
+        return this == other;
+    }
+
+    @Intrinsic
+    int hashCode(&this);
 }

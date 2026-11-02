@@ -1,6 +1,6 @@
 package std.util;
 
-class HashSet<T> implements Set<T> {
+class HashSet<T extends Hashable<T>> implements Set<T> {
     @Intrinsic
     int size(&this);
 

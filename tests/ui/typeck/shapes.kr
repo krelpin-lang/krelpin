@@ -9,8 +9,8 @@ interface Shape extends Comparable<Shape> {
         return "a shape with area " + this.area();
     }
 
-    int compareTo(&this, Shape other) {
-        return this.area().compareTo(other.area());
+    int compareTo(&this, &Shape other) {
+        return this.area().compareTo(&other.area());
     }
 }
 
@@ -59,7 +59,7 @@ class Shapes {
     <T extends Comparable<T>> T largest(List<T> values) {
         T best = values.get(0);
         for (T value : values) {
-            if (value.compareTo(best) > 0) {
+            if (value.compareTo(&best) > 0) {
                 best = value;
             }
         }

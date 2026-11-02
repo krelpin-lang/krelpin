@@ -1,12 +1,12 @@
 package std.primitive;
 
-final class Double implements Comparable<double> {
+final class Double implements Comparable<double>, Hashable<double> {
     public const double MIN_VALUE = 4.9e-324;
     public const double MAX_VALUE = 1.7976931348623157e308;
 
     private Double() {}
 
-    int compareTo(&this, double other) {
+    int compareTo(&this, &double other) {
         if (this < other) {
             return -1;
         }
@@ -15,4 +15,11 @@ final class Double implements Comparable<double> {
 
     @Intrinsic
     double parse(String text);
+
+    boolean equals(&this, &double other) {
+        return this == other;
+    }
+
+    @Intrinsic
+    int hashCode(&this);
 }

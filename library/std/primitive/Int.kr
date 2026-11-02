@@ -1,12 +1,12 @@
 package std.primitive;
 
-final class Int implements Comparable<int> {
+final class Int implements Comparable<int>, Hashable<int> {
     public const int MIN_VALUE = -2147483648;
     public const int MAX_VALUE = 2147483647;
 
     private Int() {}
 
-    int compareTo(&this, int other) {
+    int compareTo(&this, &int other) {
         if (this < other) {
             return -1;
         }
@@ -15,4 +15,11 @@ final class Int implements Comparable<int> {
 
     @Intrinsic
     int parse(String text);
+
+    boolean equals(&this, &int other) {
+        return this == other;
+    }
+
+    @Intrinsic
+    int hashCode(&this);
 }

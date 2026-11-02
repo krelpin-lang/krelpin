@@ -1,0 +1,5 @@
+package std.lang;
+
+interface Hashable<T> extends Equatable<T> {
+    int hashCode(&this);
+}

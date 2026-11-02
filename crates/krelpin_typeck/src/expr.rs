@@ -473,13 +473,6 @@ impl FnCtxt<'_, '_> {
             return Ty::Unknown;
         };
 
-        if self.tcx.sig(def).kind == AdtKind::Enum
-            && name.name.as_str() == "values"
-            && args.is_empty()
-        {
-            return Ty::Array(Box::new(ty.clone()));
-        }
-
         let candidates = self.tcx.methods_named(def, &[], name.name);
         if candidates.is_empty() {
             self.no_method(ty, name);
@@ -771,9 +764,13 @@ impl FnCtxt<'_, '_> {
             };
         }
 
+        if matches!(op, BinOp::Eq | BinOp::Ne) {
+            self.check_equality(l, r, op, span);
+            return Ty::BOOLEAN;
+        }
+
         let both = |pred: fn(&Ty) -> bool| pred(l) && pred(r);
         let result = match op {
-            BinOp::Eq | BinOp::Ne => self.comparable(l, r).then_some(Ty::BOOLEAN),
             BinOp::Lt | BinOp::Le | BinOp::Gt | BinOp::Ge => {
                 both(Ty::is_numeric).then_some(Ty::BOOLEAN)
             }
@@ -790,28 +787,55 @@ impl FnCtxt<'_, '_> {
             BinOp::Shl | BinOp::Shr | BinOp::UShr => both(Ty::is_integral)
                 .then(|| l.primitive().map(|p| promote(p, PrimitiveTy::Int)))
                 .flatten(),
-            BinOp::And | BinOp::Or | BinOp::Elvis => None,
+            BinOp::Eq | BinOp::Ne | BinOp::And | BinOp::Or | BinOp::Elvis => None,
         };
 
         result.unwrap_or_else(|| {
-            let message = if matches!(op, BinOp::Eq | BinOp::Ne) {
-                format!("cannot compare `{l}` with `{r}`")
-            } else {
-                format!("cannot apply `{}` to `{l}` and `{r}`", op.as_str())
-            };
-            self.error(span, message);
+            self.error(
+                span,
+                format!("cannot apply `{}` to `{l}` and `{r}`", op.as_str()),
+            );
             Ty::Unknown
         })
     }
 
-    fn comparable(&self, l: &Ty, r: &Ty) -> bool {
-        match (l, r) {
-            (Ty::Primitive(_), Ty::Primitive(_)) => {
+    fn check_equality(&self, l: &Ty, r: &Ty, op: BinOp, span: Span) {
+        let compatible = match (l.non_null(), r.non_null()) {
+            (Ty::Null, Ty::Primitive(_)) | (Ty::Primitive(_), Ty::Null) => false,
+            (Ty::Null, _) | (_, Ty::Null) => return,
+            (l @ Ty::Primitive(_), r @ Ty::Primitive(_)) => {
                 (l.is_numeric() && r.is_numeric()) || (l.is_boolean() && r.is_boolean())
             }
-            (Ty::Null, Ty::Primitive(_)) | (Ty::Primitive(_), Ty::Null) => false,
-            (Ty::Null, _) | (_, Ty::Null) => true,
-            _ => self.is_assignable(l, r) || self.is_assignable(r, l),
+            (l, r) => self.is_assignable(l, r) || self.is_assignable(r, l),
+        };
+        if !compatible {
+            self.error(span, format!("cannot compare `{l}` with `{r}`"));
+            return;
+        }
+
+        let (l, r) = (l.non_null(), r.non_null());
+        let ty = if self.is_assignable(l, r) { r } else { l };
+        if self.is_equatable(ty) {
+            return;
+        }
+        let help = match ty {
+            Ty::Param(name) => format!("add the bound `{name} extends Equatable<{name}>`"),
+            ty => format!("implement `Equatable<{ty}>` for `{ty}`"),
+        };
+        self.emit(
+            Diagnostic::error(format!(
+                "values of type `{ty}` cannot be compared with `{}`",
+                op.as_str()
+            ))
+            .with_span(span)
+            .with_help(help),
+        );
+    }
+
+    fn is_equatable(&self, ty: &Ty) -> bool {
+        match ty {
+            Ty::Primitive(_) | Ty::Unknown | Ty::External { .. } => true,
+            ty => self.is_assignable(ty, &self.tcx.lang_ty(LangItem::Equatable)),
         }
     }
 

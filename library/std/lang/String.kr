@@ -1,6 +1,6 @@
 package std.lang;
 
-final class String implements Comparable<String> {
+final class String implements Comparable<String>, Hashable<String> {
     @Intrinsic
     int length(&this);
 
@@ -49,7 +49,13 @@ final class String implements Comparable<String> {
     String[] split(&this, String separator);
 
     @Intrinsic
-    int compareTo(&this, String other);
+    int compareTo(&this, &String other);
+
+    @Intrinsic
+    boolean equals(&this, &String other);
+
+    @Intrinsic
+    int hashCode(&this);
 
     @Intrinsic
     String join(String separator, String... parts);
