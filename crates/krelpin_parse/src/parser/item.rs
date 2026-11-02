@@ -728,6 +728,17 @@ impl Parser<'_> {
                 self.reject_inheritance(modifiers.inheritance, "constructors");
             }
             MemberKind::Method(method) => {
+                if container == Container::Struct {
+                    self.emit(
+                        Diagnostic::error("structs cannot have methods")
+                            .with_span(method.name.span)
+                            .with_note("a struct only holds data")
+                            .with_help(
+                                "move the behavior to a class, or generate it with `@Derive`",
+                            ),
+                    );
+                    return;
+                }
                 if let (Some(_), Some(span)) = (abstract_kw, final_kw) {
                     self.error(span, "a method cannot be both `abstract` and `final`");
                 }

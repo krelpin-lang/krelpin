@@ -6,11 +6,14 @@ error: structs cannot extend other types
   |
   = help: structs can implement interfaces with `implements`
 
-error: abstract methods are not allowed in structs
- --> tests/ui/parser/declaration_errors.kr:2:5
+error: structs cannot have methods
+ --> tests/ui/parser/declaration_errors.kr:2:19
   |
 2 |     abstract void move(&mut this);
-  |     ^^^^^^^^
+  |                   ^^^^
+  |
+  = note: a struct only holds data
+  = help: move the behavior to a class, or generate it with `@Derive`
 
 error: interfaces cannot implement other interfaces
  --> tests/ui/parser/declaration_errors.kr:5:17

@@ -24,14 +24,13 @@ fn structs() {
         "struct Point implements Comparable<Point> {\n\
          \x20   int x;\n\
          \x20   int y;\n\
-         \x20   double length(&this) { return Math.sqrt(this.x * this.x + this.y * this.y); }\n\
          }",
     );
     let ItemKind::Struct(point) = &unit.items[0].kind else {
         panic!("expected a struct");
     };
     assert_eq!(point.implements[0].to_string(), "Comparable<Point>");
-    assert_eq!(point.members.len(), 3);
+    assert_eq!(point.members.len(), 2);
 }
 
 #[test]
@@ -203,6 +202,10 @@ fn member_errors() {
         ["structs cannot have constructors"]
     );
     assert_eq!(
+        errors("struct Point { int x; int twice(&this) { return this.x * 2; } }"),
+        ["structs cannot have methods"]
+    );
+    assert_eq!(
         errors("class A { static void f(); }"),
         ["missing body for method `f`"]
     );
@@ -220,7 +223,7 @@ fn member_errors() {
     );
     assert_eq!(
         errors("struct S { abstract static void f(); }"),
-        ["abstract methods are not allowed in structs"]
+        ["structs cannot have methods"]
     );
     assert_eq!(
         errors("class A { abstract int x; }"),
