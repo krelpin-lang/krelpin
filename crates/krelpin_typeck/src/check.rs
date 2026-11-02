@@ -85,6 +85,7 @@ pub(crate) fn check_units(tcx: &Tcx<'_>, units: &[CompilationUnit]) -> TypeckRes
         for member in members {
             let fcx = check_member(tcx, owner, member);
             results.extend(fcx.results);
+            results.local_types.extend(fcx.locals);
         }
     }
 

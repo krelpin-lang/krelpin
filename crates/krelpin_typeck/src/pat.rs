@@ -3,6 +3,7 @@ use krelpin_errors::Diagnostic;
 use krelpin_span::Span;
 use krelpin_span::def_id::DefId;
 
+use crate::PatRes;
 use crate::check::FnCtxt;
 use crate::sig::AdtKind;
 use crate::ty::Ty;
@@ -17,7 +18,7 @@ struct VariantRef {
 enum PatPath {
     Variant(VariantRef),
     Type(Ty),
-    Const(Ty),
+    Const(DefId, Ident, Ty),
     Error,
 }
 
@@ -108,9 +109,12 @@ impl FnCtxt<'_, '_> {
                 if let Some(binding) = binding {
                     self.locals.insert(binding.span, tested.clone());
                 }
+                self.results
+                    .pats
+                    .insert(pat.span, PatRes::Type(tested.clone()));
                 self.type_test(&tested, &expected, ty.span)
             }
-            PatKind::Path(path) => match self.pat_path(path, &expected) {
+            PatKind::Path(path) => match self.resolve_pat_path(pat.span, path, &expected) {
                 PatPath::Variant(VariantRef { def, index, .. }) => {
                     let arity = self.tcx.sig(def).variants[index].fields.len();
                     if arity > 0 {
@@ -125,7 +129,7 @@ impl FnCtxt<'_, '_> {
                     }
                 }
                 PatPath::Type(ty) => self.type_test(&ty, &expected, path.span),
-                PatPath::Const(ty) => {
+                PatPath::Const(_, _, ty) => {
                     if !self.is_assignable(&ty, &expected) {
                         self.mismatch(path.span, &expected, &ty);
                     }
@@ -133,25 +137,46 @@ impl FnCtxt<'_, '_> {
                 }
                 PatPath::Error => DeconPat::wildcard(),
             },
-            PatKind::Variant { path, fields } => match self.pat_path(path, &expected) {
-                PatPath::Variant(variant) => {
-                    self.check_variant_fields(&variant, path, fields, &expected, pat.span)
-                }
-                found => {
-                    if matches!(found, PatPath::Type(_) | PatPath::Const(_)) {
-                        self.emit(
-                            Diagnostic::error(format!("`{path}` is not an enum variant"))
-                                .with_span(path.span)
-                                .with_label("only enum variants can be matched with `(...)`"),
-                        );
+            PatKind::Variant { path, fields } => {
+                match self.resolve_pat_path(pat.span, path, &expected) {
+                    PatPath::Variant(variant) => {
+                        self.check_variant_fields(&variant, path, fields, &expected, pat.span)
                     }
-                    for field in fields {
-                        self.check_pat(field, &Ty::Unknown);
+                    found => {
+                        if matches!(found, PatPath::Type(_) | PatPath::Const(..)) {
+                            self.emit(
+                                Diagnostic::error(format!("`{path}` is not an enum variant"))
+                                    .with_span(path.span)
+                                    .with_label("only enum variants can be matched with `(...)`"),
+                            );
+                        }
+                        for field in fields {
+                            self.check_pat(field, &Ty::Unknown);
+                        }
+                        DeconPat::wildcard()
                     }
-                    DeconPat::wildcard()
                 }
-            },
+            }
         }
+    }
+
+    fn resolve_pat_path(&mut self, span: Span, path: &Path, expected: &Ty) -> PatPath {
+        let found = self.pat_path(path, expected);
+        let res = match &found {
+            PatPath::Variant(VariantRef { def, index, .. }) => PatRes::Variant {
+                def: *def,
+                index: *index,
+            },
+            PatPath::Type(ty) => PatRes::Type(ty.clone()),
+            PatPath::Const(owner, name, ty) => PatRes::Const {
+                owner: *owner,
+                name: name.name,
+                ty: ty.clone(),
+            },
+            PatPath::Error => return found,
+        };
+        self.results.pats.insert(span, res);
+        found
     }
 
     fn check_variant_fields(
@@ -318,7 +343,7 @@ impl FnCtxt<'_, '_> {
             return PatPath::Variant(VariantRef { def, args, index });
         }
         match self.static_const(def, name) {
-            Some(ty) => PatPath::Const(ty),
+            Some(ty) => PatPath::Const(def, name, ty),
             None => {
                 self.error(
                     name.span,

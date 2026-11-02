@@ -22,7 +22,8 @@ use std::collections::HashMap;
 use krelpin_ast::ast::CompilationUnit;
 use krelpin_errors::DiagCtxt;
 use krelpin_resolve::ResolverOutput;
-use krelpin_span::Span;
+use krelpin_span::def_id::DefId;
+use krelpin_span::{Span, Symbol};
 
 pub use crate::closure::FnSig;
 pub use crate::lang_items::{LangItem, LangItems};
@@ -37,6 +38,8 @@ pub struct TypeckResults {
     pub expr_types: HashMap<Span, Ty>,
     pub callees: HashMap<Span, Callee>,
     pub fields: HashMap<Span, FieldSig>,
+    pub local_types: HashMap<Span, Ty>,
+    pub pats: HashMap<Span, PatRes>,
 }
 
 impl TypeckResults {
@@ -44,7 +47,16 @@ impl TypeckResults {
         self.expr_types.extend(other.expr_types);
         self.callees.extend(other.callees);
         self.fields.extend(other.fields);
+        self.local_types.extend(other.local_types);
+        self.pats.extend(other.pats);
     }
+}
+
+#[derive(Clone, Debug)]
+pub enum PatRes {
+    Variant { def: DefId, index: usize },
+    Type(Ty),
+    Const { owner: DefId, name: Symbol, ty: Ty },
 }
 
 #[derive(Clone, Debug)]
