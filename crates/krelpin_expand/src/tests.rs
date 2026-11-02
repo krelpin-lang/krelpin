@@ -151,30 +151,3 @@ fn derive_comparable() {
         ["`Comparable` cannot be derived because `label` may be null"]
     );
 }
-
-#[test]
-fn to_string_and_constructor() {
-    let expanded = expand_str("@Constructor @ToString class Point { int x; int y; int z = 0; }");
-    assert_eq!(expanded.errors, Vec::<String>::new());
-    let ItemKind::Class(class) = &expanded.unit.items[0].kind else {
-        panic!("expected a class");
-    };
-    let params: Vec<usize> = class
-        .members
-        .iter()
-        .filter_map(|member| match &member.kind {
-            MemberKind::Constructor(ctor) => Some(ctor.params.len()),
-            _ => None,
-        })
-        .collect();
-    assert_eq!(params, [2]);
-    assert_eq!(method_names(&expanded.unit), ["toString"]);
-    assert_eq!(
-        errors("@Constructor enum E { A(int x) }"),
-        ["`@Constructor` cannot be used on enums"]
-    );
-    assert_eq!(
-        errors("@ToString(verbose) class A {}"),
-        ["`@ToString` takes no arguments"]
-    );
-}

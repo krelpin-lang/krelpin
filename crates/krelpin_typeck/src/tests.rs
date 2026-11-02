@@ -1679,25 +1679,24 @@ fn derived_equality_and_hashing() {
 }
 
 #[test]
-fn generated_constructors_strings_and_ordering() {
-    ok("@Constructor\n\
-        @ToString\n\
-        @Derive(Equatable, Comparable)\n\
-        class Version {\n\
-        \x20   int major;\n\
-        \x20   String tag;\n\
-        \x20   int build = 0;\n\
-        }\n\
-        @ToString\n\
-        @Derive(Equatable, Comparable)\n\
-        enum Shape { Circle(double radius), Empty }\n\
-        class Main {\n\
-        \x20   String run(&this) {\n\
-        \x20       Version a = new Version(1, \"beta\");\n\
-        \x20       int order = a.compareTo(&new Version(2, \"rc\"));\n\
-        \x20       return a.toString() + Shape.Circle(1.0).toString() + order;\n\
-        \x20   }\n\
-        }");
+fn structs_are_built_from_their_fields() {
+    let src = |code: &str| {
+        format!(
+            "@Derive(Equatable, Comparable)\n\
+             struct Version {{ int major; String tag; int build = 0; }}\n\
+             class Main {{ void run(&this) {{ {code} }} }}"
+        )
+    };
+    ok(&src("Version a = new Version(1, \"beta\"); \
+         int order = a.compareTo(&new Version(2, \"rc\")); boolean same = a == a;"));
+    assert_eq!(
+        errors(&src("Version a = new Version(1);")),
+        ["this constructor takes 2 arguments but 1 argument was supplied"]
+    );
+    assert_eq!(
+        errors(&src("Version a = new Version(\"beta\", 1);")),
+        ["mismatched types", "mismatched types"]
+    );
     assert_eq!(
         errors("class Handle {}\n@Derive(Comparable) struct Holder { Handle handle; }"),
         ["no method named `compareTo` found for `Handle`"]

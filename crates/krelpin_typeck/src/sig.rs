@@ -345,6 +345,9 @@ impl<'a> Tcx<'a> {
         if let ItemKind::Enum(def) = &item.kind {
             self.collect_variants(&mut sig, def_id, &def.variants);
         }
+        if kind == AdtKind::Struct {
+            sig.ctors.push(self.struct_ctor(item.name, def_id, members));
+        }
 
         for member in members {
             let vis = if kind == AdtKind::Interface {
@@ -376,6 +379,25 @@ impl<'a> Tcx<'a> {
         }
 
         sig
+    }
+
+    fn struct_ctor(&self, name: Ident, def: DefId, members: &[Member]) -> MethodSig {
+        let params = members
+            .iter()
+            .filter_map(|member| match &member.kind {
+                MemberKind::Field(field)
+                    if field.storage == FieldStorage::Instance && field.init.is_none() =>
+                {
+                    Some(self.lower_ty(&field.ty))
+                }
+                _ => None,
+            })
+            .collect();
+        MethodSig {
+            params,
+            is_final: false,
+            ..synthesized_method(name, def, None, Ty::Void)
+        }
     }
 
     fn collect_variants(&self, sig: &mut TypeSig, def: DefId, variants: &[ast::Variant]) {

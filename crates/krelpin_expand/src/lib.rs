@@ -1,8 +1,6 @@
-mod constructor;
 mod derive;
 mod item;
 mod table;
-mod to_string;
 
 #[cfg(test)]
 mod tests;
@@ -51,8 +49,6 @@ impl ExpandCtxt<'_> {
         for invocation in self.take_invocations(&mut item.annotations) {
             match invocation.builtin {
                 BuiltinMacro::Derive => self.expand_derive(item, &invocation),
-                BuiltinMacro::ToString => self.expand_to_string(item, &invocation),
-                BuiltinMacro::Constructor => self.expand_constructor(item, &invocation),
             }
         }
 

@@ -9,22 +9,14 @@ use krelpin_span::{Span, Symbol};
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum BuiltinMacro {
     Derive,
-    ToString,
-    Constructor,
 }
 
 impl BuiltinMacro {
-    const ALL: &[BuiltinMacro] = &[
-        BuiltinMacro::Derive,
-        BuiltinMacro::ToString,
-        BuiltinMacro::Constructor,
-    ];
+    const ALL: &[BuiltinMacro] = &[BuiltinMacro::Derive];
 
     pub fn name(self) -> &'static str {
         match self {
             BuiltinMacro::Derive => "Derive",
-            BuiltinMacro::ToString => "ToString",
-            BuiltinMacro::Constructor => "Constructor",
         }
     }
 
@@ -35,8 +27,6 @@ impl BuiltinMacro {
     pub fn usage(self) -> &'static str {
         match self {
             BuiltinMacro::Derive => "`@Derive` can only be used on classes, structs and enums",
-            BuiltinMacro::ToString => "`@ToString` can only be used on classes, structs and enums",
-            BuiltinMacro::Constructor => "`@Constructor` can only be used on classes and structs",
         }
     }
 

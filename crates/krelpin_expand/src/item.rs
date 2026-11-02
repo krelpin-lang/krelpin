@@ -12,7 +12,6 @@ pub(crate) struct Field {
     pub(crate) name: Symbol,
     pub(crate) ty: String,
     pub(crate) nullable: bool,
-    pub(crate) initialized: bool,
 }
 
 pub(crate) struct Variant {
@@ -26,7 +25,6 @@ pub(crate) enum Layout {
 }
 
 pub(crate) struct ItemModel {
-    pub(crate) name: Symbol,
     pub(crate) self_ty: String,
     pub(crate) layout: Layout,
 }
@@ -61,7 +59,7 @@ impl ExpandCtxt<'_> {
                         fields: variant
                             .fields
                             .iter()
-                            .map(|field| self.field(field.name.name, &field.ty, false))
+                            .map(|field| self.field(field.name.name, &field.ty))
                             .collect(),
                     })
                     .collect();
@@ -96,11 +94,7 @@ impl ExpandCtxt<'_> {
         } else {
             format!("{name}<{}>", params.join(", "))
         };
-        Some(ItemModel {
-            name,
-            self_ty,
-            layout,
-        })
+        Some(ItemModel { self_ty, layout })
     }
 
     pub(crate) fn misplaced(&self, invocation: &Invocation, target: &str) {
@@ -112,21 +106,6 @@ impl ExpandCtxt<'_> {
             .with_span(invocation.annotation.span)
             .with_help(invocation.builtin.usage()),
         );
-    }
-
-    pub(crate) fn reject_args(&self, invocation: &Invocation) -> bool {
-        let Some(args) = &invocation.annotation.args else {
-            return false;
-        };
-        self.emit(
-            Diagnostic::error(format!(
-                "`@{}` takes no arguments",
-                invocation.builtin.name()
-            ))
-            .with_span(args.span)
-            .with_help(format!("write `@{}`", invocation.builtin.name())),
-        );
-        true
     }
 
     pub(crate) fn splice(&self, item: &mut Item, invocation: &Invocation, generated: Generated) {
@@ -167,14 +146,14 @@ impl ExpandCtxt<'_> {
             .iter()
             .filter_map(|member| match &member.kind {
                 MemberKind::Field(field) if field.storage == FieldStorage::Instance => {
-                    Some(self.field(field.name.name, &field.ty, field.init.is_some()))
+                    Some(self.field(field.name.name, &field.ty))
                 }
                 _ => None,
             })
             .collect()
     }
 
-    fn field(&self, name: Symbol, ty: &Ty, initialized: bool) -> Field {
+    fn field(&self, name: Symbol, ty: &Ty) -> Field {
         Field {
             name,
             ty: self
@@ -182,7 +161,6 @@ impl ExpandCtxt<'_> {
                 .span_to_snippet(ty.span)
                 .unwrap_or_else(|| ty.to_string()),
             nullable: matches!(ty.kind, TyKind::Nullable(_)),
-            initialized,
         }
     }
 }

@@ -24,14 +24,6 @@ enum Status {
 @Derive(Equatable)
 interface Named {}
 
-@Constructor
-enum Kind {
-    Small(int size);
-}
-
-@ToString(verbose)
-class Note {}
-
 @Derive(Comparable)
 class Label {
     String? text;

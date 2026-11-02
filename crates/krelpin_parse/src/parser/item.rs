@@ -652,7 +652,18 @@ impl Parser<'_> {
                                 .with_help("declare the fields of each variant in the variant"),
                         );
                     }
-                    Container::Class | Container::Struct => {}
+                    Container::Struct => {
+                        self.emit(
+                            Diagnostic::error("structs cannot have constructors")
+                                .with_span(constructor.name.span)
+                                .with_note(
+                                    "a struct is created from its fields in order, \
+                                     like `new Point(1, 2)`",
+                                )
+                                .with_help("give a field an initial value to leave it out"),
+                        );
+                    }
+                    Container::Class => {}
                 }
                 self.reject_inheritance(modifiers.inheritance, "constructors");
             }

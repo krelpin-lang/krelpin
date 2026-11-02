@@ -24,7 +24,6 @@ fn structs() {
         "struct Point implements Comparable<Point> {\n\
          \x20   int x;\n\
          \x20   int y;\n\
-         \x20   Point(int x, int y) { this.x = x; this.y = y; }\n\
          \x20   double length(&this) { return Math.sqrt(this.x * this.x + this.y * this.y); }\n\
          }",
     );
@@ -32,7 +31,7 @@ fn structs() {
         panic!("expected a struct");
     };
     assert_eq!(point.implements[0].to_string(), "Comparable<Point>");
-    assert_eq!(point.members.len(), 4);
+    assert_eq!(point.members.len(), 3);
 }
 
 #[test]
@@ -198,6 +197,10 @@ fn member_errors() {
     assert_eq!(
         errors("interface I { I() {} }"),
         ["interfaces cannot have constructors"]
+    );
+    assert_eq!(
+        errors("struct Point { int x; Point(int x) { this.x = x; } }"),
+        ["structs cannot have constructors"]
     );
     assert_eq!(
         errors("class A { void f(); }"),

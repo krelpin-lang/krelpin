@@ -1,14 +1,11 @@
 package shop;
 
-@Constructor
-@ToString
 @Derive(Equatable, Hashable, Comparable)
-class Money {
+struct Money {
     long cents;
     String currency;
 }
 
-@ToString
 @Derive(Equatable, Hashable)
 enum Payment {
     Card(String number, Money amount),

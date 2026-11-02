@@ -36,29 +36,13 @@ error: `@Derive` cannot be used on interfaces
    |
    = help: `@Derive` can only be used on classes, structs and enums
 
-error: `@Constructor` cannot be used on enums
+error: `Comparable` cannot be derived because `text` may be null
   --> tests/ui/expand/macro_errors.kr:27:1
    |
-27 | @Constructor
-   | ^^^^^^^^^^^^
-   |
-   = help: `@Constructor` can only be used on classes and structs
-
-error: `@ToString` takes no arguments
-  --> tests/ui/expand/macro_errors.kr:32:10
-   |
-32 | @ToString(verbose)
-   |          ^^^^^^^^^
-   |
-   = help: write `@ToString`
-
-error: `Comparable` cannot be derived because `text` may be null
-  --> tests/ui/expand/macro_errors.kr:35:1
-   |
-35 | @Derive(Comparable)
+27 | @Derive(Comparable)
    | ^^^^^^^^^^^^^^^^^^^
    |
    = help: implement `compareTo` yourself to decide where null values go
 
-error: aborting due to 8 previous errors
+error: aborting due to 6 previous errors
 
