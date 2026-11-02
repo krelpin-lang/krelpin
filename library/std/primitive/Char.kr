@@ -1,8 +1,8 @@
 package std.primitive;
 
 final class Char implements Comparable<char>, Hashable<char> {
-    public const char MIN_VALUE = '\u0000';
-    public const char MAX_VALUE = '￿';
+    public const char MIN_VALUE = '\u{0}';
+    public const char MAX_VALUE = '\u{10FFFF}';
 
     private Char() {}
 

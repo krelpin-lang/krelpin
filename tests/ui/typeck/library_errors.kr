@@ -2,7 +2,7 @@ class Main {
     void main() {
         String name = "Krelpin";
         int size = name.lenght();
-        char first = name.charAt("0");
+        String part = name.substring("0");
 
         List<String> names = new ArrayList<>();
         names.add(42);

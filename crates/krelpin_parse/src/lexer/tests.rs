@@ -245,9 +245,10 @@ fn char_literals() {
     assert_eq!(single_literal("'a'"), lit(LitKind::Char, "a", None));
     assert_eq!(single_literal("'\\n'"), lit(LitKind::Char, "\\n", None));
     assert_eq!(
-        single_literal("'\\u0041'"),
-        lit(LitKind::Char, "\\u0041", None)
+        single_literal("'\\u{41}'"),
+        lit(LitKind::Char, "\\u{41}", None)
     );
+    assert_eq!(single_literal("'😀'"), lit(LitKind::Char, "😀", None));
 }
 
 #[test]
@@ -279,10 +280,14 @@ fn string_errors() {
     assert_eq!(errors("\"abc"), ["unterminated double quote string"]);
     assert_eq!(errors("\"abc\nx"), ["unterminated double quote string"]);
     assert_eq!(errors(r#""\q""#), ["unknown character escape: `q`"]);
-    assert_eq!(errors(r#""\u12""#), ["invalid unicode escape"]);
+    assert_eq!(errors(r#""\u0041""#), ["invalid unicode escape"]);
     assert_eq!(
-        errors(r#""\uD800""#),
+        errors(r#""\u{D800}""#),
         ["unicode escape must not be a surrogate"]
+    );
+    assert_eq!(
+        errors(r#""\u{110000}""#),
+        ["unicode escape is out of range"]
     );
 }
 

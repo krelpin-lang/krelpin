@@ -5,10 +5,10 @@ error: no method named `lenght` found for `String`
   |                         ^^^^^^ method not found
 
 error: mismatched types
- --> tests/ui/typeck/library_errors.kr:5:34
+ --> tests/ui/typeck/library_errors.kr:5:38
   |
-5 |         char first = name.charAt("0");
-  |                                  ^^^ expected `int`, found `String`
+5 |         String part = name.substring("0");
+  |                                      ^^^ expected `int`, found `String`
 
 error: mismatched types
  --> tests/ui/typeck/library_errors.kr:8:19

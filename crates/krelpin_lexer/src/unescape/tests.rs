@@ -41,10 +41,21 @@ fn octal_escapes() {
 
 #[test]
 fn unicode_escapes() {
-    assert_eq!(chars(r"A").unwrap(), "A");
-    assert_eq!(chars(r"\uuu00e9").unwrap(), "é");
-    assert_eq!(chars(r"\u41"), Err(EscapeError::InvalidUnicodeEscape));
-    assert_eq!(chars(r"\uD800"), Err(EscapeError::SurrogateUnicodeEscape));
+    assert_eq!(chars(r"\u{41}").unwrap(), "A");
+    assert_eq!(chars(r"\u{e9}").unwrap(), "é");
+    assert_eq!(chars(r"\u{1F600}").unwrap(), "😀");
+    assert_eq!(chars(r"\u0041"), Err(EscapeError::InvalidUnicodeEscape));
+    assert_eq!(chars(r"\u{}"), Err(EscapeError::InvalidUnicodeEscape));
+    assert_eq!(
+        chars(r"\u{1234567}"),
+        Err(EscapeError::InvalidUnicodeEscape)
+    );
+    assert_eq!(chars(r"\u{41"), Err(EscapeError::InvalidUnicodeEscape));
+    assert_eq!(chars(r"\u{D800}"), Err(EscapeError::SurrogateUnicodeEscape));
+    assert_eq!(
+        chars(r"\u{110000}"),
+        Err(EscapeError::OutOfRangeUnicodeEscape)
+    );
 }
 
 #[test]
@@ -58,6 +69,12 @@ fn escape_ranges() {
     let mut ranges = Vec::new();
     unescape(r"a\nb", Mode::Str, |range, _| ranges.push(range));
     assert_eq!(ranges, [0..1, 1..3, 3..4]);
+}
+
+#[test]
+fn char_literals_hold_one_unicode_scalar() {
+    assert_eq!(char_lit("😀"), Ok('😀'));
+    assert_eq!(char_lit(r"\u{10FFFF}"), Ok('\u{10FFFF}'));
 }
 
 #[test]

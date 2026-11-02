@@ -515,7 +515,7 @@ fn standard_library_has_no_errors() {
 #[test]
 fn string_methods_are_checked() {
     body_ok(
-        "String s = \"Krelpin\"; int n = s.length(); char c = s.charAt(0); \
+        "String s = \"Krelpin\"; int n = s.length(); char c = s.chars()[0]; \
          boolean b = s.contains(\"pin\") && !s.isEmpty(); String[] parts = s.split(\",\"); \
          String joined = String.join(\", \", \"a\", \"b\");",
     );
@@ -528,7 +528,7 @@ fn string_methods_are_checked() {
         ["mismatched types"]
     );
     assert_eq!(
-        in_body("String s = \"x\"; char c = s.charAt(\"0\");"),
+        in_body("String s = \"x\"; String part = s.substring(\"0\");"),
         ["mismatched types"]
     );
 }
@@ -1404,5 +1404,17 @@ fn list_lookups_need_equatable_elements() {
             "List<Thing> things = new ArrayList<>(); things.contains(new Thing());"
         )),
         ["type `Thing` does not satisfy the bound of `T`"]
+    );
+}
+
+#[test]
+fn chars_are_unicode_scalars() {
+    body_ok(
+        "char smile = '😀'; char last = char.MAX_VALUE; int code = smile; \
+         char[] letters = \"Ayşe 😀\".chars(); boolean letter = letters[2].isLetter();",
+    );
+    assert_eq!(
+        in_body("String s = \"x\"; char c = s.charAt(0);"),
+        ["no method named `charAt` found for `String`"]
     );
 }

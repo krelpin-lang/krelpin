@@ -20,6 +20,7 @@ pub enum EscapeError {
     EscapeOnlyChar,
     InvalidUnicodeEscape,
     SurrogateUnicodeEscape,
+    OutOfRangeUnicodeEscape,
 }
 
 pub fn unescape(
@@ -129,23 +130,28 @@ fn scan_escape(chars: &mut Chars<'_>) -> Result<char, EscapeError> {
 }
 
 fn scan_unicode(chars: &mut Chars<'_>) -> Result<char, EscapeError> {
-    while chars.as_str().starts_with('u') {
-        chars.next();
+    if chars.next() != Some('{') {
+        return Err(EscapeError::InvalidUnicodeEscape);
     }
 
-    let mut value = 0;
-    for _ in 0..4 {
-        let digit = chars
-            .as_str()
-            .chars()
-            .next()
-            .and_then(|c| c.to_digit(16))
-            .ok_or(EscapeError::InvalidUnicodeEscape)?;
-        chars.next();
-        value = value * 16 + digit;
+    let mut value: u32 = 0;
+    let mut digits = 0;
+    loop {
+        match chars.next() {
+            Some('}') if digits > 0 => break,
+            Some(c) if digits < 6 => {
+                let digit = c.to_digit(16).ok_or(EscapeError::InvalidUnicodeEscape)?;
+                value = value * 16 + digit;
+                digits += 1;
+            }
+            _ => return Err(EscapeError::InvalidUnicodeEscape),
+        }
     }
 
-    char::from_u32(value).ok_or(EscapeError::SurrogateUnicodeEscape)
+    match value {
+        0xD800..=0xDFFF => Err(EscapeError::SurrogateUnicodeEscape),
+        value => char::from_u32(value).ok_or(EscapeError::OutOfRangeUnicodeEscape),
+    }
 }
 
 fn scan_octal(first: char, chars: &mut Chars<'_>) -> char {

@@ -9,7 +9,7 @@ final class String implements Comparable<String>, Hashable<String> {
     }
 
     @Intrinsic
-    char charAt(&this, int index);
+    char[] chars(&this);
 
     @Intrinsic
     String substring(&this, int begin);

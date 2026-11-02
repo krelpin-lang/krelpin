@@ -10,7 +10,7 @@ use super::StringReader;
 
 const VALID_ESCAPES: &str = "valid escapes are `\\b`, `\\t`, `\\n`, `\\f`, `\\r`, `\\s`, \
                              `\\\"`, `\\'`, `\\\\`, octal escapes like `\\0` \
-                             and unicode escapes like `\\u0041`";
+                             and unicode escapes like `\\u{41}`";
 
 #[derive(Clone, Copy)]
 enum Quote {
@@ -285,11 +285,18 @@ impl StringReader<'_> {
             }
             EscapeError::InvalidUnicodeEscape => Diagnostic::error("invalid unicode escape")
                 .with_span(span)
-                .with_help("unicode escapes need exactly four hexadecimal digits, like `\\u0041`"),
+                .with_help(
+                    "write one to six hexadecimal digits in braces, like `\\u{41}` or `\\u{1F600}`",
+                ),
             EscapeError::SurrogateUnicodeEscape => {
                 Diagnostic::error("unicode escape must not be a surrogate")
                     .with_span(span)
-                    .with_note("code points from `\\uD800` to `\\uDFFF` are not valid characters")
+                    .with_note("code points from `\\u{D800}` to `\\u{DFFF}` are not characters")
+            }
+            EscapeError::OutOfRangeUnicodeEscape => {
+                Diagnostic::error("unicode escape is out of range")
+                    .with_span(span)
+                    .with_note("the largest character is `\\u{10FFFF}`")
             }
         };
 

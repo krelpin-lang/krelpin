@@ -1,8 +1,8 @@
 class Strings {
     void main() {
         String a = "bad \q escape";
-        String b = "\u12";
-        String c = "\uD800";
+        String b = "\u{12";
+        String c = "\u{D800}";
         String d = "unterminated;
     }
 }
