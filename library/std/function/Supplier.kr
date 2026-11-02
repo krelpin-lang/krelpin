@@ -1,0 +1,5 @@
+package std.function;
+
+interface Supplier<T> {
+    T get();
+}
