@@ -438,6 +438,13 @@ impl FnCtxt<'_, '_> {
             Some(base) => self.receiver(base, safe),
             None => (Receiver::None, false),
         };
+        let unknown = matches!(
+            &receiver,
+            Receiver::Type(ty) | Receiver::Value(ty) if is_unknown_code(ty)
+        );
+        if unknown {
+            self.calls_unknown_code();
+        }
         let arg_tys = self.check_closure_args(args);
 
         let ret = match receiver {
@@ -643,6 +650,7 @@ impl FnCtxt<'_, '_> {
                     format!("cannot create an object of generic parameter `{name}`"),
                 );
             }
+            ty if is_unknown_code(ty) => self.calls_unknown_code(),
             _ => {}
         }
         ty
@@ -984,4 +992,11 @@ fn is_int_literal(expr: &Expr) -> bool {
         } => is_int_literal(expr),
         _ => false,
     }
+}
+
+fn is_unknown_code(ty: &Ty) -> bool {
+    matches!(
+        ty.strip_refs().non_null(),
+        Ty::Unknown | Ty::External { .. }
+    )
 }

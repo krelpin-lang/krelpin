@@ -1,0 +1,40 @@
+import std.io.IOException;
+
+class Files {
+    String read(String path) throws IOException {
+        if (path.isEmpty()) {
+            throw new IOException("no path");
+        }
+        return path;
+    }
+}
+
+class Base {
+    void save(&this) {}
+}
+
+class Cache extends Base {
+    void save(&this) throws IOException {}
+}
+
+class Main {
+    void main() {
+        String text = Files.read("notes.txt");
+
+        try {
+            Console.println(text);
+        } catch (IOException e) {
+        }
+
+        List<String> paths = new ArrayList<>();
+        paths.forEach(path -> Files.read(path));
+    }
+
+    void safe() {
+        try {
+            String text = Files.read("notes.txt");
+        } catch (IOException e) {
+            Console.println(e.getMessage() ?: "unknown error");
+        }
+    }
+}

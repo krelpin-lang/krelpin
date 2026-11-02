@@ -142,6 +142,25 @@ impl Tcx<'_> {
         let env = ParamEnv::default()
             .with_generics(&self.sig(method.owner).generics)
             .with_generics(&method.generics);
+        for thrown in &method.throws {
+            let allowed = theirs_sig
+                .throws
+                .iter()
+                .any(|theirs| self.is_assignable(&env, thrown, theirs));
+            if self.is_checked(&env, thrown) && !allowed {
+                self.dcx.emit(
+                    Diagnostic::error(format!(
+                        "`{}` cannot throw `{thrown}` because `{owner}.{}` does not",
+                        name.name, name.name
+                    ))
+                    .with_span(name.span)
+                    .with_help(
+                        "an overriding method can only throw the checked exceptions \
+                         of the method it overrides",
+                    ),
+                );
+            }
+        }
         if !self.is_assignable(&env, &method.ret, &theirs_sig.ret) {
             self.dcx.emit(
                 Diagnostic::error(format!(

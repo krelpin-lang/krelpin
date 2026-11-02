@@ -132,10 +132,12 @@ impl FnCtxt<'_, '_> {
                 catches,
                 finally,
             } => {
+                self.enter_try(catches);
                 let mut diverges = self.check_block(body);
+                let thrown = self.exit_try();
                 let mut caught = Vec::new();
                 for catch in catches {
-                    let ty = self.check_catch(catch, &mut caught);
+                    let ty = self.check_catch(catch, &thrown, &mut caught);
                     self.locals.insert(catch.name.span, ty);
                     diverges &= self.check_block(&catch.body);
                 }

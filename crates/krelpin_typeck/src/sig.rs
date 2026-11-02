@@ -54,6 +54,7 @@ pub struct MethodSig {
     pub vis: Visibility,
     pub owner: DefId,
     pub generics: Vec<GenericParamSig>,
+    pub throws: Vec<Ty>,
     pub is_abstract: bool,
     pub is_final: bool,
 }
@@ -390,6 +391,7 @@ impl<'a> Tcx<'a> {
             vis,
             owner,
             generics: self.generic_params(&method.generics),
+            throws: self.lower_tys(&method.throws),
             is_abstract,
             is_final: member.inheritance.final_kw.is_some(),
         }
@@ -405,6 +407,7 @@ impl<'a> Tcx<'a> {
             vis,
             owner,
             generics: Vec::new(),
+            throws: self.lower_tys(&ctor.throws),
             is_abstract: false,
             is_final: false,
         }
@@ -438,7 +441,7 @@ impl<'a> Tcx<'a> {
             .collect()
     }
 
-    fn lower_tys(&self, tys: &[ast::Ty]) -> Vec<Ty> {
+    pub(crate) fn lower_tys(&self, tys: &[ast::Ty]) -> Vec<Ty> {
         tys.iter().map(|ty| self.lower_ty(ty)).collect()
     }
 }

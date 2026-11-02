@@ -4,6 +4,7 @@ use krelpin_span::def_id::DefId;
 use krelpin_span::{Span, Symbol, kw};
 
 use crate::check::{FnCtxt, plural};
+use crate::exceptions::ExceptionScope;
 use crate::lang_items::LangItem;
 use crate::sig::{AdtKind, MethodSig, Tcx};
 use crate::ty::{Subst, Ty};
@@ -13,6 +14,7 @@ pub struct FnSig {
     pub name: Symbol,
     pub params: Vec<Ty>,
     pub ret: Ty,
+    pub throws: Vec<Ty>,
 }
 
 impl Tcx<'_> {
@@ -44,7 +46,9 @@ impl Tcx<'_> {
                 continue;
             }
             let fn_sig = instantiate(method, &subst);
-            let seen = out.iter().any(|(_, other)| *other == fn_sig);
+            let seen = out
+                .iter()
+                .any(|(_, other)| other.name == fn_sig.name && other.params == fn_sig.params);
             if !seen {
                 out.push((method.clone(), fn_sig));
             }
@@ -81,6 +85,7 @@ pub(crate) fn instantiate(method: &MethodSig, subst: &Subst) -> FnSig {
             .map(|param| param.subst(subst))
             .collect(),
         ret: method.ret.subst(subst),
+        throws: method.throws.iter().map(|ty| ty.subst(subst)).collect(),
     }
 }
 
@@ -206,6 +211,8 @@ impl FnCtxt<'_, '_> {
         let ret = sig.map_or(Ty::Unknown, |sig| sig.ret.clone());
         let outer_ret = std::mem::replace(&mut self.ret, ret.clone());
         let outer_yields = std::mem::take(&mut self.yields);
+        let outer_exceptions =
+            std::mem::replace(&mut self.exceptions, ExceptionScope::for_lambda(sig));
         match body {
             LambdaBody::Expr(body) if matches!(ret, Ty::Void | Ty::Unknown) => {
                 self.check_expr(body);
@@ -217,6 +224,7 @@ impl FnCtxt<'_, '_> {
         }
         self.ret = outer_ret;
         self.yields = outer_yields;
+        self.exceptions = outer_exceptions;
     }
 
     fn check_lambda_block(&mut self, block: &Block, ret: &Ty) {

@@ -341,7 +341,8 @@ fn shared_and_const_fields_cannot_be_assigned() {
 fn returns() {
     ok("class A { int f(boolean b) { if (b) { return 1; } else { return 2; } } }");
     ok("class A { int f() { while (true) {} } }");
-    ok("class A { int f() { throw new Exception(); } }");
+    ok("class A { int f() throws Exception { throw new Exception(); } }");
+    ok("class A { int f() { throw new IllegalStateException(); } }");
     ok("class A { int f(int x) { switch (x) { \
          case 1 -> { return 1; } default -> { return 2; } } } }");
     assert_eq!(
@@ -1166,5 +1167,149 @@ fn exceptions_are_caught_only_once() {
     assert_eq!(
         labels(&body(code)),
         ["already caught by the `catch` for `Exception`"]
+    );
+}
+
+fn files(code: &str) -> String {
+    format!(
+        "import std.io.IOException;\n\
+         class Files {{\n\
+         \x20   String read(String path) throws IOException {{ return path; }}\n\
+         \x20   void write(String text) {{}}\n\
+         }}\n\
+         interface Source {{ String next(&this) throws IOException; }}\n\
+         class Main {{\n\
+         \x20   {code}\n\
+         }}"
+    )
+}
+
+#[test]
+fn checked_exceptions_are_caught_or_declared() {
+    ok(&files(
+        "void run(&this) throws IOException { String text = Files.read(\"a\"); }",
+    ));
+    ok(&files(
+        "void run(&this) throws Exception { Files.read(\"a\"); }",
+    ));
+    ok(&files(
+        "void run(&this) { try { Files.read(\"a\"); } catch (IOException e) {} }",
+    ));
+    ok(&files(
+        "void run(&this) { try { Files.read(\"a\"); } catch (Exception e) {} }",
+    ));
+    ok(&files(
+        "void run(&this) { throw new IllegalArgumentException(\"bad\"); }",
+    ));
+
+    let src = files("void run(&this) { Files.read(\"a\"); }");
+    assert_eq!(errors(&src), ["unreported exception `IOException`"]);
+    assert_eq!(
+        helps(&src),
+        [
+            "checked exceptions must be caught or declared with `throws`",
+            "catch it with `try`, or add `throws IOException` to the method",
+        ]
+    );
+    assert_eq!(
+        errors(&files(
+            "void run(&this) { throw new IOException(\"disk\"); }"
+        )),
+        ["unreported exception `IOException`"]
+    );
+    assert_eq!(
+        errors(&files(
+            "void run(&this) { try { Files.read(\"a\"); } catch (RuntimeException e) {} }"
+        )),
+        ["unreported exception `IOException`"]
+    );
+}
+
+#[test]
+fn exceptions_thrown_in_catch_blocks_are_not_caught_by_them() {
+    assert_eq!(
+        errors(&files(
+            "void run(&this) { \
+             try { Files.read(\"a\"); } catch (IOException e) { Files.read(\"b\"); } }"
+        )),
+        ["unreported exception `IOException`"]
+    );
+    ok(&files(
+        "void run(&this) { try { try { Files.read(\"a\"); } finally {} } \
+         catch (IOException e) {} }",
+    ));
+}
+
+#[test]
+fn lambdas_cannot_throw_checked_exceptions_their_method_does_not() {
+    let src = files(
+        "void run(&this) throws IOException { \
+         List<String> paths = new ArrayList<>(); \
+         paths.forEach(path -> Files.read(path)); }",
+    );
+    assert_eq!(errors(&src), ["unreported exception `IOException`"]);
+    assert_eq!(
+        helps(&src)[1],
+        "catch it inside the lambda, because `accept` cannot throw it"
+    );
+    ok(&files(
+        "void run(&this) { Source s = () -> Files.read(\"a\"); }",
+    ));
+}
+
+#[test]
+fn constructors_declare_their_exceptions() {
+    ok("import std.io.IOException;\n\
+        class Conn { Conn() throws IOException {} }\n\
+        class Main { void run(&this) throws IOException { Conn c = new Conn(); } }");
+    assert_eq!(
+        errors(
+            "import std.io.IOException;\n\
+             class Conn { Conn() throws IOException {} }\n\
+             class Main { void run(&this) { Conn c = new Conn(); } }"
+        ),
+        ["unreported exception `IOException`"]
+    );
+}
+
+#[test]
+fn catching_checked_exceptions_that_are_never_thrown() {
+    assert_eq!(
+        errors(&files(
+            "void run(&this) { try { Files.write(\"a\"); } catch (IOException e) {} }"
+        )),
+        ["`IOException` is never thrown in the body of this `try`"]
+    );
+    ok(&files(
+        "void run(&this) { try { Files.write(\"a\"); } catch (Exception e) {} }",
+    ));
+    ok(&files(
+        "void run(&this) { try { Files.write(\"a\"); } catch (IllegalStateException e) {} }",
+    ));
+    ok("import std.io.IOException;\n\
+        import java.net.Socket;\n\
+        class Main {\n\
+        \x20   void run(&this, Socket s) { try { s.connect(); } catch (IOException e) {} }\n\
+        }");
+}
+
+#[test]
+fn overrides_cannot_throw_more() {
+    let src = |code: &str| {
+        format!(
+            "import std.io.IOException;\n\
+             class Base {{ void f(&this) {{}} void g(&this) throws Exception {{}} }}\n\
+             {code}"
+        )
+    };
+    ok(&src(
+        "class A extends Base { void g(&this) throws IOException {} \
+         void f(&this) throws IllegalStateException {} }",
+    ));
+    assert_eq!(
+        errors(&src(
+            "class A extends Base { void f(&this) throws IOException {} }"
+        )),
+        ["`f` cannot throw `IOException` because `Base.f` does not"]
     );
 }

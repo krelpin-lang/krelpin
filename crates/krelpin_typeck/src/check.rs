@@ -8,6 +8,7 @@ use krelpin_span::def_id::DefId;
 use krelpin_span::{Span, Symbol};
 
 use crate::TypeckResults;
+use crate::exceptions::ExceptionScope;
 use crate::param_env::ParamEnv;
 use crate::sig::Tcx;
 use crate::ty::Ty;
@@ -21,6 +22,7 @@ pub(crate) struct FnCtxt<'a, 'tcx> {
     pub(crate) locals: HashMap<Span, Ty>,
     pub(crate) narrowed: Vec<HashMap<Span, Ty>>,
     pub(crate) yields: Vec<Vec<Ty>>,
+    pub(crate) exceptions: ExceptionScope,
     pub(crate) results: HashMap<Span, Ty>,
 }
 
@@ -121,6 +123,7 @@ fn check_member<'a, 'tcx>(tcx: &'a Tcx<'tcx>, owner: DefId, member: &Member) -> 
         }
         MemberKind::Constructor(ctor) => {
             let mut fcx = FnCtxt::new(tcx, owner, Ty::Void);
+            fcx.exceptions = ExceptionScope::declared(tcx.lower_tys(&ctor.throws));
             fcx.declare_params(&ctor.params);
             fcx.check_block(&ctor.body);
             fcx
@@ -137,6 +140,7 @@ fn check_member<'a, 'tcx>(tcx: &'a Tcx<'tcx>, owner: DefId, member: &Member) -> 
             if method.receiver.is_none() {
                 fcx.self_ty = Ty::Unknown;
             }
+            fcx.exceptions = ExceptionScope::declared(tcx.lower_tys(&method.throws));
             fcx.declare_params(&method.params);
             if let Some(body) = &method.body {
                 let diverges = fcx.check_block(body);
@@ -160,6 +164,7 @@ impl<'a, 'tcx> FnCtxt<'a, 'tcx> {
             locals: HashMap::new(),
             narrowed: Vec::new(),
             yields: Vec::new(),
+            exceptions: ExceptionScope::default(),
             results: HashMap::new(),
         }
     }

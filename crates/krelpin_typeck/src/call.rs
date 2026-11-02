@@ -111,6 +111,9 @@ impl FnCtxt<'_, '_> {
         };
         self.check_inferred_bounds(chosen, name);
         self.check_vis(chosen.method.vis, chosen.method.owner, false, what, name);
+        for thrown in &chosen.method.throws {
+            self.raise(thrown.subst(&chosen.subst), name.span);
+        }
         for (index, arg) in args.iter().enumerate() {
             if is_closure(arg) {
                 self.check_closure(arg, &chosen.param(index, phase));
