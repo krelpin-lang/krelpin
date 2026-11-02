@@ -70,7 +70,6 @@ keywords! {
     Throws: "throws",
     True: "true",
     Try: "try",
-    Var: "var",
     Void: "void",
     While: "while",
     Yield: "yield",

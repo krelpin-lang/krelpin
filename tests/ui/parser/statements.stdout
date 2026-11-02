@@ -228,14 +228,12 @@ CompilationUnit {
                                                 Stmt {
                                                     kind: Local(
                                                         Local {
-                                                            ty: Some(
-                                                                Ty {
-                                                                    kind: Primitive(
-                                                                        Int,
-                                                                    ),
-                                                                    span: 248..251,
-                                                                },
-                                                            ),
+                                                            ty: Ty {
+                                                                kind: Primitive(
+                                                                    Int,
+                                                                ),
+                                                                span: 248..251,
+                                                            },
                                                             name: "sum" @ 252..255,
                                                             init: Some(
                                                                 Expr {
@@ -255,22 +253,20 @@ CompilationUnit {
                                                 },
                                                 Stmt {
                                                     kind: ForEach {
-                                                        ty: Some(
-                                                            Ty {
-                                                                kind: Ref {
-                                                                    mutable: false,
-                                                                    sources: [],
-                                                                    ty: Ty {
-                                                                        kind: Path {
-                                                                            path: "Item" @ 275..279,
-                                                                            args: [],
-                                                                        },
-                                                                        span: 275..279,
+                                                        ty: Ty {
+                                                            kind: Ref {
+                                                                mutable: false,
+                                                                sources: [],
+                                                                ty: Ty {
+                                                                    kind: Path {
+                                                                        path: "Item" @ 275..279,
+                                                                        args: [],
                                                                     },
+                                                                    span: 275..279,
                                                                 },
-                                                                span: 274..279,
                                                             },
-                                                        ),
+                                                            span: 274..279,
+                                                        },
                                                         name: "item" @ 280..284,
                                                         iter: Expr {
                                                             kind: Borrow {
@@ -446,14 +442,12 @@ CompilationUnit {
                                                             Stmt {
                                                                 kind: Local(
                                                                     Local {
-                                                                        ty: Some(
-                                                                            Ty {
-                                                                                kind: Primitive(
-                                                                                    Int,
-                                                                                ),
-                                                                                span: 438..441,
-                                                                            },
-                                                                        ),
+                                                                        ty: Ty {
+                                                                            kind: Primitive(
+                                                                                Int,
+                                                                            ),
+                                                                            span: 438..441,
+                                                                        },
                                                                         name: "i" @ 442..443,
                                                                         init: Some(
                                                                             Expr {
@@ -528,22 +522,20 @@ CompilationUnit {
                                                                         Stmt {
                                                                             kind: Local(
                                                                                 Local {
-                                                                                    ty: Some(
-                                                                                        Ty {
-                                                                                            kind: Ref {
-                                                                                                mutable: false,
-                                                                                                sources: [],
-                                                                                                ty: Ty {
-                                                                                                    kind: Path {
-                                                                                                        path: "Item" @ 492..496,
-                                                                                                        args: [],
-                                                                                                    },
-                                                                                                    span: 492..496,
+                                                                                    ty: Ty {
+                                                                                        kind: Ref {
+                                                                                            mutable: false,
+                                                                                            sources: [],
+                                                                                            ty: Ty {
+                                                                                                kind: Path {
+                                                                                                    path: "Item" @ 492..496,
+                                                                                                    args: [],
                                                                                                 },
+                                                                                                span: 492..496,
                                                                                             },
-                                                                                            span: 491..496,
                                                                                         },
-                                                                                    ),
+                                                                                        span: 491..496,
+                                                                                    },
                                                                                     name: "item" @ 497..501,
                                                                                     init: Some(
                                                                                         Expr {
@@ -714,15 +706,13 @@ CompilationUnit {
                                                 Stmt {
                                                     kind: Local(
                                                         Local {
-                                                            ty: Some(
-                                                                Ty {
-                                                                    kind: Path {
-                                                                        path: "String" @ 687..693,
-                                                                        args: [],
-                                                                    },
-                                                                    span: 687..693,
+                                                            ty: Ty {
+                                                                kind: Path {
+                                                                    path: "String" @ 687..693,
+                                                                    args: [],
                                                                 },
-                                                            ),
+                                                                span: 687..693,
+                                                            },
                                                             name: "label" @ 694..699,
                                                             init: Some(
                                                                 Expr {

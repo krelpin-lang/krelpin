@@ -101,17 +101,6 @@ fn literal_and_local_types() {
 }
 
 #[test]
-fn var_inference() {
-    body_ok("var a = 5; int b = a; var p = new Point(1, 2); int s = p.sum();");
-    assert_eq!(
-        in_body("var a = null;"),
-        ["cannot infer the type of `a` from `null`"]
-    );
-    assert_eq!(in_body("var a;"), ["`var` needs an initializer"]);
-    assert_eq!(in_body("var a = 5; String b = a;"), ["mismatched types"]);
-}
-
-#[test]
 fn null_safety() {
     assert_eq!(in_body("String s = null;"), ["mismatched types"]);
     assert_eq!(
@@ -393,7 +382,7 @@ fn operators() {
 fn switch_expressions() {
     body_ok("int x = 1; String s = switch (x) { case 1 -> \"a\"; default -> { yield \"b\"; } };");
     assert_eq!(
-        in_body("int x = 1; var s = switch (x) { case 1 -> \"a\"; default -> 2; };"),
+        in_body("int x = 1; Object s = switch (x) { case 1 -> \"a\"; default -> 2; };"),
         ["the cases of this `switch` have incompatible types `String` and `int`"]
     );
     assert_eq!(
@@ -929,10 +918,6 @@ fn lambda_errors() {
     assert_eq!(
         errors(&closures("String s = () -> 1;")),
         ["a lambda cannot be used as `String`"]
-    );
-    assert_eq!(
-        errors(&closures("var f = () -> 1;")),
-        ["cannot infer the type of `f` from a lambda"]
     );
 }
 

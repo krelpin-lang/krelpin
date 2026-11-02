@@ -352,9 +352,7 @@ impl<'a> Resolver<'a> {
     fn resolve_stmt(&mut self, stmt: &Stmt) {
         match &stmt.kind {
             StmtKind::Local(local) => {
-                if let Some(ty) = &local.ty {
-                    self.resolve_ty(ty);
-                }
+                self.resolve_ty(&local.ty);
                 if let Some(init) = &local.init {
                     self.resolve_expr(init);
                 }
@@ -404,9 +402,7 @@ impl<'a> Resolver<'a> {
             } => {
                 self.resolve_expr(iter);
                 self.with_scope(|this| {
-                    if let Some(ty) = ty {
-                        this.resolve_ty(ty);
-                    }
+                    this.resolve_ty(ty);
                     this.declare(*name);
                     this.resolve_loop_body(body);
                 });

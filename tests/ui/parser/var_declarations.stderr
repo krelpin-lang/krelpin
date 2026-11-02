@@ -1,0 +1,18 @@
+error: invalid variable declaration
+ --> tests/ui/parser/var_declarations.kr:3:9
+  |
+3 |         var count = 0;
+  |         ^^^ `var` is not supported
+  |
+  = help: write the type of the variable instead of `var`
+
+error: invalid variable declaration
+ --> tests/ui/parser/var_declarations.kr:4:14
+  |
+4 |         for (var name : names) {}
+  |              ^^^ `var` is not supported
+  |
+  = help: write the type of the variable instead of `var`
+
+error: aborting due to 2 previous errors
+

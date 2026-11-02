@@ -31,13 +31,7 @@ fn local_decls(src: &str) -> Vec<String> {
     body(src)
         .iter()
         .map(|stmt| match &stmt.kind {
-            StmtKind::Local(local) => {
-                let ty = local
-                    .ty
-                    .as_ref()
-                    .map_or("var".to_owned(), ToString::to_string);
-                format!("{ty} {}", local.name.name)
-            }
+            StmtKind::Local(local) => format!("{} {}", local.ty, local.name.name),
             other => panic!("expected a local, found {other:?}"),
         })
         .collect()
@@ -47,13 +41,13 @@ fn local_decls(src: &str) -> Vec<String> {
 fn local_declarations() {
     assert_eq!(
         local_decls(
-            "int x = 1; var y = 2; List<String> names = new ArrayList<>(); \
+            "int x = 1; long y = 2; List<String> names = new ArrayList<>(); \
              &String r = &name; String? n = null; int[] xs = {1}; \
              Map<String, List<Integer>> m; &mut [a] Buffer b = &mut buffer;"
         ),
         [
             "int x",
-            "var y",
+            "long y",
             "List<String> names",
             "&String r",
             "String? n",
@@ -96,10 +90,9 @@ fn loops() {
              for (int i = 0; i < n; i++, j--) {} \
              for (;;) break; \
              for (String s : names) print(s); \
-             for (var s : &names) {} \
              for (&String s : &names) {}"
         )),
-        ["while", "do", "for", "for", "foreach", "foreach", "foreach"]
+        ["while", "do", "for", "for", "foreach", "foreach"]
     );
 }
 
@@ -190,4 +183,20 @@ fn unclosed_nested_block_reports_once() {
 #[test]
 fn yield_statements() {
     assert_eq!(kinds(&body("yield 1;")), ["yield"]);
+}
+
+#[test]
+fn var_is_not_a_declaration() {
+    assert_eq!(
+        body_errors("var x = 1; int y = 2;"),
+        ["invalid variable declaration"]
+    );
+    assert_eq!(
+        body_errors("for (var s : names) {}"),
+        ["invalid variable declaration"]
+    );
+    assert_eq!(
+        body_errors("int var = 1; var = var + 1;"),
+        Vec::<String>::new()
+    );
 }

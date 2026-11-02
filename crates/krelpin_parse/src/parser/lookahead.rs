@@ -40,9 +40,6 @@ impl Parser<'_> {
     }
 
     pub(crate) fn local_decl_ahead(&self, in_for_header: bool) -> bool {
-        if self.token.is_keyword(kw::Var) {
-            return true;
-        }
         let Some(end) = self.scan_type(0) else {
             return false;
         };

@@ -576,15 +576,13 @@ CompilationUnit {
                                                 Stmt {
                                                     kind: Local(
                                                         Local {
-                                                            ty: Some(
-                                                                Ty {
-                                                                    kind: Path {
-                                                                        path: "Person" @ 604..610,
-                                                                        args: [],
-                                                                    },
-                                                                    span: 604..610,
+                                                            ty: Ty {
+                                                                kind: Path {
+                                                                    path: "Person" @ 604..610,
+                                                                    args: [],
                                                                 },
-                                                            ),
+                                                                span: 604..610,
+                                                            },
                                                             name: "p" @ 611..612,
                                                             init: Some(
                                                                 Expr {

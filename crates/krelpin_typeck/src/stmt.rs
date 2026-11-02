@@ -3,8 +3,8 @@ use std::collections::HashMap;
 use krelpin_ast::ast::{BinOp, Block, Expr, ExprKind, Stmt, StmtKind, UnOp};
 use krelpin_errors::Diagnostic;
 use krelpin_resolve::Res;
+use krelpin_span::Span;
 use krelpin_span::def_id::DefId;
-use krelpin_span::{Span, Symbol};
 
 use crate::check::FnCtxt;
 use crate::lang_items::LangItem;
@@ -25,24 +25,10 @@ impl FnCtxt<'_, '_> {
     fn check_stmt(&mut self, stmt: &Stmt) -> bool {
         match &stmt.kind {
             StmtKind::Local(local) => {
-                let ty = match (&local.ty, &local.init) {
-                    (Some(ty), init) => {
-                        let ty = self.lower_ty(ty);
-                        if let Some(init) = init {
-                            self.check_expr_coerce(init, &ty);
-                        }
-                        ty
-                    }
-                    (None, Some(init)) => self.infer_local(local.name.name, init),
-                    (None, None) => {
-                        self.emit(
-                            Diagnostic::error("`var` needs an initializer")
-                                .with_span(local.name.span)
-                                .with_help("give it a value, or write the type instead of `var`"),
-                        );
-                        Ty::Unknown
-                    }
-                };
+                let ty = self.lower_ty(&local.ty);
+                if let Some(init) = &local.init {
+                    self.check_expr_coerce(init, &ty);
+                }
                 self.locals.insert(local.name.span, ty);
                 false
             }
@@ -103,16 +89,10 @@ impl FnCtxt<'_, '_> {
             } => {
                 let iter_ty = self.check_expr(iter);
                 let elem = self.element_ty(&iter_ty, iter.span);
-                let declared = match ty {
-                    Some(ty) => {
-                        let declared = self.lower_ty(ty);
-                        if !self.is_assignable(&elem, &declared) {
-                            self.mismatch(ty.span, &declared, &elem);
-                        }
-                        declared
-                    }
-                    None => elem,
-                };
+                let declared = self.lower_ty(ty);
+                if !self.is_assignable(&elem, &declared) {
+                    self.mismatch(ty.span, &declared, &elem);
+                }
                 self.locals.insert(name.span, declared);
                 self.check_stmt(body);
                 false
@@ -162,29 +142,6 @@ impl FnCtxt<'_, '_> {
                 true
             }
             StmtKind::Break | StmtKind::Continue | StmtKind::Empty => false,
-        }
-    }
-
-    fn infer_local(&mut self, name: Symbol, init: &Expr) -> Ty {
-        let ty = self.check_expr(init);
-        let problem = match (&ty, &init.kind) {
-            (_, ExprKind::ArrayInit { ty: None, .. }) => Some("an array initializer"),
-            (_, ExprKind::Lambda { .. }) => Some("a lambda"),
-            (_, ExprKind::MethodRef { .. }) => Some("a method reference"),
-            (Ty::Null, _) => Some("`null`"),
-            (Ty::Void, _) => Some("a method that returns nothing"),
-            _ => None,
-        };
-        match problem {
-            Some(problem) => {
-                self.emit(
-                    Diagnostic::error(format!("cannot infer the type of `{name}` from {problem}"))
-                        .with_span(init.span)
-                        .with_help("write the type instead of `var`"),
-                );
-                Ty::Unknown
-            }
-            None => ty,
         }
     }
 

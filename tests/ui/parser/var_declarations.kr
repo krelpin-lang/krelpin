@@ -1,0 +1,7 @@
+class Main {
+    void run(&this, List<String> names) {
+        var count = 0;
+        for (var name : names) {}
+        int var = 1;
+    }
+}

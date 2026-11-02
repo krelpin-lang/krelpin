@@ -1,4 +1,6 @@
-use krelpin_ast::ast::{Block, Catch, Expr, ExprKind, Local, Stmt, StmtKind, SwitchArm, Ty, UnOp};
+use krelpin_ast::ast::{
+    Block, Catch, Expr, ExprKind, Local, Stmt, StmtKind, SwitchArm, Ty, TyKind, UnOp,
+};
 use krelpin_ast::token::TokenKind;
 use krelpin_errors::Diagnostic;
 use krelpin_span::kw;
@@ -110,12 +112,17 @@ impl Parser<'_> {
         Ok(Local { ty, name, init })
     }
 
-    fn parse_local_ty(&mut self) -> PResult<Option<Ty>> {
-        if self.eat_keyword_noexpect(kw::Var) {
-            Ok(None)
-        } else {
-            self.parse_ty().map(Some)
+    fn parse_local_ty(&mut self) -> PResult<Ty> {
+        let ty = self.parse_ty()?;
+        if !is_var(&ty) {
+            return Ok(ty);
         }
+        Err(self.emit(
+            Diagnostic::error("invalid variable declaration")
+                .with_span(ty.span)
+                .with_label("`var` is not supported")
+                .with_help("write the type of the variable instead of `var`"),
+        ))
     }
 
     fn check_expr_stmt(&self, expr: &Expr) {
@@ -364,5 +371,15 @@ impl Parser<'_> {
             catches,
             finally,
         })
+    }
+}
+
+fn is_var(ty: &Ty) -> bool {
+    match &ty.kind {
+        TyKind::Path { path, args } => {
+            args.is_empty()
+                && matches!(path.segments.as_slice(), [segment] if segment.name.as_str() == "var")
+        }
+        _ => false,
     }
 }

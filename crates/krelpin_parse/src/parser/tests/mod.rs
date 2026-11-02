@@ -84,7 +84,7 @@ pub(super) fn body_errors(src: &str) -> Vec<String> {
 }
 
 pub(super) fn expr(src: &str) -> String {
-    let stmts = body(&format!("var t = {src};"));
+    let stmts = body(&format!("Object t = {src};"));
     match &stmts[0].kind {
         StmtKind::Local(local) => local.init.as_ref().expect("initializer").to_string(),
         other => panic!("expected a local, found {other:?}"),

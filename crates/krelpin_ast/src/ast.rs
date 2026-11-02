@@ -344,7 +344,7 @@ pub enum StmtKind {
         body: Box<Stmt>,
     },
     ForEach {
-        ty: Option<Ty>,
+        ty: Ty,
         name: Ident,
         iter: Expr,
         body: Box<Stmt>,
@@ -368,7 +368,7 @@ pub enum StmtKind {
 
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct Local {
-    pub ty: Option<Ty>,
+    pub ty: Ty,
     pub name: Ident,
     pub init: Option<Expr>,
 }
