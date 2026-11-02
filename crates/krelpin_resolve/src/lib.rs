@@ -1,7 +1,5 @@
 mod collect;
 mod late;
-mod package;
-mod prelude;
 
 #[cfg(test)]
 mod tests;
@@ -9,12 +7,12 @@ mod tests;
 use std::collections::HashMap;
 
 use krelpin_ast::ast::{CompilationUnit, PrimitiveTy};
+pub use krelpin_ast::package::PackagePath;
 use krelpin_errors::DiagCtxt;
 use krelpin_span::Span;
 use krelpin_span::def_id::DefId;
 
 pub use crate::collect::{FieldDef, ItemTable, MethodDef, TypeDef, UnitScope};
-pub use crate::package::PackagePath;
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum Res {

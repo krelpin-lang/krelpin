@@ -1,7 +1,9 @@
 use std::fmt;
 
-use krelpin_ast::ast::{CompilationUnit, Ident};
+use crate::ast::{CompilationUnit, Ident};
 use krelpin_span::Symbol;
+
+const PRELUDE: &[&str] = &["std.lang", "std.util", "std.sync"];
 
 #[derive(Clone, Debug, Default, PartialEq, Eq, Hash)]
 pub struct PackagePath(Vec<Symbol>);
@@ -9,6 +11,13 @@ pub struct PackagePath(Vec<Symbol>);
 impl PackagePath {
     pub fn parse(dotted: &str) -> PackagePath {
         PackagePath(dotted.split('.').map(Symbol::intern).collect())
+    }
+
+    pub fn prelude() -> Vec<PackagePath> {
+        PRELUDE
+            .iter()
+            .map(|package| PackagePath::parse(package))
+            .collect()
     }
 
     pub fn is_std(&self) -> bool {

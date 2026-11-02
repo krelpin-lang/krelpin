@@ -9,7 +9,7 @@ use krelpin_errors::{DiagCtxt, Diagnostic};
 use krelpin_span::{Span, Symbol, kw};
 
 use crate::collect::{ItemTable, TypeDef, UnitScope};
-use crate::{PackagePath, Res, Resolutions, prelude};
+use crate::{PackagePath, Res, Resolutions};
 
 #[derive(Clone, Copy, PartialEq, Eq)]
 enum StaticContext {
@@ -52,7 +52,7 @@ pub(crate) fn resolve_bodies(
         table,
         dcx,
         resolutions: Resolutions::default(),
-        prelude: prelude::packages(),
+        prelude: PackagePath::prelude(),
         scope: &table.scopes[first.unit],
         owner: first,
         class_type_params: Vec::new(),
