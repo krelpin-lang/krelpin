@@ -157,6 +157,10 @@ pub enum PatKind {
         index: usize,
         fields: Vec<Pat>,
     },
+    Record {
+        def: DefId,
+        fields: Vec<Pat>,
+    },
     Const {
         owner: DefId,
         name: Symbol,

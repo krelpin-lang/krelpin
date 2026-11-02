@@ -11,6 +11,7 @@ use krelpin_span::Symbol;
 use krelpin_span::def_id::DefId;
 
 use crate::lang_items::{LangItem, LangItems};
+use crate::param_env::ParamEnv;
 use crate::ty::{Subst, Ty};
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -34,6 +35,7 @@ pub struct TypeSig {
     pub methods: HashMap<Symbol, Vec<MethodSig>>,
     pub ctors: Vec<MethodSig>,
     pub variants: Vec<VariantSig>,
+    pub components: Vec<Symbol>,
 }
 
 impl TypeSig {
@@ -343,6 +345,7 @@ impl<'a> Tcx<'a> {
             methods: HashMap::new(),
             ctors: Vec::new(),
             variants: Vec::new(),
+            components: Vec::new(),
         };
 
         if let ItemKind::Enum(def) = &item.kind {
@@ -387,6 +390,7 @@ impl<'a> Tcx<'a> {
     fn collect_components(&self, sig: &mut TypeSig, def: DefId, record: &ast::Record) {
         for component in &record.components {
             let name = component.name;
+            sig.components.push(name.name);
             sig.fields.entry(name.name).or_insert(FieldSig {
                 name,
                 ty: self.lower_ty(&component.ty),
@@ -448,6 +452,69 @@ impl<'a> Tcx<'a> {
         if sig.variants.iter().all(|variant| variant.fields.is_empty()) {
             self.synthesize_unit_enum_members(sig, def, self_ty);
         }
+    }
+
+    pub(crate) fn derive_record_equality(&mut self) {
+        loop {
+            let mut changed = false;
+            for def in (0..self.types.len()).map(DefId::from_index) {
+                for item in [LangItem::Equatable, LangItem::Hashable] {
+                    changed |= self.add_record_interface(def, item);
+                }
+            }
+            if !changed {
+                return;
+            }
+        }
+    }
+
+    fn add_record_interface(&mut self, def: DefId, item: LangItem) -> bool {
+        let sig = self.sig(def);
+        let Some(interface) = self.lang_items.get(item) else {
+            return false;
+        };
+        let method_name = match item {
+            LangItem::Equatable => "equals",
+            _ => "hashCode",
+        };
+        let already_implemented = sig.methods.contains_key(&Symbol::intern(method_name))
+            || sig.interfaces.iter().any(
+                |parent| matches!(parent, Ty::Adt { def: parent, .. } if *parent == interface),
+            );
+        if sig.kind != AdtKind::Record || already_implemented {
+            return false;
+        }
+        let env = ParamEnv::default().with_generics(&sig.generics);
+        let every_component = sig.components.iter().all(|name| {
+            let ty = sig.fields[name].ty.clone();
+            let bound = self.def_ty(interface, vec![ty.clone()]);
+            ty.references_unknown() || self.is_assignable(&env, &ty, &bound)
+        });
+        if !every_component {
+            return false;
+        }
+
+        let self_ty = self.self_ty(def);
+        let span = sig.name.span;
+        let name = Ident::new(Symbol::intern(method_name), span);
+        let method = match item {
+            LangItem::Equatable => MethodSig {
+                params: vec![Ty::Ref {
+                    mutable: false,
+                    ty: Box::new(self_ty.clone()),
+                }],
+                ..synthesized_method(name, def, Some(ReceiverKind::Ref), Ty::BOOLEAN)
+            },
+            _ => synthesized_method(name, def, Some(ReceiverKind::Ref), Ty::INT),
+        };
+        let interface_ty = self.def_ty(interface, vec![self_ty]);
+        let sig = &mut self.types[def.index()];
+        sig.interfaces.push(interface_ty);
+        sig.methods
+            .entry(method.name.name)
+            .or_default()
+            .push(method);
+        true
     }
 
     fn synthesize_unit_enum_members(&self, sig: &mut TypeSig, def: DefId, self_ty: Ty) {

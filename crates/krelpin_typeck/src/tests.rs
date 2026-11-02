@@ -1577,7 +1577,7 @@ fn patterns_destructure_variants() {
         errors(&variants(
             "static int f(Object o) { return switch (o) { case Main(int x) -> 1; default -> 0; }; }"
         )),
-        ["`Main` is not an enum variant"]
+        ["`Main` is not an enum variant or a record"]
     );
 }
 
@@ -1688,10 +1688,10 @@ fn derived_equality_and_hashing() {
 }
 
 #[test]
-fn structs_are_built_from_their_fields() {
+fn records_are_built_from_their_components() {
     let src = |code: &str| {
         format!(
-            "@Derive(Equatable, Comparable)\n\
+            "@Derive(Comparable)\n\
              record Version(int major, String tag);\n\
              class Main {{ void run(&this) {{ {code} }} }}"
         )
@@ -1802,5 +1802,56 @@ fn record_components_never_change() {
     assert_eq!(
         errors(&src("User user2 = new User(\"Ali\");")),
         ["this constructor takes 2 arguments but 1 argument was supplied"]
+    );
+}
+
+#[test]
+fn records_are_equatable_when_their_components_are() {
+    let src = |code: &str| {
+        format!(
+            "record Point(double x, double y);\n\
+             class Handle {{}}\n\
+             record Holder(Handle handle);\n\
+             record Pair<A, B>(A first, B second);\n\
+             record Key<K extends Hashable<K>>(K value);\n\
+             class Main {{ static void run(Point a, Point b, Holder h) {{ {code} }} }}"
+        )
+    };
+    ok(&src(
+        "boolean same = a == b; HashSet<Point> points = new HashSet<>(); \
+         HashSet<Key<String>> keys = new HashSet<>();",
+    ));
+    assert_eq!(
+        errors(&src("boolean same = h == h;")),
+        ["values of type `Holder` cannot be compared with `==`"]
+    );
+    assert_eq!(
+        errors(&src(
+            "Pair<String, int> p = new Pair<>(\"a\", 1); boolean same = p == p;"
+        )),
+        ["values of type `Pair<String, int>` cannot be compared with `==`"]
+    );
+}
+
+#[test]
+fn records_are_taken_apart_with_patterns() {
+    let src = |code: &str| {
+        format!(
+            "record Point(double x, double y);\n\
+             record Line(Point from, Point to);\n\
+             class Main {{ static double run(Line line, Object any) {{ {code} }} }}"
+        )
+    };
+    ok(&src(
+        "if (any instanceof Point(double x, _) && x > 0.0) { return x; }\n\
+         return switch (line) {\n\
+         \x20   case Line(Point(double x1, _), Point(double x2, _)) -> x2 - x1;\n\
+         };",
+    ));
+    assert_eq!(
+        errors(&src(
+            "return switch (line) { case Line(Point from) -> 0.0; };"
+        )),
+        ["this pattern has 1 field, but the record `Line` has 2 components"]
     );
 }

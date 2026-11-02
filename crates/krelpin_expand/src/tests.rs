@@ -151,3 +151,15 @@ fn derive_comparable() {
         ["`Comparable` cannot be derived because `label` may be null"]
     );
 }
+
+#[test]
+fn records_only_derive_comparable() {
+    assert_eq!(
+        errors("@Derive(Equatable) record Point(int x, int y);"),
+        ["records are already `Equatable` when their components are"]
+    );
+    assert_eq!(
+        errors("@Derive(Comparable) record Point(int x, int y);"),
+        Vec::<String>::new()
+    );
+}

@@ -1,6 +1,6 @@
 use std::fmt::Write;
 
-use krelpin_ast::ast::Item;
+use krelpin_ast::ast::{Item, ItemKind};
 use krelpin_ast::token::TokenKind;
 use krelpin_errors::Diagnostic;
 use krelpin_span::Symbol;
@@ -46,6 +46,20 @@ impl ExpandCtxt<'_> {
         let Some(model) = self.item_model(item, invocation) else {
             return;
         };
+        let automatic = derived
+            .iter()
+            .find(|derivable| **derivable != Derivable::Comparable);
+        if let (ItemKind::Record(_), Some(derivable)) = (&item.kind, automatic) {
+            self.emit(
+                Diagnostic::error(format!(
+                    "records are already `{}` when their components are",
+                    derivable.name()
+                ))
+                .with_span(invocation.annotation.span)
+                .with_help("remove it from `@Derive`; only `Comparable` needs to be derived"),
+            );
+            return;
+        }
         let built_in = derived
             .iter()
             .find(|derivable| **derivable != Derivable::Comparable);

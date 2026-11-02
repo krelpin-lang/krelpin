@@ -1,6 +1,5 @@
 package shop;
 
-@Derive(Equatable)
 record Money(long cents, String currency) {}
 
 enum Payment {

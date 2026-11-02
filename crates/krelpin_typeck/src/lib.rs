@@ -55,6 +55,7 @@ impl TypeckResults {
 #[derive(Clone, Debug)]
 pub enum PatRes {
     Variant { def: DefId, index: usize },
+    Record { def: DefId },
     Type(Ty),
     Const { owner: DefId, name: Symbol, ty: Ty },
 }
@@ -79,6 +80,7 @@ pub fn check<'a>(
 ) -> TypeckOutput<'a> {
     let mut tcx = Tcx::new(units, resolved, dcx);
     tcx.break_inheritance_cycles();
+    tcx.derive_record_equality();
     let results = check::check_units(&tcx, units);
     TypeckOutput { tcx, results }
 }

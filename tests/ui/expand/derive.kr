@@ -1,6 +1,6 @@
 package shop;
 
-@Derive(Equatable, Hashable, Comparable)
+@Derive(Comparable)
 record Money(long cents, String currency) {}
 
 @Derive(Equatable, Hashable)

@@ -912,6 +912,18 @@ impl FnCtxt<'_, '_> {
         }
         let help = match ty {
             Ty::Param(name) => format!("add the bound `{name} extends Equatable<{name}>`"),
+            Ty::Adt { def, .. } if self.tcx.sig(*def).kind == AdtKind::Record => {
+                if self.tcx.sig(*def).generics.is_empty() {
+                    format!(
+                        "a record is `Equatable` when all of its components are, \
+                         and one of `{ty}`'s is not"
+                    )
+                } else {
+                    "a generic record is `Equatable` when its type parameters are bounded, \
+                     like `<T extends Equatable<T>>`"
+                        .to_owned()
+                }
+            }
             ty => format!("implement `Equatable<{ty}>` for `{ty}`"),
         };
         self.emit(

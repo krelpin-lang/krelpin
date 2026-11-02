@@ -1,7 +1,3 @@
-fn Money.equals(this_0: &Money, other_1: &Money) -> boolean {
-    return (this_0.cents == other_1.cents);
-}
-
 fn Counter.bump(this_0: &mut Counter) -> void {
     (this_0.count++);
 }

@@ -155,6 +155,16 @@ impl<'a, 'tcx> MatchCheck<'a, 'tcx> {
                     .collect();
                 CtorSet::Variants(variants)
             }
+            Ty::Adt { def, args, .. } if self.tcx.sig(*def).kind == AdtKind::Record => {
+                let sig = self.tcx.sig(*def);
+                let subst = self.tcx.subst_for(*def, args);
+                let fields = sig
+                    .components
+                    .iter()
+                    .map(|name| sig.fields[name].ty.subst(&subst))
+                    .collect();
+                CtorSet::Variants(vec![(sig.name.name.as_str().to_owned(), fields)])
+            }
             _ => CtorSet::Infinite,
         }
     }

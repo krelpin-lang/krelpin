@@ -20,6 +20,14 @@ error: `@Derive` cannot be used on members
   |
   = help: `@Derive` can only be used on classes, records and enums
 
+error: records are already `Equatable` when their components are
+  --> tests/ui/expand/macro_errors.kr:13:1
+   |
+13 | @Derive(Equatable, Comparable)
+   | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+   |
+   = help: remove it from `@Derive`; only `Comparable` needs to be derived
+
 error: enums without data are already `Equatable`
   --> tests/ui/expand/macro_errors.kr:16:1
    |
@@ -44,5 +52,5 @@ error: `Comparable` cannot be derived because `text` may be null
    |
    = help: implement `compareTo` yourself to decide where null values go
 
-error: aborting due to 6 previous errors
+error: aborting due to 7 previous errors
 

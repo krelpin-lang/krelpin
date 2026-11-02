@@ -1,0 +1,42 @@
+error: values of type `Holder` cannot be compared with `==`
+  --> tests/ui/typeck/record_errors.kr:13:16
+   |
+13 |         return a == b || p == p;
+   |                ^^^^^^
+   |
+   = help: a record is `Equatable` when all of its components are, and one of `Holder`'s is not
+
+error: values of type `Pair<String, int>` cannot be compared with `==`
+  --> tests/ui/typeck/record_errors.kr:13:26
+   |
+13 |         return a == b || p == p;
+   |                          ^^^^^^
+   |
+   = help: a generic record is `Equatable` when its type parameters are bounded, like `<T extends Equatable<T>>`
+
+error: this pattern has 1 field, but the record `Point` has 2 components
+  --> tests/ui/typeck/record_errors.kr:18:18
+   |
+18 |             case Point(double x) -> x;
+   |                  ^^^^^
+
+error: this `switch` expression does not cover every case
+  --> tests/ui/typeck/record_errors.kr:23:16
+   |
+23 |         return switch (point) {
+   |                ^^^^^^^^^^^^^^^^
+   |
+   = note: not covered: `Point(_, _)`
+   = help: add the missing cases, or a `default` case
+
+error: cannot assign to `x`, a component of the record `Point`
+  --> tests/ui/typeck/record_errors.kr:29:15
+   |
+29 |         point.x = 1.0;
+   |               ^
+   |
+   = note: the components of a record never change
+   = help: make a changed copy with `with { ... }`
+
+error: aborting due to 5 previous errors
+

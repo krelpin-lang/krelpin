@@ -377,6 +377,12 @@ impl LoweringCtxt<'_, '_> {
                     fields: fields.iter().map(|field| self.lower_pat(field)).collect(),
                 }
             }
+            (ast::PatKind::Variant { fields, .. }, Some(PatRes::Record { def })) => {
+                PatKind::Record {
+                    def,
+                    fields: fields.iter().map(|field| self.lower_pat(field)).collect(),
+                }
+            }
             (ast::PatKind::Path(_), Some(PatRes::Type(ty))) => PatKind::Binding { local: None, ty },
             (ast::PatKind::Path(_), Some(PatRes::Const { owner, name, .. })) => {
                 PatKind::Const { owner, name }

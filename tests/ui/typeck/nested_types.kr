@@ -18,7 +18,6 @@ class LinkedList<T> {
 
     enum Kind { Single, Double }
 
-    @Derive(Equatable)
     record Entry(String key, int count) {}
 
     void push(&mut this, int value) {

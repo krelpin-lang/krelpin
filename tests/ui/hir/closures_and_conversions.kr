@@ -2,7 +2,6 @@ package demo;
 
 import std.function.Function;
 
-@Derive(Equatable)
 record Money(long cents) {}
 
 class Counter {

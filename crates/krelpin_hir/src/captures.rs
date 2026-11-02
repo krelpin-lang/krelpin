@@ -127,7 +127,7 @@ impl CaptureFinder {
     fn pat(&mut self, pat: &Pat) {
         match &pat.kind {
             PatKind::Lit(expr) => self.expr(expr, false),
-            PatKind::Variant { fields, .. } => {
+            PatKind::Variant { fields, .. } | PatKind::Record { fields, .. } => {
                 for field in fields {
                     self.pat(field);
                 }

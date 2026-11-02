@@ -246,6 +246,16 @@ impl Printer<'_, '_> {
                     self.out.push(')');
                 }
             }
+            PatKind::Record { def, fields } => {
+                let _ = write!(self.out, "{}(", self.tcx.sig(*def).name.name);
+                for (position, field) in fields.iter().enumerate() {
+                    if position > 0 {
+                        self.out.push_str(", ");
+                    }
+                    self.pat(field);
+                }
+                self.out.push(')');
+            }
             PatKind::Const { owner, name } => {
                 let _ = write!(self.out, "{}::{name}", self.tcx.sig(*owner).name.name);
             }

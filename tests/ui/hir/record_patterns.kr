@@ -1,0 +1,25 @@
+package geometry;
+
+record Point(double x, double y) {}
+
+record Line(Point from, Point to) {}
+
+class Main {
+    static double width(Line line) {
+        return switch (line) {
+            case Line(Point(double x1, _), Point(double x2, _)) when x2 > x1 -> x2 - x1;
+            case Line(Point(double x1, _), Point(double x2, _)) -> x1 - x2;
+        };
+    }
+
+    static boolean sameStart(Line a, Line b) {
+        return a.from == b.from;
+    }
+
+    static double originX(Object any) {
+        if (any instanceof Point(double x, double y) && y == 0.0) {
+            return x;
+        }
+        return 0.0;
+    }
+}

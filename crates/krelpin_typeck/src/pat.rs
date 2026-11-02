@@ -142,12 +142,22 @@ impl FnCtxt<'_, '_> {
                     PatPath::Variant(variant) => {
                         self.check_variant_fields(&variant, path, fields, &expected, pat.span)
                     }
+                    PatPath::Type(Ty::Adt { def, args, .. })
+                        if self.tcx.sig(def).kind == AdtKind::Record =>
+                    {
+                        self.results.pats.insert(pat.span, PatRes::Record { def });
+                        self.check_record_fields(def, args, path, fields, &expected)
+                    }
                     found => {
                         if matches!(found, PatPath::Type(_) | PatPath::Const(..)) {
                             self.emit(
-                                Diagnostic::error(format!("`{path}` is not an enum variant"))
-                                    .with_span(path.span)
-                                    .with_label("only enum variants can be matched with `(...)`"),
+                                Diagnostic::error(format!(
+                                    "`{path}` is not an enum variant or a record"
+                                ))
+                                .with_span(path.span)
+                                .with_label(
+                                    "only enum variants and records can be matched with `(...)`",
+                                ),
                             );
                         }
                         for field in fields {
@@ -177,6 +187,73 @@ impl FnCtxt<'_, '_> {
         };
         self.results.pats.insert(span, res);
         found
+    }
+
+    fn check_record_fields(
+        &mut self,
+        def: DefId,
+        args: Vec<Ty>,
+        path: &Path,
+        fields: &[Pat],
+        expected: &Ty,
+    ) -> DeconPat {
+        let args = match expected.non_null() {
+            Ty::Adt {
+                def: expected,
+                args,
+                ..
+            } if *expected == def => args.clone(),
+            _ => args,
+        };
+        let subst = self.tcx.subst_for(def, &args);
+        let sig = self.tcx.sig(def);
+        let component_tys: Vec<Ty> = sig
+            .components
+            .iter()
+            .map(|name| sig.fields[name].ty.subst(&subst))
+            .collect();
+        if fields.len() != component_tys.len() {
+            self.emit(
+                Diagnostic::error(format!(
+                    "this pattern has {}, but the record `{}` has {} {}",
+                    plural_fields(fields.len()),
+                    self.type_name(def),
+                    component_tys.len(),
+                    if component_tys.len() == 1 {
+                        "component"
+                    } else {
+                        "components"
+                    }
+                ))
+                .with_span(path.span),
+            );
+            for field in fields {
+                self.check_pat(field, &Ty::Unknown);
+            }
+            return DeconPat::wildcard();
+        }
+
+        let fields: Vec<DeconPat> = fields
+            .iter()
+            .zip(&component_tys)
+            .map(|(field, ty)| self.check_pat(field, ty))
+            .collect();
+        let record_ty = self.tcx.self_ty(def);
+        match expected.non_null() {
+            Ty::Adt { def: expected, .. } if *expected == def => {
+                DeconPat::new(Ctor::Variant(0), fields)
+            }
+            ty if ty.references_unknown() || matches!(ty, Ty::External { .. }) => {
+                DeconPat::wildcard()
+            }
+            ty if self.is_assignable(&record_ty, ty) || self.is_interface(ty) => {
+                DeconPat::new(Ctor::Opaque(None), Vec::new())
+            }
+            ty => {
+                self.mismatch(path.span, ty, &record_ty);
+                DeconPat::wildcard()
+            }
+        }
     }
 
     fn check_variant_fields(
