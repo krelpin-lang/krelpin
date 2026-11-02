@@ -28,15 +28,21 @@ struct Point {
     }
 }
 
-enum Color {
-    RED("#ff0000"),
-    GREEN("#00ff00");
+enum Paint {
+    Solid(String hex),
+    Gradient(String from, String to),
+    Clear;
 
-    String hex;
+    const String DEFAULT = "#000000";
 
-    Color(String hex) {
-        this.hex = hex;
+    boolean isClear(&this) {
+        return this.ordinal() == 2;
     }
+}
+
+enum Result<T, E> {
+    Ok(T value),
+    Err(E error);
 }
 
 abstract class Polygon implements Shape {

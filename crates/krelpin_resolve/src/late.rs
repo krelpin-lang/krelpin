@@ -16,7 +16,6 @@ enum StaticContext {
     Method,
     SharedField,
     ConstField,
-    EnumConstant,
 }
 
 #[derive(Clone, Copy, Default)]
@@ -87,13 +86,10 @@ pub(crate) fn resolve_bodies(
                 resolver.resolve_members(&interface.members);
             }
             ItemKind::Enum(enum_def) => {
-                resolver.enter_type(&Generics::default());
+                resolver.enter_type(&enum_def.generics);
                 resolver.resolve_tys(enum_def.implements.iter());
-                resolver.static_context = Some(StaticContext::EnumConstant);
-                for constant in &enum_def.constants {
-                    for arg in &constant.args {
-                        resolver.resolve_expr(arg);
-                    }
+                for variant in &enum_def.variants {
+                    resolver.resolve_tys(variant.fields.iter().map(|field| &field.ty));
                 }
                 resolver.resolve_members(&enum_def.members);
             }
@@ -712,7 +708,6 @@ impl<'a> Resolver<'a> {
             Some(StaticContext::ConstField) => {
                 "a `const` field belongs to the class, not to a specific object"
             }
-            Some(StaticContext::EnumConstant) => "enum constants are created before any object",
         };
         self.emit(
             Diagnostic::error(format!("`{keyword}` is not available here"))

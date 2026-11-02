@@ -33,7 +33,27 @@ pub struct TypeSig {
     pub fields: HashMap<Symbol, FieldSig>,
     pub methods: HashMap<Symbol, Vec<MethodSig>>,
     pub ctors: Vec<MethodSig>,
-    pub enum_constants: Vec<Symbol>,
+    pub variants: Vec<VariantSig>,
+}
+
+impl TypeSig {
+    pub fn variant(&self, name: Symbol) -> Option<&VariantSig> {
+        self.variants
+            .iter()
+            .find(|variant| variant.name.name == name)
+    }
+}
+
+#[derive(Clone, Debug)]
+pub struct VariantSig {
+    pub name: Ident,
+    pub fields: Vec<VariantFieldSig>,
+}
+
+#[derive(Clone, Debug)]
+pub struct VariantFieldSig {
+    pub name: Ident,
+    pub ty: Ty,
 }
 
 #[derive(Clone, Debug)]
@@ -301,7 +321,7 @@ impl<'a> Tcx<'a> {
                 ),
                 ItemKind::Enum(def) => (
                     AdtKind::Enum,
-                    &EMPTY_GENERICS,
+                    &def.generics,
                     None,
                     self.lower_tys(&def.implements),
                     &def.members,
@@ -319,25 +339,11 @@ impl<'a> Tcx<'a> {
             fields: HashMap::new(),
             methods: HashMap::new(),
             ctors: Vec::new(),
-            enum_constants: Vec::new(),
+            variants: Vec::new(),
         };
 
         if let ItemKind::Enum(def) = &item.kind {
-            let self_ty = self.def_ty(def_id, Vec::new());
-            for constant in &def.constants {
-                sig.enum_constants.push(constant.name.name);
-                sig.fields.insert(
-                    constant.name.name,
-                    FieldSig {
-                        name: constant.name,
-                        ty: self_ty.clone(),
-                        vis: Visibility::Public(constant.name.span),
-                        storage: FieldStorage::Const(constant.name.span),
-                        owner: def_id,
-                    },
-                );
-            }
-            self.synthesize_enum_members(&mut sig, def_id);
+            self.collect_variants(&mut sig, def_id, &def.variants);
         }
 
         for member in members {
@@ -372,41 +378,67 @@ impl<'a> Tcx<'a> {
         sig
     }
 
-    fn synthesize_enum_members(&self, sig: &mut TypeSig, def: DefId) {
-        let self_ty = self.def_ty(def, Vec::new());
+    fn collect_variants(&self, sig: &mut TypeSig, def: DefId, variants: &[ast::Variant]) {
+        let self_ty = self.def_ty(
+            def,
+            sig.generics
+                .iter()
+                .map(|param| Ty::Param(param.name))
+                .collect(),
+        );
+        for variant in variants {
+            let fields: Vec<VariantFieldSig> = variant
+                .fields
+                .iter()
+                .map(|field| VariantFieldSig {
+                    name: field.name,
+                    ty: self.lower_ty(&field.ty),
+                })
+                .collect();
+            let name = variant.name;
+            if fields.is_empty() {
+                sig.fields.entry(name.name).or_insert(FieldSig {
+                    name,
+                    ty: self_ty.clone(),
+                    vis: Visibility::Public(name.span),
+                    storage: FieldStorage::Const(name.span),
+                    owner: def,
+                });
+            } else {
+                let ctor = MethodSig {
+                    params: fields.iter().map(|field| field.ty.clone()).collect(),
+                    generics: sig.generics.clone(),
+                    ..synthesized_method(name, def, None, self_ty.clone())
+                };
+                sig.methods.entry(name.name).or_default().push(ctor);
+            }
+            sig.variants.push(VariantSig { name, fields });
+        }
+
+        if sig.variants.iter().all(|variant| variant.fields.is_empty()) {
+            self.synthesize_unit_enum_members(sig, def, self_ty);
+        }
+    }
+
+    fn synthesize_unit_enum_members(&self, sig: &mut TypeSig, def: DefId, self_ty: Ty) {
         if let Some(hashable) = self.lang_items.get(LangItem::Hashable) {
             sig.interfaces
                 .push(self.def_ty(hashable, vec![self_ty.clone()]));
         }
 
         let span = sig.name.span;
-        let method = |name: &str, receiver, params, ret| MethodSig {
-            name: Ident::new(Symbol::intern(name), span),
-            params,
-            variadic: false,
-            ret,
-            receiver,
-            vis: Visibility::Public(span),
-            owner: def,
-            generics: Vec::new(),
-            where_bounds: Vec::new(),
-            throws: Vec::new(),
-            is_abstract: false,
-            is_final: true,
-        };
+        let name = |name: &str| Ident::new(Symbol::intern(name), span);
         let borrowed_self = Ty::Ref {
             mutable: false,
             ty: Box::new(self_ty.clone()),
         };
         let methods = [
-            method("values", None, Vec::new(), Ty::Array(Box::new(self_ty))),
-            method(
-                "equals",
-                Some(ReceiverKind::Ref),
-                vec![borrowed_self],
-                Ty::BOOLEAN,
-            ),
-            method("hashCode", Some(ReceiverKind::Ref), Vec::new(), Ty::INT),
+            synthesized_method(name("values"), def, None, Ty::Array(Box::new(self_ty))),
+            MethodSig {
+                params: vec![borrowed_self],
+                ..synthesized_method(name("equals"), def, Some(ReceiverKind::Ref), Ty::BOOLEAN)
+            },
+            synthesized_method(name("hashCode"), def, Some(ReceiverKind::Ref), Ty::INT),
         ];
         for method in methods {
             sig.methods
@@ -505,11 +537,28 @@ impl<'a> Tcx<'a> {
     }
 }
 
-static EMPTY_GENERICS: Generics = Generics {
-    params: Vec::new(),
-    span: krelpin_span::Span::DUMMY,
-};
-
 fn is_variadic(params: &[Param]) -> bool {
     params.last().is_some_and(|param| param.variadic)
+}
+
+fn synthesized_method(
+    name: Ident,
+    owner: DefId,
+    receiver: Option<ReceiverKind>,
+    ret: Ty,
+) -> MethodSig {
+    MethodSig {
+        name,
+        params: Vec::new(),
+        variadic: false,
+        ret,
+        receiver,
+        vis: Visibility::Public(name.span),
+        owner,
+        generics: Vec::new(),
+        where_bounds: Vec::new(),
+        throws: Vec::new(),
+        is_abstract: false,
+        is_final: true,
+    }
 }

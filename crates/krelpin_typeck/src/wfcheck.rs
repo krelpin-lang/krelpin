@@ -14,27 +14,28 @@ impl Tcx<'_> {
         let sig = self.sig(def);
         let env = ParamEnv::default().with_generics(&sig.generics);
 
-        let (generics, parents, members): (_, Vec<&ast::Ty>, &[Member]) = match &item.kind {
+        let (generics, parents, members): (&ast::Generics, Vec<&ast::Ty>, &[Member]) = match &item
+            .kind
+        {
             ItemKind::Class(class) => (
-                Some(&class.generics),
+                &class.generics,
                 class.extends.iter().chain(&class.implements).collect(),
                 &class.members,
             ),
-            ItemKind::Struct(def) => (
-                Some(&def.generics),
-                def.implements.iter().collect(),
-                &def.members,
-            ),
+            ItemKind::Struct(def) => (&def.generics, def.implements.iter().collect(), &def.members),
             ItemKind::Interface(interface) => (
-                Some(&interface.generics),
+                &interface.generics,
                 interface.extends.iter().collect(),
                 &interface.members,
             ),
-            ItemKind::Enum(def) => (None, def.implements.iter().collect(), &def.members),
+            ItemKind::Enum(def) => (&def.generics, def.implements.iter().collect(), &def.members),
         };
 
-        if let Some(generics) = generics {
-            self.check_bounds_wf(&env, generics);
+        self.check_bounds_wf(&env, generics);
+        if let ItemKind::Enum(def) = &item.kind {
+            for field in def.variants.iter().flat_map(|variant| &variant.fields) {
+                self.check_wf(&env, &field.ty);
+            }
         }
         for parent in parents {
             self.check_wf(&env, parent);

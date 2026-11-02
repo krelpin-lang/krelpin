@@ -226,11 +226,11 @@ impl FnCtxt<'_, '_> {
             };
             if let Some(name) = unresolved {
                 match enum_def {
-                    Some(def) if self.tcx.sig(def).enum_constants.contains(&name.name) => {}
+                    Some(def) if self.tcx.sig(def).variant(name.name).is_some() => {}
                     Some(def) => self.error(
                         name.span,
                         format!(
-                            "no constant `{}` in enum `{}`",
+                            "no variant `{}` in enum `{}`",
                             name.name,
                             self.type_name(def)
                         ),
@@ -272,10 +272,10 @@ impl FnCtxt<'_, '_> {
             Some(def) => self
                 .tcx
                 .sig(def)
-                .enum_constants
+                .variants
                 .iter()
-                .filter(|constant| !covered.contains(constant))
-                .map(|constant| format!("`{constant}`"))
+                .filter(|variant| !covered.contains(&variant.name.name))
+                .map(|variant| format!("`{}`", variant.name.name))
                 .collect(),
             None if scrutinee.is_unknown() => Vec::new(),
             None => vec!["other values".to_owned()],

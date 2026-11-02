@@ -3,7 +3,7 @@ use std::collections::{HashMap, HashSet};
 
 use krelpin_ast::ast::{
     CompilationUnit, FieldStorage, Ident, Import, Item, ItemKind, Member, MemberKind, Method,
-    is_intrinsic,
+    Variant, is_intrinsic,
 };
 use krelpin_errors::{DiagCtxt, Diagnostic};
 use krelpin_span::def_id::DefId;
@@ -122,12 +122,7 @@ fn collect_type(
         ItemKind::Class(class) => &class.members,
         ItemKind::Struct(def) => &def.members,
         ItemKind::Interface(interface) => &interface.members,
-        ItemKind::Enum(enum_def) => {
-            for constant in &enum_def.constants {
-                add_field(dcx, &mut type_def, constant.name, false);
-            }
-            &enum_def.members
-        }
+        ItemKind::Enum(enum_def) => &enum_def.members,
     };
 
     for member in members {
@@ -150,7 +145,40 @@ fn collect_type(
         }
     }
 
+    if let ItemKind::Enum(enum_def) = &item.kind {
+        add_variants(dcx, &mut type_def, &enum_def.variants);
+    }
     type_def
+}
+
+fn add_variants(dcx: &DiagCtxt, def: &mut TypeDef, variants: &[Variant]) {
+    let mut seen = HashSet::new();
+    for variant in variants {
+        let name = variant.name;
+        if !seen.insert(name.name) {
+            report_redefinition(dcx, "variant", name);
+            continue;
+        }
+        if def.fields.contains_key(&name.name) || def.methods.contains_key(&name.name) {
+            dcx.emit(
+                Diagnostic::error(format!(
+                    "the variant `{}` has the same name as a member of the enum",
+                    name.name
+                ))
+                .with_span(name.span)
+                .with_help("rename the variant or the member"),
+            );
+            continue;
+        }
+        if variant.fields.is_empty() {
+            add_field(dcx, def, name, false);
+        } else {
+            def.methods.entry(name.name).or_default().push(MethodDef {
+                span: name.span,
+                has_receiver: false,
+            });
+        }
+    }
 }
 
 fn collect_imports(table: &ItemTable, unit: &CompilationUnit, dcx: &DiagCtxt) -> UnitScope {

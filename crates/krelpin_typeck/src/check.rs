@@ -79,16 +79,7 @@ pub(crate) fn check_units(tcx: &Tcx<'_>, units: &[CompilationUnit]) -> TypeckRes
             ItemKind::Class(class) => &class.members,
             ItemKind::Struct(def) => &def.members,
             ItemKind::Interface(interface) => &interface.members,
-            ItemKind::Enum(def) => {
-                for constant in &def.constants {
-                    let mut fcx = FnCtxt::new(tcx, owner, Ty::Void);
-                    let arg_tys = fcx.check_closure_args(&constant.args);
-                    fcx.check_ctor_call(owner, &[], &constant.args, &arg_tys, constant.name);
-                    fcx.finish_closure_args(&constant.args);
-                    results.expr_types.extend(fcx.results);
-                }
-                &def.members
-            }
+            ItemKind::Enum(def) => &def.members,
         };
 
         for member in members {

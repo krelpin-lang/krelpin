@@ -407,7 +407,7 @@ fn switch_expressions() {
         errors(&enums(
             "switch (c) { case BLUE -> \"b\"; default -> \"?\"; }"
         )),
-        ["no constant `BLUE` in enum `Color`"]
+        ["no variant `BLUE` in enum `Color`"]
     );
 }
 
@@ -1436,5 +1436,69 @@ fn only_lossless_conversions_are_implicit() {
     assert_eq!(
         in_body("long l = 1L; double d = 1.5; double sum = l * d;"),
         ["cannot apply `*` to `long` and `double`"]
+    );
+}
+
+#[test]
+fn enum_variants_carry_data() {
+    let src = |code: &str| {
+        format!(
+            "enum Shape {{\n\
+             \x20   Circle(double radius),\n\
+             \x20   Rect(double width, double height),\n\
+             \x20   Empty;\n\
+             \x20   Shape unit() {{ return Circle(1.0); }}\n\
+             }}\n\
+             enum Option<T> {{ Some(T value), None }}\n\
+             class Main {{ void run(&this) {{ {code} }} }}"
+        )
+    };
+    ok(&src(
+        "Shape a = Shape.Circle(2.0); Shape b = Shape.Rect(1, 2.0); Shape c = Shape.Empty; \
+         Option<String> s = Option.Some(\"x\"); Option<int> n = Option.None; \
+         String name = a.name(); int index = c.ordinal();",
+    ));
+    assert_eq!(
+        errors(&src("Shape a = Shape.Circle(\"x\");")),
+        ["mismatched types"]
+    );
+    assert_eq!(
+        errors(&src("Option<String> s = Option.Some(5);")),
+        ["mismatched types"]
+    );
+    assert_eq!(
+        errors(&src("Shape a = Shape.Rect(1.0);")),
+        ["this variant takes 2 arguments but 1 argument was supplied"]
+    );
+    assert_eq!(
+        errors(&src("Shape a = Shape.Circle;")),
+        ["the variant `Shape.Circle` has fields"]
+    );
+    assert_eq!(
+        errors(&src("Shape a = Shape.Empty();")),
+        ["the variant `Shape.Empty` has no fields"]
+    );
+}
+
+#[test]
+fn only_enums_without_data_are_hashable() {
+    let src = |code: &str| {
+        format!(
+            "enum Color {{ RED, GREEN }}\n\
+             enum Shape {{ Circle(double radius), Empty }}\n\
+             class Main {{ void run(&this) {{ {code} }} }}"
+        )
+    };
+    ok(&src(
+        "Color[] all = Color.values(); boolean same = Color.RED == Color.GREEN; \
+         HashSet<Color> colors = new HashSet<>();",
+    ));
+    assert_eq!(
+        errors(&src("boolean same = Shape.Empty == Shape.Empty;")),
+        ["values of type `Shape` cannot be compared with `==`"]
+    );
+    assert_eq!(
+        errors(&src("Shape[] all = Shape.values();")),
+        ["no method named `values` found for `Shape`"]
     );
 }

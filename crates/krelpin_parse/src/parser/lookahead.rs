@@ -51,6 +51,17 @@ impl Parser<'_> {
             }
     }
 
+    pub(crate) fn variant_field_ahead(&self, start: usize) -> bool {
+        let Some(end) = self.scan_type(start) else {
+            return false;
+        };
+        is_plain_ident(self.look_ahead(end))
+            && matches!(
+                self.look_ahead(end + 1),
+                TokenKind::Comma | TokenKind::CloseParen
+            )
+    }
+
     fn matching_paren(&self, open: usize) -> Option<usize> {
         let mut depth = 0usize;
         let mut index = open;

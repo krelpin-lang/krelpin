@@ -358,11 +358,27 @@ impl FnCtxt<'_, '_> {
     }
 
     fn no_field(&self, ty: &Ty, name: Ident) {
+        if let Some(owner) = self.enum_with_variant(ty, name) {
+            self.emit(
+                Diagnostic::error(format!("the variant `{owner}.{}` has fields", name.name))
+                    .with_span(name.span)
+                    .with_help(format!("create it with `{owner}.{}(...)`", name.name)),
+            );
+            return;
+        }
         self.emit(
             Diagnostic::error(format!("no field `{}` on type `{ty}`", name.name))
                 .with_span(name.span)
                 .with_label("unknown field"),
         );
+    }
+
+    fn enum_with_variant(&self, ty: &Ty, name: Ident) -> Option<Symbol> {
+        let Ty::Adt { def, .. } = ty else {
+            return None;
+        };
+        let sig = self.tcx.sig(*def);
+        sig.variant(name.name).map(|_| sig.name.name)
     }
 
     fn find_field(&self, def: DefId, args: &[Ty], name: Symbol) -> Option<(FieldSig, Ty)> {
@@ -458,7 +474,8 @@ impl FnCtxt<'_, '_> {
                 if statics.is_empty() {
                     Ty::Unknown
                 } else {
-                    self.call(statics, args, &arg_tys, name, "method")
+                    let what = self.callee_kind(owner, name);
+                    self.call(statics, args, &arg_tys, name, what)
                 }
             }
             Receiver::Type(ty) => self.static_call(&ty, name, args, &arg_tys),
@@ -493,7 +510,16 @@ impl FnCtxt<'_, '_> {
             );
             return Ty::Unknown;
         }
-        self.call(statics, args, arg_tys, name, "method")
+        let what = self.callee_kind(def, name);
+        self.call(statics, args, arg_tys, name, what)
+    }
+
+    fn callee_kind(&self, def: DefId, name: Ident) -> &'static str {
+        if self.tcx.sig(def).variant(name.name).is_some() {
+            "variant"
+        } else {
+            "method"
+        }
     }
 
     fn instance_call(&mut self, ty: &Ty, name: Ident, args: &[Expr], arg_tys: &[Ty]) -> Ty {
@@ -567,6 +593,14 @@ impl FnCtxt<'_, '_> {
     }
 
     fn no_method(&self, ty: &Ty, name: Ident) {
+        if let Some(owner) = self.enum_with_variant(ty, name) {
+            self.emit(
+                Diagnostic::error(format!("the variant `{owner}.{}` has no fields", name.name))
+                    .with_span(name.span)
+                    .with_help(format!("write `{owner}.{}` without parentheses", name.name)),
+            );
+            return;
+        }
         self.emit(
             Diagnostic::error(format!("no method named `{}` found for `{ty}`", name.name))
                 .with_span(name.span)

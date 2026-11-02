@@ -125,6 +125,9 @@ impl FnCtxt<'_, '_> {
     fn instantiate(&self, method: MethodSig, mut subst: Subst, arg_tys: &[Ty]) -> Candidate {
         if !method.generics.is_empty() {
             let vars: Vec<Symbol> = method.generics.iter().map(|param| param.name).collect();
+            for var in &vars {
+                subst.remove(var);
+            }
             let mut inferred = Subst::new();
             for (index, arg) in arg_tys.iter().enumerate() {
                 if let Some(param) = param_for_inference(&method, index, arg_tys.len(), arg) {

@@ -56,11 +56,38 @@ error: abstract methods cannot have a body
 12 |     abstract void withBody(&this) {}
    |     ^^^^^^^^
 
-error: enums cannot have generic parameters
-  --> tests/ui/parser/declaration_errors.kr:15:11
+error: enum variants declare fields, not arguments
+  --> tests/ui/parser/declaration_errors.kr:16:8
    |
-15 | enum Level<T> {
-   |           ^^^
+16 |     LOW(1),
+   |        ^^^
+   |
+   = note: enums have no constructors; each variant carries its own data
+   = help: declare its fields, like `LOW(Type name)`, and pass the values when creating it: `Level.LOW(...)`
 
-error: aborting due to 9 previous errors
+error: the variant `HIGH` has no fields
+  --> tests/ui/parser/declaration_errors.kr:17:9
+   |
+17 |     HIGH();
+   |         ^^
+   |
+   = help: a variant without data is written without parentheses
+
+error: enums cannot have instance fields
+  --> tests/ui/parser/declaration_errors.kr:19:9
+   |
+19 |     int value;
+   |         ^^^^^
+   |
+   = help: store the data in the variants that carry it
+
+error: enums cannot have constructors
+  --> tests/ui/parser/declaration_errors.kr:21:5
+   |
+21 |     Level(int value) {}
+   |     ^^^^^
+   |
+   = help: declare the fields of each variant in the variant
+
+error: aborting due to 12 previous errors
 

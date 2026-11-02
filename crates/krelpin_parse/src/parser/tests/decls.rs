@@ -63,26 +63,41 @@ fn interfaces() {
 #[test]
 fn enums() {
     let unit = parse_ok(
-        "enum Planet implements Named {\n\
-         \x20   MERCURY(3.3e23, 2.44e6),\n\
-         \x20   EARTH(5.97e24, 6.37e6),\n\
+        "enum Shape implements Named {\n\
+         \x20   Circle(double radius),\n\
+         \x20   Rect(double width, double height),\n\
+         \x20   Empty,\n\
          \x20   ;\n\
-         \x20   double mass;\n\
-         \x20   double radius;\n\
-         \x20   Planet(double mass, double radius) { this.mass = mass; this.radius = radius; }\n\
+         \x20   const double PI = 3.14;\n\
+         \x20   double area(&this) { return 0.0; }\n\
          }",
     );
-    let ItemKind::Enum(planet) = &unit.items[0].kind else {
+    let ItemKind::Enum(shape) = &unit.items[0].kind else {
         panic!("expected an enum");
     };
-    let names: Vec<&str> = planet
-        .constants
+    let variants: Vec<(&str, usize)> = shape
+        .variants
         .iter()
-        .map(|constant| constant.name.name.as_str())
+        .map(|variant| (variant.name.name.as_str(), variant.fields.len()))
         .collect();
-    assert_eq!(names, ["MERCURY", "EARTH"]);
-    assert_eq!(planet.constants[0].args.len(), 2);
-    assert_eq!(planet.members.len(), 3);
+    assert_eq!(variants, [("Circle", 1), ("Rect", 2), ("Empty", 0)]);
+    let fields: Vec<&str> = shape.variants[1]
+        .fields
+        .iter()
+        .map(|field| field.name.name.as_str())
+        .collect();
+    assert_eq!(fields, ["width", "height"]);
+    assert_eq!(shape.members.len(), 2);
+}
+
+#[test]
+fn generic_enums() {
+    let unit = parse_ok("enum Option<T> { Some(T value), None }");
+    let ItemKind::Enum(option) = &unit.items[0].kind else {
+        panic!("expected an enum");
+    };
+    assert_eq!(option.generics.params.len(), 1);
+    assert_eq!(option.variants.len(), 2);
 }
 
 #[test]
@@ -91,8 +106,27 @@ fn simple_enums() {
     let ItemKind::Enum(color) = &unit.items[0].kind else {
         panic!("expected an enum");
     };
-    assert_eq!(color.constants.len(), 3);
+    assert_eq!(color.variants.len(), 3);
     assert!(color.members.is_empty());
+}
+
+#[test]
+fn enums_have_no_constructors() {
+    assert_eq!(
+        errors("enum Color { RED(\"#ff0000\") }"),
+        ["enum variants declare fields, not arguments"]
+    );
+    assert_eq!(
+        errors("enum Color { RED(); }"),
+        ["the variant `RED` has no fields"]
+    );
+    assert_eq!(
+        errors("enum Color { RED; String hex; Color(String hex) {} }"),
+        [
+            "enums cannot have instance fields",
+            "enums cannot have constructors"
+        ]
+    );
 }
 
 #[test]
@@ -140,10 +174,6 @@ fn declaration_errors() {
     assert_eq!(
         errors("interface I implements J {}"),
         ["interfaces cannot implement other interfaces"]
-    );
-    assert_eq!(
-        errors("enum E<T> { A }"),
-        ["enums cannot have generic parameters"]
     );
     assert_eq!(
         errors("abstract struct S {}"),

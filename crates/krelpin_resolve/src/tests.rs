@@ -198,7 +198,11 @@ fn duplicate_definitions() {
     );
     assert_eq!(
         errors("enum E { A, B, A }"),
-        ["the field `A` is defined multiple times"]
+        ["the variant `A` is defined multiple times"]
+    );
+    assert_eq!(
+        errors("enum E { A(int x), B; void A() {} }"),
+        ["the variant `A` has the same name as a member of the enum"]
     );
     assert_eq!(
         errors("class A<T, T> {}"),

@@ -134,18 +134,25 @@ pub struct Interface {
 
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct Enum {
+    pub generics: Generics,
     pub implements: Vec<Ty>,
-    pub constants: Vec<EnumConstant>,
+    pub variants: Vec<Variant>,
     pub members: Vec<Member>,
 }
 
 #[derive(Clone, Debug, PartialEq, Eq)]
-pub struct EnumConstant {
+pub struct Variant {
     pub docs: Vec<Symbol>,
     pub annotations: Vec<Annotation>,
     pub name: Ident,
-    pub args: Vec<Expr>,
+    pub fields: Vec<VariantField>,
     pub span: Span,
+}
+
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct VariantField {
+    pub ty: Ty,
+    pub name: Ident,
 }
 
 #[derive(Clone, Debug, PartialEq, Eq)]

@@ -1,7 +1,7 @@
 use krelpin_ast::ast::{
-    Annotation, Class, CompilationUnit, Enum, EnumConstant, FieldStorage, FnRetTy, Generics, Ident,
-    Import, Inheritance, Interface, Item, ItemKind, Member, MemberKind, Path, Struct, Ty,
-    Visibility, is_intrinsic,
+    Annotation, Class, CompilationUnit, Enum, FieldStorage, FnRetTy, Generics, Ident, Import,
+    Inheritance, Interface, Item, ItemKind, Member, MemberKind, Path, Struct, Ty, Variant,
+    VariantField, Visibility, is_intrinsic,
 };
 use krelpin_ast::token::TokenKind;
 use krelpin_errors::Diagnostic;
@@ -216,17 +216,14 @@ impl Parser<'_> {
     }
 
     fn parse_enum(&mut self, name: Ident) -> PResult<ItemKind> {
-        if self.token.kind == TokenKind::Lt {
-            let generics = self.parse_generics()?;
-            self.error(generics.span, "enums cannot have generic parameters");
-        }
+        let generics = self.parse_generics()?;
         self.reject_extends("enums")?;
         let implements = self.parse_implements()?;
 
         let open = self.expect(TokenKind::OpenBrace)?;
-        let mut constants = Vec::new();
+        let mut variants = Vec::new();
         while !matches!(self.token.kind, TokenKind::Semi | TokenKind::CloseBrace) {
-            constants.push(self.parse_enum_constant()?);
+            variants.push(self.parse_variant(name)?);
             if !self.eat(TokenKind::Comma) {
                 break;
             }
@@ -241,13 +238,14 @@ impl Parser<'_> {
         };
 
         Ok(ItemKind::Enum(Enum {
+            generics,
             implements,
-            constants,
+            variants,
             members,
         }))
     }
 
-    fn parse_enum_constant(&mut self) -> PResult<EnumConstant> {
+    fn parse_variant(&mut self, owner: Ident) -> PResult<Variant> {
         let lo = self.token.span;
         let docs = self.parse_docs();
         let annotations = self.parse_annotations()?;
@@ -256,19 +254,61 @@ impl Parser<'_> {
             return Err(self.unexpected());
         }
         let name = self.parse_ident()?;
-        let args = if self.token.kind == TokenKind::OpenParen {
-            self.parse_args()?
+        let fields = if self.token.kind == TokenKind::OpenParen {
+            self.parse_variant_fields(owner, name)?
         } else {
             Vec::new()
         };
 
-        Ok(EnumConstant {
+        Ok(Variant {
             docs,
             annotations,
             name,
-            args,
+            fields,
             span: lo.to(self.prev_token.span),
         })
+    }
+
+    fn parse_variant_fields(&mut self, owner: Ident, variant: Ident) -> PResult<Vec<VariantField>> {
+        let open = self.token.span;
+        if self.look_ahead(1) == TokenKind::CloseParen {
+            self.bump();
+            self.bump();
+            self.emit(
+                Diagnostic::error(format!("the variant `{}` has no fields", variant.name))
+                    .with_span(open.to(self.prev_token.span))
+                    .with_help("a variant without data is written without parentheses"),
+            );
+            return Ok(Vec::new());
+        }
+        if !self.variant_field_ahead(1) {
+            self.parse_args()?;
+            self.emit(
+                Diagnostic::error("enum variants declare fields, not arguments")
+                    .with_span(open.to(self.prev_token.span))
+                    .with_note("enums have no constructors; each variant carries its own data")
+                    .with_help(format!(
+                        "declare its fields, like `{variant}(Type name)`, and pass the values \
+                         when creating it: `{owner}.{variant}(...)`",
+                        variant = variant.name,
+                        owner = owner.name,
+                    )),
+            );
+            return Ok(Vec::new());
+        }
+
+        self.bump();
+        let mut fields = Vec::new();
+        loop {
+            let ty = self.parse_ty()?;
+            let name = self.parse_ident()?;
+            fields.push(VariantField { ty, name });
+            if !self.eat(TokenKind::Comma) {
+                break;
+            }
+        }
+        self.expect(TokenKind::CloseParen)?;
+        Ok(fields)
     }
 
     fn parse_implements(&mut self) -> PResult<Vec<Ty>> {
@@ -526,10 +566,27 @@ impl Parser<'_> {
                             .with_help("make the field `const`, or move it to a class"),
                     );
                 }
+                if container == Container::Enum && field.storage == FieldStorage::Instance {
+                    self.emit(
+                        Diagnostic::error("enums cannot have instance fields")
+                            .with_span(field.name.span)
+                            .with_help("store the data in the variants that carry it"),
+                    );
+                }
             }
             MemberKind::Constructor(constructor) => {
-                if container == Container::Interface {
-                    self.error(constructor.name.span, "interfaces cannot have constructors");
+                match container {
+                    Container::Interface => {
+                        self.error(constructor.name.span, "interfaces cannot have constructors");
+                    }
+                    Container::Enum => {
+                        self.emit(
+                            Diagnostic::error("enums cannot have constructors")
+                                .with_span(constructor.name.span)
+                                .with_help("declare the fields of each variant in the variant"),
+                        );
+                    }
+                    Container::Class | Container::Struct => {}
                 }
                 self.reject_inheritance(modifiers.inheritance, "constructors");
             }
