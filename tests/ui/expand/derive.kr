@@ -1,10 +1,7 @@
 package shop;
 
 @Derive(Equatable, Hashable, Comparable)
-struct Money {
-    long cents;
-    String currency;
-}
+record Money(long cents, String currency) {}
 
 @Derive(Equatable, Hashable)
 enum Payment {
@@ -30,7 +27,7 @@ enum Priority {
 class Register {
     HashMap<Payment, int> counts = new HashMap<>();
 
-    void record(&mut this, Payment payment) {
+    void track(&mut this, Payment payment) {
         int? count = this.counts.get(payment);
         this.counts.put(payment, (count ?: 0) + 1);
     }

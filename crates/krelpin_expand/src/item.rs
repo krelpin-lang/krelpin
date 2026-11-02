@@ -49,7 +49,14 @@ impl ExpandCtxt<'_> {
             ItemKind::Class(class) => {
                 (&class.generics, Layout::Fields(self.fields(&class.members)))
             }
-            ItemKind::Struct(def) => (&def.generics, Layout::Fields(self.fields(&def.members))),
+            ItemKind::Record(def) => {
+                let fields = def
+                    .components
+                    .iter()
+                    .map(|component| self.field(component.name.name, &component.ty))
+                    .collect();
+                (&def.generics, Layout::Fields(fields))
+            }
             ItemKind::Enum(def) => {
                 let variants = def
                     .variants
@@ -126,7 +133,7 @@ impl ExpandCtxt<'_> {
 
         let (implements, item_members): (&mut Vec<Ty>, &mut Vec<Member>) = match &mut item.kind {
             ItemKind::Class(class) => (&mut class.implements, &mut class.members),
-            ItemKind::Struct(def) => (&mut def.implements, &mut def.members),
+            ItemKind::Record(def) => (&mut def.implements, &mut def.members),
             ItemKind::Enum(def) => (&mut def.implements, &mut def.members),
             ItemKind::Interface(_) => return,
         };

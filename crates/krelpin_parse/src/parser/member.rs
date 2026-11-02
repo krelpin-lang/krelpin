@@ -61,6 +61,7 @@ impl Parser<'_> {
         let body = self.parse_block()?;
 
         Ok(Constructor {
+            compact: false,
             name,
             params,
             throws,
@@ -128,7 +129,7 @@ impl Parser<'_> {
         }
     }
 
-    fn parse_params(&mut self) -> PResult<(Option<Receiver>, Vec<Param>)> {
+    pub(crate) fn parse_params(&mut self) -> PResult<(Option<Receiver>, Vec<Param>)> {
         self.expect(TokenKind::OpenParen)?;
         let mut receiver = None;
         let mut params = Vec::new();

@@ -16,7 +16,7 @@ use crate::ty::{Subst, Ty};
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum AdtKind {
     Class,
-    Struct,
+    Record,
     Interface,
     Enum,
 }
@@ -290,7 +290,7 @@ impl<'a> Tcx<'a> {
 
     fn implicit_superclass(&self, def: DefId, kind: AdtKind) -> Option<Ty> {
         let parent = match kind {
-            AdtKind::Class | AdtKind::Struct => LangItem::Object,
+            AdtKind::Class | AdtKind::Record => LangItem::Object,
             AdtKind::Enum => LangItem::Enum,
             AdtKind::Interface => return None,
         };
@@ -308,8 +308,8 @@ impl<'a> Tcx<'a> {
                     self.lower_tys(&class.implements),
                     &class.members,
                 ),
-                ItemKind::Struct(def) => (
-                    AdtKind::Struct,
+                ItemKind::Record(def) => (
+                    AdtKind::Record,
                     &def.generics,
                     None,
                     self.lower_tys(&def.implements),
@@ -348,16 +348,13 @@ impl<'a> Tcx<'a> {
         if let ItemKind::Enum(def) = &item.kind {
             self.collect_variants(&mut sig, def_id, &def.variants);
         }
-        if kind == AdtKind::Struct {
-            sig.ctors.push(self.struct_ctor(item.name, def_id, members));
+        if let ItemKind::Record(def) = &item.kind {
+            self.collect_components(&mut sig, def_id, def);
         }
 
         for member in members {
-            let is_struct_field =
-                kind == AdtKind::Struct && matches!(member.kind, MemberKind::Field(_));
             let vis = match member.vis {
                 _ if kind == AdtKind::Interface => Visibility::Public(member.span),
-                Visibility::Default if is_struct_field => Visibility::Public(member.span),
                 vis => vis,
             };
             match &member.kind {
@@ -387,22 +384,27 @@ impl<'a> Tcx<'a> {
         sig
     }
 
-    fn struct_ctor(&self, name: Ident, def: DefId, members: &[Member]) -> MethodSig {
-        let params = members
+    fn collect_components(&self, sig: &mut TypeSig, def: DefId, record: &ast::Record) {
+        for component in &record.components {
+            let name = component.name;
+            sig.fields.entry(name.name).or_insert(FieldSig {
+                name,
+                ty: self.lower_ty(&component.ty),
+                vis: Visibility::Public(name.span),
+                storage: FieldStorage::Instance,
+                owner: def,
+            });
+        }
+        let has_compact_ctor = record
+            .members
             .iter()
-            .filter_map(|member| match &member.kind {
-                MemberKind::Field(field)
-                    if field.storage == FieldStorage::Instance && field.init.is_none() =>
-                {
-                    Some(self.lower_ty(&field.ty))
-                }
-                _ => None,
-            })
-            .collect();
-        MethodSig {
-            params,
-            is_final: false,
-            ..synthesized_method(name, def, None, Ty::Void)
+            .any(|member| matches!(&member.kind, MemberKind::Constructor(ctor) if ctor.compact));
+        if !has_compact_ctor {
+            sig.ctors.push(MethodSig {
+                params: self.param_tys(&record.components),
+                is_final: false,
+                ..synthesized_method(sig.name, def, None, Ty::Void)
+            });
         }
     }
 

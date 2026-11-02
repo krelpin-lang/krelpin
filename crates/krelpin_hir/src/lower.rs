@@ -28,7 +28,7 @@ pub fn lower(
     for (type_def, item) in resolved.items.items(units) {
         let members: &[Member] = match &item.kind {
             ItemKind::Class(class) => &class.members,
-            ItemKind::Struct(def) => &def.members,
+            ItemKind::Record(def) => &def.members,
             ItemKind::Interface(interface) => &interface.members,
             ItemKind::Enum(def) => &def.members,
         };
@@ -110,7 +110,7 @@ impl LoweringCtxt<'_, '_> {
             };
             self.this = Some(self.push_local(kw::This, ty, member.span));
         }
-        let params = params
+        let params: Vec<LocalId> = params
             .iter()
             .map(|param| self.declare(param.name.name, param.name.span))
             .collect();
@@ -122,7 +122,15 @@ impl LoweringCtxt<'_, '_> {
                 let init = self.lower_expr(field.init.as_ref()?);
                 BodyValue::Expr(coerce(init, &ret))
             }
-            MemberKind::Constructor(ctor) => BodyValue::Block(self.lower_block(&ctor.body)),
+            MemberKind::Constructor(ctor) => {
+                let mut block = self.lower_block(&ctor.body);
+                if ctor.compact {
+                    block
+                        .stmts
+                        .extend(self.assign_components(&params, ctor.body.span));
+                }
+                BodyValue::Block(block)
+            }
             MemberKind::Method(method) => BodyValue::Block(self.lower_block(method.body.as_ref()?)),
         };
         Some(Body {
@@ -137,6 +145,41 @@ impl LoweringCtxt<'_, '_> {
             value,
             span: member.span,
         })
+    }
+
+    fn assign_components(&self, params: &[LocalId], span: Span) -> Vec<Stmt> {
+        let Some(this) = self.this else {
+            return Vec::new();
+        };
+        params
+            .iter()
+            .map(|&param| {
+                let decl = &self.locals[param.index()];
+                let field = Expr {
+                    kind: ExprKind::Field {
+                        base: Box::new(self.local_expr(this, span)),
+                        owner: self.owner,
+                        name: decl.name,
+                        safe: false,
+                    },
+                    ty: decl.ty.clone(),
+                    span,
+                };
+                let assign = Expr {
+                    kind: ExprKind::Assign {
+                        op: None,
+                        place: Box::new(field),
+                        value: Box::new(self.local_expr(param, span)),
+                    },
+                    ty: decl.ty.clone(),
+                    span,
+                };
+                Stmt {
+                    kind: StmtKind::Expr(assign),
+                    span,
+                }
+            })
+            .collect()
     }
 
     fn push_local(&mut self, name: Symbol, ty: Ty, span: Span) -> LocalId {
@@ -675,7 +718,7 @@ impl LoweringCtxt<'_, '_> {
 
     fn lower_lambda(&mut self, params: &[LambdaParam], body: &LambdaBody, ty: &Ty) -> ExprKind {
         let first_inner = LocalId(self.locals.len() as u32);
-        let params = params
+        let params: Vec<LocalId> = params
             .iter()
             .map(|param| self.declare(param.name.name, param.name.span))
             .collect();

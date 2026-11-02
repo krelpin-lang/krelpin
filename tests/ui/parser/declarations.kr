@@ -18,11 +18,19 @@ interface Shape extends Comparable<Shape> {
     int sides(&this);
 }
 
-struct Point {
-    double x;
-    double y;
-    String label = "origin";
+record Point(double x, double y) implements Shape {
+    Point {
+        if (x < 0.0) {
+            throw new IllegalArgumentException("x");
+        }
+    }
+
+    double length(&this) {
+        return Math.sqrt(this.x * this.x + this.y * this.y);
+    }
 }
+
+record Empty();
 
 enum Paint {
     Solid(String hex),

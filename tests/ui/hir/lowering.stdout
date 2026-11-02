@@ -8,7 +8,7 @@ ctor Register.Register(this_0: &mut Register, count_1: int) -> void {
     this_0.count = count_1;
 }
 
-fn Register.record(this_0: &mut Register, payment_1: Payment) -> void {
+fn Register.track(this_0: &mut Register, payment_1: Payment) -> void {
     switch payment_1 {
         Payment::Card(number_2: String, amount_3: Money) if (amount_3.cents > (0 as long)) => {
             ArrayList::add(&mut this_0.history, amount_3);

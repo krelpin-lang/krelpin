@@ -22,7 +22,7 @@ impl Tcx<'_> {
                 class.extends.iter().chain(&class.implements).collect(),
                 &class.members,
             ),
-            ItemKind::Struct(def) => (&def.generics, def.implements.iter().collect(), &def.members),
+            ItemKind::Record(def) => (&def.generics, def.implements.iter().collect(), &def.members),
             ItemKind::Interface(interface) => (
                 &interface.generics,
                 interface.extends.iter().collect(),
@@ -32,6 +32,11 @@ impl Tcx<'_> {
         };
 
         self.check_bounds_wf(&env, generics);
+        if let ItemKind::Record(def) = &item.kind {
+            for component in &def.components {
+                self.check_wf(&env, &component.ty);
+            }
+        }
         if let ItemKind::Enum(def) = &item.kind {
             for field in def.variants.iter().flat_map(|variant| &variant.fields) {
                 self.check_wf(&env, &field.ty);

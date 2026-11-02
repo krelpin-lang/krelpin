@@ -35,7 +35,7 @@ fn errors(src: &str) -> Vec<String> {
 fn method_names(unit: &CompilationUnit) -> Vec<&str> {
     let members = match &unit.items[0].kind {
         ItemKind::Class(class) => &class.members,
-        ItemKind::Struct(def) => &def.members,
+        ItemKind::Record(def) => &def.members,
         ItemKind::Enum(def) => &def.members,
         ItemKind::Interface(interface) => &interface.members,
     };

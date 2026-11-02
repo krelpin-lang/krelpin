@@ -54,7 +54,7 @@ impl ExpandCtxt<'_> {
 
         let members: &mut Vec<Member> = match &mut item.kind {
             ItemKind::Class(class) => &mut class.members,
-            ItemKind::Struct(def) => &mut def.members,
+            ItemKind::Record(def) => &mut def.members,
             ItemKind::Interface(interface) => &mut interface.members,
             ItemKind::Enum(def) => {
                 for variant in &mut def.variants {

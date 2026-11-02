@@ -203,8 +203,8 @@ impl FnCtxt<'_, '_> {
     fn check_with(&mut self, base: &Expr, fields: &[FieldInit]) -> Ty {
         let base_ty = self.check_expr(base);
         let ty = base_ty.strip_refs().clone();
-        let struct_ty = match &ty {
-            Ty::Adt { def, args, .. } if self.tcx.sig(*def).kind == AdtKind::Struct => {
+        let record_ty = match &ty {
+            Ty::Adt { def, args, .. } if self.tcx.sig(*def).kind == AdtKind::Record => {
                 Some((*def, args.clone()))
             }
             Ty::Unknown | Ty::External { .. } => None,
@@ -212,7 +212,7 @@ impl FnCtxt<'_, '_> {
                 self.emit(
                     Diagnostic::error(format!("`with` cannot be used on `{other}`"))
                         .with_span(base.span)
-                        .with_note("only structs can be copied with some of their fields changed")
+                        .with_note("only records can be copied with some components changed")
                         .with_help(
                             "a class keeps its rules in its constructor; create a new object",
                         ),
@@ -224,7 +224,7 @@ impl FnCtxt<'_, '_> {
         let mut seen: Vec<Symbol> = Vec::new();
         for field in fields {
             let name = field.name;
-            let expected = match &struct_ty {
+            let expected = match &record_ty {
                 Some((def, args)) => match self.find_field(*def, args, name.name) {
                     Some((sig, field_ty)) if sig.storage == FieldStorage::Instance => {
                         self.results.fields.insert(name.span, sig);
@@ -1016,6 +1016,17 @@ impl FnCtxt<'_, '_> {
 
     fn check_field_assignable(&self, field: &FieldSig, name: Ident) {
         match field.storage {
+            FieldStorage::Instance if self.tcx.sig(field.owner).kind == AdtKind::Record => self
+                .emit(
+                    Diagnostic::error(format!(
+                        "cannot assign to `{}`, a component of the record `{}`",
+                        name.name,
+                        self.type_name(field.owner)
+                    ))
+                    .with_span(name.span)
+                    .with_note("the components of a record never change")
+                    .with_help("make a changed copy with `with { ... }`"),
+                ),
             FieldStorage::Instance => {}
             FieldStorage::Const(_) => {
                 self.error(

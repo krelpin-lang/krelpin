@@ -111,7 +111,7 @@ fn patterns_bind_locals() {
 #[test]
 fn structs_and_variants_are_constructed() {
     assert_lowers_to(
-        "struct Money { long cents; }\n\
+        "record Money(long cents);\n\
          enum Payment { Cash(Money amount), Free }\n\
          class A { static Payment pay() { return Payment.Cash(new Money(5)); } \
          static Payment free() { return Payment.Free; } }",
@@ -143,7 +143,7 @@ fn implicit_conversions_are_explicit() {
 #[test]
 fn equality_of_objects_calls_equals() {
     assert_lowers_to(
-        "@Derive(Equatable) struct Money { long cents; }\n\
+        "@Derive(Equatable) record Money(long cents);\n\
          class A { static boolean f(Money a, Money b, String? s) {\n\
          \x20   return a != b || s == null;\n\
          } }",

@@ -136,7 +136,12 @@ fn collect_type(
 
     let members: &[Member] = match &item.kind {
         ItemKind::Class(class) => &class.members,
-        ItemKind::Struct(def) => &def.members,
+        ItemKind::Record(def) => {
+            for component in &def.components {
+                add_field(dcx, &mut type_def, component.name, true);
+            }
+            &def.members
+        }
         ItemKind::Interface(interface) => &interface.members,
         ItemKind::Enum(enum_def) => &enum_def.members,
     };
@@ -188,7 +193,7 @@ fn item_at<'u>(unit: &'u CompilationUnit, path: &[usize]) -> &'u Item {
     for &index in &path[1..] {
         let members = match &item.kind {
             ItemKind::Class(class) => &class.members,
-            ItemKind::Struct(def) => &def.members,
+            ItemKind::Record(def) => &def.members,
             ItemKind::Interface(interface) => &interface.members,
             ItemKind::Enum(def) => &def.members,
         };

@@ -93,6 +93,7 @@ fn starts_item(symbol: krelpin_span::Symbol) -> bool {
     matches!(
         symbol,
         kw::Class
+            | kw::Record
             | kw::Struct
             | kw::Interface
             | kw::Enum

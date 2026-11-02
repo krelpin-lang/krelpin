@@ -59,6 +59,7 @@ keywords! {
     Package: "package",
     Private: "private",
     Protected: "protected",
+    Record: "record",
     Public: "public",
     Return: "return",
     Short: "short",

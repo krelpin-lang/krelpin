@@ -74,8 +74,9 @@ pub(crate) fn resolve_bodies(
                 resolver.resolve_tys(class.implements.iter());
                 resolver.resolve_members(&class.members);
             }
-            ItemKind::Struct(def) => {
+            ItemKind::Record(def) => {
                 resolver.enter_type(&def.generics);
+                resolver.resolve_tys(def.components.iter().map(|component| &component.ty));
                 resolver.resolve_tys(def.implements.iter());
                 resolver.resolve_members(&def.members);
             }

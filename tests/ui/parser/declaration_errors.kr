@@ -1,5 +1,11 @@
-struct Point extends Base {
-    abstract void move(&mut this);
+struct Old {
+    int x;
+}
+
+record Point(int x) extends Base {
+    int y;
+    Point(int x) {}
+    void move(&mut this) {}
 }
 
 interface Named implements Other {

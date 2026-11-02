@@ -1,10 +1,7 @@
 package shop;
 
 @Derive(Equatable)
-struct Money {
-    long cents;
-    String currency;
-}
+record Money(long cents, String currency) {}
 
 enum Payment {
     Card(String number, Money amount),
@@ -20,7 +17,7 @@ class Register {
         this.count = count;
     }
 
-    void record(&mut this, Payment payment) {
+    void track(&mut this, Payment payment) {
         switch (payment) {
             case Card(String number, Money amount) when amount.cents > 0 -> {
                 this.history.add(amount);

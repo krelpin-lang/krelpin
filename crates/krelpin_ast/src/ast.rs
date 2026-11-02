@@ -119,7 +119,7 @@ pub struct Item {
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub enum ItemKind {
     Class(Class),
-    Struct(Struct),
+    Record(Record),
     Interface(Interface),
     Enum(Enum),
 }
@@ -139,8 +139,9 @@ pub struct Class {
 }
 
 #[derive(Clone, Debug, PartialEq, Eq)]
-pub struct Struct {
+pub struct Record {
     pub generics: Generics,
+    pub components: Vec<Param>,
     pub implements: Vec<Ty>,
     pub members: Vec<Member>,
 }
@@ -203,6 +204,7 @@ pub struct Field {
 
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct Constructor {
+    pub compact: bool,
     pub name: Ident,
     pub params: Vec<Param>,
     pub throws: Vec<Ty>,

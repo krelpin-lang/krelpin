@@ -1,10 +1,6 @@
 package demo;
 
-struct User {
-    String name;
-    String email;
-    long visits;
-}
+record User(String name, String email, long visits) {}
 
 class Account {
     String owner;

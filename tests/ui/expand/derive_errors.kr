@@ -15,6 +15,4 @@ enum Tree<T> {
 }
 
 @Derive(Comparable)
-struct Holder {
-    Handle handle;
-}
+record Holder(Handle handle) {}

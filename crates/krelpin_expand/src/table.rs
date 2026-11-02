@@ -26,7 +26,7 @@ impl BuiltinMacro {
 
     pub fn usage(self) -> &'static str {
         match self {
-            BuiltinMacro::Derive => "`@Derive` can only be used on classes, structs and enums",
+            BuiltinMacro::Derive => "`@Derive` can only be used on classes, records and enums",
         }
     }
 

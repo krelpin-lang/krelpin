@@ -181,6 +181,7 @@ CompilationUnit {
                             },
                             kind: Constructor(
                                 Constructor {
+                                    compact: false,
                                     name: "Person" @ 214..220,
                                     params: [
                                         Param {

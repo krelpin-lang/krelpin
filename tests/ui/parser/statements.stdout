@@ -116,6 +116,7 @@ CompilationUnit {
                             },
                             kind: Constructor(
                                 Constructor {
+                                    compact: false,
                                     name: "Inventory" @ 115..124,
                                     params: [],
                                     throws: [],

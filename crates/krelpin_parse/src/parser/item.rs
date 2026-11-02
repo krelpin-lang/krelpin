@@ -1,19 +1,19 @@
 use krelpin_ast::ast::{
-    Annotation, Class, CompilationUnit, Enum, FieldStorage, FnRetTy, Generics, Ident, Import,
-    Inheritance, Interface, Item, ItemKind, MacroDef, Member, MemberKind, Path, Struct, Ty,
-    Variant, VariantField, Visibility, is_intrinsic,
+    Annotation, Class, CompilationUnit, Constructor, Enum, FieldStorage, FnRetTy, Generics, Ident,
+    Import, Inheritance, Interface, Item, ItemKind, MacroDef, Member, MemberKind, Path,
+    ReceiverKind, Record, Ty, Variant, VariantField, Visibility, is_intrinsic,
 };
 use krelpin_ast::token::TokenKind;
 use krelpin_errors::Diagnostic;
 use krelpin_span::{Span, Symbol, kw};
 
 use super::lookahead::is_plain_ident;
-use super::{Expected, PResult, Parser};
+use super::{ErrorReported, Expected, PResult, Parser};
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub(crate) enum Container {
     Class,
-    Struct,
+    Record,
     Interface,
     Enum,
 }
@@ -22,7 +22,7 @@ impl Container {
     fn plural(self) -> &'static str {
         match self {
             Container::Class => "classes",
-            Container::Struct => "structs",
+            Container::Record => "records",
             Container::Interface => "interfaces",
             Container::Enum => "enums",
         }
@@ -124,6 +124,9 @@ impl Parser<'_> {
                 .parse_macro(docs, annotations, &modifiers, lo)
                 .map(Declaration::Macro);
         }
+        if self.token.is_keyword(kw::Struct) {
+            return Err(self.reject_struct());
+        }
         self.reject_storage(modifiers.storage, "top-level types");
         let Some(container) = type_container(self.token.kind) else {
             self.expected = vec![Expected::Item];
@@ -188,7 +191,7 @@ impl Parser<'_> {
         let name = self.parse_ident()?;
         let kind = match container {
             Container::Class => self.parse_class(name)?,
-            Container::Struct => self.parse_struct(name)?,
+            Container::Record => self.parse_record(name)?,
             Container::Interface => self.parse_interface(name)?,
             Container::Enum => self.parse_enum(name)?,
         };
@@ -255,17 +258,60 @@ impl Parser<'_> {
         }))
     }
 
-    fn parse_struct(&mut self, name: Ident) -> PResult<ItemKind> {
+    fn parse_record(&mut self, name: Ident) -> PResult<ItemKind> {
         let generics = self.parse_generics()?;
-        self.reject_extends("structs")?;
+        let components = if self.token.kind == TokenKind::OpenParen {
+            let (receiver, components) = self.parse_params()?;
+            if let Some(receiver) = receiver {
+                self.error(receiver.span, "`this` cannot be a record component");
+            }
+            for component in components.iter().filter(|component| component.variadic) {
+                self.error(component.span, "record components cannot be variadic");
+            }
+            components
+        } else {
+            self.emit(
+                Diagnostic::error(format!("the record `{}` has no components", name.name))
+                    .with_span(name.span)
+                    .with_help(format!(
+                        "list its components after the name, like `record {}(String name)`",
+                        name.name
+                    )),
+            );
+            Vec::new()
+        };
+        self.reject_extends("records")?;
         let implements = self.parse_implements()?;
-        let members = self.parse_body(Container::Struct, name)?;
+        let mut members = if self.eat(TokenKind::Semi) {
+            Vec::new()
+        } else {
+            self.parse_body(Container::Record, name)?
+        };
+        for member in &mut members {
+            if let MemberKind::Constructor(ctor) = &mut member.kind
+                && ctor.compact
+            {
+                ctor.params = components.clone();
+            }
+        }
 
-        Ok(ItemKind::Struct(Struct {
+        Ok(ItemKind::Record(Record {
             generics,
+            components,
             implements,
             members,
         }))
+    }
+
+    fn reject_struct(&mut self) -> ErrorReported {
+        let span = self.token.span;
+        self.bump();
+        self.emit(
+            Diagnostic::error("`struct` is not a Krelpin keyword")
+                .with_span(span)
+                .with_note("data types are written as records")
+                .with_help("write `record Name(Type field, ...) {}`"),
+        )
     }
 
     fn parse_interface(&mut self, name: Ident) -> PResult<ItemKind> {
@@ -598,6 +644,9 @@ impl Parser<'_> {
         let lo = self.token.span;
         let annotations = self.parse_annotations()?;
         let modifiers = self.parse_modifiers();
+        if self.token.is_keyword(kw::Struct) {
+            return Err(self.reject_struct());
+        }
         if let Some(nested) = type_container(self.token.kind) {
             let item = self.parse_nested_type(docs, annotations, &modifiers, nested, lo)?;
             return Ok(Member {
@@ -632,6 +681,24 @@ impl Parser<'_> {
             return self
                 .parse_method(generics, ret, name, is_static)
                 .map(MemberKind::Method);
+        }
+
+        let compact = match self.token.ident() {
+            Some(name) if name == owner.name && self.look_ahead(1) == TokenKind::OpenBrace => {
+                Some(self.parse_ident()?)
+            }
+            _ => None,
+        };
+        if let Some(name) = compact {
+            self.reject_storage(storage, "constructors");
+            let body = self.parse_block()?;
+            return Ok(MemberKind::Constructor(Constructor {
+                compact: true,
+                name,
+                params: Vec::new(),
+                throws: Vec::new(),
+                body,
+            }));
         }
 
         let called = match self.token.ident() {
@@ -699,6 +766,16 @@ impl Parser<'_> {
                             .with_help("store the data in the variants that carry it"),
                     );
                 }
+                if container == Container::Record && field.storage == FieldStorage::Instance {
+                    self.emit(
+                        Diagnostic::error("records cannot have instance fields")
+                            .with_span(field.name.span)
+                            .with_help(format!(
+                                "add `{}` to the components of the record",
+                                field.name.name
+                            )),
+                    );
+                }
             }
             MemberKind::Constructor(constructor) => {
                 match container {
@@ -712,32 +789,42 @@ impl Parser<'_> {
                                 .with_help("declare the fields of each variant in the variant"),
                         );
                     }
-                    Container::Struct => {
+                    Container::Record if !constructor.compact => {
                         self.emit(
-                            Diagnostic::error("structs cannot have constructors")
+                            Diagnostic::error("records cannot declare full constructors")
                                 .with_span(constructor.name.span)
-                                .with_note(
-                                    "a struct is created from its fields in order, \
-                                     like `new Point(1, 2)`",
-                                )
-                                .with_help("give a field an initial value to leave it out"),
+                                .with_note("a record is always created from its components")
+                                .with_help(format!(
+                                    "check the components in a compact constructor: `{} {{ ... }}`",
+                                    constructor.name.name
+                                )),
                         );
                     }
-                    Container::Class => {}
+                    Container::Class if constructor.compact => {
+                        self.emit(
+                            Diagnostic::error("only records have compact constructors")
+                                .with_span(constructor.name.span)
+                                .with_help(format!(
+                                    "list the parameters: `{}(...) {{ ... }}`",
+                                    constructor.name.name
+                                )),
+                        );
+                    }
+                    Container::Record | Container::Class => {}
                 }
                 self.reject_inheritance(modifiers.inheritance, "constructors");
             }
             MemberKind::Method(method) => {
-                if container == Container::Struct {
+                let changes_this = method
+                    .receiver
+                    .is_some_and(|receiver| receiver.kind == ReceiverKind::RefMut);
+                if container == Container::Record && changes_this {
                     self.emit(
-                        Diagnostic::error("structs cannot have methods")
-                            .with_span(method.name.span)
-                            .with_note("a struct only holds data")
-                            .with_help(
-                                "move the behavior to a class, or generate it with `@Derive`",
-                            ),
+                        Diagnostic::error("record methods cannot take `&mut this`")
+                            .with_span(method.receiver.map_or(method.name.span, |r| r.span))
+                            .with_note("the components of a record never change")
+                            .with_help("return a changed copy with `with` instead"),
                     );
-                    return;
                 }
                 if let (Some(_), Some(span)) = (abstract_kw, final_kw) {
                     self.error(span, "a method cannot be both `abstract` and `final`");
@@ -774,7 +861,7 @@ impl Parser<'_> {
 fn type_container(kind: TokenKind) -> Option<Container> {
     match kind {
         TokenKind::Ident(kw::Class) => Some(Container::Class),
-        TokenKind::Ident(kw::Struct) => Some(Container::Struct),
+        TokenKind::Ident(kw::Record) => Some(Container::Record),
         TokenKind::Ident(kw::Interface) => Some(Container::Interface),
         TokenKind::Ident(kw::Enum) => Some(Container::Enum),
         _ => None,

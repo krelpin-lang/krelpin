@@ -22,7 +22,7 @@ impl Tcx<'_> {
                 class.extends.iter().collect(),
                 class.implements.iter().collect(),
             ),
-            ItemKind::Struct(def) => (Vec::new(), def.implements.iter().collect()),
+            ItemKind::Record(def) => (Vec::new(), def.implements.iter().collect()),
             ItemKind::Interface(interface) => (interface.extends.iter().collect(), Vec::new()),
             ItemKind::Enum(def) => (Vec::new(), def.implements.iter().collect()),
         };
@@ -271,7 +271,7 @@ fn same_params(a: &[Ty], b: &[Ty]) -> bool {
 fn article(kind: AdtKind) -> &'static str {
     match kind {
         AdtKind::Class => "a class",
-        AdtKind::Struct => "a struct",
+        AdtKind::Record => "a record",
         AdtKind::Interface => "an interface",
         AdtKind::Enum => "an enum",
     }

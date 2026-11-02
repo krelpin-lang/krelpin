@@ -18,28 +18,28 @@ error: `@Derive` cannot be used on members
 7 |     @Derive(Equatable)
   |     ^^^^^^^^^^^^^^^^^^
   |
-  = help: `@Derive` can only be used on classes, structs and enums
+  = help: `@Derive` can only be used on classes, records and enums
 
 error: enums without data are already `Equatable`
-  --> tests/ui/expand/macro_errors.kr:18:1
+  --> tests/ui/expand/macro_errors.kr:16:1
    |
-18 | @Derive(Equatable)
+16 | @Derive(Equatable)
    | ^^^^^^^^^^^^^^^^^^
    |
    = note: enums without data are always `Equatable` and `Hashable`
 
 error: `@Derive` cannot be used on interfaces
-  --> tests/ui/expand/macro_errors.kr:24:1
+  --> tests/ui/expand/macro_errors.kr:22:1
    |
-24 | @Derive(Equatable)
+22 | @Derive(Equatable)
    | ^^^^^^^^^^^^^^^^^^
    |
-   = help: `@Derive` can only be used on classes, structs and enums
+   = help: `@Derive` can only be used on classes, records and enums
 
 error: `Comparable` cannot be derived because `text` may be null
-  --> tests/ui/expand/macro_errors.kr:27:1
+  --> tests/ui/expand/macro_errors.kr:25:1
    |
-27 | @Derive(Comparable)
+25 | @Derive(Comparable)
    | ^^^^^^^^^^^^^^^^^^^
    |
    = help: implement `compareTo` yourself to decide where null values go

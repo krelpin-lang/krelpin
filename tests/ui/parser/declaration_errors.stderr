@@ -1,96 +1,122 @@
-error: structs cannot extend other types
- --> tests/ui/parser/declaration_errors.kr:1:14
+error: `struct` is not a Krelpin keyword
+ --> tests/ui/parser/declaration_errors.kr:1:1
   |
-1 | struct Point extends Base {
-  |              ^^^^^^^^^^^^
+1 | struct Old {
+  | ^^^^^^
   |
-  = help: structs can implement interfaces with `implements`
+  = note: data types are written as records
+  = help: write `record Name(Type field, ...) {}`
 
-error: structs cannot have methods
- --> tests/ui/parser/declaration_errors.kr:2:19
+error: records cannot extend other types
+ --> tests/ui/parser/declaration_errors.kr:5:21
   |
-2 |     abstract void move(&mut this);
-  |                   ^^^^
+5 | record Point(int x) extends Base {
+  |                     ^^^^^^^^^^^^
   |
-  = note: a struct only holds data
-  = help: move the behavior to a class, or generate it with `@Derive`
+  = help: records can implement interfaces with `implements`
 
-error: interfaces cannot implement other interfaces
- --> tests/ui/parser/declaration_errors.kr:5:17
+error: records cannot have instance fields
+ --> tests/ui/parser/declaration_errors.kr:6:9
   |
-5 | interface Named implements Other {
-  |                 ^^^^^^^^^^
+6 |     int y;
+  |         ^
   |
-  = help: use `extends` to inherit from other interfaces
+  = help: add `y` to the components of the record
 
-error: interfaces can only have `const` fields
- --> tests/ui/parser/declaration_errors.kr:6:12
-  |
-6 |     String name;
-  |            ^^^^
-  |
-  = help: make the field `const`, or move it to a class
-
-error: interfaces cannot have constructors
+error: records cannot declare full constructors
  --> tests/ui/parser/declaration_errors.kr:7:5
   |
-7 |     Named() {}
+7 |     Point(int x) {}
   |     ^^^^^
+  |
+  = note: a record is always created from its components
+  = help: check the components in a compact constructor: `Point { ... }`
+
+error: record methods cannot take `&mut this`
+ --> tests/ui/parser/declaration_errors.kr:8:15
+  |
+8 |     void move(&mut this) {}
+  |               ^^^^^^^^^
+  |
+  = note: the components of a record never change
+  = help: return a changed copy with `with` instead
+
+error: interfaces cannot implement other interfaces
+  --> tests/ui/parser/declaration_errors.kr:11:17
+   |
+11 | interface Named implements Other {
+   |                 ^^^^^^^^^^
+   |
+   = help: use `extends` to inherit from other interfaces
+
+error: interfaces can only have `const` fields
+  --> tests/ui/parser/declaration_errors.kr:12:12
+   |
+12 |     String name;
+   |            ^^^^
+   |
+   = help: make the field `const`, or move it to a class
+
+error: interfaces cannot have constructors
+  --> tests/ui/parser/declaration_errors.kr:13:5
+   |
+13 |     Named() {}
+   |     ^^^^^
 
 error: a class cannot be both `abstract` and `final`
-  --> tests/ui/parser/declaration_errors.kr:10:10
+  --> tests/ui/parser/declaration_errors.kr:16:10
    |
-10 | abstract final class Broken {
+16 | abstract final class Broken {
    |          ^^^^^
    |
    = note: an abstract class must be extended, a final class cannot be
 
 error: missing body for method `missingBody`
-  --> tests/ui/parser/declaration_errors.kr:11:10
+  --> tests/ui/parser/declaration_errors.kr:17:10
    |
-11 |     void missingBody(&this);
+17 |     void missingBody(&this);
    |          ^^^^^^^^^^^
    |
    = help: add a body, or mark the method `abstract`
 
 error: abstract methods cannot have a body
-  --> tests/ui/parser/declaration_errors.kr:12:5
+  --> tests/ui/parser/declaration_errors.kr:18:5
    |
-12 |     abstract void withBody(&this) {}
+18 |     abstract void withBody(&this) {}
    |     ^^^^^^^^
 
 error: enum variants declare fields, not arguments
-  --> tests/ui/parser/declaration_errors.kr:16:8
+  --> tests/ui/parser/declaration_errors.kr:22:8
    |
-16 |     LOW(1),
+22 |     LOW(1),
    |        ^^^
    |
    = note: enums have no constructors; each variant carries its own data
    = help: declare its fields, like `LOW(Type name)`, and pass the values when creating it: `Level.LOW(...)`
 
 error: the variant `HIGH` has no fields
-  --> tests/ui/parser/declaration_errors.kr:17:9
+  --> tests/ui/parser/declaration_errors.kr:23:9
    |
-17 |     HIGH();
+23 |     HIGH();
    |         ^^
    |
    = help: a variant without data is written without parentheses
 
 error: enums cannot have instance fields
-  --> tests/ui/parser/declaration_errors.kr:19:9
+  --> tests/ui/parser/declaration_errors.kr:25:9
    |
-19 |     int value;
+25 |     int value;
    |         ^^^^^
    |
    = help: store the data in the variants that carry it
 
 error: enums cannot have constructors
-  --> tests/ui/parser/declaration_errors.kr:21:5
+  --> tests/ui/parser/declaration_errors.kr:27:5
    |
-21 |     Level(int value) {}
+27 |     Level(int value) {}
    |     ^^^^^
    |
    = help: declare the fields of each variant in the variant
 
-error: aborting due to 12 previous errors
+error: aborting due to 15 previous errors
 

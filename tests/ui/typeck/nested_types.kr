@@ -19,10 +19,7 @@ class LinkedList<T> {
     enum Kind { Single, Double }
 
     @Derive(Equatable)
-    struct Entry {
-        String key;
-        int count;
-    }
+    record Entry(String key, int count) {}
 
     void push(&mut this, int value) {
         Node node = Node.of(value);

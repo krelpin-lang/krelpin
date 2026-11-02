@@ -3,9 +3,7 @@ package demo;
 import std.function.Function;
 
 @Derive(Equatable)
-struct Money {
-    long cents;
-}
+record Money(long cents) {}
 
 class Counter {
     int count;

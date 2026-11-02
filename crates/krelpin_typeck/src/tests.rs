@@ -987,7 +987,7 @@ fn abstract_methods_are_implemented() {
         ]
     );
     assert_eq!(
-        helps(&shapes("struct Point implements Shape {}")),
+        helps(&shapes("record Point(int x) implements Shape {}")),
         [
             "missing: `double area(&this)`",
             "implement the missing methods"
@@ -1086,7 +1086,7 @@ fn parents_have_the_right_kind() {
         ["an interface can only extend interfaces"]
     );
     assert_eq!(
-        errors("struct S {} class A extends S {}"),
+        errors("record S(int x) {} class A extends S {}"),
         ["a class can only extend another class"]
     );
     assert_eq!(
@@ -1692,7 +1692,7 @@ fn structs_are_built_from_their_fields() {
     let src = |code: &str| {
         format!(
             "@Derive(Equatable, Comparable)\n\
-             struct Version {{ int major; String tag; int build = 0; }}\n\
+             record Version(int major, String tag);\n\
              class Main {{ void run(&this) {{ {code} }} }}"
         )
     };
@@ -1707,14 +1707,14 @@ fn structs_are_built_from_their_fields() {
         ["mismatched types", "mismatched types"]
     );
     assert_eq!(
-        errors("class Handle {}\n@Derive(Comparable) struct Holder { Handle handle; }"),
+        errors("class Handle {}\n@Derive(Comparable) record Holder(Handle handle);"),
         ["no method named `compareTo` found for `Handle`"]
     );
 }
 
 #[test]
 fn results_record_callees_and_fields() {
-    let src = "struct Money { long cents; String currency; }\n\
+    let src = "record Money(long cents, String currency);\n\
                class Main { long run(&this, Money m, String... tags) {\n\
                \x20   this.log(\"a\", \"b\");\n\
                \x20   return m.cents + m.currency.length();\n\
@@ -1750,7 +1750,7 @@ fn results_record_callees_and_fields() {
 fn with_copies_a_struct_with_some_fields_changed() {
     let src = |code: &str| {
         format!(
-            "struct User {{ String name; String email; long visits; }}\n\
+            "record User(String name, String email, long visits);\n\
              class Account {{ String owner; }}\n\
              class Main {{ static void run(User user, Account account) {{ {code} }} }}"
         )
@@ -1775,5 +1775,32 @@ fn with_copies_a_struct_with_some_fields_changed() {
     assert_eq!(
         errors(&src("Account other = account with { owner = \"x\" };")),
         ["`with` cannot be used on `Account`"]
+    );
+}
+
+#[test]
+fn record_components_never_change() {
+    let src = |code: &str| {
+        format!(
+            "record User(String name, long visits) {{\n\
+             \x20   User {{\n\
+             \x20       if (visits < 0) {{ throw new IllegalArgumentException(\"visits\"); }}\n\
+             \x20   }}\n\
+             \x20   boolean isNew(&this) {{ return this.visits == 0; }}\n\
+             }}\n\
+             class Main {{ static void run(User user) {{ {code} }} }}"
+        )
+    };
+    ok(&src(
+        "User user2 = new User(\"Ali\", 0); boolean fresh = user2.isNew(); \
+         String name = user.name;",
+    ));
+    assert_eq!(
+        errors(&src("user.visits = 3;")),
+        ["cannot assign to `visits`, a component of the record `User`"]
+    );
+    assert_eq!(
+        errors(&src("User user2 = new User(\"Ali\");")),
+        ["this constructor takes 2 arguments but 1 argument was supplied"]
     );
 }

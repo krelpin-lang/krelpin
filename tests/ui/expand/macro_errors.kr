@@ -11,9 +11,7 @@ class Order {
 }
 
 @Derive(Equatable, Comparable)
-struct Line {
-    int quantity;
-}
+record Line(int quantity) {}
 
 @Derive(Equatable)
 enum Status {

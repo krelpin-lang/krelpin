@@ -5,7 +5,7 @@ use super::{errors, parse_ok};
 fn kind_name(unit: &CompilationUnit, index: usize) -> &'static str {
     match unit.items[index].kind {
         ItemKind::Class(_) => "class",
-        ItemKind::Struct(_) => "struct",
+        ItemKind::Record(_) => "record",
         ItemKind::Interface(_) => "interface",
         ItemKind::Enum(_) => "enum",
     }
@@ -13,24 +13,40 @@ fn kind_name(unit: &CompilationUnit, index: usize) -> &'static str {
 
 #[test]
 fn all_item_kinds() {
-    let unit = parse_ok("class A {} struct B {} interface C {} enum D { X }");
+    let unit = parse_ok("class A {} record B(int x); interface C {} enum D { X }");
     let kinds: Vec<&str> = (0..4).map(|index| kind_name(&unit, index)).collect();
-    assert_eq!(kinds, ["class", "struct", "interface", "enum"]);
+    assert_eq!(kinds, ["class", "record", "interface", "enum"]);
 }
 
 #[test]
-fn structs() {
+fn records() {
     let unit = parse_ok(
-        "struct Point implements Comparable<Point> {\n\
-         \x20   int x;\n\
-         \x20   int y;\n\
-         }",
+        "record Point(int x, int y) implements Comparable<Point> {\n\
+         \x20   Point { if (x < 0) { throw new IllegalArgumentException(\"x\"); } }\n\
+         \x20   int sum(&this) { return this.x + this.y; }\n\
+         }\n\
+         record Pair<A, B>(A first, B second);",
     );
-    let ItemKind::Struct(point) = &unit.items[0].kind else {
-        panic!("expected a struct");
+    let ItemKind::Record(point) = &unit.items[0].kind else {
+        panic!("expected a record");
     };
+    let components: Vec<&str> = point
+        .components
+        .iter()
+        .map(|component| component.name.name.as_str())
+        .collect();
+    assert_eq!(components, ["x", "y"]);
     assert_eq!(point.implements[0].to_string(), "Comparable<Point>");
-    assert_eq!(point.members.len(), 2);
+    let MemberKind::Constructor(compact) = &point.members[0].kind else {
+        panic!("expected a compact constructor");
+    };
+    assert!(compact.compact);
+    assert_eq!(compact.params.len(), 2);
+    let ItemKind::Record(pair) = &unit.items[1].kind else {
+        panic!("expected a record");
+    };
+    assert_eq!(pair.generics.params.len(), 2);
+    assert!(pair.members.is_empty());
 }
 
 #[test]
@@ -166,16 +182,16 @@ fn shared_fields_keep_their_visibility() {
 #[test]
 fn declaration_errors() {
     assert_eq!(
-        errors("struct P extends Q {}"),
-        ["structs cannot extend other types"]
+        errors("record P(int x) extends Q {}"),
+        ["records cannot extend other types"]
     );
     assert_eq!(
         errors("interface I implements J {}"),
         ["interfaces cannot implement other interfaces"]
     );
     assert_eq!(
-        errors("abstract struct S {}"),
-        ["`abstract` cannot be used on structs"]
+        errors("abstract record S(int x) {}"),
+        ["`abstract` cannot be used on records"]
     );
     assert_eq!(
         errors("abstract final class C {}"),
@@ -198,12 +214,23 @@ fn member_errors() {
         ["interfaces cannot have constructors"]
     );
     assert_eq!(
-        errors("struct Point { int x; Point(int x) { this.x = x; } }"),
-        ["structs cannot have constructors"]
+        errors("struct Point { int x; }"),
+        ["`struct` is not a Krelpin keyword"]
     );
     assert_eq!(
-        errors("struct Point { int x; int twice(&this) { return this.x * 2; } }"),
-        ["structs cannot have methods"]
+        errors("record Point(int x) { int y; Point(int x) {} void grow(&mut this) {} }"),
+        [
+            "records cannot have instance fields",
+            "records cannot declare full constructors",
+            "record methods cannot take `&mut this`"
+        ]
+    );
+    assert_eq!(
+        errors("record Point { } class A { A { } }"),
+        [
+            "the record `Point` has no components",
+            "only records have compact constructors"
+        ]
     );
     assert_eq!(
         errors("class A { static void f(); }"),
@@ -222,8 +249,8 @@ fn member_errors() {
         ["a method cannot be both `abstract` and `final`"]
     );
     assert_eq!(
-        errors("struct S { abstract static void f(); }"),
-        ["structs cannot have methods"]
+        errors("record S(int x) { abstract static void f(); }"),
+        ["abstract methods are not allowed in records"]
     );
     assert_eq!(
         errors("class A { abstract int x; }"),
@@ -241,7 +268,7 @@ fn nested_types() {
         "class List {\n\
          \x20   static class Node { int value; }\n\
          \x20   enum Kind { Single, Double }\n\
-         \x20   struct Entry { int count; }\n\
+         \x20   record Entry(int count);\n\
          \x20   interface Visitor { void visit(&this, Node node); }\n\
          }",
     );
