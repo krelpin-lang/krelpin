@@ -1,5 +1,8 @@
+mod constructor;
 mod derive;
+mod item;
 mod table;
+mod to_string;
 
 #[cfg(test)]
 mod tests;
@@ -32,7 +35,7 @@ pub fn expand(units: &mut [CompilationUnit], source_map: &SourceMap, dcx: &DiagC
     }
 }
 
-struct Invocation {
+pub(crate) struct Invocation {
     builtin: BuiltinMacro,
     annotation: Annotation,
 }
@@ -47,7 +50,9 @@ impl ExpandCtxt<'_> {
     fn expand_item(&self, item: &mut Item) {
         for invocation in self.take_invocations(&mut item.annotations) {
             match invocation.builtin {
-                BuiltinMacro::Derive => self.expand_derive(item, &invocation.annotation),
+                BuiltinMacro::Derive => self.expand_derive(item, &invocation),
+                BuiltinMacro::ToString => self.expand_to_string(item, &invocation),
+                BuiltinMacro::Constructor => self.expand_constructor(item, &invocation),
             }
         }
 
@@ -69,14 +74,7 @@ impl ExpandCtxt<'_> {
 
     fn reject_macros(&self, annotations: &mut Vec<Annotation>, target: &str) {
         for invocation in self.take_invocations(annotations) {
-            self.emit(
-                Diagnostic::error(format!(
-                    "`@{}` cannot be used on {target}",
-                    invocation.builtin.name()
-                ))
-                .with_span(invocation.annotation.span)
-                .with_help(invocation.builtin.usage()),
-            );
+            self.misplaced(&invocation, target);
         }
     }
 

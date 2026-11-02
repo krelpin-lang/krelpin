@@ -20,21 +20,13 @@ error: `@Derive` cannot be used on members
   |
   = help: `@Derive` can only be used on classes, structs and enums
 
-error: cannot derive `Comparable`
-  --> tests/ui/expand/macro_errors.kr:13:20
-   |
-13 | @Derive(Equatable, Comparable)
-   |                    ^^^^^^^^^^
-   |
-   = note: `@Derive` can implement `Equatable` and `Hashable`
-
-error: enums without data are already `Equatable` and `Hashable`
+error: enums without data are already `Equatable`
   --> tests/ui/expand/macro_errors.kr:18:1
    |
 18 | @Derive(Equatable)
    | ^^^^^^^^^^^^^^^^^^
    |
-   = help: remove the `@Derive`
+   = note: enums without data are always `Equatable` and `Hashable`
 
 error: `@Derive` cannot be used on interfaces
   --> tests/ui/expand/macro_errors.kr:24:1
@@ -44,5 +36,29 @@ error: `@Derive` cannot be used on interfaces
    |
    = help: `@Derive` can only be used on classes, structs and enums
 
-error: aborting due to 6 previous errors
+error: `@Constructor` cannot be used on enums
+  --> tests/ui/expand/macro_errors.kr:27:1
+   |
+27 | @Constructor
+   | ^^^^^^^^^^^^
+   |
+   = help: `@Constructor` can only be used on classes and structs
+
+error: `@ToString` takes no arguments
+  --> tests/ui/expand/macro_errors.kr:32:10
+   |
+32 | @ToString(verbose)
+   |          ^^^^^^^^^
+   |
+   = help: write `@ToString`
+
+error: `Comparable` cannot be derived because `text` may be null
+  --> tests/ui/expand/macro_errors.kr:35:1
+   |
+35 | @Derive(Comparable)
+   | ^^^^^^^^^^^^^^^^^^^
+   |
+   = help: implement `compareTo` yourself to decide where null values go
+
+error: aborting due to 8 previous errors
 

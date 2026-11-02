@@ -13,3 +13,8 @@ enum Tree<T> {
     Leaf(T value),
     Empty;
 }
+
+@Derive(Comparable)
+struct Holder {
+    Handle handle;
+}

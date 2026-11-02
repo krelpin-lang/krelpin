@@ -1,16 +1,14 @@
 package shop;
 
-@Derive(Equatable, Hashable)
+@Constructor
+@ToString
+@Derive(Equatable, Hashable, Comparable)
 class Money {
     long cents;
     String currency;
-
-    Money(long cents, String currency) {
-        this.cents = cents;
-        this.currency = currency;
-    }
 }
 
+@ToString
 @Derive(Equatable, Hashable)
 enum Payment {
     Card(String number, Money amount),
@@ -25,6 +23,13 @@ enum Tree<T extends Equatable<T>> {
     Node(Tree<T> left, Tree<T> right);
 }
 
+@Derive(Comparable)
+enum Priority {
+    Low,
+    Normal,
+    Urgent;
+}
+
 class Register {
     HashMap<Payment, int> counts = new HashMap<>();
 
@@ -35,5 +40,18 @@ class Register {
 
     boolean same(Money a, Money b) {
         return a == b;
+    }
+
+    String cheaper(Money a, Money b) {
+        Money cheapest = a.compareTo(&b) <= 0 ? a : b;
+        return "cheapest: " + cheapest.toString();
+    }
+
+    Money tip() {
+        return new Money(500, "TRY");
+    }
+
+    boolean urgent(Priority priority) {
+        return priority.compareTo(&Priority.Normal) > 0;
     }
 }

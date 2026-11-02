@@ -24,5 +24,13 @@ error: values of type `T` cannot be compared with `==`
    = help: add the bound `T extends Equatable<T>`
    = note: this comes from the expansion of `@Derive`
 
-error: aborting due to 3 previous errors
+error: no method named `compareTo` found for `Handle`
+  --> tests/ui/expand/derive_errors.kr:17:1
+   |
+17 | @Derive(Comparable)
+   | ^^^^^^^^^^^^^^^^^^^ method not found
+   |
+   = note: this comes from the expansion of `@Derive`
+
+error: aborting due to 4 previous errors
 
