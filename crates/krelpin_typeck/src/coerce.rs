@@ -6,36 +6,21 @@ use crate::param_env::ParamEnv;
 use crate::sig::Tcx;
 use crate::ty::{Ty, promote, widens};
 
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
-pub enum Coercion {
-    Subtype,
-    Boxing,
-}
-
 impl Tcx<'_> {
     pub fn is_assignable(&self, env: &ParamEnv, from: &Ty, to: &Ty) -> bool {
-        self.coerces(env, from, to, Coercion::Boxing)
-    }
-
-    pub fn is_subtype(&self, env: &ParamEnv, from: &Ty, to: &Ty) -> bool {
-        self.coerces(env, from, to, Coercion::Subtype)
-    }
-
-    pub fn coerces(&self, env: &ParamEnv, from: &Ty, to: &Ty, coercion: Coercion) -> bool {
-        let coerces = |from, to| self.coerces(env, from, to, coercion);
+        let assignable = |from, to| self.is_assignable(env, from, to);
         match (from, to) {
             (Ty::Unknown, _) | (_, Ty::Unknown) => true,
             _ if from == to => true,
             (Ty::Null, Ty::Nullable(_)) => true,
-            (Ty::Nullable(from), Ty::Nullable(to)) => coerces(from, to),
+            (Ty::Nullable(from), Ty::Nullable(to)) => assignable(from, to),
             (Ty::Nullable(_) | Ty::Null, _) => false,
-            (from, Ty::Nullable(to)) => coerces(from, to),
+            (from, Ty::Nullable(to)) => assignable(from, to),
             (Ty::Primitive(from), Ty::Primitive(to)) => widens(*from, *to),
-            (Ty::Primitive(primitive), Ty::Adt { def, .. })
-            | (Ty::Adt { def, .. }, Ty::Primitive(primitive)) => {
-                coercion == Coercion::Boxing
-                    && self.lang_items.is(*def, LangItem::boxed(*primitive))
-            }
+            (Ty::Primitive(primitive), Ty::Adt { .. }) => self
+                .lang_items
+                .primitive_impl(*primitive)
+                .is_some_and(|def| self.adt_assignable(env, def, &[], to)),
             (
                 Ty::Ref {
                     mutable: from_mut,
@@ -49,7 +34,7 @@ impl Tcx<'_> {
                 if *to_mut {
                     *from_mut && (from == to || from.is_unknown() || to.is_unknown())
                 } else {
-                    coerces(from, to)
+                    assignable(from, to)
                 }
             }
             (Ty::Ref { .. }, _) | (_, Ty::Ref { .. }) => false,
@@ -57,20 +42,13 @@ impl Tcx<'_> {
             (_, Ty::Adt { def, .. }) if self.lang_items.is(*def, LangItem::Object) => true,
             (Ty::External { .. }, _) | (_, Ty::External { .. }) => true,
             (Ty::Array(from), Ty::Array(to)) => from == to || from.is_unknown() || to.is_unknown(),
-            (Ty::Param(name), to) => env.bounds(*name).iter().any(|bound| coerces(bound, to)),
-            (Ty::Adt { def, args, .. }, to) => self.adt_coerces(env, *def, args, to, coercion),
+            (Ty::Param(name), to) => env.bounds(*name).iter().any(|bound| assignable(bound, to)),
+            (Ty::Adt { def, args, .. }, to) => self.adt_assignable(env, *def, args, to),
             _ => false,
         }
     }
 
-    fn adt_coerces(
-        &self,
-        env: &ParamEnv,
-        def: DefId,
-        args: &[Ty],
-        to: &Ty,
-        coercion: Coercion,
-    ) -> bool {
+    fn adt_assignable(&self, env: &ParamEnv, def: DefId, args: &[Ty], to: &Ty) -> bool {
         match to {
             Ty::Adt {
                 def: target,
@@ -85,7 +63,7 @@ impl Tcx<'_> {
         sig.superclass
             .iter()
             .chain(sig.interfaces.iter())
-            .any(|parent| self.coerces(env, &parent.subst(&subst), to, coercion))
+            .any(|parent| self.is_assignable(env, &parent.subst(&subst), to))
     }
 
     pub fn common_ty(&self, env: &ParamEnv, a: &Ty, b: &Ty) -> Option<Ty> {

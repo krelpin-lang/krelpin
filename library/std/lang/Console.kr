@@ -4,21 +4,6 @@ final class Console {
     private Console() {}
 
     @Intrinsic
-    void print(boolean value);
-
-    @Intrinsic
-    void print(char value);
-
-    @Intrinsic
-    void print(int value);
-
-    @Intrinsic
-    void print(long value);
-
-    @Intrinsic
-    void print(double value);
-
-    @Intrinsic
     void print(Object? value);
 
     @Intrinsic
@@ -26,21 +11,6 @@ final class Console {
 
     @Intrinsic
     void println();
-
-    @Intrinsic
-    void println(boolean value);
-
-    @Intrinsic
-    void println(char value);
-
-    @Intrinsic
-    void println(int value);
-
-    @Intrinsic
-    void println(long value);
-
-    @Intrinsic
-    void println(double value);
 
     @Intrinsic
     void println(Object? value);

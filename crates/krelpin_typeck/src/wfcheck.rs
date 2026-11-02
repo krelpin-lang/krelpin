@@ -5,7 +5,6 @@ use krelpin_span::Span;
 use krelpin_span::def_id::DefId;
 
 use crate::check::plural;
-use crate::lang_items::LangItem;
 use crate::param_env::ParamEnv;
 use crate::sig::{GenericParamSig, Tcx};
 use crate::ty::Ty;
@@ -97,7 +96,16 @@ impl Tcx<'_> {
                     return;
                 };
                 match self.resolutions.get(segment.span) {
-                    Some(Res::Item(def)) => self.check_generic_args(env, def, args, ty.span),
+                    Some(Res::Item(def)) => match self.lang_items.primitive_of(def) {
+                        Some(primitive) => {
+                            self.dcx.emit(
+                                Diagnostic::error(format!("`{}` is not a type", segment.name))
+                                    .with_span(ty.span)
+                                    .with_help(format!("use `{}` instead", primitive.name())),
+                            );
+                        }
+                        None => self.check_generic_args(env, def, args, ty.span),
+                    },
                     Some(Res::TypeParam(_)) if !args.is_empty() => {
                         self.dcx.emit(
                             Diagnostic::error(format!(
@@ -138,15 +146,6 @@ impl Tcx<'_> {
         let lowered: Vec<Ty> = args.iter().map(|arg| self.lower_ty(arg)).collect();
         let subst = self.subst_for(def, &lowered);
         for ((param, arg), ast_arg) in generics.iter().zip(&lowered).zip(args) {
-            if let Ty::Primitive(primitive) = arg {
-                let boxed = self.lang_ty(LangItem::boxed(*primitive));
-                self.dcx.emit(
-                    Diagnostic::error("type arguments cannot be primitive types")
-                        .with_span(ast_arg.span)
-                        .with_help(format!("use `{boxed}` instead")),
-                );
-                continue;
-            }
             self.check_bound(env, param, arg, &subst, ast_arg.span);
         }
     }

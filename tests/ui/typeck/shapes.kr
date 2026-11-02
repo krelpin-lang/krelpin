@@ -10,7 +10,7 @@ interface Shape extends Comparable<Shape> {
     }
 
     int compareTo(&this, Shape other) {
-        return Double.compare(this.area(), other.area());
+        return this.area().compareTo(other.area());
     }
 }
 
@@ -81,11 +81,11 @@ class Main {
 
         Shape biggest = Shapes.largest(shapes);
         List<String> names = Shapes.map(shapes, shape -> shape.describe());
-        List<Double> areas = Shapes.map(shapes, Shape::area);
+        List<double> areas = Shapes.map(shapes, Shape::area);
 
         Consumer<String> print = Console::println;
         names.forEach(print);
-        areas.forEach(area -> Console.println(area.doubleValue()));
+        areas.forEach(area -> Console.println(area));
 
         try {
             if (biggest.area() > 100.0) {

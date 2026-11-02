@@ -4,7 +4,7 @@ error: call to `amb` is ambiguous
 17 |         Pick.amb(1, 2);
    |              ^^^
    |
-   = note: it could call `Pick.amb(Integer, long)` or `Pick.amb(long, Integer)`
+   = note: it could call `Pick.amb(int, long)` or `Pick.amb(long, int)`
    = help: cast the arguments to the types of the method you want to call
 
 error: mismatched types

@@ -3,7 +3,7 @@ use std::collections::HashMap;
 use krelpin_ast::ast::{
     Block, CompilationUnit, Constructor, Expr, ExprKind, Field, FieldStorage, FnRetTy,
     GenericParamKind, Generics, Ident, ItemKind, LambdaBody, Member, MemberKind, Method, Param,
-    Stmt, StmtKind, SwitchExprBody, Ty, TyKind,
+    PrimitiveTy, Stmt, StmtKind, SwitchExprBody, Ty, TyKind,
 };
 use krelpin_errors::{DiagCtxt, Diagnostic};
 use krelpin_span::{Span, Symbol, kw};
@@ -295,6 +295,9 @@ impl<'a> Resolver<'a> {
     }
 
     fn lookup_type(&self, name: Symbol) -> Option<Res> {
+        if let Some(primitive) = PrimitiveTy::from_symbol(name) {
+            return Some(Res::PrimTy(primitive));
+        }
         if let Some(&(_, span)) = self.type_params.iter().rev().find(|&&(p, _)| p == name) {
             return Some(Res::TypeParam(span));
         }

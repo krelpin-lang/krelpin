@@ -9,10 +9,10 @@ class Main {
         int count = names.get(0);
         String second = names[1];
 
-        Map<String, Integer> ages = new HashMap<>();
+        Map<String, int> ages = new HashMap<>();
         for (String key : ages) {}
 
-        Long big = 5;
+        int big = 5L;
         Console console = new Console();
         String line = Console.readLine();
     }

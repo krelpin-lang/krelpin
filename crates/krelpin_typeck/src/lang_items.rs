@@ -28,25 +28,36 @@ lang_items! {
     Enum: "std.lang.Enum",
     Iterable: "std.lang.Iterable",
     Throwable: "std.lang.Throwable",
-    Boolean: "std.lang.Boolean",
-    Byte: "std.lang.Byte",
-    Short: "std.lang.Short",
-    Integer: "std.lang.Integer",
-    Long: "std.lang.Long",
-    Character: "std.lang.Character",
-    Float: "std.lang.Float",
-    Double: "std.lang.Double",
+    Boolean: "std.primitive.Boolean",
+    Byte: "std.primitive.Byte",
+    Short: "std.primitive.Short",
+    Int: "std.primitive.Int",
+    Long: "std.primitive.Long",
+    Char: "std.primitive.Char",
+    Float: "std.primitive.Float",
+    Double: "std.primitive.Double",
 }
 
+const PRIMITIVES: [PrimitiveTy; 8] = [
+    PrimitiveTy::Boolean,
+    PrimitiveTy::Byte,
+    PrimitiveTy::Short,
+    PrimitiveTy::Int,
+    PrimitiveTy::Long,
+    PrimitiveTy::Char,
+    PrimitiveTy::Float,
+    PrimitiveTy::Double,
+];
+
 impl LangItem {
-    pub fn boxed(primitive: PrimitiveTy) -> LangItem {
+    pub fn primitive(primitive: PrimitiveTy) -> LangItem {
         match primitive {
             PrimitiveTy::Boolean => LangItem::Boolean,
             PrimitiveTy::Byte => LangItem::Byte,
             PrimitiveTy::Short => LangItem::Short,
-            PrimitiveTy::Int => LangItem::Integer,
+            PrimitiveTy::Int => LangItem::Int,
             PrimitiveTy::Long => LangItem::Long,
-            PrimitiveTy::Char => LangItem::Character,
+            PrimitiveTy::Char => LangItem::Char,
             PrimitiveTy::Float => LangItem::Float,
             PrimitiveTy::Double => LangItem::Double,
         }
@@ -82,5 +93,15 @@ impl LangItems {
 
     pub fn is(&self, def: DefId, item: LangItem) -> bool {
         self.get(item) == Some(def)
+    }
+
+    pub fn primitive_impl(&self, primitive: PrimitiveTy) -> Option<DefId> {
+        self.get(LangItem::primitive(primitive))
+    }
+
+    pub fn primitive_of(&self, def: DefId) -> Option<PrimitiveTy> {
+        PRIMITIVES
+            .into_iter()
+            .find(|&primitive| self.primitive_impl(primitive) == Some(def))
     }
 }

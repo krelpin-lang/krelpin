@@ -1,6 +1,6 @@
 use krelpin_ast::ast::{
-    BinOp, Expr, ExprKind, Ident, LambdaBody, LambdaParam, SwitchExprArm, SwitchExprBody, TyKind,
-    UnOp,
+    BinOp, Expr, ExprKind, Ident, LambdaBody, LambdaParam, PrimitiveTy, SwitchExprArm,
+    SwitchExprBody, TyKind, UnOp,
 };
 use krelpin_ast::token::TokenKind;
 use krelpin_span::{Span, kw};
@@ -225,6 +225,12 @@ impl Parser<'_> {
                 return Ok(self.mk_expr(lo, expr.kind));
             }
             TokenKind::Ident(name) if !name.is_keyword() => ExprKind::Name(Ident::new(name, lo)),
+            TokenKind::Ident(name)
+                if PrimitiveTy::from_symbol(name).is_some()
+                    && matches!(self.look_ahead(1), TokenKind::Dot | TokenKind::PathSep) =>
+            {
+                ExprKind::Name(Ident::new(name, lo))
+            }
             _ => {
                 self.expected.push(Expected::Expr);
                 return Err(self.unexpected());

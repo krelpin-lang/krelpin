@@ -1,0 +1,18 @@
+package std.primitive;
+
+final class Short implements Comparable<short> {
+    public const short MIN_VALUE = -32768;
+    public const short MAX_VALUE = 32767;
+
+    private Short() {}
+
+    int compareTo(&this, short other) {
+        if (this < other) {
+            return -1;
+        }
+        return this > other ? 1 : 0;
+    }
+
+    @Intrinsic
+    short parse(String text);
+}

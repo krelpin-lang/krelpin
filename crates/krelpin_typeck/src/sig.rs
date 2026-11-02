@@ -148,6 +148,9 @@ impl<'a> Tcx<'a> {
     }
 
     pub fn self_ty(&self, def: DefId) -> Ty {
+        if let Some(primitive) = self.lang_items.primitive_of(def) {
+            return Ty::Primitive(primitive);
+        }
         let generics = &self.sig(def).generics;
         self.def_ty(
             def,

@@ -13,7 +13,7 @@ impl Tcx<'_> {
     pub(crate) fn is_throwable(&self, env: &ParamEnv, ty: &Ty) -> bool {
         match ty {
             Ty::Unknown | Ty::External { .. } => true,
-            ty => self.is_subtype(env, ty, &self.lang_ty(LangItem::Throwable)),
+            ty => self.is_assignable(env, ty, &self.lang_ty(LangItem::Throwable)),
         }
     }
 
@@ -106,6 +106,6 @@ impl FnCtxt<'_, '_> {
     }
 
     fn is_subtype(&self, from: &Ty, to: &Ty) -> bool {
-        self.tcx.is_subtype(&self.param_env, from, to)
+        self.tcx.is_assignable(&self.param_env, from, to)
     }
 }

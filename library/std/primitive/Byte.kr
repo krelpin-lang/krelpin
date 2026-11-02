@@ -1,0 +1,18 @@
+package std.primitive;
+
+final class Byte implements Comparable<byte> {
+    public const byte MIN_VALUE = -128;
+    public const byte MAX_VALUE = 127;
+
+    private Byte() {}
+
+    int compareTo(&this, byte other) {
+        if (this < other) {
+            return -1;
+        }
+        return this > other ? 1 : 0;
+    }
+
+    @Intrinsic
+    byte parse(String text);
+}

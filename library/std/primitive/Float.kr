@@ -1,0 +1,18 @@
+package std.primitive;
+
+final class Float implements Comparable<float> {
+    public const float MIN_VALUE = 1.4e-45f;
+    public const float MAX_VALUE = 3.4028235e38f;
+
+    private Float() {}
+
+    int compareTo(&this, float other) {
+        if (this < other) {
+            return -1;
+        }
+        return this > other ? 1 : 0;
+    }
+
+    @Intrinsic
+    float parse(String text);
+}

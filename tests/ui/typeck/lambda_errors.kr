@@ -4,12 +4,12 @@ interface Transform<A, B> {
 
 class Main {
     void main() {
-        Transform<String, Integer> length = text -> text.lenght();
-        Transform<String, Integer> pair = (a, b) -> 1;
-        Transform<String, Integer> missing = text -> {
+        Transform<String, int> length = text -> text.lenght();
+        Transform<String, int> pair = (a, b) -> 1;
+        Transform<String, int> missing = text -> {
             Console.println(text);
         };
         String notAFunction = () -> 1;
-        Transform<String, Integer> size = String::size;
+        Transform<String, int> size = String::size;
     }
 }

@@ -1,7 +1,7 @@
 class Pick {
-    void amb(Integer a, long b) {}
+    void amb(int a, long b) {}
 
-    void amb(long a, Integer b) {}
+    void amb(long a, int b) {}
 
     int f(long x) {
         return 1;

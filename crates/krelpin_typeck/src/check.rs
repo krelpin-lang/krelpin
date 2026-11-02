@@ -209,7 +209,10 @@ impl<'a, 'tcx> FnCtxt<'a, 'tcx> {
     }
 
     pub(crate) fn type_name(&self, def: DefId) -> Symbol {
-        self.tcx.sig(def).name.name
+        match self.tcx.lang_items.primitive_of(def) {
+            Some(primitive) => Symbol::intern(primitive.name()),
+            None => self.tcx.sig(def).name.name,
+        }
     }
 
     pub(crate) fn emit(&self, diagnostic: Diagnostic) {

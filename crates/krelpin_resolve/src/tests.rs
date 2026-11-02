@@ -322,7 +322,7 @@ fn catch_and_lambda_parameters() {
     assert_eq!(
         in_method(
             "try { arg = 1; } catch (Exception e) { Console.println(e); } \
-             List<Integer> xs = null; xs.forEach(x -> Console.println(x + arg));"
+             List<int> xs = null; xs.forEach(x -> Console.println(x + arg));"
         ),
         Vec::<String>::new()
     );

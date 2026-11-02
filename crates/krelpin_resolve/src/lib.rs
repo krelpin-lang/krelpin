@@ -8,7 +8,7 @@ mod tests;
 
 use std::collections::HashMap;
 
-use krelpin_ast::ast::CompilationUnit;
+use krelpin_ast::ast::{CompilationUnit, PrimitiveTy};
 use krelpin_errors::DiagCtxt;
 use krelpin_span::Span;
 use krelpin_span::def_id::DefId;
@@ -22,6 +22,7 @@ pub enum Res {
     TypeParam(Span),
     BorrowSource(Span),
     Item(DefId),
+    PrimTy(PrimitiveTy),
     Import(Span),
 }
 

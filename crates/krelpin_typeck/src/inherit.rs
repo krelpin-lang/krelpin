@@ -142,7 +142,7 @@ impl Tcx<'_> {
         let env = ParamEnv::default()
             .with_generics(&self.sig(method.owner).generics)
             .with_generics(&method.generics);
-        if !self.is_subtype(&env, &method.ret, &theirs_sig.ret) {
+        if !self.is_assignable(&env, &method.ret, &theirs_sig.ret) {
             self.dcx.emit(
                 Diagnostic::error(format!(
                     "`{}` returns `{}` but `{owner}.{}` returns `{}`",

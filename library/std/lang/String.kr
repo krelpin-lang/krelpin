@@ -55,20 +55,5 @@ final class String implements Comparable<String> {
     String join(String separator, String... parts);
 
     @Intrinsic
-    String valueOf(boolean value);
-
-    @Intrinsic
-    String valueOf(char value);
-
-    @Intrinsic
-    String valueOf(int value);
-
-    @Intrinsic
-    String valueOf(long value);
-
-    @Intrinsic
-    String valueOf(double value);
-
-    @Intrinsic
     String valueOf(Object? value);
 }

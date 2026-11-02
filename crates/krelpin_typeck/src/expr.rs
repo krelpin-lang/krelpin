@@ -9,7 +9,6 @@ use krelpin_span::{Span, Symbol};
 
 use crate::check::{FnCtxt, plural};
 use crate::closure::is_closure;
-use crate::coerce::Coercion;
 use crate::lang_items::LangItem;
 use crate::sig::{AdtKind, FieldSig};
 use crate::ty::{Ty, promote};
@@ -55,7 +54,7 @@ impl FnCtxt<'_, '_> {
     }
 
     pub(crate) fn require_assignable(&self, expr: &Expr, actual: &Ty, expected: &Ty) {
-        if self.accepts(expr, actual, expected, Coercion::Boxing) {
+        if self.accepts(expr, actual, expected) || narrows_literal(expr, expected) {
             return;
         }
         self.mismatch(expr.span, expected, actual);
@@ -218,6 +217,7 @@ impl FnCtxt<'_, '_> {
                 args: Vec::new(),
             }),
             Res::TypeParam(_) => Some(Ty::Param(name.name)),
+            Res::PrimTy(primitive) => Some(Ty::Primitive(primitive)),
             Res::Local(_) | Res::BorrowSource(_) => None,
         }
     }
@@ -225,6 +225,13 @@ impl FnCtxt<'_, '_> {
     fn check_name(&mut self, name: Ident) -> Ty {
         match self.tcx.resolutions.get(name.span) {
             Some(Res::Local(decl)) => self.local_ty(decl),
+            Some(Res::PrimTy(_)) => {
+                self.error(
+                    name.span,
+                    format!("expected a value, found type `{}`", name.name),
+                );
+                Ty::Unknown
+            }
             Some(Res::Item(_) | Res::Import(_) | Res::TypeParam(_)) => {
                 self.emit(
                     Diagnostic::error(format!("expected a value, found type `{}`", name.name))
@@ -294,10 +301,10 @@ impl FnCtxt<'_, '_> {
     }
 
     fn static_field(&mut self, ty: &Ty, name: Ident) -> (Ty, Option<FieldSig>) {
-        let Ty::Adt { def, .. } = ty else {
+        let Some(def) = self.static_def(ty) else {
             return (Ty::Unknown, None);
         };
-        let Some((field, field_ty)) = self.find_field(*def, &[], name.name) else {
+        let Some((field, field_ty)) = self.find_field(def, &[], name.name) else {
             self.no_field(ty, name);
             return (Ty::Unknown, None);
         };
@@ -318,7 +325,7 @@ impl FnCtxt<'_, '_> {
 
     fn instance_field(&mut self, ty: &Ty, name: Ident) -> (Ty, Option<FieldSig>) {
         match ty {
-            Ty::Adt { .. } | Ty::Param(_) => {
+            Ty::Adt { .. } | Ty::Param(_) | Ty::Primitive(_) => {
                 let found = self
                     .receiver_adts(ty)
                     .into_iter()
@@ -342,7 +349,7 @@ impl FnCtxt<'_, '_> {
                 (field_ty, Some(field))
             }
             Ty::Array(_) if name.name.as_str() == "length" => (Ty::INT, None),
-            Ty::Primitive(_) | Ty::Array(_) | Ty::Void => {
+            Ty::Array(_) | Ty::Void => {
                 self.no_field(ty, name);
                 (Ty::Unknown, None)
             }
@@ -455,10 +462,9 @@ impl FnCtxt<'_, '_> {
     }
 
     fn static_call(&mut self, ty: &Ty, name: Ident, args: &[Expr], arg_tys: &[Ty]) -> Ty {
-        let Ty::Adt { def, .. } = ty else {
+        let Some(def) = self.static_def(ty) else {
             return Ty::Unknown;
         };
-        let def = *def;
 
         if self.tcx.sig(def).kind == AdtKind::Enum
             && name.name.as_str() == "values"
@@ -492,7 +498,7 @@ impl FnCtxt<'_, '_> {
 
     fn instance_call(&mut self, ty: &Ty, name: Ident, args: &[Expr], arg_tys: &[Ty]) -> Ty {
         match ty {
-            Ty::Adt { .. } | Ty::Param(_) => {
+            Ty::Adt { .. } | Ty::Param(_) | Ty::Primitive(_) => {
                 let receivers = self.receiver_adts(ty);
                 let candidates: Vec<_> = receivers
                     .iter()
@@ -520,7 +526,7 @@ impl FnCtxt<'_, '_> {
                 }
                 self.call(instance, args, arg_tys, name, "method")
             }
-            Ty::Primitive(_) | Ty::Void => {
+            Ty::Void => {
                 self.no_method(ty, name);
                 Ty::Unknown
             }
@@ -528,9 +534,21 @@ impl FnCtxt<'_, '_> {
         }
     }
 
+    fn static_def(&self, ty: &Ty) -> Option<DefId> {
+        match ty {
+            Ty::Adt { def, .. } => Some(*def),
+            Ty::Primitive(primitive) => self.tcx.lang_items.primitive_impl(*primitive),
+            _ => None,
+        }
+    }
+
     pub(crate) fn receiver_adts(&self, ty: &Ty) -> Vec<(DefId, Vec<Ty>)> {
         match ty {
             Ty::Adt { def, args, .. } => vec![(*def, args.clone())],
+            Ty::Primitive(primitive) => {
+                let def = self.tcx.lang_items.primitive_impl(*primitive);
+                def.into_iter().map(|def| (def, Vec::new())).collect()
+            }
             Ty::Param(name) => {
                 let bounds: Vec<_> = self
                     .param_env
@@ -946,5 +964,24 @@ fn numeric_result(l: &Ty, r: &Ty) -> Option<Ty> {
     match (l.primitive(), r.primitive()) {
         (Some(a), Some(b)) if l.is_numeric() && r.is_numeric() => Some(promote(a, b)),
         _ => None,
+    }
+}
+
+fn narrows_literal(expr: &Expr, expected: &Ty) -> bool {
+    is_int_literal(expr)
+        && matches!(
+            expected.non_null(),
+            Ty::Primitive(PrimitiveTy::Byte | PrimitiveTy::Short | PrimitiveTy::Char)
+        )
+}
+
+fn is_int_literal(expr: &Expr) -> bool {
+    match &expr.kind {
+        ExprKind::Lit(lit) => lit.kind == LitKind::Integer && lit.suffix.is_none(),
+        ExprKind::Unary {
+            op: UnOp::Neg,
+            expr,
+        } => is_int_literal(expr),
+        _ => false,
     }
 }

@@ -30,7 +30,7 @@ error: cannot index into a value of type `List<String>`
    |
    = help: use `.get(index)` instead
 
-error: cannot iterate over a value of type `Map<String, Integer>`
+error: cannot iterate over a value of type `Map<String, int>`
   --> tests/ui/typeck/library_errors.kr:13:27
    |
 13 |         for (String key : ages) {}
@@ -39,10 +39,10 @@ error: cannot iterate over a value of type `Map<String, Integer>`
    = note: `for` loops work with arrays and types that implement `Iterable`
 
 error: mismatched types
-  --> tests/ui/typeck/library_errors.kr:15:20
+  --> tests/ui/typeck/library_errors.kr:15:19
    |
-15 |         Long big = 5;
-   |                    ^ expected `Long`, found `int`
+15 |         int big = 5L;
+   |                   ^^ expected `int`, found `long`
 
 error: constructor `Console` of `Console` is private
   --> tests/ui/typeck/library_errors.kr:16:27

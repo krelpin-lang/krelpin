@@ -46,11 +46,11 @@ class Main {
             Console.println(student.report("math").toUpperCase());
         }
 
-        Integer boxed = longest;
+        String text = longest.toString();
         String? line = Console.readLine();
         if (line == null) {
             throw new IOException("no input");
         }
-        Console.println("longest name: " + boxed + ", input: " + line.trim());
+        Console.println("longest name: " + text + ", input: " + line.trim());
     }
 }

@@ -1,31 +1,20 @@
-use krelpin_ast::ast::{Expr, ExprKind, Ident, PrimitiveTy, UnOp};
-use krelpin_ast::token::LitKind;
+use krelpin_ast::ast::{Expr, Ident};
 use krelpin_errors::Diagnostic;
 use krelpin_span::Symbol;
 
 use crate::check::{FnCtxt, plural};
 use crate::closure::is_closure;
-use crate::coerce::Coercion;
-use crate::lang_items::LangItem;
 use crate::sig::MethodSig;
 use crate::ty::{Subst, Ty};
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 enum Phase {
-    Strict,
-    Loose,
+    Fixed,
     Variadic,
 }
 
 impl Phase {
-    const ALL: [Phase; 3] = [Phase::Strict, Phase::Loose, Phase::Variadic];
-
-    fn coercion(self) -> Coercion {
-        match self {
-            Phase::Strict => Coercion::Subtype,
-            Phase::Loose | Phase::Variadic => Coercion::Boxing,
-        }
-    }
+    const ALL: [Phase; 2] = [Phase::Fixed, Phase::Variadic];
 }
 
 struct Candidate {
@@ -38,7 +27,7 @@ struct Candidate {
 impl Candidate {
     fn accepts_arity(&self, args: usize, phase: Phase) -> bool {
         match phase {
-            Phase::Strict | Phase::Loose => args == self.params.len(),
+            Phase::Fixed => args == self.params.len(),
             Phase::Variadic => self.method.variadic && args + 1 >= self.params.len(),
         }
     }
@@ -53,26 +42,11 @@ impl Candidate {
 }
 
 impl FnCtxt<'_, '_> {
-    pub(crate) fn accepts(
-        &self,
-        expr: &Expr,
-        actual: &Ty,
-        expected: &Ty,
-        coercion: Coercion,
-    ) -> bool {
-        if let Some(fits) = self.closure_fits(expr, expected) {
-            return fits;
+    pub(crate) fn accepts(&self, expr: &Expr, actual: &Ty, expected: &Ty) -> bool {
+        match self.closure_fits(expr, expected) {
+            Some(fits) => fits,
+            None => self.is_assignable(actual, expected),
         }
-        let narrows_literal = coercion == Coercion::Boxing
-            && is_int_literal(expr)
-            && matches!(
-                expected.non_null(),
-                Ty::Primitive(PrimitiveTy::Byte | PrimitiveTy::Short | PrimitiveTy::Char)
-            );
-        narrows_literal
-            || self
-                .tcx
-                .coerces(&self.param_env, actual, expected, coercion)
     }
 
     pub(crate) fn call(
@@ -176,13 +150,9 @@ impl FnCtxt<'_, '_> {
         match (param, arg) {
             (_, Ty::Unknown | Ty::Null) => {}
             (Ty::Param(name), _) if vars.contains(name) => {
-                let arg = match arg {
-                    Ty::Primitive(primitive) => self.tcx.lang_ty(LangItem::boxed(*primitive)),
-                    arg => arg.clone(),
-                };
                 let merged = match inferred.get(name) {
-                    None => Some(arg),
-                    Some(previous) => self.tcx.common_ty(&self.param_env, previous, &arg),
+                    None => Some(arg.clone()),
+                    Some(previous) => self.tcx.common_ty(&self.param_env, previous, arg),
                 };
                 if let Some(merged) = merged {
                     inferred.insert(*name, merged);
@@ -224,9 +194,7 @@ impl FnCtxt<'_, '_> {
                 .iter()
                 .zip(arg_tys)
                 .enumerate()
-                .all(|(index, (arg, ty))| {
-                    self.accepts(arg, ty, &candidate.param(index, phase), phase.coercion())
-                })
+                .all(|(index, (arg, ty))| self.accepts(arg, ty, &candidate.param(index, phase)))
     }
 
     fn most_specific<'c>(
@@ -237,7 +205,7 @@ impl FnCtxt<'_, '_> {
     ) -> Option<&'c Candidate> {
         let more_specific = |a: &Candidate, b: &Candidate| {
             (0..arg_count).all(|index| {
-                self.tcx.is_subtype(
+                self.tcx.is_assignable(
                     &self.param_env,
                     &a.param(index, phase),
                     &b.param(index, phase),
@@ -281,8 +249,8 @@ impl FnCtxt<'_, '_> {
 
     fn report_arg_mismatches(&mut self, candidate: &Candidate, args: &[Expr], arg_tys: &[Ty]) {
         for (index, (arg, ty)) in args.iter().zip(arg_tys).enumerate() {
-            let phases: &[Phase] = if candidate.accepts_arity(args.len(), Phase::Loose) {
-                &[Phase::Loose, Phase::Variadic]
+            let phases: &[Phase] = if candidate.accepts_arity(args.len(), Phase::Fixed) {
+                &[Phase::Fixed, Phase::Variadic]
             } else {
                 &[Phase::Variadic]
             };
@@ -293,7 +261,7 @@ impl FnCtxt<'_, '_> {
                 .collect();
             let fits = expected
                 .iter()
-                .any(|expected| self.accepts(arg, ty, expected, Coercion::Boxing));
+                .any(|expected| self.accepts(arg, ty, expected));
             match (fits, expected.last()) {
                 (false, Some(expected)) if is_closure(arg) => {
                     self.check_closure(arg, expected);
@@ -338,17 +306,6 @@ fn param_for_inference(method: &MethodSig, index: usize, arg_count: usize, arg: 
             }
         }
         _ => method.params.get(index).cloned(),
-    }
-}
-
-fn is_int_literal(expr: &Expr) -> bool {
-    match &expr.kind {
-        ExprKind::Lit(lit) => lit.kind == LitKind::Integer && lit.suffix.is_none(),
-        ExprKind::Unary {
-            op: UnOp::Neg,
-            expr,
-        } => is_int_literal(expr),
-        _ => false,
     }
 }
 

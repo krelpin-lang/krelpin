@@ -1,0 +1,39 @@
+package std.primitive;
+
+final class Char implements Comparable<char> {
+    public const char MIN_VALUE = '\u0000';
+    public const char MAX_VALUE = '￿';
+
+    private Char() {}
+
+    int compareTo(&this, char other) {
+        if (this < other) {
+            return -1;
+        }
+        return this > other ? 1 : 0;
+    }
+
+    @Intrinsic
+    boolean isDigit(&this);
+
+    @Intrinsic
+    boolean isLetter(&this);
+
+    @Intrinsic
+    boolean isLetterOrDigit(&this);
+
+    @Intrinsic
+    boolean isWhitespace(&this);
+
+    @Intrinsic
+    boolean isUpperCase(&this);
+
+    @Intrinsic
+    boolean isLowerCase(&this);
+
+    @Intrinsic
+    char toUpperCase(&this);
+
+    @Intrinsic
+    char toLowerCase(&this);
+}

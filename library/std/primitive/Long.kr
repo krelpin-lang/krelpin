@@ -1,0 +1,18 @@
+package std.primitive;
+
+final class Long implements Comparable<long> {
+    public const long MIN_VALUE = -9223372036854775808L;
+    public const long MAX_VALUE = 9223372036854775807L;
+
+    private Long() {}
+
+    int compareTo(&this, long other) {
+        if (this < other) {
+            return -1;
+        }
+        return this > other ? 1 : 0;
+    }
+
+    @Intrinsic
+    long parse(String text);
+}

@@ -563,8 +563,8 @@ fn collections_are_generic() {
          for (String name : names) { Console.println(name.length()); }",
     );
     body_ok(
-        "Map<String, Integer> ages = new HashMap<>(); ages.put(\"Ali\", 30); \
-         Integer? age = ages.get(\"Ali\"); int years = age ?: 0;",
+        "Map<String, int> ages = new HashMap<>(); ages.put(\"Ali\", 30); \
+         int? age = ages.get(\"Ali\"); int years = age ?: 0;",
     );
     assert_eq!(
         in_body("List<String> names = new ArrayList<>(); int first = names.get(0);"),
@@ -579,12 +579,12 @@ fn collections_are_generic() {
         ["mismatched types"]
     );
     assert_eq!(
-        in_body("Map<String, Integer> ages = new HashMap<>(); int age = ages.get(\"Ali\");"),
+        in_body("Map<String, int> ages = new HashMap<>(); int age = ages.get(\"Ali\");"),
         ["mismatched types"]
     );
     assert_eq!(
-        in_body("Map<String, Integer> ages = new HashMap<>(); for (String key : ages) {}"),
-        ["cannot iterate over a value of type `Map<String, Integer>`"]
+        in_body("Map<String, int> ages = new HashMap<>(); for (String key : ages) {}"),
+        ["cannot iterate over a value of type `Map<String, int>`"]
     );
     assert_eq!(
         in_body("List<String> names = new ArrayList<>(); String s = names[0];"),
@@ -600,26 +600,57 @@ fn collections_are_generic() {
 
 #[test]
 fn own_types_can_be_iterable() {
-    ok("abstract class Countdown implements Iterable<Integer> {}\n\
+    ok("abstract class Countdown implements Iterable<int> {}\n\
         class Main {\n\
         \x20   void run(&this, Countdown countdown) {\n\
-        \x20       for (Integer n : countdown) { int x = n; }\n\
+        \x20       for (int n : countdown) { int x = n; }\n\
         \x20   }\n\
         }");
 }
 
 #[test]
-fn primitives_box_into_their_classes() {
-    body_ok("Integer boxed = 5; int unboxed = boxed; Character c = 'x';");
-    assert_eq!(in_body("Long boxed = 5;"), ["mismatched types"]);
-    assert_eq!(in_body("Integer boxed = 5L;"), ["mismatched types"]);
+fn primitives_are_the_only_number_types() {
+    body_ok(
+        "List<int> xs = new ArrayList<>(); xs.add(5); int first = xs.get(0); \
+         Map<String, int> ages = new HashMap<>(); int? age = ages.get(\"Ali\"); \
+         int? missing = null; Object any = 5; Comparable<int> order = 5;",
+    );
+    assert_eq!(
+        errors("import std.primitive.Int; class A { Int x; }"),
+        ["`Int` is not a type"]
+    );
+    assert_eq!(
+        helps("import std.primitive.Int; class A { Int x; }"),
+        ["use `int` instead"]
+    );
+    assert_eq!(
+        in_body("int? maybe = null; int x = maybe;"),
+        ["mismatched types"]
+    );
+}
+
+#[test]
+fn primitives_have_members() {
+    body_ok(
+        "int big = int.MAX_VALUE; long small = long.MIN_VALUE; int parsed = int.parse(\"42\"); \
+         int order = 5.compareTo(6); String text = 5.toString(); boolean digit = 'x'.isDigit();",
+    );
+    assert_eq!(
+        in_body("int x = 5; int n = x.lenght();"),
+        ["no method named `lenght` found for `int`"]
+    );
+    assert_eq!(in_body("int n = int.parse(5);"), ["mismatched types"]);
+    assert_eq!(
+        in_body("int n = 5.parse(\"5\");"),
+        ["`parse` belongs to the class `int`"]
+    );
 }
 
 #[test]
 fn class_members_of_the_standard_library() {
     body_ok(
         "int a = Math.max(1, 2); long b = Math.max(1L, 2); double c = Math.sqrt(2.0) * Math.PI; \
-         int big = Integer.MAX_VALUE; int parsed = Integer.parseInt(\"42\");",
+         int big = int.MAX_VALUE; int parsed = int.parse(\"42\");",
     );
     assert_eq!(in_body("int a = Math.sqrt(2.0);"), ["mismatched types"]);
     assert_eq!(
@@ -679,11 +710,11 @@ fn atomics_can_change_through_shared_fields() {
 #[test]
 fn generic_arguments_are_counted() {
     assert_eq!(
-        errors("class A { List<String, Integer> xs; }"),
+        errors("class A { List<String, int> xs; }"),
         ["`List` takes 1 type argument but 2 were supplied"]
     );
     assert_eq!(
-        errors("class A { String<Integer> s; }"),
+        errors("class A { String<int> s; }"),
         ["`String` takes 0 type arguments but 1 was supplied"]
     );
     assert_eq!(
@@ -697,18 +728,6 @@ fn generic_arguments_are_counted() {
 }
 
 #[test]
-fn generic_arguments_are_not_primitive() {
-    assert_eq!(
-        errors("class A { List<int> xs; }"),
-        ["type arguments cannot be primitive types"]
-    );
-    assert_eq!(
-        helps("class A { List<int> xs; }"),
-        ["use `Integer` instead"]
-    );
-}
-
-#[test]
 fn generic_arguments_satisfy_bounds() {
     let src = |code: &str| {
         format!(
@@ -718,7 +737,7 @@ fn generic_arguments_satisfy_bounds() {
         )
     };
     ok(&src(
-        "Sorted<String>? s = null; Sorted<Integer>? i = new Sorted<>();",
+        "Sorted<String>? s = null; Sorted<int>? i = new Sorted<>();",
     ));
     assert_eq!(
         errors(&src("Sorted<Thing>? s = null;")),
@@ -758,12 +777,10 @@ fn pick(code: &str) -> String {
          \x20   String f(int x) {{ return \"\"; }}\n\
          \x20   boolean g(Object? x) {{ return true; }}\n\
          \x20   char g(String? x) {{ return 'c'; }}\n\
-         \x20   double h(Integer x) {{ return 1.0; }}\n\
-         \x20   long h(long x) {{ return 1L; }}\n\
          \x20   int v(String... xs) {{ return 0; }}\n\
          \x20   String v(String x) {{ return x; }}\n\
-         \x20   void amb(Integer a, long b) {{}}\n\
-         \x20   void amb(long a, Integer b) {{}}\n\
+         \x20   void amb(int a, long b) {{}}\n\
+         \x20   void amb(long a, int b) {{}}\n\
          }}\n\
          class Main {{ void run(&this) {{ {code} }} }}"
     )
@@ -783,13 +800,6 @@ fn the_most_specific_overload_is_chosen() {
 }
 
 #[test]
-fn boxing_is_only_used_when_needed() {
-    ok(&pick(
-        "long a = Pick.h(1); double b = Pick.h(Integer.valueOf(1));",
-    ));
-}
-
-#[test]
 fn variadic_methods_are_the_last_resort() {
     ok(&pick(
         "String a = Pick.v(\"x\"); int b = Pick.v(\"x\", \"y\"); int c = Pick.v();",
@@ -805,7 +815,7 @@ fn ambiguous_calls() {
     assert_eq!(
         helps(&pick("Pick.amb(1, 2);")),
         [
-            "it could call `Pick.amb(Integer, long)` or `Pick.amb(long, Integer)`",
+            "it could call `Pick.amb(int, long)` or `Pick.amb(long, int)`",
             "cast the arguments to the types of the method you want to call",
         ]
     );
@@ -830,7 +840,7 @@ fn util(code: &str) -> String {
 fn generic_methods_infer_their_type_arguments() {
     ok(&util(
         "List<String> names = new ArrayList<>(); String s = Util.first(names); \
-         Integer i = Util.either(1, 2); String m = Util.max(\"a\", \"b\"); \
+         int i = Util.either(1, 2); String m = Util.max(\"a\", \"b\"); \
          List<String> xs = Util.listOf(\"a\", \"b\");",
     ));
     assert_eq!(
@@ -840,8 +850,8 @@ fn generic_methods_infer_their_type_arguments() {
         ["mismatched types"]
     );
     assert_eq!(
-        labels(&util("List<Integer> xs = Util.listOf(\"a\");")),
-        ["expected `List<Integer>`, found `List<String>`"]
+        labels(&util("List<int> xs = Util.listOf(\"a\");")),
+        ["expected `List<int>`, found `List<String>`"]
     );
     assert_eq!(
         errors(&util("Object o = Util.either(\"a\", 1);")),
@@ -878,13 +888,13 @@ fn lambdas_take_the_types_of_their_target() {
     ok(&closures(
         "Runnable r = () -> Console.println(\"x\"); \
          Consumer<String> c = s -> Console.println(s.length()); \
-         Mapper<String, Integer> m = s -> s.length(); \
-         Mapper<String, Integer> b = (String s) -> { return s.length(); }; \
+         Mapper<String, int> m = s -> s.length(); \
+         Mapper<String, int> b = (String s) -> { return s.length(); }; \
          List<String> names = new ArrayList<>(); \
          names.forEach(name -> Console.println(name.length()));",
     ));
     assert_eq!(
-        errors(&closures("Mapper<String, Integer> m = s -> s.lenght();")),
+        errors(&closures("Mapper<String, int> m = s -> s.lenght();")),
         ["no method named `lenght` found for `String`"]
     );
     assert_eq!(
@@ -894,24 +904,24 @@ fn lambdas_take_the_types_of_their_target() {
         ["no method named `lenght` found for `String`"]
     );
     assert_eq!(
-        labels(&closures("Mapper<String, Integer> m = s -> s;")),
-        ["expected `Integer`, found `String`"]
+        labels(&closures("Mapper<String, int> m = s -> s;")),
+        ["expected `int`, found `String`"]
     );
 }
 
 #[test]
 fn lambda_errors() {
     assert_eq!(
-        errors(&closures("Mapper<String, Integer> m = (a, b) -> 1;")),
+        errors(&closures("Mapper<String, int> m = (a, b) -> 1;")),
         ["this lambda takes 2 parameters but `apply` takes 1 parameter"]
     );
     assert_eq!(
-        labels(&closures("Mapper<String, Integer> m = (Integer s) -> 1;")),
-        ["expected `String`, found `Integer`"]
+        labels(&closures("Mapper<String, int> m = (int s) -> 1;")),
+        ["expected `String`, found `int`"]
     );
     assert_eq!(
         errors(&closures(
-            "Mapper<String, Integer> m = s -> { Console.println(s); };"
+            "Mapper<String, int> m = s -> { Console.println(s); };"
         )),
         ["missing return statement"]
     );
@@ -935,15 +945,15 @@ fn lambdas_choose_overloads_by_their_parameters() {
 #[test]
 fn method_references() {
     ok(&closures(
-        "Mapper<String, Integer> len = String::length; \
-         Mapper<String, Integer> parse = Integer::parseInt; \
+        "Mapper<String, int> len = String::length; \
+         Mapper<String, int> parse = int::parse; \
          Consumer<String> print = Console::println; \
          Mapper<String, Thing> make = Thing::new; \
-         Mapper<String, Integer> own = this::helper;",
+         Mapper<String, int> own = this::helper;",
     ));
     assert_eq!(
-        errors(&closures("Mapper<String, Integer> size = String::size;")),
-        ["`String::size` does not match `Mapper<String, Integer>`"]
+        errors(&closures("Mapper<String, int> size = String::size;")),
+        ["`String::size` does not match `Mapper<String, int>`"]
     );
     assert_eq!(
         labels(&closures("Mapper<String, String> len = String::length;")),
@@ -973,7 +983,7 @@ fn abstract_methods_are_implemented() {
          class Square extends Base implements Shape {}",
     ));
     ok(&shapes(
-        "class IntBox implements Box<Integer> { Integer get(&this) { return 1; } }",
+        "class IntBox implements Box<int> { int get(&this) { return 1; } }",
     ));
 
     let src = shapes("class Square implements Shape {}");
@@ -1059,9 +1069,9 @@ fn overrides_keep_the_signature() {
     );
     assert_eq!(
         errors(&shapes(
-            "class StrBox implements Box<String> { Integer get(&this) { return 1; } }"
+            "class StrBox implements Box<String> { int get(&this) { return 1; } }"
         )),
-        ["`get` returns `Integer` but `Box.get` returns `String`"]
+        ["`get` returns `int` but `Box.get` returns `String`"]
     );
 }
 

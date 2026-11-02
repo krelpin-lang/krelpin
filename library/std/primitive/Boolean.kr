@@ -1,0 +1,16 @@
+package std.primitive;
+
+final class Boolean implements Comparable<boolean> {
+    private Boolean() {}
+
+    int compareTo(&this, boolean other) {
+        if (this == other) {
+            return 0;
+        }
+        return this ? 1 : -1;
+    }
+
+    boolean parse(String text) {
+        return text.equals("true");
+    }
+}

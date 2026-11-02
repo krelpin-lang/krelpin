@@ -23,7 +23,6 @@ use krelpin_resolve::ResolverOutput;
 use krelpin_span::Span;
 
 pub use crate::closure::FnSig;
-pub use crate::coerce::Coercion;
 pub use crate::lang_items::{LangItem, LangItems};
 pub use crate::param_env::ParamEnv;
 pub use crate::sig::{AdtKind, FieldSig, GenericParamSig, MethodSig, Tcx, TypeSig};

@@ -10,7 +10,7 @@ class Util {
 
 class Main {
     void main() {
-        List<String, Integer>? pairs = null;
+        List<String, int>? pairs = null;
         List<int>? numbers = null;
         Sorted<Thing>? things = null;
         Thing best = Util.max(new Thing(), new Thing());
