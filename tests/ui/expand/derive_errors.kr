@@ -1,0 +1,15 @@
+package shop;
+
+class Handle {}
+
+@Derive(Equatable, Hashable)
+class Account {
+    String owner;
+    Handle handle;
+}
+
+@Derive(Equatable)
+enum Tree<T> {
+    Leaf(T value),
+    Empty;
+}

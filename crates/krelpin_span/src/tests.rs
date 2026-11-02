@@ -2,7 +2,7 @@ use std::collections::HashSet;
 use std::thread;
 
 use crate::symbol::keyword_texts;
-use crate::{BytePos, SourceFile, SourceMap, Span, Symbol, kw};
+use crate::{BytePos, Expansion, SourceFile, SourceMap, Span, Symbol, kw};
 
 #[test]
 fn keywords_are_prefilled_in_order() {
@@ -112,4 +112,23 @@ fn source_files_can_be_added_from_many_threads() {
     for pos in [0, 11, 22, 33, 44, 55, 66, 77] {
         assert!(source_map.lookup_file(BytePos(pos)).is_some());
     }
+}
+
+#[test]
+fn expansion_files_point_back_to_their_call_site() {
+    let source_map = SourceMap::new();
+    let user = source_map.new_source_file("a.kr", "@Derive(Equatable) class A {}".to_owned());
+    let call_site = Span::new(user.start_pos, user.start_pos + 18);
+    let generated = source_map.new_expansion_file(
+        "<@Derive on A>",
+        "boolean equals(&this, &A other) {}".to_owned(),
+        Expansion {
+            call_site,
+            macro_name: "Derive".to_owned(),
+        },
+    );
+    let inside = Span::new(generated.start_pos + 8, generated.start_pos + 14);
+    let expansion = source_map.expansion_of(inside).expect("an expansion");
+    assert_eq!(expansion.call_site, call_site);
+    assert!(source_map.expansion_of(call_site).is_none());
 }

@@ -1,6 +1,6 @@
 use krelpin_span::{Span, Symbol, kw};
 
-use crate::token::Lit;
+use crate::token::{Lit, Token};
 
 mod display;
 
@@ -41,6 +41,15 @@ pub struct CompilationUnit {
     pub package: Option<Path>,
     pub imports: Vec<Import>,
     pub items: Vec<Item>,
+    pub macros: Vec<MacroDef>,
+    pub span: Span,
+}
+
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct MacroDef {
+    pub docs: Vec<Symbol>,
+    pub annotations: Vec<Annotation>,
+    pub name: Ident,
     pub span: Span,
 }
 
@@ -76,6 +85,17 @@ pub enum Visibility {
     Public(Span),
     Protected(Span),
     Private(Span),
+}
+
+impl Visibility {
+    pub fn span(self) -> Option<Span> {
+        match self {
+            Visibility::Default => None,
+            Visibility::Public(span) | Visibility::Protected(span) | Visibility::Private(span) => {
+                Some(span)
+            }
+        }
+    }
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -317,8 +337,9 @@ impl PrimitiveTy {
     }
 }
 
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+#[derive(Clone, Debug, PartialEq, Eq)]
 pub struct Unparsed {
+    pub tokens: Vec<Token>,
     pub span: Span,
 }
 

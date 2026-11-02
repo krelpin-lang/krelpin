@@ -1,0 +1,28 @@
+error: values of type `Handle` cannot be compared with `==`
+ --> tests/ui/expand/derive_errors.kr:5:1
+  |
+5 | @Derive(Equatable, Hashable)
+  | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  |
+  = help: implement `Equatable<Handle>` for `Handle`
+  = note: this comes from the expansion of `@Derive`
+
+error: no method named `hashCode` found for `Handle`
+ --> tests/ui/expand/derive_errors.kr:5:1
+  |
+5 | @Derive(Equatable, Hashable)
+  | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^ method not found
+  |
+  = note: this comes from the expansion of `@Derive`
+
+error: values of type `T` cannot be compared with `==`
+  --> tests/ui/expand/derive_errors.kr:11:1
+   |
+11 | @Derive(Equatable)
+   | ^^^^^^^^^^^^^^^^^^
+   |
+   = help: add the bound `T extends Equatable<T>`
+   = note: this comes from the expansion of `@Derive`
+
+error: aborting due to 3 previous errors
+

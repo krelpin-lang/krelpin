@@ -1,0 +1,4 @@
+package std.lang;
+
+@Intrinsic
+macro Derive;

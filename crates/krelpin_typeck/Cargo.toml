@@ -10,5 +10,6 @@ krelpin_resolve.workspace = true
 krelpin_span.workspace = true
 
 [dev-dependencies]
+krelpin_expand.workspace = true
 krelpin_parse.workspace = true
 krelpin_sysroot.workspace = true

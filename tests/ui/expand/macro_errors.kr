@@ -1,0 +1,25 @@
+package shop;
+
+macro Builder;
+
+@Builder
+class Order {
+    @Derive(Equatable)
+    int total(&this) {
+        return 0;
+    }
+}
+
+@Derive(Equatable, Comparable)
+struct Line {
+    int quantity;
+}
+
+@Derive(Equatable)
+enum Status {
+    Open,
+    Closed;
+}
+
+@Derive(Equatable)
+interface Named {}

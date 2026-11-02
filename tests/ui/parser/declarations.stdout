@@ -1036,5 +1036,6 @@ CompilationUnit {
             span: 755..1027,
         },
     ],
+    macros: [],
     span: 0..1028,
 }

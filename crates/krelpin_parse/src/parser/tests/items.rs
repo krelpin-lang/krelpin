@@ -413,3 +413,29 @@ fn where_clauses() {
         .collect();
     assert_eq!(predicates, ["T: Comparable<T> & Cloneable", "U: Object"]);
 }
+
+#[test]
+fn macro_declarations() {
+    let unit = parse_ok("@Intrinsic\nmacro Derive;\nclass A {}");
+    assert_eq!(unit.items.len(), 1);
+    assert_eq!(unit.macros.len(), 1);
+    assert_eq!(unit.macros[0].name.name.as_str(), "Derive");
+    assert_eq!(
+        errors("macro Builder { }"),
+        ["macros written in Krelpin are not supported yet"]
+    );
+    assert_eq!(
+        errors("public macro Builder;"),
+        ["macros cannot have a visibility modifier"]
+    );
+}
+
+#[test]
+fn annotation_arguments_keep_their_tokens() {
+    let unit = parse_ok("@Derive(Equatable, Hashable) class A {}");
+    let args = unit.items[0].annotations[0]
+        .args
+        .as_ref()
+        .expect("arguments");
+    assert_eq!(args.tokens.len(), 3);
+}

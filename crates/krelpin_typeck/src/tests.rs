@@ -19,11 +19,12 @@ fn diagnostics(src: &str) -> Vec<Diagnostic> {
     let unit = parser::parse(lexer::lex(&file, &dcx), &dcx);
     let mut units = test_sysroot().load_std(&source_map, &dcx);
     units.push(unit);
+    krelpin_expand::expand(&mut units, &source_map, &dcx);
     let resolved = krelpin_resolve::resolve(&units, &dcx);
     assert_eq!(
         buffer.messages(),
         Vec::<String>::new(),
-        "parse or resolve errors in {src:?}"
+        "parse, expansion or resolve errors in {src:?}"
     );
 
     crate::check(&units, &resolved, &dcx);
@@ -1645,4 +1646,34 @@ fn unreachable_patterns_are_reported() {
     ok(&variants(
         "int f(Object o) { return switch (o) { case String s -> 1; case Object any -> 2; }; }",
     ));
+}
+
+#[test]
+fn derived_equality_and_hashing() {
+    ok("@Derive(Equatable, Hashable)\n\
+        class Point {\n\
+        \x20   int x;\n\
+        \x20   String? label;\n\
+        \x20   Point(int x) { this.x = x; }\n\
+        }\n\
+        @Derive(Equatable, Hashable)\n\
+        enum Shape { Circle(Point center, double radius), Empty }\n\
+        class Main {\n\
+        \x20   boolean run(&this) {\n\
+        \x20       HashMap<Shape, String> names = new HashMap<>();\n\
+        \x20       names.put(Shape.Circle(new Point(1), 2.0), \"circle\");\n\
+        \x20       return new Point(1) == new Point(2) && Shape.Empty == Shape.Empty;\n\
+        \x20   }\n\
+        }");
+    assert_eq!(
+        errors(
+            "class Handle {}\n\
+             @Derive(Equatable) class Account { Handle handle; }"
+        ),
+        ["values of type `Handle` cannot be compared with `==`"]
+    );
+    assert_eq!(
+        errors("@Derive(Equatable) enum Tree<T> { Leaf(T value), Empty }"),
+        ["values of type `T` cannot be compared with `==`"]
+    );
 }

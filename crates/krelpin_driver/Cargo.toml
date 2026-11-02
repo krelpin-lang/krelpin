@@ -7,6 +7,7 @@ edition.workspace = true
 clap.workspace = true
 krelpin_ast.workspace = true
 krelpin_errors.workspace = true
+krelpin_expand.workspace = true
 krelpin_parse.workspace = true
 krelpin_resolve.workspace = true
 krelpin_span.workspace = true

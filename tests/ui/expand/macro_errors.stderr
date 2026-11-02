@@ -1,0 +1,48 @@
+error: only the standard library can declare macros for now
+ --> tests/ui/expand/macro_errors.kr:3:7
+  |
+3 | macro Builder;
+  |       ^^^^^^^
+  |
+  = note: macros written in Krelpin are not supported yet
+
+error: cannot find macro `Builder` in this scope
+ --> tests/ui/expand/macro_errors.kr:5:2
+  |
+5 | @Builder
+  |  ^^^^^^^ not found in this scope
+
+error: `@Derive` cannot be used on members
+ --> tests/ui/expand/macro_errors.kr:7:5
+  |
+7 |     @Derive(Equatable)
+  |     ^^^^^^^^^^^^^^^^^^
+  |
+  = help: `@Derive` can only be used on classes, structs and enums
+
+error: cannot derive `Comparable`
+  --> tests/ui/expand/macro_errors.kr:13:20
+   |
+13 | @Derive(Equatable, Comparable)
+   |                    ^^^^^^^^^^
+   |
+   = note: `@Derive` can implement `Equatable` and `Hashable`
+
+error: enums without data are already `Equatable` and `Hashable`
+  --> tests/ui/expand/macro_errors.kr:18:1
+   |
+18 | @Derive(Equatable)
+   | ^^^^^^^^^^^^^^^^^^
+   |
+   = help: remove the `@Derive`
+
+error: `@Derive` cannot be used on interfaces
+  --> tests/ui/expand/macro_errors.kr:24:1
+   |
+24 | @Derive(Equatable)
+   | ^^^^^^^^^^^^^^^^^^
+   |
+   = help: `@Derive` can only be used on classes, structs and enums
+
+error: aborting due to 6 previous errors
+

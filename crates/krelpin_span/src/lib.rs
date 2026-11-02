@@ -7,5 +7,5 @@ mod symbol;
 mod tests;
 
 pub use crate::pos::{BytePos, Span};
-pub use crate::source_map::{Loc, SourceFile, SourceMap};
+pub use crate::source_map::{Expansion, Loc, SourceFile, SourceMap};
 pub use crate::symbol::{Symbol, kw};

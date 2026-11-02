@@ -196,6 +196,7 @@ impl Parser<'_> {
     ) -> PResult<Unparsed> {
         let open_span = self.expect(open)?;
         let mut depth = 1usize;
+        let mut tokens = Vec::new();
 
         loop {
             match self.token.kind {
@@ -206,12 +207,14 @@ impl Parser<'_> {
                     if depth == 0 {
                         self.bump();
                         return Ok(Unparsed {
+                            tokens,
                             span: open_span.to(self.prev_token.span),
                         });
                     }
                 }
                 _ => {}
             }
+            tokens.push(self.token);
             self.bump();
         }
     }

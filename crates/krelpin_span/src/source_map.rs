@@ -5,16 +5,28 @@ use std::sync::{Arc, PoisonError, RwLock};
 
 use crate::{BytePos, Span};
 
+#[derive(Clone, Debug)]
+pub struct Expansion {
+    pub call_site: Span,
+    pub macro_name: String,
+}
+
 #[derive(Debug)]
 pub struct SourceFile {
     pub name: PathBuf,
     pub src: String,
     pub start_pos: BytePos,
+    pub expansion: Option<Expansion>,
     line_starts: Vec<BytePos>,
 }
 
 impl SourceFile {
-    fn new(name: PathBuf, src: String, start_pos: BytePos) -> SourceFile {
+    fn new(
+        name: PathBuf,
+        src: String,
+        start_pos: BytePos,
+        expansion: Option<Expansion>,
+    ) -> SourceFile {
         let line_starts = std::iter::once(0)
             .chain(src.match_indices('\n').map(|(index, _)| index + 1))
             .map(|offset| start_pos + offset as u32)
@@ -24,6 +36,7 @@ impl SourceFile {
             name,
             src,
             start_pos,
+            expansion,
             line_starts,
         }
     }
@@ -92,11 +105,33 @@ impl SourceMap {
     }
 
     pub fn new_source_file(&self, name: impl Into<PathBuf>, src: String) -> Arc<SourceFile> {
+        self.add_file(name.into(), src, None)
+    }
+
+    pub fn new_expansion_file(
+        &self,
+        name: impl Into<PathBuf>,
+        src: String,
+        expansion: Expansion,
+    ) -> Arc<SourceFile> {
+        self.add_file(name.into(), src, Some(expansion))
+    }
+
+    fn add_file(
+        &self,
+        name: PathBuf,
+        src: String,
+        expansion: Option<Expansion>,
+    ) -> Arc<SourceFile> {
         let mut files = self.files.write().unwrap_or_else(PoisonError::into_inner);
         let start_pos = files.last().map_or(BytePos(0), |file| file.end_pos() + 1);
-        let file = Arc::new(SourceFile::new(name.into(), src, start_pos));
+        let file = Arc::new(SourceFile::new(name, src, start_pos, expansion));
         files.push(Arc::clone(&file));
         file
+    }
+
+    pub fn expansion_of(&self, span: Span) -> Option<Expansion> {
+        self.lookup_file(span.lo)?.expansion.clone()
     }
 
     pub fn lookup_file(&self, pos: BytePos) -> Option<Arc<SourceFile>> {

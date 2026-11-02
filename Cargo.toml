@@ -12,6 +12,7 @@ unicode-ident = "1"
 krelpin_ast = { path = "crates/krelpin_ast" }
 krelpin_driver = { path = "crates/krelpin_driver" }
 krelpin_errors = { path = "crates/krelpin_errors" }
+krelpin_expand = { path = "crates/krelpin_expand" }
 krelpin_lexer = { path = "crates/krelpin_lexer" }
 krelpin_parse = { path = "crates/krelpin_parse" }
 krelpin_resolve = { path = "crates/krelpin_resolve" }

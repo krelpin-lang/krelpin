@@ -71,9 +71,12 @@ impl<W: Write> HumanEmitter<W> {
             self.paint(BOLD, &format!(": {}", diagnostic.message)),
         )];
 
-        let location = diagnostic
+        let mut origins = Vec::new();
+        let span = diagnostic
             .span
-            .and_then(|span| Some((span, self.source_map.lookup_char_pos(span.lo)?)));
+            .map(|span| self.call_site(span, &mut origins));
+        let location =
+            span.and_then(|span| Some((span, self.source_map.lookup_char_pos(span.lo)?)));
         let width = location.as_ref().map_or(1, |(_, loc)| digits(loc.line));
         let pad = " ".repeat(width);
         let bar = self.paint(GUTTER, "|");
@@ -82,16 +85,24 @@ impl<W: Write> HumanEmitter<W> {
             self.render_snippet(&mut lines, diagnostic, *span, loc, &pad);
         }
 
-        if !diagnostic.children.is_empty() {
+        let children = diagnostic
+            .children
+            .iter()
+            .map(|child| (child.level.as_str(), child.message.clone()))
+            .chain(origins.into_iter().map(|name| {
+                let level = Level::Note.as_str();
+                (level, format!("this comes from the expansion of `@{name}`"))
+            }))
+            .collect::<Vec<_>>();
+        if !children.is_empty() {
             if location.is_some() {
                 lines.push(format!("{pad} {bar}"));
             }
-            for child in &diagnostic.children {
+            for (level, message) in children {
                 lines.push(format!(
-                    "{pad} {} {}: {}",
+                    "{pad} {} {}: {message}",
                     self.paint(GUTTER, "="),
-                    self.paint(BOLD, child.level.as_str()),
-                    child.message,
+                    self.paint(BOLD, level),
                 ));
             }
         }
@@ -140,6 +151,14 @@ impl<W: Write> HumanEmitter<W> {
             expand_tabs(text),
         ));
         lines.push(format!("{pad} {bar} {}{marker}", " ".repeat(indent)));
+    }
+
+    fn call_site(&self, mut span: Span, origins: &mut Vec<String>) -> Span {
+        while let Some(expansion) = self.source_map.expansion_of(span) {
+            origins.push(expansion.macro_name);
+            span = expansion.call_site;
+        }
+        span
     }
 
     fn paint(&self, style: &str, text: &str) -> String {

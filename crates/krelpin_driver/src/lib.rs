@@ -91,6 +91,10 @@ pub fn run(args: &Args, sess: &Session) {
         return;
     }
     units.push(unit);
+    krelpin_expand::expand(&mut units, &sess.source_map, &sess.dcx);
+    if sess.dcx.has_errors() {
+        return;
+    }
     let resolved = krelpin_resolve::resolve(&units, &sess.dcx);
     if sess.dcx.has_errors() {
         return;

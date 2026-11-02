@@ -74,13 +74,15 @@ fn packages_match_directories() {
 }
 
 #[test]
-fn each_file_declares_the_type_it_is_named_after() {
+fn each_file_declares_the_type_or_macro_it_is_named_after() {
     let (files, units, _) = load();
     for (file, unit) in files.iter().zip(&units) {
         let names: Vec<&str> = unit
             .items
             .iter()
-            .map(|item| item.name.name.as_str())
+            .map(|item| item.name)
+            .chain(unit.macros.iter().map(|def| def.name))
+            .map(|name| name.name.as_str())
             .collect();
         let stem = file.file_stem().unwrap().to_string_lossy();
         assert_eq!(names, [stem.as_ref()], "{}", file.display());

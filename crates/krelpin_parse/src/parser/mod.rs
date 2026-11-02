@@ -10,13 +10,24 @@ mod ty;
 #[cfg(test)]
 mod tests;
 
-use krelpin_ast::ast::{CompilationUnit, Ident};
+use krelpin_ast::ast::{CompilationUnit, Ident, Member, Ty};
 use krelpin_ast::token::{Token, TokenKind};
 use krelpin_errors::{DiagCtxt, Diagnostic};
 use krelpin_span::{Span, Symbol};
 
 pub fn parse(tokens: Vec<Token>, dcx: &DiagCtxt) -> CompilationUnit {
     Parser::new(tokens, dcx).parse_compilation_unit()
+}
+
+pub fn parse_tys(tokens: Vec<Token>, dcx: &DiagCtxt) -> Option<Vec<Ty>> {
+    let mut parser = Parser::new(tokens, dcx);
+    let tys = parser.parse_ty_list().ok()?;
+    parser.expect(TokenKind::Eof).ok()?;
+    Some(tys)
+}
+
+pub fn parse_members(tokens: Vec<Token>, owner: Ident, dcx: &DiagCtxt) -> Vec<Member> {
+    Parser::new(tokens, dcx).parse_members_to_eof(owner)
 }
 
 #[derive(Clone, Copy, Debug)]

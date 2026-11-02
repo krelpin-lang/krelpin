@@ -1,7 +1,7 @@
 use krelpin_ast::ast::{
     Annotation, Class, CompilationUnit, Enum, FieldStorage, FnRetTy, Generics, Ident, Import,
-    Inheritance, Interface, Item, ItemKind, Member, MemberKind, Path, Struct, Ty, Variant,
-    VariantField, Visibility, is_intrinsic,
+    Inheritance, Interface, Item, ItemKind, MacroDef, Member, MemberKind, Path, Struct, Ty,
+    Variant, VariantField, Visibility, is_intrinsic,
 };
 use krelpin_ast::token::TokenKind;
 use krelpin_errors::Diagnostic;
@@ -27,6 +27,11 @@ impl Container {
             Container::Enum => "enums",
         }
     }
+}
+
+enum Declaration {
+    Item(Item),
+    Macro(MacroDef),
 }
 
 struct Modifiers {
@@ -61,13 +66,15 @@ impl Parser<'_> {
         }
 
         let mut items = Vec::new();
+        let mut macros = Vec::new();
         loop {
             docs.extend(self.parse_docs());
             if self.token.kind == TokenKind::Eof {
                 break;
             }
-            match self.parse_item(std::mem::take(&mut docs)) {
-                Ok(item) => items.push(item),
+            match self.parse_declaration(std::mem::take(&mut docs)) {
+                Ok(Declaration::Item(item)) => items.push(item),
+                Ok(Declaration::Macro(def)) => macros.push(def),
                 Err(_) => self.recover_to_next_item(),
             }
         }
@@ -77,6 +84,7 @@ impl Parser<'_> {
             package,
             imports,
             items,
+            macros,
             span: lo.to(self.token.span),
         }
     }
@@ -107,10 +115,15 @@ impl Parser<'_> {
         })
     }
 
-    fn parse_item(&mut self, docs: Vec<Symbol>) -> PResult<Item> {
+    fn parse_declaration(&mut self, docs: Vec<Symbol>) -> PResult<Declaration> {
         let lo = self.token.span;
         let annotations = self.parse_annotations()?;
         let modifiers = self.parse_modifiers();
+        if self.token.is_keyword(kw::Macro) {
+            return self
+                .parse_macro(docs, annotations, &modifiers, lo)
+                .map(Declaration::Macro);
+        }
         self.reject_storage(modifiers.storage, "type declarations");
 
         let container = match self.token.kind {
@@ -147,13 +160,46 @@ impl Parser<'_> {
             Container::Enum => self.parse_enum(name)?,
         };
 
-        Ok(Item {
+        Ok(Declaration::Item(Item {
             docs,
             annotations,
             vis: modifiers.vis,
             inheritance: modifiers.inheritance,
             name,
             kind,
+            span: lo.to(self.prev_token.span),
+        }))
+    }
+
+    fn parse_macro(
+        &mut self,
+        docs: Vec<Symbol>,
+        annotations: Vec<Annotation>,
+        modifiers: &Modifiers,
+        lo: Span,
+    ) -> PResult<MacroDef> {
+        self.bump();
+        self.reject_storage(modifiers.storage, "macros");
+        self.reject_inheritance(modifiers.inheritance, "macros");
+        if let Some(span) = modifiers.vis.span() {
+            self.error(span, "macros cannot have a visibility modifier");
+        }
+        let name = self.parse_ident()?;
+        if self.token.kind == TokenKind::OpenBrace {
+            let body =
+                self.parse_unparsed_delimited(TokenKind::OpenBrace, TokenKind::CloseBrace)?;
+            self.emit(
+                Diagnostic::error("macros written in Krelpin are not supported yet")
+                    .with_span(body.span)
+                    .with_note("only the macros of the standard library can be used for now"),
+            );
+        } else {
+            self.expect_semi()?;
+        }
+        Ok(MacroDef {
+            docs,
+            annotations,
+            name,
             span: lo.to(self.prev_token.span),
         })
     }
@@ -366,6 +412,26 @@ impl Parser<'_> {
                     if self.token.kind == TokenKind::Eof {
                         return Err(error);
                     }
+                }
+            }
+        }
+    }
+
+    pub(crate) fn parse_members_to_eof(&mut self, owner: Ident) -> Vec<Member> {
+        let mut members = Vec::new();
+        loop {
+            let docs = self.parse_docs();
+            if self.token.kind == TokenKind::Eof {
+                return members;
+            }
+            if self.eat_noexpect(TokenKind::Semi) {
+                continue;
+            }
+            match self.parse_member(docs, Container::Class, owner) {
+                Ok(member) => members.push(member),
+                Err(_) => {
+                    self.recover_to_member_end();
+                    self.eat_noexpect(TokenKind::CloseBrace);
                 }
             }
         }
