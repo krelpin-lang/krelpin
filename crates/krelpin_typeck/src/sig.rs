@@ -350,10 +350,12 @@ impl<'a> Tcx<'a> {
         }
 
         for member in members {
-            let vis = if kind == AdtKind::Interface {
-                Visibility::Public(member.span)
-            } else {
-                member.vis
+            let is_struct_field =
+                kind == AdtKind::Struct && matches!(member.kind, MemberKind::Field(_));
+            let vis = match member.vis {
+                _ if kind == AdtKind::Interface => Visibility::Public(member.span),
+                Visibility::Default if is_struct_field => Visibility::Public(member.span),
+                vis => vis,
             };
             match &member.kind {
                 MemberKind::Field(field) => {
