@@ -597,6 +597,7 @@ impl Parser<'_> {
                         *slot = Some(span);
                     }
                 }
+                kw::Move if !self.move_is_modifier() => return modifiers,
                 kw::Mut | kw::Move => {
                     let kind = if symbol == kw::Mut {
                         ReceiverKind::RefMut
@@ -616,6 +617,13 @@ impl Parser<'_> {
             }
             self.bump();
         }
+    }
+
+    fn move_is_modifier(&self) -> bool {
+        matches!(
+            self.look_ahead(1),
+            TokenKind::Ident(_) | TokenKind::Lt | TokenKind::And
+        )
     }
 
     fn reject_storage(&self, storage: FieldStorage, what: &str) {

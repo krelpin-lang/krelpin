@@ -10,6 +10,8 @@ fn keywords_are_prefilled_in_order() {
     assert_eq!(Symbol::intern("this"), kw::This);
     assert_eq!(kw::Mut.as_str(), "mut");
     assert!(kw::Null.is_keyword());
+    assert!(!kw::Move.is_keyword());
+    assert_eq!(Symbol::intern("move"), kw::Move);
     assert_eq!(Symbol::intern("static"), kw::Static);
     assert_eq!(Symbol::intern("new"), kw::New);
 }

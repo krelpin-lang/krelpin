@@ -136,6 +136,34 @@ fn method_receivers() {
 }
 
 #[test]
+fn move_is_only_a_keyword_before_a_method() {
+    let unit = parse_ok(
+        "class Piece {\n\
+         \x20   int move;\n\
+         \x20   mut void move(int steps) { int move = steps; this.move = move; }\n\
+         \x20   move Piece take() { return this; }\n\
+         }",
+    );
+    let names: Vec<String> = class(&unit, 0)
+        .members
+        .iter()
+        .map(|member| match &member.kind {
+            MemberKind::Field(field) => format!("field {}", field.name.name),
+            MemberKind::Method(method) => format!(
+                "{:?} {}",
+                method.receiver.map(|receiver| receiver.kind),
+                method.name.name
+            ),
+            other => panic!("unexpected member {other:?}"),
+        })
+        .collect();
+    assert_eq!(
+        names,
+        ["field move", "Some(RefMut) move", "Some(Owned) take"]
+    );
+}
+
+#[test]
 fn reference_types() {
     assert_eq!(ret_ty("static &String f() {}"), "&String");
     assert_eq!(

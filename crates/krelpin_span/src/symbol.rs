@@ -6,10 +6,14 @@ use std::sync::{LazyLock, PoisonError, RwLock};
 pub struct Symbol(u32);
 
 macro_rules! keywords {
-    ($($name:ident: $text:literal,)*) => {
+    (
+        reserved { $($name:ident: $text:literal,)* }
+        contextual { $($cname:ident: $ctext:literal,)* }
+    ) => {
         #[repr(u32)]
         enum KeywordIndex {
             $($name,)*
+            $($cname,)*
         }
 
         #[allow(non_upper_case_globals)]
@@ -17,69 +21,75 @@ macro_rules! keywords {
             use super::{KeywordIndex, Symbol};
 
             $(pub const $name: Symbol = Symbol(KeywordIndex::$name as u32);)*
+            $(pub const $cname: Symbol = Symbol(KeywordIndex::$cname as u32);)*
         }
 
-        const KEYWORDS: &[&str] = &[$($text,)*];
+        const KEYWORDS: &[&str] = &[$($text,)* $($ctext,)*];
+        const RESERVED: usize = [$($text,)*].len();
     };
 }
 
 keywords! {
-    Abstract: "abstract",
-    Boolean: "boolean",
-    Break: "break",
-    Byte: "byte",
-    Case: "case",
-    Catch: "catch",
-    Char: "char",
-    Class: "class",
-    Const: "const",
-    Continue: "continue",
-    Default: "default",
-    Do: "do",
-    Double: "double",
-    Else: "else",
-    Enum: "enum",
-    Extends: "extends",
-    False: "false",
-    Final: "final",
-    Finally: "finally",
-    Float: "float",
-    For: "for",
-    If: "if",
-    Implements: "implements",
-    Import: "import",
-    Instanceof: "instanceof",
-    Int: "int",
-    Interface: "interface",
-    Long: "long",
-    Macro: "macro",
-    Move: "move",
-    Mut: "mut",
-    New: "new",
-    Null: "null",
-    Package: "package",
-    Private: "private",
-    Protected: "protected",
-    Record: "record",
-    Public: "public",
-    Return: "return",
-    Short: "short",
-    Static: "static",
-    Struct: "struct",
-    Super: "super",
-    Switch: "switch",
-    This: "this",
-    Throw: "throw",
-    Throws: "throws",
-    True: "true",
-    Try: "try",
-    Underscore: "_",
-    Void: "void",
-    When: "when",
-    Where: "where",
-    While: "while",
-    With: "with",
-    Yield: "yield",
+    reserved {
+        Abstract: "abstract",
+        Boolean: "boolean",
+        Break: "break",
+        Byte: "byte",
+        Case: "case",
+        Catch: "catch",
+        Char: "char",
+        Class: "class",
+        Const: "const",
+        Continue: "continue",
+        Default: "default",
+        Do: "do",
+        Double: "double",
+        Else: "else",
+        Enum: "enum",
+        Extends: "extends",
+        False: "false",
+        Final: "final",
+        Finally: "finally",
+        Float: "float",
+        For: "for",
+        If: "if",
+        Implements: "implements",
+        Import: "import",
+        Instanceof: "instanceof",
+        Int: "int",
+        Interface: "interface",
+        Long: "long",
+        Macro: "macro",
+        Mut: "mut",
+        New: "new",
+        Null: "null",
+        Package: "package",
+        Private: "private",
+        Protected: "protected",
+        Record: "record",
+        Public: "public",
+        Return: "return",
+        Short: "short",
+        Static: "static",
+        Struct: "struct",
+        Super: "super",
+        Switch: "switch",
+        This: "this",
+        Throw: "throw",
+        Throws: "throws",
+        True: "true",
+        Try: "try",
+        Underscore: "_",
+        Void: "void",
+        When: "when",
+        Where: "where",
+        While: "while",
+        With: "with",
+        Yield: "yield",
+    }
+    contextual {
+        Move: "move",
+    }
 }
 
 impl Symbol {
@@ -104,7 +114,7 @@ impl Symbol {
     }
 
     pub fn is_keyword(self) -> bool {
-        (self.0 as usize) < KEYWORDS.len()
+        (self.0 as usize) < RESERVED
     }
 }
 
