@@ -1,0 +1,77 @@
+package shop;
+
+import std.function.Function;
+import std.function.Supplier;
+
+record Pair(Object first, Object second) {}
+
+class Counter {
+    static int created = 0;
+    int count;
+    int[] slots;
+
+    Counter() {
+        this(0);
+    }
+
+    Counter(int start) {
+        this.count = start;
+        this.slots = new int[4];
+    }
+
+    mut void bump() {
+        this.count++;
+        this.slots[1] += 2;
+    }
+
+    static String name(String code) {
+        return switch (code) {
+            case "a" -> "alpha";
+            case "b" -> {
+                String text = "beta";
+                yield text + "!";
+            }
+            default -> throw new IllegalArgumentException(code);
+        };
+    }
+
+    static int nested(int limit) {
+        int total = 0;
+        while (true) {
+            try {
+                try {
+                    if (total > limit) {
+                        return total;
+                    }
+                    total += 1;
+                } finally {
+                    total += 10;
+                }
+            } finally {
+                total += 100;
+            }
+            if (total > 1000) {
+                break;
+            }
+        }
+        return total;
+    }
+
+    static Supplier<Function<int, int>> curry(int base) {
+        return () -> (int value) -> value + base;
+    }
+
+    static Function<String, int> length() {
+        return String::length;
+    }
+
+    static boolean deep(Object any) {
+        return any instanceof Pair(Pair(String a, _), String b) && a == b;
+    }
+
+    static long widen(int value, double ratio) {
+        long wide = value;
+        int narrow = (int) ratio;
+        return value > 0 ? wide : (long) narrow;
+    }
+}

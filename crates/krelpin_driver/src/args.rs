@@ -217,6 +217,7 @@ pub enum Emit {
     Tokens,
     Ast,
     Hir,
+    Mir,
     Ir,
     Asm,
     Obj,

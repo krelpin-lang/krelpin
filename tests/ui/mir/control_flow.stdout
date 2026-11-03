@@ -1,0 +1,311 @@
+field Counter.created() -> int {
+
+    bb0: {
+        _0 = const 0;
+        return;
+    }
+}
+
+ctor Counter.Counter(_1: &mut Counter) -> void {
+    let _2: &mut Counter;
+    debug this => _1;
+
+    bb0: {
+        _2 = &mut (*_1);
+        Counter::Counter(move _2, const 0) -> [return: bb1, unwind continue];
+    }
+
+    bb1: {
+        return;
+    }
+}
+
+ctor Counter.Counter(_1: &mut Counter, _2: int) -> void {
+    debug this => _1;
+    debug start => _2;
+
+    bb0: {
+        (*_1).count = copy _2;
+        (*_1).slots = new int[const 4];
+        return;
+    }
+}
+
+fn Counter.bump(_1: &mut Counter) -> void {
+    let _2: int;
+    let _3: int;
+    debug this => _1;
+
+    bb0: {
+        (*_1).count = Add(copy (*_1).count, const 1_int);
+        _2 = const 1;
+        _3 = Len((*_1).slots);
+        assert(copy _2 < move _3) -> [success: bb1, unwind continue];
+    }
+
+    bb1: {
+        (*_1).slots[_2] = Add(copy (*_1).slots[_2], const 2);
+        return;
+    }
+}
+
+fn Counter.name(_1: String) -> String {
+    let _2: boolean;
+    let _3: String;
+    let _4: &String;
+    let _5: &String;
+    let _6: boolean;
+    let _7: String;
+    let _8: &String;
+    let _9: &String;
+    let _10: String;
+    let _11: IllegalArgumentException;
+    let _12: IllegalArgumentException;
+    let _13: &mut IllegalArgumentException;
+    debug code => _1;
+    debug text => _10;
+
+    bb0: {
+        _3 = const "a";
+        _4 = &_1;
+        _5 = &_3;
+        _2 = Equatable::equals(move _4, move _5) -> [return: bb4, unwind continue];
+    }
+
+    bb1: {
+        return;
+    }
+
+    bb2: {
+        _7 = const "b";
+        _8 = &_1;
+        _9 = &_7;
+        _6 = Equatable::equals(move _8, move _9) -> [return: bb6, unwind continue];
+    }
+
+    bb3: {
+        _0 = const "alpha";
+        goto -> bb1;
+    }
+
+    bb4: {
+        switchInt(move _2) -> [0: bb2, otherwise: bb3];
+    }
+
+    bb5: {
+        StorageLive(_10);
+        _10 = const "beta";
+        _0 = Add(move _10, const "!");
+        StorageDead(_10);
+        goto -> bb1;
+    }
+
+    bb6: {
+        switchInt(move _6) -> [0: bb7, otherwise: bb5];
+    }
+
+    bb7: {
+        _12 = new IllegalArgumentException;
+        _13 = &mut _12;
+        IllegalArgumentException::IllegalArgumentException(move _13, move _1) -> [return: bb8, unwind continue];
+    }
+
+    bb8: {
+        _11 = move _12;
+        throw(move _11) -> [unwind continue];
+    }
+}
+
+fn Counter.nested(_1: int) -> int {
+    let _2: int;
+    let _3: boolean;
+    let _4: boolean;
+    debug limit => _1;
+    debug total => _2;
+
+    bb0: {
+        StorageLive(_2);
+        _2 = const 0;
+        goto -> bb1;
+    }
+
+    bb1: {
+        switchInt(const true) -> [0: bb3, otherwise: bb2];
+    }
+
+    bb2: {
+        _3 = Gt(copy _2, copy _1);
+        switchInt(move _3) -> [0: bb7, otherwise: bb6];
+    }
+
+    bb3: {
+        _0 = copy _2;
+        StorageDead(_2);
+        return;
+    }
+
+    bb4: {
+        _4 = Gt(copy _2, const 1000);
+        switchInt(move _4) -> [0: bb1, otherwise: bb3];
+    }
+
+    bb5: {
+        _2 = Add(copy _2, const 100);
+        goto -> bb4;
+    }
+
+    bb6: {
+        _0 = copy _2;
+        _2 = Add(copy _2, const 10);
+        _2 = Add(copy _2, const 100);
+        StorageDead(_2);
+        return;
+    }
+
+    bb7: {
+        _2 = Add(copy _2, const 1);
+        _2 = Add(copy _2, const 10);
+        goto -> bb5;
+    }
+}
+
+fn Counter.curry(_1: int) -> Supplier<Function<int, int>> {
+    let _2: &int;
+    debug base => _1;
+
+    bb0: {
+        _2 = &_1;
+        _0 = Counter.curry::closure#0 [move _2];
+        return;
+    }
+}
+
+fn Counter.curry::closure#0(_1: Supplier<Function<int, int>>) -> Function<int, int> {
+    capture base: &int;
+    let _2: &int;
+
+    bb0: {
+        _2 = &(*_1.base);
+        _0 = Counter.curry::closure#0::closure#0 [move _2];
+        return;
+    }
+}
+
+fn Counter.curry::closure#0::closure#0(_1: Function<int, int>, _2: int) -> int {
+    capture base: &int;
+    debug value => _2;
+
+    bb0: {
+        _0 = Add(copy _2, copy (*_1.base));
+        return;
+    }
+}
+
+fn Counter.length() -> Function<String, int> {
+
+    bb0: {
+        _0 = String::length [];
+        return;
+    }
+}
+
+fn Counter.deep(_1: Object) -> boolean {
+    let _2: boolean;
+    let _3: boolean;
+    let _4: boolean;
+    let _5: boolean;
+    let _6: String;
+    let _7: String;
+    let _8: boolean;
+    let _9: &String;
+    let _10: &String;
+    debug any => _1;
+    debug a => _6;
+    debug b => _7;
+
+    bb0: {
+        _2 = _1 instanceof Pair;
+        switchInt(move _2) -> [0: bb7, otherwise: bb1];
+    }
+
+    bb1: {
+        _3 = (_1 as Pair).first instanceof Pair;
+        switchInt(move _3) -> [0: bb7, otherwise: bb2];
+    }
+
+    bb2: {
+        _4 = ((_1 as Pair).first as Pair).first instanceof String;
+        switchInt(move _4) -> [0: bb7, otherwise: bb3];
+    }
+
+    bb3: {
+        _5 = (_1 as Pair).second instanceof String;
+        switchInt(move _5) -> [0: bb7, otherwise: bb4];
+    }
+
+    bb4: {
+        StorageLive(_6);
+        _6 = move (((_1 as Pair).first as Pair).first as String);
+        StorageLive(_7);
+        _7 = move ((_1 as Pair).second as String);
+        _9 = &_6;
+        _10 = &_7;
+        _8 = Equatable::equals(move _9, move _10) -> [return: bb5, unwind continue];
+    }
+
+    bb5: {
+        switchInt(move _8) -> [0: bb7, otherwise: bb6];
+    }
+
+    bb6: {
+        _0 = const true;
+        goto -> bb8;
+    }
+
+    bb7: {
+        _0 = const false;
+        goto -> bb8;
+    }
+
+    bb8: {
+        StorageDead(_7);
+        StorageDead(_6);
+        return;
+    }
+}
+
+fn Counter.widen(_1: int, _2: double) -> long {
+    let _3: long;
+    let _4: int;
+    let _5: boolean;
+    debug value => _1;
+    debug ratio => _2;
+    debug wide => _3;
+    debug narrow => _4;
+
+    bb0: {
+        StorageLive(_3);
+        _3 = copy _1 as long;
+        StorageLive(_4);
+        _4 = copy _2 as int;
+        _5 = Gt(copy _1, const 0);
+        switchInt(move _5) -> [0: bb2, otherwise: bb1];
+    }
+
+    bb1: {
+        _0 = copy _3;
+        goto -> bb3;
+    }
+
+    bb2: {
+        _0 = copy _4 as long;
+        goto -> bb3;
+    }
+
+    bb3: {
+        StorageDead(_4);
+        StorageDead(_3);
+        return;
+    }
+}
+

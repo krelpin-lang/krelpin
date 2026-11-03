@@ -124,6 +124,9 @@ dependencies = [
  "clap",
  "krelpin_ast",
  "krelpin_errors",
+ "krelpin_expand",
+ "krelpin_hir",
+ "krelpin_mir",
  "krelpin_parse",
  "krelpin_resolve",
  "krelpin_span",
@@ -139,10 +142,50 @@ dependencies = [
 ]
 
 [[package]]
+name = "krelpin_expand"
+version = "0.1.0"
+dependencies = [
+ "krelpin_ast",
+ "krelpin_errors",
+ "krelpin_parse",
+ "krelpin_span",
+ "krelpin_sysroot",
+]
+
+[[package]]
+name = "krelpin_hir"
+version = "0.1.0"
+dependencies = [
+ "krelpin_ast",
+ "krelpin_errors",
+ "krelpin_expand",
+ "krelpin_parse",
+ "krelpin_resolve",
+ "krelpin_span",
+ "krelpin_sysroot",
+ "krelpin_typeck",
+]
+
+[[package]]
 name = "krelpin_lexer"
 version = "0.1.0"
 dependencies = [
  "unicode-ident",
+]
+
+[[package]]
+name = "krelpin_mir"
+version = "0.1.0"
+dependencies = [
+ "krelpin_ast",
+ "krelpin_errors",
+ "krelpin_expand",
+ "krelpin_hir",
+ "krelpin_parse",
+ "krelpin_resolve",
+ "krelpin_span",
+ "krelpin_sysroot",
+ "krelpin_typeck",
 ]
 
 [[package]]
@@ -186,6 +229,7 @@ version = "0.1.0"
 dependencies = [
  "krelpin_ast",
  "krelpin_errors",
+ "krelpin_expand",
  "krelpin_parse",
  "krelpin_resolve",
  "krelpin_span",

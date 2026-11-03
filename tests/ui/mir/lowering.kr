@@ -1,0 +1,99 @@
+package shop;
+
+import std.io.IOException;
+import std.util.List;
+import std.util.ArrayList;
+import std.function.Function;
+
+enum Shape {
+    Circle(double radius),
+    Square(double side),
+    Dot;
+
+    double area() {
+        return switch (this) {
+            case Circle(double r) when r > 0.0 -> r * r * 3.14;
+            case Circle(double r) -> 0.0;
+            case Square(double s) -> s * s;
+            case Dot -> 0.0;
+        };
+    }
+}
+
+record Point(double x, double y) {}
+
+record User(String name, String email, long visits) {}
+
+class Main {
+    static int sum(int[] values) {
+        int total = 0;
+        for (int value : values) {
+            if (value < 0) {
+                continue;
+            }
+            if (value > 100) {
+                break;
+            }
+            total += value;
+        }
+        return total;
+    }
+
+    static int count(List<String> names) {
+        int found = 0;
+        for (String name : names) {
+            found++;
+        }
+        return found;
+    }
+
+    static int safe(String? text) {
+        String value = text ?: "none";
+        int? size = text?.length();
+        return size ?: 0;
+    }
+
+    static double originX(Object any) {
+        if (any instanceof Point(double x, double y) && y == 0.0) {
+            return x;
+        }
+        return -1.0;
+    }
+
+    static User rename(User user) {
+        return user with { email = "x@example.com" };
+    }
+
+    static int read(int[] values, int index) throws IOException {
+        try {
+            if (index > 3) {
+                throw new IOException("far");
+            }
+            return values[index] / index;
+        } catch (IOException error) {
+            return -1;
+        } finally {
+            index = 0;
+        }
+    }
+
+    static Function<int, int> adder(int amount) {
+        return (int value) -> value + amount;
+    }
+
+    static String label(int code) {
+        String text = "";
+        switch (code) {
+            case 1 -> text = "one";
+            case 2 -> {
+                text = "two";
+            }
+            default -> text = "many";
+        }
+        int i = 0;
+        do {
+            i++;
+        } while (i < 3);
+        return text;
+    }
+}

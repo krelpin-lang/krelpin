@@ -116,9 +116,21 @@ pub fn run(args: &Args, sess: &Session) {
         write_output(sess, emit.path.as_deref(), &rendered);
     }
 
+    if emits.iter().any(|emit| emit.kind == Emit::Mir) {
+        let mir = krelpin_mir::build(&hir, &typeck.tcx);
+        let bodies: Vec<_> = (0..mir.bodies.len())
+            .map(|index| krelpin_mir::BodyId(index as u32))
+            .filter(|&id| resolved.items.def(mir.body(id).owner).unit == user_unit)
+            .collect();
+        let rendered = krelpin_mir::print(&mir, bodies, &typeck.tcx);
+        for emit in emits.iter().filter(|emit| emit.kind == Emit::Mir) {
+            write_output(sess, emit.path.as_deref(), &rendered);
+        }
+    }
+
     for emit in &emits {
         match emit.kind {
-            Emit::Tokens | Emit::Ast | Emit::Hir | Emit::Metadata => {}
+            Emit::Tokens | Emit::Ast | Emit::Hir | Emit::Mir | Emit::Metadata => {}
             kind => sess.dcx.emit(Diagnostic::error(format!(
                 "`--emit={}` is not supported yet",
                 value_name(kind)

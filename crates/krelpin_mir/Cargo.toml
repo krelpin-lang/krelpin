@@ -1,0 +1,17 @@
+[package]
+name = "krelpin_mir"
+version.workspace = true
+edition.workspace = true
+
+[dependencies]
+krelpin_ast.workspace = true
+krelpin_hir.workspace = true
+krelpin_span.workspace = true
+krelpin_typeck.workspace = true
+
+[dev-dependencies]
+krelpin_errors.workspace = true
+krelpin_expand.workspace = true
+krelpin_parse.workspace = true
+krelpin_resolve.workspace = true
+krelpin_sysroot.workspace = true
