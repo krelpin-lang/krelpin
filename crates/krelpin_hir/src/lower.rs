@@ -117,33 +117,29 @@ impl LoweringCtxt<'_, '_> {
             .collect();
 
         let ret_sources = match &member.kind {
-            MemberKind::Method(method) => match &method.ret {
-                FnRetTy::Ty(ty) => {
-                    let class_sources = &self.tcx.sig(self.owner).borrow_params;
-                    let borrows = self.tcx.ret_borrows(ty, &method.params, class_sources);
-                    borrows.explicit().map(|sources| {
-                        sources
-                            .iter()
-                            .filter_map(|source| match source {
-                                BorrowSource::This => self.this.map(ReturnSource::Whole),
-                                BorrowSource::Param(index) => {
-                                    params.get(*index).copied().map(ReturnSource::Whole)
-                                }
-                                BorrowSource::Class(name) => {
-                                    self.this.map(|this| ReturnSource::Contents(this, *name))
-                                }
-                            })
-                            .collect()
-                    })
-                }
-                FnRetTy::Void(_) => None,
-            },
+            MemberKind::Method(method) => {
+                let class_sources = &self.tcx.sig(self.owner).borrow_params;
+                let borrows = self.tcx.ret_borrows(method, class_sources);
+                borrows.explicit().map(|sources| {
+                    sources
+                        .iter()
+                        .filter_map(|source| match source {
+                            BorrowSource::This => self.this.map(ReturnSource::Whole),
+                            BorrowSource::Param(index) => {
+                                params.get(*index).copied().map(ReturnSource::Whole)
+                            }
+                            BorrowSource::Class(name) => {
+                                self.this.map(|this| ReturnSource::Contents(this, *name))
+                            }
+                        })
+                        .collect()
+                })
+            }
             _ => None,
         };
         let param_storage = match &member.kind {
-            MemberKind::Method(_) | MemberKind::Constructor(_) => {
-                self.tcx.param_storage(member_params)
-            }
+            MemberKind::Method(method) => self.tcx.param_storage(member_params, &method.keeps),
+            MemberKind::Constructor(ctor) => self.tcx.param_storage(member_params, &ctor.keeps),
             MemberKind::Field(_) | MemberKind::Type(_) => Vec::new(),
         };
         self.rets.push(ret.clone());
@@ -865,6 +861,24 @@ impl LoweringCtxt<'_, '_> {
 }
 
 fn coerce(expr: Expr, target: &Ty) -> Expr {
+    if let Ty::Ref {
+        mutable: false,
+        ty: inner,
+    } = target
+    {
+        let lends = !matches!(expr.ty, Ty::Ref { .. } | Ty::Null | Ty::Unknown);
+        if lends && !inner.is_unknown() {
+            let value = coerce(expr, inner);
+            return Expr {
+                ty: target.clone(),
+                span: value.span,
+                kind: ExprKind::Borrow {
+                    mutable: false,
+                    expr: Box::new(value),
+                },
+            };
+        }
+    }
     let expr = copy_through_ref(expr, target);
     let converts = match (&expr.ty, target) {
         (Ty::Primitive(from), Ty::Primitive(to)) => from != to,

@@ -7,7 +7,7 @@ interface Map<K, V> {
         return this.size() == 0;
     }
 
-    (&[this] V)? get(&K key);
+    (&V)? get(&K key);
 
     mut V? put(K key, V value);
 
@@ -17,7 +17,7 @@ interface Map<K, V> {
 
     mut void clear();
 
-    Set<&[this] K> keySet();
+    Set<&K> keySet();
 
-    List<&[this] V> values();
+    List<&V> values();
 }

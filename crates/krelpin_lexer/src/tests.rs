@@ -87,12 +87,10 @@ fn borrows_of_this() {
 fn borrow_sources() {
     use TokenKind::*;
     assert_eq!(
-        kinds("&[a, b] String"),
-        [And, OpenBracket, Ident, Comma, Ident, CloseBracket, Ident]
-    );
-    assert_eq!(
-        kinds("class Parser<&src>"),
-        [Ident, Ident, Lt, And, Ident, Gt]
+        kinds("&String f(&String a) borrows a"),
+        [
+            And, Ident, Ident, OpenParen, And, Ident, Ident, CloseParen, Ident, Ident
+        ]
     );
 }
 

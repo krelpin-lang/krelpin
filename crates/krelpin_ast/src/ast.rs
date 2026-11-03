@@ -218,6 +218,7 @@ pub struct Constructor {
     pub compact: bool,
     pub name: Ident,
     pub params: Vec<Param>,
+    pub keeps: Vec<Ident>,
     pub throws: Vec<Ty>,
     pub body: Block,
 }
@@ -229,6 +230,8 @@ pub struct Method {
     pub name: Ident,
     pub receiver: Option<Receiver>,
     pub params: Vec<Param>,
+    pub borrows: Vec<Ident>,
+    pub keeps: Vec<Ident>,
     pub throws: Vec<Ty>,
     pub where_clause: Vec<WherePredicate>,
     pub body: Option<Block>,
@@ -296,16 +299,8 @@ pub struct Ty {
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub enum TyKind {
     Primitive(PrimitiveTy),
-    Path {
-        path: Path,
-        sources: Vec<Ident>,
-        args: Vec<Ty>,
-    },
-    Ref {
-        mutable: bool,
-        sources: Vec<Ident>,
-        ty: Box<Ty>,
-    },
+    Path { path: Path, args: Vec<Ty> },
+    Ref { mutable: bool, ty: Box<Ty> },
     Nullable(Box<Ty>),
     Array(Box<Ty>),
 }

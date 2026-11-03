@@ -16,15 +16,13 @@ fn ident(name: &str) -> Ident {
 fn path(name: &str, args: Vec<Ty>) -> Ty {
     ty(TyKind::Path {
         path: Path::new(name.split('.').map(ident).collect()),
-        sources: Vec::new(),
         args,
     })
 }
 
-fn reference(mutable: bool, sources: &[&str], inner: Ty) -> Ty {
+fn reference(mutable: bool, inner: Ty) -> Ty {
     ty(TyKind::Ref {
         mutable,
-        sources: sources.iter().copied().map(ident).collect(),
         ty: Box::new(inner),
     })
 }
@@ -46,24 +44,18 @@ fn displays_paths_and_generics() {
 #[test]
 fn displays_references() {
     let string = path("String", vec![]);
-    assert_eq!(reference(false, &[], string.clone()).to_string(), "&String");
-    assert_eq!(
-        reference(true, &["a", "b"], string).to_string(),
-        "&mut [a, b] String"
-    );
+    assert_eq!(reference(false, string.clone()).to_string(), "&String");
+    assert_eq!(reference(true, string).to_string(), "&mut String");
 }
 
 #[test]
 fn displays_nullable_references_unambiguously() {
     let string = path("String", vec![]);
     assert_eq!(
-        nullable(reference(false, &[], string.clone())).to_string(),
+        nullable(reference(false, string.clone())).to_string(),
         "&String?"
     );
-    assert_eq!(
-        reference(false, &[], nullable(string)).to_string(),
-        "&(String?)"
-    );
+    assert_eq!(reference(false, nullable(string)).to_string(), "&(String?)");
 }
 
 #[test]
@@ -90,11 +82,11 @@ fn displays_arrays() {
     let array = |inner| ty(TyKind::Array(Box::new(inner)));
     assert_eq!(array(string.clone()).to_string(), "String[]");
     assert_eq!(
-        reference(false, &[], array(string.clone())).to_string(),
+        reference(false, array(string.clone())).to_string(),
         "&String[]"
     );
     assert_eq!(
-        array(reference(false, &[], string.clone())).to_string(),
+        array(reference(false, string.clone())).to_string(),
         "(&String)[]"
     );
     assert_eq!(array(nullable(string)).to_string(), "(String?)[]");

@@ -268,13 +268,10 @@ impl<'a, 'tcx> Checker<'a, 'tcx> {
             span,
             format!("`{stored_name}` is still in `{target_name}` here"),
         )
-        .with_note(
-            "a method can only keep a reference it was given when the parameter names a \
-             borrow source",
-        )
+        .with_note("a method can only keep a reference it was given when its signature says so")
         .with_help(format!(
-            "give `{stored_name}` a borrow source of the class, like `&[src] {}`",
-            self.tys.describe_ty_of(stored)
+            "write `keeps {stored_name}` after the parameters of `{}`",
+            self.body.name
         ));
         self.emit(declaration, diagnostic);
     }

@@ -376,13 +376,6 @@ impl PlaceTys<'_, '_> {
         out
     }
 
-    pub(crate) fn describe_ty_of(&self, local: Local) -> String {
-        match &self.body.local(local).ty {
-            Ty::Ref { ty, .. } => ty.to_string(),
-            ty => ty.to_string(),
-        }
-    }
-
     pub(crate) fn is_capture(&self, place: &Place) -> bool {
         place
             .projection

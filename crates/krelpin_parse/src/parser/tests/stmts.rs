@@ -43,7 +43,7 @@ fn local_declarations() {
         local_decls(
             "int x = 1; long y = 2; List<String> names = new ArrayList<>(); \
              &String r = &name; String? n = null; int[] xs = {1}; \
-             Map<String, List<Integer>> m; &mut [a] Buffer b = &mut buffer;"
+             Map<String, List<Integer>> m; &mut Buffer b = &mut buffer;"
         ),
         [
             "int x",
@@ -53,7 +53,7 @@ fn local_declarations() {
             "String? n",
             "int[] xs",
             "Map<String, List<Integer>> m",
-            "&mut [a] Buffer b",
+            "&mut Buffer b",
         ]
     );
 }

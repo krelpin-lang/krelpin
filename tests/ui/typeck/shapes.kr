@@ -56,7 +56,7 @@ class Circle implements Shape {
 }
 
 class Shapes {
-    static <T extends Comparable<T>> &[values] T largest(&List<T> values) {
+    static <T extends Comparable<T>> &T largest(&List<T> values) {
         &T best = values.get(0);
         for (&T value : values) {
             if (value.compareTo(best) > 0) {

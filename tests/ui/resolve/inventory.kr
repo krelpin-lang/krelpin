@@ -30,7 +30,7 @@ class Item implements Priced {
         return &this.cost;
     }
 
-    &[this] String label() {
+    &String label() {
         return &this.name;
     }
 

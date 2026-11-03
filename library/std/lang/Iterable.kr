@@ -4,7 +4,7 @@ import std.function.Consumer;
 import std.util.Iterator;
 
 interface Iterable<T> {
-    Iterator[this]<T> iterator();
+    Iterator<T> iterator();
 
     void forEach(Consumer<&T> action) {
         Iterator<T> values = this.iterator();

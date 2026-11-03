@@ -753,6 +753,7 @@ impl Parser<'_> {
                 compact: true,
                 name,
                 params: Vec::new(),
+                keeps: Vec::new(),
                 throws: Vec::new(),
                 body,
             }));

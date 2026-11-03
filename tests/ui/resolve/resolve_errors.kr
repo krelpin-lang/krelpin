@@ -19,7 +19,7 @@ class Account {
         }
     }
 
-    &[other] String name() {
+    &String name() borrows other {
         return null;
     }
 }

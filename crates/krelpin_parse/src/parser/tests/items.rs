@@ -1,8 +1,8 @@
 use std::thread;
 
 use krelpin_ast::ast::{
-    CompilationUnit, FieldStorage, FnRetTy, GenericParamKind, MemberKind, ReceiverKind, TyKind,
-    Visibility,
+    CompilationUnit, FieldStorage, FnRetTy, GenericParamKind, Ident, MemberKind, ReceiverKind,
+    TyKind, Visibility,
 };
 use krelpin_errors::{DiagCtxt, DiagnosticBuffer};
 use krelpin_span::SourceMap;
@@ -166,11 +166,7 @@ fn move_is_only_a_keyword_before_a_method() {
 #[test]
 fn reference_types() {
     assert_eq!(ret_ty("static &String f() {}"), "&String");
-    assert_eq!(
-        ret_ty("static &mut [a, b] String f() {}"),
-        "&mut [a, b] String"
-    );
-    assert_eq!(ret_ty("&[this] String f() {}"), "&[this] String");
+    assert_eq!(ret_ty("static &mut String f() {}"), "&mut String");
     assert_eq!(ret_ty("static &String? f() {}"), "&String?");
     assert_eq!(ret_ty("static &(String?) f() {}"), "&(String?)");
     assert_eq!(ret_ty("static &&String f() {}"), "&&String");
@@ -181,7 +177,6 @@ fn array_types() {
     assert_eq!(ret_ty("static String[] f() {}"), "String[]");
     assert_eq!(ret_ty("static int[][] f() {}"), "int[][]");
     assert_eq!(ret_ty("static &int[] f() {}"), "&int[]");
-    assert_eq!(ret_ty("static &mut [src] int[] f() {}"), "&mut [src] int[]");
     assert_eq!(ret_ty("static String[]? f() {}"), "String[]?");
     assert_eq!(ret_ty("static &String[]? f() {}"), "&String[]?");
     assert_eq!(ret_ty("static (&String)[] f() {}"), "(&String)[]");
@@ -218,13 +213,13 @@ fn generic_types_split_closing_brackets() {
 
 #[test]
 fn class_generics() {
-    let unit = parse_ok("class Parser[src]<T extends Comparable<T> & Cloneable> {}");
+    let unit = parse_ok("class Parser<T extends Comparable<T> & Cloneable> borrows src {}");
     let params = &class(&unit, 0).generics.params;
 
-    assert_eq!(params[0].name.name.as_str(), "src");
-    assert_eq!(params[0].kind, GenericParamKind::BorrowSource);
+    assert_eq!(params[1].name.name.as_str(), "src");
+    assert_eq!(params[1].kind, GenericParamKind::BorrowSource);
 
-    let GenericParamKind::Type { bounds } = &params[1].kind else {
+    let GenericParamKind::Type { bounds } = &params[0].kind else {
         panic!("expected a type parameter");
     };
     let bounds: Vec<String> = bounds.iter().map(ToString::to_string).collect();
@@ -232,18 +227,42 @@ fn class_generics() {
 }
 
 #[test]
-fn borrow_sources_on_types() {
-    assert_eq!(ret_ty("Iterator[this]<T> f() {}"), "Iterator[this]<T>");
-    assert_eq!(ret_ty("Pair[a, b]<String> f() {}"), "Pair[a, b]<String>");
-    assert_eq!(ret_ty("Parser[src] f() {}"), "Parser[src]");
-    assert_eq!(ret_ty("int[] f() {}"), "int[]");
+fn borrows_and_keeps_clauses() {
+    let MemberKind::Method(method) =
+        only_member("static &String pick(&String a, &String b) borrows a, b keeps b throws Bad {}")
+    else {
+        panic!("expected a method");
+    };
+    let names = |idents: &[Ident]| -> Vec<String> {
+        idents.iter().map(|ident| ident.name.to_string()).collect()
+    };
+    assert_eq!(names(&method.borrows), ["a", "b"]);
+    assert_eq!(names(&method.keeps), ["b"]);
+    assert_eq!(method.throws.len(), 1);
+
+    let MemberKind::Method(method) = only_member("&String name() borrows this {}") else {
+        panic!("expected a method");
+    };
+    assert_eq!(names(&method.borrows), ["this"]);
+
+    let unit = parse_ok("class A { int borrows; int keeps(int borrows) { return borrows; } }");
+    assert_eq!(class(&unit, 0).members.len(), 2);
+
     assert_eq!(
         errors("class Parser<&src, T> {}"),
         ["borrow sources are not declared between `<` and `>`"]
     );
     assert_eq!(
-        errors("class Parser[this] {}"),
+        errors("class Parser borrows this {}"),
         ["`this` cannot be declared as a borrow source"]
+    );
+    assert_eq!(
+        errors("class A { &[this] String f() {} }"),
+        ["borrow sources are not written in brackets"]
+    );
+    assert_eq!(
+        errors("class A { A(&String a) borrows a {} }"),
+        ["a constructor does not return a value, so it borrows nothing"]
     );
 }
 

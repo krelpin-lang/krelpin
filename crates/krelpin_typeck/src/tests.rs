@@ -462,13 +462,18 @@ fn cyclic_inheritance() {
 #[test]
 fn references() {
     body_ok("String s = \"x\"; &String r = &s; &mut String m = &mut s; &String fromMut = m;");
+    body_ok("String s = \"x\"; &String r = s; &int n = 5;");
     assert_eq!(
-        in_body("String s = \"x\"; &String r = s;"),
+        in_body("int[] xs = {1}; &int[] r = xs;"),
         ["mismatched types"]
     );
     assert_eq!(
-        helps(&body("String s = \"x\"; &String r = s;")),
+        helps(&body("int[] xs = {1}; &int[] r = xs;")),
         ["borrow the value with `&`"]
+    );
+    assert_eq!(
+        in_body("String s = \"x\"; &mut String m = s;"),
+        ["mismatched types"]
     );
     assert_eq!(
         in_body("String s = \"x\"; &mut String m = &s;"),
@@ -556,7 +561,7 @@ fn collections_are_generic() {
     );
     body_ok(
         "Map<String, int> ages = new HashMap<>(); ages.put(\"Ali\", 30); \
-         int? age = ages.get(&\"Ali\"); int years = age ?: 0;",
+         int? age = ages.get(\"Ali\"); int years = age ?: 0;",
     );
     assert_eq!(
         in_body("List<String> names = new ArrayList<>(); int first = names.get(0);"),
@@ -571,7 +576,7 @@ fn collections_are_generic() {
         ["mismatched types"]
     );
     assert_eq!(
-        in_body("Map<String, int> ages = new HashMap<>(); int age = ages.get(&\"Ali\");"),
+        in_body("Map<String, int> ages = new HashMap<>(); int age = ages.get(\"Ali\");"),
         ["mismatched types"]
     );
     assert_eq!(
@@ -604,7 +609,7 @@ fn own_types_can_be_iterable() {
 fn primitives_are_the_only_number_types() {
     body_ok(
         "List<int> xs = new ArrayList<>(); xs.add(5); int first = xs.get(0); \
-         Map<String, int> ages = new HashMap<>(); int? age = ages.get(&\"Ali\"); \
+         Map<String, int> ages = new HashMap<>(); int? age = ages.get(\"Ali\"); \
          int? missing = null; Object any = 5; Comparable<int> order = 5;",
     );
     assert_eq!(
@@ -816,7 +821,7 @@ fn ambiguous_calls() {
 fn util(code: &str) -> String {
     format!(
         "class Util {{\n\
-         \x20   static <T> &[xs] T first(&List<T> xs) {{ return xs.get(0); }}\n\
+         \x20   static <T> &T first(&List<T> xs) {{ return xs.get(0); }}\n\
          \x20   static <T> T either(T a, T b) {{ return a; }}\n\
          \x20   static <T extends Comparable<T>> T max(T a, T b) {{\n\
          \x20       return a.compareTo(&b) >= 0 ? a : b;\n\

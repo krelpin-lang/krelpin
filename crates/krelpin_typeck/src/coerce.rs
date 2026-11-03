@@ -48,6 +48,15 @@ impl Tcx<'_> {
             (Ty::Ref { ty: inner, .. }, to) if copying && self.is_copy(inner) => {
                 assignable(inner, to)
             }
+            (
+                from,
+                Ty::Ref {
+                    mutable: false,
+                    ty: to,
+                },
+            ) if copying && !matches!(from, Ty::Ref { .. } | Ty::Null) && self.is_copy(from) => {
+                assignable(from, to)
+            }
             (Ty::Ref { .. }, _) | (_, Ty::Ref { .. }) => false,
             (Ty::Primitive(_) | Ty::Void, _) | (_, Ty::Primitive(_) | Ty::Void) => false,
             (_, Ty::Adt { def, .. }) if self.lang_items.is(*def, LangItem::Object) => true,

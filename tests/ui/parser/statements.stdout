@@ -39,7 +39,6 @@ CompilationUnit {
                                     ty: Ty {
                                         kind: Path {
                                             path: "AtomicInt" @ 47..56,
-                                            sources: [],
                                             args: [],
                                         },
                                         span: 47..56,
@@ -51,7 +50,6 @@ CompilationUnit {
                                                 ty: Ty {
                                                     kind: Path {
                                                         path: "AtomicInt" @ 73..82,
-                                                        sources: [],
                                                         args: [],
                                                     },
                                                     span: 73..82,
@@ -90,12 +88,10 @@ CompilationUnit {
                                     ty: Ty {
                                         kind: Path {
                                             path: "List" @ 92..96,
-                                            sources: [],
                                             args: [
                                                 Ty {
                                                     kind: Path {
                                                         path: "Item" @ 97..101,
-                                                        sources: [],
                                                         args: [],
                                                     },
                                                     span: 97..101,
@@ -123,6 +119,7 @@ CompilationUnit {
                                     compact: false,
                                     name: "Inventory" @ 115..124,
                                     params: [],
+                                    keeps: [],
                                     throws: [],
                                     body: Block {
                                         stmts: [
@@ -147,7 +144,6 @@ CompilationUnit {
                                                                     ty: Ty {
                                                                         kind: Path {
                                                                             path: "ArrayList" @ 154..163,
-                                                                            sources: [],
                                                                             args: [],
                                                                         },
                                                                         span: 154..165,
@@ -227,6 +223,8 @@ CompilationUnit {
                                         },
                                     ),
                                     params: [],
+                                    borrows: [],
+                                    keeps: [],
                                     throws: [],
                                     where_clause: [],
                                     body: Some(
@@ -263,11 +261,9 @@ CompilationUnit {
                                                         ty: Ty {
                                                             kind: Ref {
                                                                 mutable: false,
-                                                                sources: [],
                                                                 ty: Ty {
                                                                     kind: Path {
                                                                         path: "Item" @ 270..274,
-                                                                        sources: [],
                                                                         args: [],
                                                                     },
                                                                     span: 270..274,
@@ -404,11 +400,9 @@ CompilationUnit {
                                                 Ty {
                                                     kind: Ref {
                                                         mutable: false,
-                                                        sources: [],
                                                         ty: Ty {
                                                             kind: Path {
                                                                 path: "Item" @ 387..391,
-                                                                sources: [],
                                                                 args: [],
                                                             },
                                                             span: 387..391,
@@ -432,7 +426,6 @@ CompilationUnit {
                                             ty: Ty {
                                                 kind: Path {
                                                     path: "String" @ 398..404,
-                                                    sources: [],
                                                     args: [],
                                                 },
                                                 span: 398..404,
@@ -442,6 +435,8 @@ CompilationUnit {
                                             span: 398..409,
                                         },
                                     ],
+                                    borrows: [],
+                                    keeps: [],
                                     throws: [],
                                     where_clause: [],
                                     body: Some(
@@ -536,11 +531,9 @@ CompilationUnit {
                                                                                     ty: Ty {
                                                                                         kind: Ref {
                                                                                             mutable: false,
-                                                                                            sources: [],
                                                                                             ty: Ty {
                                                                                                 kind: Path {
                                                                                                     path: "Item" @ 480..484,
-                                                                                                    sources: [],
                                                                                                     args: [],
                                                                                                 },
                                                                                                 span: 480..484,
@@ -699,7 +692,6 @@ CompilationUnit {
                                                     Ty {
                                                         kind: Path {
                                                             path: "Item" @ 646..650,
-                                                            sources: [],
                                                             args: [],
                                                         },
                                                         span: 646..650,
@@ -712,6 +704,8 @@ CompilationUnit {
                                             span: 646..656,
                                         },
                                     ],
+                                    borrows: [],
+                                    keeps: [],
                                     throws: [],
                                     where_clause: [],
                                     body: Some(
@@ -723,7 +717,6 @@ CompilationUnit {
                                                             ty: Ty {
                                                                 kind: Path {
                                                                     path: "String" @ 668..674,
-                                                                    sources: [],
                                                                     args: [],
                                                                 },
                                                                 span: 668..674,
@@ -1000,7 +993,6 @@ CompilationUnit {
                                                                     Ty {
                                                                         kind: Path {
                                                                             path: "IOException" @ 990..1001,
-                                                                            sources: [],
                                                                             args: [],
                                                                         },
                                                                         span: 990..1001,
@@ -1008,7 +1000,6 @@ CompilationUnit {
                                                                     Ty {
                                                                         kind: Path {
                                                                             path: "ParseException" @ 1004..1018,
-                                                                            sources: [],
                                                                             args: [],
                                                                         },
                                                                         span: 1004..1018,
@@ -1146,7 +1137,6 @@ CompilationUnit {
                                                                                                     ty: Ty {
                                                                                                         kind: Path {
                                                                                                             path: "String" @ 1181..1187,
-                                                                                                            sources: [],
                                                                                                             args: [],
                                                                                                         },
                                                                                                         span: 1181..1187,

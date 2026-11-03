@@ -262,13 +262,18 @@ fn instanceof_bindings_are_scoped_to_the_if() {
 #[test]
 fn generics_and_borrow_sources() {
     ok("class Box<T> { T value; <U> U map(U other) { return other; } }");
-    ok("class Parser[src] { &[src] String input; }");
-    ok("class A { static &[a, b] String longer(&String a, &String b) { return a; } }");
-    ok("class A { String text; &[this] String get() { return &this.text; } }");
+    ok("class Parser borrows src { &String input; &String input() borrows src { return null; } }");
+    ok("class A { static &String longer(&String a, &String b) borrows a, b { return a; } }");
+    ok("class A { String text; &String get() borrows this { return &this.text; } }");
+    ok("class A { A(&String a) keeps a {} }");
 
     assert_eq!(
-        errors("class A { static &[c] String f(&String a) { return a; } }"),
+        errors("class A { static &String f(&String a) borrows c { return a; } }"),
         ["cannot find borrow source `c`"]
+    );
+    assert_eq!(
+        errors("class A { mut void f(&String a) keeps b {} }"),
+        ["cannot find parameter `b` to keep"]
     );
     assert_eq!(
         errors("class Box<T> { static T instance = null; }"),

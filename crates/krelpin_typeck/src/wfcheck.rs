@@ -101,20 +101,9 @@ impl Tcx<'_> {
     pub(crate) fn check_wf(&self, env: &ParamEnv, ty: &ast::Ty) {
         match &ty.kind {
             TyKind::Primitive(_) => {}
-            TyKind::Path {
-                path,
-                sources,
-                args,
-            } => {
+            TyKind::Path { path, args } => {
                 for arg in args {
                     self.check_wf(env, arg);
-                }
-                if let Some(Res::Item(def)) = path
-                    .segments
-                    .last()
-                    .and_then(|segment| self.resolutions.get(segment.span))
-                {
-                    self.check_borrow_sources(def, sources, ty.span);
                 }
                 let [segment] = path.segments.as_slice() else {
                     return;
@@ -146,34 +135,6 @@ impl Tcx<'_> {
                 self.check_wf(env, ty);
             }
         }
-    }
-
-    fn check_borrow_sources(&self, def: DefId, sources: &[ast::Ident], span: Span) {
-        if sources.is_empty() {
-            return;
-        }
-        let sig = self.sig(def);
-        let expected = sig.borrow_params.len();
-        if sources.len() == expected {
-            return;
-        }
-        let diagnostic = if expected == 0 {
-            Diagnostic::error(format!(
-                "`{}` does not borrow from anything, so it takes no borrow sources",
-                sig.name.name
-            ))
-            .with_span(span)
-            .with_help("remove the sources in brackets")
-        } else {
-            let plural = if expected == 1 { "source" } else { "sources" };
-            Diagnostic::error(format!(
-                "`{}` borrows from {expected} {plural}, but {} were given",
-                sig.name.name,
-                sources.len()
-            ))
-            .with_span(span)
-        };
-        self.dcx.emit(diagnostic);
     }
 
     fn check_generic_args(&self, env: &ParamEnv, def: DefId, args: &[ast::Ty], span: Span) {

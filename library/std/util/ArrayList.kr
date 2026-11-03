@@ -5,7 +5,7 @@ class ArrayList<T> implements List<T> {
     int size();
 
     @Intrinsic
-    &[this] T get(int index);
+    &T get(int index);
 
     @Intrinsic
     mut T set(int index, T value);
@@ -26,5 +26,5 @@ class ArrayList<T> implements List<T> {
     mut void clear();
 
     @Intrinsic
-    Iterator[this]<T> iterator();
+    Iterator<T> iterator();
 }

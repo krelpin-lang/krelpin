@@ -50,6 +50,15 @@ impl Parser<'_> {
     pub(crate) fn parse_constructor(&mut self) -> PResult<Constructor> {
         let name = self.parse_ident()?;
         let params = self.parse_params()?;
+        let borrows = self.parse_name_clause(kw::Borrows)?;
+        if let Some(first) = borrows.first() {
+            self.emit(
+                Diagnostic::error("a constructor does not return a value, so it borrows nothing")
+                    .with_span(first.span)
+                    .with_help("to keep a parameter in the object, write `keeps` instead"),
+            );
+        }
+        let keeps = self.parse_name_clause(kw::Keeps)?;
         let throws = self.parse_throws()?;
         let body = self.parse_block()?;
 
@@ -57,6 +66,7 @@ impl Parser<'_> {
             compact: false,
             name,
             params,
+            keeps,
             throws,
             body,
         })
@@ -70,6 +80,8 @@ impl Parser<'_> {
         receiver: Option<Receiver>,
     ) -> PResult<Method> {
         let params = self.parse_params()?;
+        let borrows = self.parse_name_clause(kw::Borrows)?;
+        let keeps = self.parse_name_clause(kw::Keeps)?;
         let throws = self.parse_throws()?;
         let where_clause = self.parse_where_clause()?;
         let body = if self.eat(TokenKind::Semi) {
@@ -84,6 +96,8 @@ impl Parser<'_> {
             name,
             receiver,
             params,
+            borrows,
+            keeps,
             throws,
             where_clause,
             body,

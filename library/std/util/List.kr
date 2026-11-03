@@ -7,7 +7,7 @@ interface List<T> extends Iterable<T> {
         return this.size() == 0;
     }
 
-    &[this] T get(int index);
+    &T get(int index);
 
     mut T set(int index, T value);
 

@@ -480,7 +480,7 @@ impl<'a> Tcx<'a> {
         if !has_compact_ctor {
             sig.ctors.push(MethodSig {
                 params: self.param_tys(&record.components),
-                storage: self.param_storage(&record.components),
+                storage: self.param_storage(&record.components, &[]),
                 is_final: false,
                 ..synthesized_method(sig.name, def, None, Ty::Void)
             });
@@ -632,11 +632,8 @@ impl<'a> Tcx<'a> {
             FnRetTy::Void(_) => Ty::Void,
             FnRetTy::Ty(ty) => self.lower_ty(ty),
         };
-        let mut borrows = RetBorrows::default();
-        if let FnRetTy::Ty(ty) = &method.ret {
-            self.collect_borrows(ty, &method.params, class_sources, &mut borrows);
-        }
-        let storage = self.param_storage(&method.params);
+        let borrows = self.ret_borrows(method, class_sources);
+        let storage = self.param_storage(&method.params, &method.keeps);
         let is_abstract = member.inheritance.abstract_kw.is_some()
             || (method.body.is_none() && !is_intrinsic(&member.annotations));
         MethodSig {
@@ -657,18 +654,21 @@ impl<'a> Tcx<'a> {
         }
     }
 
-    pub fn param_storage(&self, params: &[Param]) -> Vec<Storage> {
+    pub fn param_storage(&self, params: &[Param], keeps: &[Ident]) -> Vec<Storage> {
         params
             .iter()
-            .map(|param| match &param.ty.kind {
-                TyKind::Ref { sources, ty, .. } => Storage {
-                    whole: !sources.is_empty(),
-                    contents: self.mentions_storable(ty),
-                },
-                _ => Storage {
-                    whole: self.mentions_storable(&param.ty),
-                    contents: false,
-                },
+            .map(|param| {
+                let kept = keeps.iter().any(|kept| kept.name == param.name.name);
+                match &param.ty.kind {
+                    TyKind::Ref { ty, .. } => Storage {
+                        whole: kept,
+                        contents: kept || self.mentions_storable(ty),
+                    },
+                    _ => Storage {
+                        whole: kept || self.mentions_storable(&param.ty),
+                        contents: false,
+                    },
+                }
             })
             .collect()
     }
@@ -676,26 +676,20 @@ impl<'a> Tcx<'a> {
     fn mentions_storable(&self, ty: &ast::Ty) -> bool {
         match &ty.kind {
             TyKind::Primitive(_) => false,
-            TyKind::Ref { sources, ty, .. } => !sources.is_empty() || self.mentions_storable(ty),
-            TyKind::Path {
-                path,
-                sources,
-                args,
-            } => {
+            TyKind::Ref { ty, .. } | TyKind::Nullable(ty) | TyKind::Array(ty) => {
+                self.mentions_storable(ty)
+            }
+            TyKind::Path { path, args } => {
                 let res = path
                     .segments
                     .last()
                     .and_then(|segment| self.resolutions.get(segment.span));
-                let elided_view = matches!(
-                    res,
-                    Some(Res::Item(def)) if sources.is_empty() && self.view_def(def)
-                );
-                matches!(res, Some(Res::TypeParam(_)))
-                    || !sources.is_empty()
-                    || elided_view
-                    || args.iter().any(|arg| self.mentions_storable(arg))
+                match res {
+                    Some(Res::TypeParam(_)) => true,
+                    Some(Res::Item(def)) if self.view_def(def) => true,
+                    _ => args.iter().any(|arg| self.mentions_storable(arg)),
+                }
             }
-            TyKind::Nullable(ty) | TyKind::Array(ty) => self.mentions_storable(ty),
         }
     }
 
@@ -703,74 +697,77 @@ impl<'a> Tcx<'a> {
         self.items.def(def).borrow_params > 0
     }
 
-    pub fn ret_borrows(
-        &self,
-        ty: &ast::Ty,
-        params: &[Param],
-        class_sources: &[Symbol],
-    ) -> RetBorrows {
-        let mut borrows = RetBorrows::default();
-        self.collect_borrows(ty, params, class_sources, &mut borrows);
-        borrows
+    fn borrows_anything(&self, ty: &ast::Ty) -> bool {
+        match &ty.kind {
+            TyKind::Primitive(_) => false,
+            TyKind::Ref { .. } => true,
+            TyKind::Nullable(ty) | TyKind::Array(ty) => self.borrows_anything(ty),
+            TyKind::Path { path, args } => {
+                let res = path
+                    .segments
+                    .last()
+                    .and_then(|segment| self.resolutions.get(segment.span));
+                matches!(res, Some(Res::Item(def)) if self.view_def(def))
+                    || args.iter().any(|arg| self.borrows_anything(arg))
+            }
+        }
     }
 
-    fn collect_borrows(
-        &self,
-        ty: &ast::Ty,
-        params: &[Param],
-        class_sources: &[Symbol],
-        borrows: &mut RetBorrows,
-    ) {
-        let name_sources = |sources: &[Ident], borrows: &mut RetBorrows| {
-            for source in sources {
-                let found = if source.name == kw::This {
+    pub fn ret_borrows(&self, method: &Method, class_sources: &[Symbol]) -> RetBorrows {
+        let FnRetTy::Ty(ret) = &method.ret else {
+            return RetBorrows::default();
+        };
+        if !self.borrows_anything(ret) {
+            return RetBorrows::default();
+        }
+        if !method.borrows.is_empty() {
+            let mut sources = Vec::new();
+            for name in &method.borrows {
+                let source = if name.name == kw::This {
                     Some(BorrowSource::This)
-                } else if let Some(index) = params
+                } else if let Some(index) = method
+                    .params
                     .iter()
-                    .position(|param| param.name.name == source.name)
+                    .position(|param| param.name.name == name.name)
                 {
                     Some(BorrowSource::Param(index))
                 } else {
                     class_sources
-                        .contains(&source.name)
-                        .then_some(BorrowSource::Class(source.name))
+                        .contains(&name.name)
+                        .then_some(BorrowSource::Class(name.name))
                 };
-                if let Some(found) = found.filter(|found| !borrows.sources.contains(found)) {
-                    borrows.sources.push(found);
+                if let Some(source) = source.filter(|source| !sources.contains(source)) {
+                    sources.push(source);
                 }
             }
-        };
-        match &ty.kind {
-            TyKind::Primitive(_) => {}
-            TyKind::Ref { sources, ty, .. } => {
-                if sources.is_empty() {
-                    borrows.elided = true;
-                }
-                name_sources(sources, borrows);
-                self.collect_borrows(ty, params, class_sources, borrows);
-            }
-            TyKind::Path {
-                path,
+            return RetBorrows {
                 sources,
-                args,
-            } => {
-                if sources.is_empty() {
-                    let def = path
-                        .segments
-                        .last()
-                        .and_then(|segment| self.resolutions.get(segment.span));
-                    if let Some(Res::Item(def)) = def {
-                        borrows.elided |= self.view_def(def);
-                    }
-                }
-                name_sources(sources, borrows);
-                for arg in args {
-                    self.collect_borrows(arg, params, class_sources, borrows);
-                }
-            }
-            TyKind::Nullable(ty) | TyKind::Array(ty) => {
-                self.collect_borrows(ty, params, class_sources, borrows);
-            }
+                elided: false,
+            };
+        }
+        let receiver = method.receiver.map(|receiver| receiver.kind);
+        if matches!(receiver, Some(ReceiverKind::Ref | ReceiverKind::RefMut)) {
+            return RetBorrows {
+                sources: vec![BorrowSource::This],
+                elided: false,
+            };
+        }
+        let borrowed: Vec<usize> = method
+            .params
+            .iter()
+            .enumerate()
+            .filter(|(_, param)| self.borrows_anything(&param.ty))
+            .map(|(index, _)| index)
+            .collect();
+        match borrowed.as_slice() {
+            [index] => RetBorrows {
+                sources: vec![BorrowSource::Param(*index)],
+                elided: false,
+            },
+            _ => RetBorrows {
+                sources: Vec::new(),
+                elided: true,
+            },
         }
     }
 
@@ -789,7 +786,7 @@ impl<'a> Tcx<'a> {
             is_abstract: false,
             is_final: false,
             borrows: RetBorrows::default(),
-            storage: self.param_storage(&ctor.params),
+            storage: self.param_storage(&ctor.params, &ctor.keeps),
         }
     }
 

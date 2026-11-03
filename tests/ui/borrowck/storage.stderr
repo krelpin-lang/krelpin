@@ -5,8 +5,8 @@ error: `sneak` keeps `text` in `this`, but its signature does not allow it
    |     ------------------------------ `text` is still in `this` here
    |                            ^^^^ `text` is only borrowed for this call
    |
-   = note: a method can only keep a reference it was given when the parameter names a borrow source
-   = help: give `text` a borrow source of the class, like `&[src] String`
+   = note: a method can only keep a reference it was given when its signature says so
+   = help: write `keeps text` after the parameters of `sneak`
 
 error: `other` does not live long enough
   --> tests/ui/borrowck/storage.kr:54:28

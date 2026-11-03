@@ -3,7 +3,7 @@ use krelpin_ast::ast::{
 };
 use krelpin_ast::token::TokenKind;
 use krelpin_errors::Diagnostic;
-use krelpin_span::kw;
+use krelpin_span::{Symbol, kw};
 
 use super::{Expected, PResult, Parser};
 
@@ -27,18 +27,12 @@ impl Parser<'_> {
 
         if self.break_and_eat(TokenKind::And) {
             let mutable = self.eat_keyword_noexpect(kw::Mut);
-            let sources = if self.eat_noexpect(TokenKind::OpenBracket) {
-                self.parse_borrow_sources()?
-            } else {
-                Vec::new()
-            };
+            if self.token.kind == TokenKind::OpenBracket {
+                self.reject_bracket_sources()?;
+            }
             let ty = Box::new(self.parse_ty_without_suffix()?);
             return Ok(Ty {
-                kind: TyKind::Ref {
-                    mutable,
-                    sources,
-                    ty,
-                },
+                kind: TyKind::Ref { mutable, ty },
                 span: lo.to(self.prev_token.span),
             });
         }
@@ -87,19 +81,12 @@ impl Parser<'_> {
         }
 
         let path = self.parse_path()?;
-        let sources = if self.borrow_sources_ahead() {
-            self.bump();
-            self.parse_borrow_sources()?
-        } else {
-            Vec::new()
-        };
+        if self.bracket_sources_ahead() {
+            self.reject_bracket_sources()?;
+        }
         let args = self.parse_generic_args()?;
         Ok(Ty {
-            kind: TyKind::Path {
-                path,
-                sources,
-                args,
-            },
+            kind: TyKind::Path { path, args },
             span: lo.to(self.prev_token.span),
         })
     }
@@ -113,16 +100,38 @@ impl Parser<'_> {
         Ok(Path::new(segments))
     }
 
-    fn parse_borrow_sources(&mut self) -> PResult<Vec<Ident>> {
-        let mut sources = vec![self.parse_borrow_source()?];
-        while self.eat(TokenKind::Comma) {
-            sources.push(self.parse_borrow_source()?);
+    fn reject_bracket_sources(&mut self) -> PResult<()> {
+        let lo = self.token.span;
+        self.bump();
+        while !matches!(self.token.kind, TokenKind::CloseBracket | TokenKind::Eof) {
+            self.bump();
         }
         self.expect(TokenKind::CloseBracket)?;
-        Ok(sources)
+        self.emit(
+            Diagnostic::error("borrow sources are not written in brackets")
+                .with_span(lo.to(self.prev_token.span))
+                .with_help(
+                    "name them after the parameters, like `&String first(&String a) borrows a`",
+                ),
+        );
+        Ok(())
     }
 
-    fn parse_borrow_source(&mut self) -> PResult<Ident> {
+    pub(crate) fn parse_name_clause(&mut self, keyword: Symbol) -> PResult<Vec<Ident>> {
+        let clause = self.token.kind == TokenKind::Ident(keyword)
+            && matches!(self.look_ahead(1), TokenKind::Ident(_));
+        if !clause {
+            return Ok(Vec::new());
+        }
+        self.bump();
+        let mut names = vec![self.parse_source_name()?];
+        while self.eat(TokenKind::Comma) {
+            names.push(self.parse_source_name()?);
+        }
+        Ok(names)
+    }
+
+    fn parse_source_name(&mut self) -> PResult<Ident> {
         if self.eat_keyword_noexpect(kw::This) {
             return Ok(Ident::new(kw::This, self.prev_token.span));
         }
@@ -158,7 +167,7 @@ impl Parser<'_> {
         Ok(tys)
     }
 
-    fn borrow_sources_ahead(&self) -> bool {
+    fn bracket_sources_ahead(&self) -> bool {
         self.token.kind == TokenKind::OpenBracket
             && matches!(self.look_ahead(1), TokenKind::Ident(_))
             && matches!(
@@ -168,27 +177,20 @@ impl Parser<'_> {
     }
 
     pub(crate) fn parse_type_generics(&mut self) -> PResult<Generics> {
-        let lo = self.token.span;
-        let mut sources = Vec::new();
-        if self.borrow_sources_ahead() {
-            self.bump();
-            for name in self.parse_borrow_sources()? {
-                if name.name == kw::This {
-                    self.error(name.span, "`this` cannot be declared as a borrow source");
-                    continue;
-                }
-                sources.push(GenericParam {
-                    name,
-                    kind: GenericParamKind::BorrowSource,
-                    span: name.span,
-                });
-            }
+        if self.bracket_sources_ahead() {
+            self.reject_bracket_sources()?;
         }
         let mut generics = self.parse_generics()?;
-        if !sources.is_empty() {
-            sources.append(&mut generics.params);
-            generics.params = sources;
-            generics.span = lo.to(self.prev_token.span);
+        for name in self.parse_name_clause(kw::Borrows)? {
+            if name.name == kw::This {
+                self.error(name.span, "`this` cannot be declared as a borrow source");
+                continue;
+            }
+            generics.params.push(GenericParam {
+                name,
+                kind: GenericParamKind::BorrowSource,
+                span: name.span,
+            });
         }
         Ok(generics)
     }
@@ -238,7 +240,7 @@ impl Parser<'_> {
                 Diagnostic::error("borrow sources are not declared between `<` and `>`")
                     .with_span(span)
                     .with_help(format!(
-                        "declare them in brackets after the type name, like `Parser[{}]<T>`",
+                        "declare them after the type parameters, like `class Parser<T> borrows {}`",
                         name.name
                     )),
             );

@@ -37,6 +37,8 @@ fn in_main(code: &str) -> Vec<String> {
         "import std.util.List;\n\
          import std.util.ArrayList;\n\
          import std.util.Iterator;\n\
+         import std.util.Map;\n\
+         import std.util.HashMap;\n\
          import std.function.Supplier;\n\
          class Box {{\n\
          \x20   public int count;\n\
@@ -252,8 +254,8 @@ fn results_borrow_from_their_declared_sources() {
     let src = |code: &str| {
         errors(&format!(
             "class A {{\n\
-             \x20   static &[a] String first(&String a, &String b) {{ return a; }}\n\
-             \x20   static &[a, b] String either(&String a, &String b) {{ return b; }}\n\
+             \x20   static &String first(&String a, &String b) borrows a {{ return a; }}\n\
+             \x20   static &String either(&String a, &String b) borrows a, b {{ return b; }}\n\
              \x20   static int run() {{\n\
              \x20       String a = \"a\";\n\
              \x20       &String kept;\n\
@@ -274,20 +276,65 @@ fn results_borrow_from_their_declared_sources() {
 }
 
 #[test]
+fn results_borrow_from_their_elided_sources() {
+    let src = |code: &str| {
+        errors(&format!(
+            "class Named {{\n\
+             \x20   String name = \"n\";\n\
+             \x20   &String name() {{ return &this.name; }}\n\
+             }}\n\
+             class A {{\n\
+             \x20   static &String trim(&String text, int limit) {{ return text; }}\n\
+             \x20   static &String either(&String a, &String b) {{ return b; }}\n\
+             \x20   static int run() {{\n\
+             \x20       String a = \"a\";\n\
+             \x20       Named outer = new Named();\n\
+             \x20       &String kept;\n\
+             \x20       {{ {code} }}\n\
+             \x20       return kept.length();\n\
+             \x20   }}\n\
+             }}"
+        ))
+    };
+    assert_eq!(
+        src("int n = 3; kept = A.trim(&a, n);"),
+        Vec::<String>::new()
+    );
+    assert_eq!(src("kept = outer.name();"), Vec::<String>::new());
+    assert_eq!(
+        src("Named inner = new Named(); kept = inner.name();"),
+        ["`inner` does not live long enough"]
+    );
+    assert_eq!(
+        src("String b = \"b\"; kept = A.either(&a, &b);"),
+        ["`b` does not live long enough"]
+    );
+}
+
+#[test]
+fn copyable_values_are_borrowed_for_the_call() {
+    ok(
+        "Map<String, int> ages = new HashMap<>(); ages.put(\"Ali\", 30); \
+        int? age = ages.get(\"Ali\"); String key = \"Ali\"; \
+        boolean known = ages.containsKey(key); String again = key;",
+    );
+}
+
+#[test]
 fn methods_keep_to_their_declared_sources() {
     assert_eq!(
-        errors("class A { static &[a] String pick(&String a, &String b) { return b; } }"),
+        errors("class A { static &String pick(&String a, &String b) borrows a { return b; } }"),
         ["`pick` returns a value borrowed from `b`, but its signature only borrows from `a`"]
     );
     assert_eq!(
         errors(
-            "class Parser[src] {\n\
-             \x20   &[src] String input;\n\
+            "class Parser borrows src {\n\
+             \x20   &String input;\n\
              \x20   String name = \"parser\";\n\
-             \x20   Parser(&[src] String input) { this.input = input; }\n\
-             \x20   &[src] String input() { return this.input; }\n\
-             \x20   &[this] String name() { return &this.name; }\n\
-             \x20   &[src] String wrong() { return &this.name; }\n\
+             \x20   Parser(&String input) keeps input { this.input = input; }\n\
+             \x20   &String input() borrows src { return this.input; }\n\
+             \x20   &String name() { return &this.name; }\n\
+             \x20   &String wrong() borrows src { return &this.name; }\n\
              }"
         ),
         ["`wrong` returns a value borrowed from `this`, but its signature only borrows from `src`"]
@@ -298,10 +345,10 @@ fn methods_keep_to_their_declared_sources() {
 fn objects_keep_the_borrows_they_store() {
     let src = |code: &str| {
         errors(&format!(
-            "class Parser[src] {{\n\
-             \x20   &[src] String input;\n\
-             \x20   Parser(&[src] String input) {{ this.input = input; }}\n\
-             \x20   &[src] String input() {{ return this.input; }}\n\
+            "class Parser borrows src {{\n\
+             \x20   &String input;\n\
+             \x20   Parser(&String input) keeps input {{ this.input = input; }}\n\
+             \x20   &String input() borrows src {{ return this.input; }}\n\
              }}\n\
              class Main {{ static int run() {{ {code} }} }}"
         ))
@@ -335,10 +382,10 @@ fn collections_lend_their_elements() {
 fn methods_keep_only_what_their_signature_allows() {
     let cache = |code: &str| {
         errors(&format!(
-            "class Cache[src] {{\n\
-             \x20   &[src] String kept;\n\
-             \x20   Cache(&[src] String first) {{ this.kept = first; }}\n\
-             \x20   mut void remember(&[src] String text) {{ this.kept = text; }}\n\
+            "class Cache borrows src {{\n\
+             \x20   &String kept;\n\
+             \x20   Cache(&String first) keeps first {{ this.kept = first; }}\n\
+             \x20   mut void remember(&String text) keeps text {{ this.kept = text; }}\n\
              \x20   mut int measure(&String text) {{ return text.length(); }}\n\
              }}\n\
              class Main {{ static int run() {{ {code} }} }}"
@@ -362,9 +409,9 @@ fn methods_keep_only_what_their_signature_allows() {
     );
     assert_eq!(
         errors(
-            "class Cache[src] {\n\
-             \x20   &[src] String kept;\n\
-             \x20   Cache(&[src] String first) { this.kept = first; }\n\
+            "class Cache borrows src {\n\
+             \x20   &String kept;\n\
+             \x20   Cache(&String first) keeps first { this.kept = first; }\n\
              \x20   mut void sneak(&String text) { this.kept = text; }\n\
              }"
         ),

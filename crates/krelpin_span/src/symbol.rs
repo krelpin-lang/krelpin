@@ -88,6 +88,8 @@ keywords! {
         Yield: "yield",
     }
     contextual {
+        Borrows: "borrows",
+        Keeps: "keeps",
         Move: "move",
     }
 }

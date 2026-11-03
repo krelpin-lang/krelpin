@@ -47,7 +47,6 @@ CompilationUnit {
                                                     Ty {
                                                         kind: Path {
                                                             path: "String" @ 34..40,
-                                                            sources: [],
                                                             args: [],
                                                         },
                                                         span: 34..40,
@@ -60,6 +59,8 @@ CompilationUnit {
                                             span: 34..47,
                                         },
                                     ],
+                                    borrows: [],
+                                    keeps: [],
                                     throws: [],
                                     where_clause: [],
                                     body: Some(
@@ -101,7 +102,6 @@ CompilationUnit {
                                             ty: Ty {
                                                 kind: Ref {
                                                     mutable: false,
-                                                    sources: [],
                                                     ty: Ty {
                                                         kind: Array(
                                                             Ty {
@@ -121,6 +121,8 @@ CompilationUnit {
                                             span: 71..84,
                                         },
                                     ],
+                                    borrows: [],
+                                    keeps: [],
                                     throws: [],
                                     where_clause: [],
                                     body: Some(
@@ -171,13 +173,11 @@ CompilationUnit {
                                                 Ty {
                                                     kind: Ref {
                                                         mutable: false,
-                                                        sources: [],
                                                         ty: Ty {
                                                             kind: Array(
                                                                 Ty {
                                                                     kind: Path {
                                                                         path: "String" @ 105..111,
-                                                                        sources: [],
                                                                         args: [],
                                                                     },
                                                                     span: 105..111,
@@ -200,6 +200,8 @@ CompilationUnit {
                                         },
                                     ),
                                     params: [],
+                                    borrows: [],
+                                    keeps: [],
                                     throws: [],
                                     where_clause: [],
                                     body: Some(
@@ -244,11 +246,9 @@ CompilationUnit {
                                                 Ty {
                                                     kind: Ref {
                                                         mutable: false,
-                                                        sources: [],
                                                         ty: Ty {
                                                             kind: Path {
                                                                 path: "String" @ 146..152,
-                                                                sources: [],
                                                                 args: [],
                                                             },
                                                             span: 146..152,
@@ -268,6 +268,8 @@ CompilationUnit {
                                         },
                                     ),
                                     params: [],
+                                    borrows: [],
+                                    keeps: [],
                                     throws: [],
                                     where_clause: [],
                                     body: Some(

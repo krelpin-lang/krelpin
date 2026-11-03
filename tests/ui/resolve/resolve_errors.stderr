@@ -59,12 +59,12 @@ error: `break` outside of a loop or switch
    |             ^^^^^^
 
 error: cannot find borrow source `other`
-  --> tests/ui/resolve/resolve_errors.kr:22:7
+  --> tests/ui/resolve/resolve_errors.kr:22:28
    |
-22 |     &[other] String name() {
-   |       ^^^^^
+22 |     &String name() borrows other {
+   |                            ^^^^^
    |
-   = help: a borrow source must name a parameter of the method, `this`, or a borrow source of the class, like `src` in `Parser[src]`
+   = help: a borrow source must name a parameter of the method, `this`, or a borrow source of the class, like `text` in `class Parser borrows text`
 
 error: aborting due to 9 previous errors
 

@@ -100,9 +100,6 @@ impl Parser<'_> {
             if self.look_ahead(index) == TokenKind::Ident(kw::Mut) {
                 index += 1;
             }
-            if self.look_ahead(index) == TokenKind::OpenBracket {
-                index = self.scan_borrow_sources(index)?;
-            }
         }
 
         index = match self.look_ahead(index) {
@@ -121,11 +118,6 @@ impl Parser<'_> {
                 {
                     end += 2;
                 }
-                if self.look_ahead(end) == TokenKind::OpenBracket
-                    && self.look_ahead(end + 1) != TokenKind::CloseBracket
-                {
-                    end = self.scan_borrow_sources(end)?;
-                }
                 if self.look_ahead(end) == TokenKind::Lt {
                     end = self.scan_generic_args(end)?;
                 }
@@ -139,22 +131,6 @@ impl Parser<'_> {
                 (TokenKind::OpenBracket, TokenKind::CloseBracket) => index += 2,
                 (TokenKind::Question, _) => index += 1,
                 _ => return Some(index),
-            }
-        }
-    }
-
-    fn scan_borrow_sources(&self, open: usize) -> Option<usize> {
-        let mut index = open + 1;
-        loop {
-            match self.look_ahead(index) {
-                TokenKind::CloseBracket => return Some(index + 1),
-                kind if is_plain_ident(kind)
-                    || kind == TokenKind::Comma
-                    || kind == TokenKind::Ident(kw::This) =>
-                {
-                    index += 1
-                }
-                _ => return None,
             }
         }
     }

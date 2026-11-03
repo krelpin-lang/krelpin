@@ -4,15 +4,15 @@ import std.util.List;
 import std.util.ArrayList;
 import std.util.HashMap;
 
-class Cache[src] {
-    &[src] String kept;
-    List<&[src] String> all = new ArrayList<>();
+class Cache borrows src {
+    &String kept;
+    List<&String> all = new ArrayList<>();
 
-    Cache(&[src] String first) {
+    Cache(&String first) keeps first {
         this.kept = first;
     }
 
-    mut void remember(&[src] String text) {
+    mut void remember(&String text) keeps text {
         this.all.add(text);
     }
 

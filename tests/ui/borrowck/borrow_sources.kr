@@ -8,17 +8,17 @@ class Pair {
     String first = "a";
     String second = "b";
 
-    &[this] String first() {
+    &String first() {
         return &this.first;
     }
 }
 
 class Main {
-    static &[a] String pick(&String a, &String b) {
+    static &String pick(&String a, &String b) borrows a {
         return b;
     }
 
-    static &[a, b] String either(&String a, &String b, boolean left) {
+    static &String either(&String a, &String b, boolean left) borrows a, b {
         return left ? a : b;
     }
 
@@ -57,19 +57,19 @@ class Main {
     }
 }
 
-class Parser[src] {
-    &[src] String input;
+class Parser borrows src {
+    &String input;
     String name = "parser";
 
-    Parser(&[src] String input) {
+    Parser(&String input) keeps input {
         this.input = input;
     }
 
-    &[src] String input() {
+    &String input() borrows src {
         return this.input;
     }
 
-    &[src] String name() {
+    &String name() borrows src {
         return &this.name;
     }
 }

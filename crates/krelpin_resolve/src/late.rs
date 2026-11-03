@@ -161,6 +161,7 @@ impl<'a> Resolver<'a> {
     }
 
     fn resolve_constructor(&mut self, constructor: &Constructor) {
+        self.resolve_kept(&constructor.params, &constructor.keeps);
         self.resolve_signature(&constructor.params, &constructor.throws);
         self.resolve_block(&constructor.body);
     }
@@ -197,6 +198,10 @@ impl<'a> Resolver<'a> {
         if let FnRetTy::Ty(ty) = &method.ret {
             self.resolve_ty(ty);
         }
+        for source in &method.borrows {
+            self.resolve_borrow_source(*source);
+        }
+        self.resolve_kept(&method.params, &method.keeps);
         self.resolve_signature(&method.params, &method.throws);
         if let Some(body) = &method.body {
             self.resolve_block(body);
@@ -242,14 +247,7 @@ impl<'a> Resolver<'a> {
     fn resolve_ty(&mut self, ty: &Ty) {
         match &ty.kind {
             TyKind::Primitive(_) => {}
-            TyKind::Path {
-                path,
-                sources,
-                args,
-            } => {
-                for source in sources {
-                    self.resolve_borrow_source(*source);
-                }
+            TyKind::Path { path, args } => {
                 match path.segments.as_slice() {
                     [segment] => self.resolve_type_name(*segment),
                     segments => {
@@ -258,12 +256,7 @@ impl<'a> Resolver<'a> {
                 }
                 self.resolve_tys(args.iter());
             }
-            TyKind::Ref { sources, ty, .. } => {
-                for source in sources {
-                    self.resolve_borrow_source(*source);
-                }
-                self.resolve_ty(ty);
-            }
+            TyKind::Ref { ty, .. } => self.resolve_ty(ty),
             TyKind::Nullable(ty) | TyKind::Array(ty) => self.resolve_ty(ty),
         }
     }
@@ -302,6 +295,21 @@ impl<'a> Resolver<'a> {
         }
     }
 
+    fn resolve_kept(&mut self, params: &[Param], keeps: &[Ident]) {
+        for kept in keeps {
+            match params.iter().find(|param| param.name.name == kept.name) {
+                Some(param) => self
+                    .resolutions
+                    .record(kept.span, Res::BorrowSource(param.name.span)),
+                None => self.emit(
+                    Diagnostic::error(format!("cannot find parameter `{}` to keep", kept.name))
+                        .with_span(kept.span)
+                        .with_help("`keeps` names the parameters that the method may store"),
+                ),
+            }
+        }
+    }
+
     fn resolve_borrow_source(&mut self, source: Ident) {
         let found = self
             .borrow_sources
@@ -318,7 +326,8 @@ impl<'a> Resolver<'a> {
                         .with_span(source.span)
                         .with_help(
                             "a borrow source must name a parameter of the method, `this`, \
-                             or a borrow source of the class, like `src` in `Parser[src]`",
+                             or a borrow source of the class, like `text` in \
+                             `class Parser borrows text`",
                         ),
                 );
             }
