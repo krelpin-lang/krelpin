@@ -250,7 +250,7 @@ impl Parser<'_> {
     }
 
     fn parse_class(&mut self, name: Ident) -> PResult<ItemKind> {
-        let generics = self.parse_generics()?;
+        let generics = self.parse_type_generics()?;
         let extends = if self.eat_keyword(kw::Extends) {
             Some(self.parse_ty()?)
         } else {
@@ -268,7 +268,7 @@ impl Parser<'_> {
     }
 
     fn parse_record(&mut self, name: Ident) -> PResult<ItemKind> {
-        let generics = self.parse_generics()?;
+        let generics = self.parse_type_generics()?;
         let components = if self.token.kind == TokenKind::OpenParen {
             let components = self.parse_params()?;
             for component in components.iter().filter(|component| component.variadic) {
@@ -321,7 +321,7 @@ impl Parser<'_> {
     }
 
     fn parse_interface(&mut self, name: Ident) -> PResult<ItemKind> {
-        let generics = self.parse_generics()?;
+        let generics = self.parse_type_generics()?;
         let extends = if self.eat_keyword(kw::Extends) {
             self.parse_ty_list()?
         } else {
@@ -347,7 +347,7 @@ impl Parser<'_> {
     }
 
     fn parse_enum(&mut self, name: Ident) -> PResult<ItemKind> {
-        let generics = self.parse_generics()?;
+        let generics = self.parse_type_generics()?;
         self.reject_extends("enums")?;
         let implements = self.parse_implements()?;
 

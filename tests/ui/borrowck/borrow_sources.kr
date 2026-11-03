@@ -1,0 +1,96 @@
+package shop;
+
+import std.util.List;
+import std.util.ArrayList;
+import std.util.Iterator;
+
+class Pair {
+    String first = "a";
+    String second = "b";
+
+    &[this] String first() {
+        return &this.first;
+    }
+}
+
+class Main {
+    static &[a] String pick(&String a, &String b) {
+        return b;
+    }
+
+    static &[a, b] String either(&String a, &String b, boolean left) {
+        return left ? a : b;
+    }
+
+    static void invalidated(List<String> names) {
+        Iterator<String> values = names.iterator();
+        names.add("x");
+        values.next();
+    }
+
+    static void fine(List<String> names) {
+        Iterator<String> values = names.iterator();
+        values.next();
+        names.add("x");
+    }
+
+    static void narrow() {
+        String a = "a";
+        &String kept = a.length() > 0 ? &a : &a;
+        String b = "b";
+        &String chosen;
+        {
+            String c = "c";
+            chosen = Main.either(&b, &c, true);
+        }
+        chosen.length();
+    }
+
+    static void precise() {
+        String b = "b";
+        &String chosen;
+        {
+            String c = "c";
+            chosen = Main.pick(&b, &c);
+        }
+        chosen.length();
+    }
+}
+
+class Parser[src] {
+    &[src] String input;
+    String name = "parser";
+
+    Parser(&[src] String input) {
+        this.input = input;
+    }
+
+    &[src] String input() {
+        return this.input;
+    }
+
+    &[src] String name() {
+        return &this.name;
+    }
+}
+
+class Parsing {
+    static int outlives() {
+        String text = "abc";
+        &String kept;
+        {
+            Parser parser = new Parser(&text);
+            kept = parser.input();
+        }
+        return kept.length();
+    }
+
+    static int dangles() {
+        Parser parser;
+        {
+            String text = "abc";
+            parser = new Parser(&text);
+        }
+        return parser.input().length();
+    }
+}

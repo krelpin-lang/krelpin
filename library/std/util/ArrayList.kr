@@ -26,5 +26,5 @@ class ArrayList<T> implements List<T> {
     mut void clear();
 
     @Intrinsic
-    Iterator<T> iterator();
+    Iterator[this]<T> iterator();
 }

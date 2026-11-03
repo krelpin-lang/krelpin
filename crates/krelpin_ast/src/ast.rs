@@ -287,6 +287,7 @@ pub enum TyKind {
     Primitive(PrimitiveTy),
     Path {
         path: Path,
+        sources: Vec<Ident>,
         args: Vec<Ty>,
     },
     Ref {

@@ -2,8 +2,8 @@ use std::collections::{HashSet, VecDeque};
 
 use krelpin_errors::{DiagCtxt, Diagnostic};
 use krelpin_mir::{
-    BasicBlock, Body, Local, Place, PlaceBase, PlaceElem, StatementKind, TerminatorKind, Unwind,
-    place_locals_of, rvalue_locals_of, terminator_input_locals_of,
+    BasicBlock, Body, Local, Place, PlaceBase, PlaceElem, ReturnSource, StatementKind,
+    TerminatorKind, Unwind, place_locals_of, rvalue_locals_of, terminator_input_locals_of,
 };
 use krelpin_span::Span;
 use krelpin_typeck::Ty;
@@ -12,7 +12,7 @@ use crate::bitset::BitSet;
 use crate::dataflow::{Forward, Location, solve};
 use crate::init::{MoveData, MoveKind, MoveOut};
 use crate::liveness::Liveness;
-use crate::loans::{Holdings, LoanData};
+use crate::loans::{Holdings, LoanData, LoanOrigin};
 use crate::places::{
     self, Access, PlacePath, PlaceTys, base_local, has_deref, operand_place, overlaps,
 };
@@ -118,6 +118,8 @@ impl<'a, 'tcx> Checker<'a, 'tcx> {
                 }
                 if let Some(loan) = escaping.iter().find(|&loan| self.is_local_data(loan)) {
                     self.report_escape(loan, span, "returned");
+                } else {
+                    self.check_ret_sources(&held[Local::RETURN.index()], span);
                 }
             }
             TerminatorKind::Throw {
@@ -135,6 +137,72 @@ impl<'a, 'tcx> Checker<'a, 'tcx> {
             }
             _ => {}
         }
+    }
+
+    fn check_ret_sources(&mut self, returned: &BitSet, span: Span) {
+        let Some(allowed) = self.body.ret_sources.clone() else {
+            return;
+        };
+        let outside = returned.iter().find_map(|index| {
+            let loan = &self.loans.loans[index];
+            let (local, contents) = match loan.origin {
+                LoanOrigin::Arg(local) => (local, false),
+                LoanOrigin::ArgContents(local) => (local, true),
+                LoanOrigin::Local => {
+                    let local = base_local(&loan.place)?;
+                    let is_arg = local.index() >= 1 && local.index() <= self.body.arg_count;
+                    if !is_arg || !has_deref(&loan.place) {
+                        return None;
+                    }
+                    (local, false)
+                }
+            };
+            let permitted = allowed.iter().any(|source| match *source {
+                ReturnSource::Whole(allowed) => allowed == local,
+                ReturnSource::Contents(allowed, _) => contents && allowed == local,
+            });
+            (!permitted).then_some((index, local))
+        });
+        let Some((index, local)) = outside else {
+            return;
+        };
+        let name = |local: Local| {
+            self.body
+                .local(local)
+                .name
+                .map_or_else(|| "value".to_owned(), |name| name.to_string())
+        };
+        let borrowed = name(local);
+        let declared: Vec<String> = allowed
+            .iter()
+            .map(|source| match *source {
+                ReturnSource::Whole(local) => format!("`{}`", name(local)),
+                ReturnSource::Contents(_, source) => format!("`{source}`"),
+            })
+            .collect();
+        let mut sources: Vec<String> = allowed
+            .iter()
+            .map(|source| match *source {
+                ReturnSource::Whole(local) => name(local),
+                ReturnSource::Contents(_, source) => source.to_string(),
+            })
+            .collect();
+        sources.push(borrowed.clone());
+        let loan = &self.loans.loans[index];
+        let diagnostic = Diagnostic::error(format!(
+            "`{}` returns a value borrowed from `{borrowed}`, \
+             but its signature only borrows from {}",
+            self.body.name,
+            declared.join(", ")
+        ))
+        .with_span(span)
+        .with_label(format!("this borrows from `{borrowed}`"))
+        .with_secondary(loan.span, format!("`{borrowed}` comes in here"))
+        .with_help(format!(
+            "list `{borrowed}` among the borrow sources: `[{}]`",
+            sources.join(", ")
+        ));
+        self.emit(span, diagnostic);
     }
 
     fn is_local_data(&self, loan: usize) -> bool {
@@ -197,6 +265,9 @@ impl<'a, 'tcx> Checker<'a, 'tcx> {
         let live = self.live_loans(location, held);
         let conflict = live.iter().find(|&loan| {
             let loan = &self.loans.loans[loan];
+            if loan.origin != LoanOrigin::Local {
+                return false;
+            }
             overlaps(&loan.place, place)
                 && (loan.mutable
                     || !matches!(access, Access::Read | Access::Borrow { mutable: false }))

@@ -299,6 +299,10 @@ impl PlaceTys<'_, '_> {
         ty.map_or(Ty::Unknown, |ty| ty.subst(&subst))
     }
 
+    pub(crate) fn is_view(&self, ty: &Ty) -> bool {
+        matches!(ty.non_null(), Ty::Adt { def, .. } if !self.tcx.sig(*def).borrow_params.is_empty())
+    }
+
     pub(crate) fn may_hold_refs(&self, ty: &Ty) -> bool {
         self.may_hold_refs_inner(ty, &mut Vec::new())
     }
@@ -319,6 +323,9 @@ impl PlaceTys<'_, '_> {
                     return false;
                 }
                 let sig = self.tcx.sig(*def);
+                if !sig.borrow_params.is_empty() {
+                    return true;
+                }
                 if sig.kind == AdtKind::Interface {
                     return self.tcx.fn_receiver(ty).is_some();
                 }

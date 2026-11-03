@@ -30,8 +30,16 @@ impl fmt::Display for Ty {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match &self.kind {
             TyKind::Primitive(primitive) => f.write_str(primitive.name()),
-            TyKind::Path { path, args } => {
+            TyKind::Path {
+                path,
+                sources,
+                args,
+            } => {
                 write!(f, "{path}")?;
+                if !sources.is_empty() {
+                    let names: Vec<&str> = sources.iter().map(|s| s.name.as_str()).collect();
+                    write!(f, "[{}]", names.join(", "))?;
+                }
                 if !args.is_empty() {
                     let args: Vec<String> = args.iter().map(Ty::to_string).collect();
                     write!(f, "<{}>", args.join(", "))?;

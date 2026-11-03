@@ -2,14 +2,21 @@ use std::collections::{HashMap, HashSet};
 
 use krelpin_ast::ast::ReceiverKind;
 use krelpin_mir::{
-    AggregateKind, BasicBlock, Body, Operand, Place, Rvalue, StatementKind, TerminatorKind,
+    AggregateKind, BasicBlock, Body, Local, Operand, Place, Rvalue, StatementKind, TerminatorKind,
 };
 use krelpin_span::Span;
-use krelpin_typeck::{Callee, Ty};
+use krelpin_typeck::{BorrowSource, Callee, Ty};
 
 use crate::bitset::BitSet;
 use crate::dataflow::{Forward, Location};
 use crate::places::{PlaceTys, base_local, has_deref, operand_place};
+
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub(crate) enum LoanOrigin {
+    Local,
+    Arg(Local),
+    ArgContents(Local),
+}
 
 #[derive(Debug)]
 pub(crate) struct Loan {
@@ -17,11 +24,14 @@ pub(crate) struct Loan {
     pub(crate) mutable: bool,
     pub(crate) span: Span,
     pub(crate) captured: bool,
+    pub(crate) origin: LoanOrigin,
 }
 
 pub(crate) struct LoanData<'a, 'tcx> {
     pub(crate) loans: Vec<Loan>,
     at: HashMap<Location, usize>,
+    arg_loans: Vec<(Local, usize)>,
+    contents_loans: HashMap<Local, usize>,
     tys: &'a PlaceTys<'a, 'tcx>,
     holds_refs: Vec<bool>,
 }
@@ -48,6 +58,31 @@ impl<'a, 'tcx> LoanData<'a, 'tcx> {
         }
 
         let mut loans = Vec::new();
+        let mut arg_loans = Vec::new();
+        let mut contents_loans = HashMap::new();
+        for local in body.args() {
+            let decl = body.local(local);
+            let Ty::Ref { mutable, .. } = decl.ty else {
+                continue;
+            };
+            let place = Place::local(local).project(krelpin_mir::PlaceElem::Deref);
+            arg_loans.push((local, loans.len()));
+            loans.push(Loan {
+                place: place.clone(),
+                mutable,
+                span: decl.span,
+                captured: false,
+                origin: LoanOrigin::Arg(local),
+            });
+            contents_loans.insert(local, loans.len());
+            loans.push(Loan {
+                place,
+                mutable,
+                span: decl.span,
+                captured: false,
+                origin: LoanOrigin::ArgContents(local),
+            });
+        }
         let mut at = HashMap::new();
         for (block_index, block) in body.blocks.iter().enumerate() {
             for (index, statement) in block.statements.iter().enumerate() {
@@ -69,6 +104,7 @@ impl<'a, 'tcx> LoanData<'a, 'tcx> {
                     captured: dest
                         .as_local()
                         .is_some_and(|local| captured.contains(&local)),
+                    origin: LoanOrigin::Local,
                 });
             }
         }
@@ -80,17 +116,45 @@ impl<'a, 'tcx> LoanData<'a, 'tcx> {
         LoanData {
             loans,
             at,
+            arg_loans,
+            contents_loans,
             tys,
             holds_refs,
         }
     }
 
     fn operand_loans(&self, state: &Holdings, operand: &Operand) -> BitSet {
-        let mut held = BitSet::new(self.loans.len());
-        if let Some(local) = operand_place(operand).and_then(base_local) {
-            held.union(&state[local.index()]);
+        let Some(place) = operand_place(operand) else {
+            return BitSet::new(self.loans.len());
+        };
+        let Some(local) = base_local(place) else {
+            return BitSet::new(self.loans.len());
+        };
+        if has_deref(place) {
+            self.contents(state, &state[local.index()])
+        } else {
+            state[local.index()].clone()
         }
-        held
+    }
+
+    fn contents(&self, state: &Holdings, held: &BitSet) -> BitSet {
+        let mut contents = BitSet::new(self.loans.len());
+        for loan in held.iter() {
+            let loan = &self.loans[loan];
+            match loan.origin {
+                LoanOrigin::Arg(local) | LoanOrigin::ArgContents(local) => {
+                    if let Some(&index) = self.contents_loans.get(&local) {
+                        contents.insert(index);
+                    }
+                }
+                LoanOrigin::Local => {
+                    if let Some(local) = base_local(&loan.place) {
+                        contents.union(&state[local.index()]);
+                    }
+                }
+            }
+        }
+        contents
     }
 
     fn rvalue_loans(&self, state: &Holdings, location: Location, rvalue: &Rvalue) -> BitSet {
@@ -148,7 +212,11 @@ impl Forward for LoanData<'_, '_> {
     }
 
     fn entry(&self) -> Holdings {
-        self.bottom()
+        let mut state = self.bottom();
+        for &(local, loan) in &self.arg_loans {
+            state[local.index()].insert(loan);
+        }
+        state
     }
 
     fn join(&self, into: &mut Holdings, from: &Holdings) -> bool {
@@ -217,15 +285,7 @@ impl Forward for LoanData<'_, '_> {
         };
         let mut held = BitSet::new(self.loans.len());
         if self.tys.may_hold_refs(&self.tys.place_ty(dest)) {
-            let returns_ref = contains_ref(&callee.method.ret);
-            for index in 0..args.len() {
-                let passed = self.passed(state, callee, args, index);
-                if returns_ref {
-                    held.union(&passed.held);
-                } else {
-                    held.union(&passed.contents);
-                }
-            }
+            held = self.returned_loans(state, callee, args);
         }
         self.store(state, dest, held);
     }
@@ -246,14 +306,68 @@ struct Passed {
 
 impl Passed {
     fn stored(&self) -> &BitSet {
-        match self.declared {
-            DeclaredArg::Value | DeclaredArg::DeclaredRef => &self.held,
-            DeclaredArg::Ref { .. } => &self.contents,
-        }
+        &self.held
     }
 }
 
 impl LoanData<'_, '_> {
+    fn returned_loans(&self, state: &Holdings, callee: &Callee, args: &[Operand]) -> BitSet {
+        let mut held = BitSet::new(self.loans.len());
+        let borrows = &callee.method.borrows;
+        let has_receiver = args.len() > callee.method.params.len();
+        let Some(sources) = borrows.explicit() else {
+            let borrowing = borrows.elided || contains_ref(&callee.method.ret);
+            for index in 0..args.len() {
+                if borrowing {
+                    held.union(&self.passed(state, callee, args, index).held);
+                } else {
+                    held.union(&self.element_loans(state, callee, args, index));
+                }
+            }
+            return held;
+        };
+        for source in sources {
+            let (index, contents) = match source {
+                BorrowSource::This => (0, false),
+                BorrowSource::Param(param) => (param + usize::from(has_receiver), false),
+                BorrowSource::Class(_) => (0, true),
+            };
+            if index >= args.len() {
+                continue;
+            }
+            let passed = self.passed(state, callee, args, index);
+            held.union(if contents {
+                &passed.contents
+            } else {
+                &passed.held
+            });
+        }
+        if contains_param(&callee.method.ret) {
+            for index in 0..args.len() {
+                held.union(&self.element_loans(state, callee, args, index));
+            }
+        }
+        held
+    }
+
+    fn element_loans(
+        &self,
+        state: &Holdings,
+        callee: &Callee,
+        args: &[Operand],
+        index: usize,
+    ) -> BitSet {
+        let contents = self.passed(state, callee, args, index).contents;
+        let viewed = operand_place(&args[index])
+            .map(|place| self.tys.place_ty(place))
+            .is_some_and(|ty| self.tys.is_view(ty.strip_refs()));
+        if viewed {
+            self.contents(state, &contents)
+        } else {
+            contents
+        }
+    }
+
     fn passed(&self, state: &Holdings, callee: &Callee, args: &[Operand], index: usize) -> Passed {
         let has_receiver = args.len() > callee.method.params.len();
         let declared = match (has_receiver, index) {
@@ -273,15 +387,7 @@ impl LoanData<'_, '_> {
         };
         let held = self.operand_loans(state, &args[index]);
         let contents = match declared {
-            DeclaredArg::Ref { .. } => {
-                let mut contents = BitSet::new(self.loans.len());
-                for loan in held.iter() {
-                    if let Some(local) = base_local(&self.loans[loan].place) {
-                        contents.union(&state[local.index()]);
-                    }
-                }
-                contents
-            }
+            DeclaredArg::Ref { .. } => self.contents(state, &held),
             DeclaredArg::Value | DeclaredArg::DeclaredRef => held.clone(),
         };
         Passed {
@@ -289,6 +395,15 @@ impl LoanData<'_, '_> {
             held,
             contents,
         }
+    }
+}
+
+fn contains_param(ty: &Ty) -> bool {
+    match ty {
+        Ty::Param(_) => true,
+        Ty::Ref { ty, .. } | Ty::Nullable(ty) | Ty::Array(ty) => contains_param(ty),
+        Ty::Adt { args, .. } | Ty::External { args, .. } => args.iter().any(contains_param),
+        Ty::Primitive(_) | Ty::Void | Ty::Null | Ty::Unknown => false,
     }
 }
 

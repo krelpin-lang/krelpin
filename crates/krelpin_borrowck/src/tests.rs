@@ -36,6 +36,7 @@ fn in_main(code: &str) -> Vec<String> {
     errors(&format!(
         "import std.util.List;\n\
          import std.util.ArrayList;\n\
+         import std.util.Iterator;\n\
          import std.function.Supplier;\n\
          class Box {{\n\
          \x20   public int count;\n\
@@ -231,5 +232,92 @@ fn values_must_be_assigned_before_use() {
     assert_eq!(
         in_main("int count; if (names.isEmpty()) { count = 1; } int copy = count;"),
         ["`count` is used before it has a value"]
+    );
+}
+
+#[test]
+fn iterators_borrow_their_collection() {
+    assert_eq!(
+        in_main(
+            "Iterator<String> values = names.iterator(); \
+             names.add(\"x\"); \
+             values.next();"
+        ),
+        ["cannot borrow `names` as mutable because it is also borrowed as shared"]
+    );
+}
+
+#[test]
+fn results_borrow_from_their_declared_sources() {
+    let src = |code: &str| {
+        errors(&format!(
+            "class A {{\n\
+             \x20   static &[a] String first(&String a, &String b) {{ return a; }}\n\
+             \x20   static &[a, b] String either(&String a, &String b) {{ return b; }}\n\
+             \x20   static int run() {{\n\
+             \x20       String a = \"a\";\n\
+             \x20       &String kept;\n\
+             \x20       {{ {code} }}\n\
+             \x20       return kept.length();\n\
+             \x20   }}\n\
+             }}"
+        ))
+    };
+    assert_eq!(
+        src("String b = \"b\"; kept = A.first(&a, &b);"),
+        Vec::<String>::new()
+    );
+    assert_eq!(
+        src("String b = \"b\"; kept = A.either(&a, &b);"),
+        ["`b` does not live long enough"]
+    );
+}
+
+#[test]
+fn methods_keep_to_their_declared_sources() {
+    assert_eq!(
+        errors("class A { static &[a] String pick(&String a, &String b) { return b; } }"),
+        ["`pick` returns a value borrowed from `b`, but its signature only borrows from `a`"]
+    );
+    assert_eq!(
+        errors(
+            "class Parser[src] {\n\
+             \x20   &[src] String input;\n\
+             \x20   String name = \"parser\";\n\
+             \x20   Parser(&[src] String input) { this.input = input; }\n\
+             \x20   &[src] String input() { return this.input; }\n\
+             \x20   &[this] String name() { return &this.name; }\n\
+             \x20   &[src] String wrong() { return &this.name; }\n\
+             }"
+        ),
+        ["`wrong` returns a value borrowed from `this`, but its signature only borrows from `src`"]
+    );
+}
+
+#[test]
+fn objects_keep_the_borrows_they_store() {
+    let src = |code: &str| {
+        errors(&format!(
+            "class Parser[src] {{\n\
+             \x20   &[src] String input;\n\
+             \x20   Parser(&[src] String input) {{ this.input = input; }}\n\
+             \x20   &[src] String input() {{ return this.input; }}\n\
+             }}\n\
+             class Main {{ static int run() {{ {code} }} }}"
+        ))
+    };
+    assert_eq!(
+        src(
+            "String text = \"abc\"; &String kept; { Parser parser = new Parser(&text); \
+             kept = parser.input(); } return kept.length();"
+        ),
+        Vec::<String>::new()
+    );
+    assert_eq!(
+        src(
+            "Parser parser; { String text = \"abc\"; parser = new Parser(&text); } \
+             return parser.input().length();"
+        ),
+        ["`text` does not live long enough"]
     );
 }

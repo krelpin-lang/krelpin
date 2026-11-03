@@ -121,6 +121,11 @@ impl Parser<'_> {
                 {
                     end += 2;
                 }
+                if self.look_ahead(end) == TokenKind::OpenBracket
+                    && self.look_ahead(end + 1) != TokenKind::CloseBracket
+                {
+                    end = self.scan_borrow_sources(end)?;
+                }
                 if self.look_ahead(end) == TokenKind::Lt {
                     end = self.scan_generic_args(end)?;
                 }

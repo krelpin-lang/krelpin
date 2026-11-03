@@ -16,6 +16,7 @@ fn ident(name: &str) -> Ident {
 fn path(name: &str, args: Vec<Ty>) -> Ty {
     ty(TyKind::Path {
         path: Path::new(name.split('.').map(ident).collect()),
+        sources: Vec::new(),
         args,
     })
 }

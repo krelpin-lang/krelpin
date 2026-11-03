@@ -218,7 +218,7 @@ fn generic_types_split_closing_brackets() {
 
 #[test]
 fn class_generics() {
-    let unit = parse_ok("class Parser<&src, T extends Comparable<T> & Cloneable> {}");
+    let unit = parse_ok("class Parser[src]<T extends Comparable<T> & Cloneable> {}");
     let params = &class(&unit, 0).generics.params;
 
     assert_eq!(params[0].name.name.as_str(), "src");
@@ -229,6 +229,22 @@ fn class_generics() {
     };
     let bounds: Vec<String> = bounds.iter().map(ToString::to_string).collect();
     assert_eq!(bounds, ["Comparable<T>", "Cloneable"]);
+}
+
+#[test]
+fn borrow_sources_on_types() {
+    assert_eq!(ret_ty("Iterator[this]<T> f() {}"), "Iterator[this]<T>");
+    assert_eq!(ret_ty("Pair[a, b]<String> f() {}"), "Pair[a, b]<String>");
+    assert_eq!(ret_ty("Parser[src] f() {}"), "Parser[src]");
+    assert_eq!(ret_ty("int[] f() {}"), "int[]");
+    assert_eq!(
+        errors("class Parser<&src, T> {}"),
+        ["borrow sources are not declared between `<` and `>`"]
+    );
+    assert_eq!(
+        errors("class Parser[this] {}"),
+        ["`this` cannot be declared as a borrow source"]
+    );
 }
 
 #[test]

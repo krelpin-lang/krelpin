@@ -262,7 +262,7 @@ fn instanceof_bindings_are_scoped_to_the_if() {
 #[test]
 fn generics_and_borrow_sources() {
     ok("class Box<T> { T value; <U> U map(U other) { return other; } }");
-    ok("class Parser<&src> { &[src] String input; }");
+    ok("class Parser[src] { &[src] String input; }");
     ok("class A { static &[a, b] String longer(&String a, &String b) { return a; } }");
     ok("class A { String text; &[this] String get() { return &this.text; } }");
 

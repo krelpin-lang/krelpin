@@ -1,0 +1,9 @@
+package shop;
+
+import std.util.List;
+import std.util.Iterator;
+
+class Wrong[src] {
+    List[src]<String> items;
+    Iterator[src, src]<String> values;
+}

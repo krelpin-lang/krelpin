@@ -42,6 +42,7 @@ pub struct Body {
     pub params: Vec<LocalId>,
     pub locals: Vec<LocalDecl>,
     pub ret: Ty,
+    pub ret_sources: Option<Vec<ReturnSource>>,
     pub value: BodyValue,
     pub span: Span,
 }
@@ -50,6 +51,12 @@ impl Body {
     pub fn local(&self, id: LocalId) -> &LocalDecl {
         &self.locals[id.index()]
     }
+}
+
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum ReturnSource {
+    Whole(LocalId),
+    Contents(LocalId, Symbol),
 }
 
 #[derive(Debug)]

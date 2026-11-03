@@ -83,6 +83,7 @@ CompilationUnit {
                                     ty: Ty {
                                         kind: Path {
                                             path: "AtomicInt" @ 131..140,
+                                            sources: [],
                                             args: [],
                                         },
                                         span: 131..140,
@@ -94,6 +95,7 @@ CompilationUnit {
                                                 ty: Ty {
                                                     kind: Path {
                                                         path: "AtomicInt" @ 155..164,
+                                                        sources: [],
                                                         args: [],
                                                     },
                                                     span: 155..164,
@@ -132,6 +134,7 @@ CompilationUnit {
                                     ty: Ty {
                                         kind: Path {
                                             path: "String" @ 174..180,
+                                            sources: [],
                                             args: [],
                                         },
                                         span: 174..180,
@@ -158,6 +161,7 @@ CompilationUnit {
                                             Ty {
                                                 kind: Path {
                                                     path: "String" @ 191..197,
+                                                    sources: [],
                                                     args: [],
                                                 },
                                                 span: 191..197,
@@ -188,6 +192,7 @@ CompilationUnit {
                                             ty: Ty {
                                                 kind: Path {
                                                     path: "String" @ 221..227,
+                                                    sources: [],
                                                     args: [],
                                                 },
                                                 span: 221..227,
@@ -311,6 +316,7 @@ CompilationUnit {
                                                 ty: Ty {
                                                     kind: Path {
                                                         path: "String" @ 340..346,
+                                                        sources: [],
                                                         args: [],
                                                     },
                                                     span: 340..346,
@@ -393,6 +399,7 @@ CompilationUnit {
                                             ty: Ty {
                                                 kind: Path {
                                                     path: "String" @ 413..419,
+                                                    sources: [],
                                                     args: [],
                                                 },
                                                 span: 413..419,
@@ -584,6 +591,7 @@ CompilationUnit {
                                                             ty: Ty {
                                                                 kind: Path {
                                                                     path: "Person" @ 594..600,
+                                                                    sources: [],
                                                                     args: [],
                                                                 },
                                                                 span: 594..600,
@@ -595,6 +603,7 @@ CompilationUnit {
                                                                         ty: Ty {
                                                                             kind: Path {
                                                                                 path: "Person" @ 609..615,
+                                                                                sources: [],
                                                                                 args: [],
                                                                             },
                                                                             span: 609..615,

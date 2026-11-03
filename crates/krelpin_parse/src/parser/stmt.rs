@@ -351,7 +351,7 @@ impl Parser<'_> {
 
 fn is_var(ty: &Ty) -> bool {
     match &ty.kind {
-        TyKind::Path { path, args } => {
+        TyKind::Path { path, args, .. } => {
             args.is_empty()
                 && matches!(path.segments.as_slice(), [segment] if segment.name.as_str() == "var")
         }

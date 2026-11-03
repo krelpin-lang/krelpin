@@ -7,8 +7,8 @@ use krelpin_ast::ast::{
 };
 use krelpin_errors::DiagCtxt;
 use krelpin_resolve::{ItemTable, Res, Resolutions, ResolverOutput};
-use krelpin_span::Symbol;
 use krelpin_span::def_id::DefId;
+use krelpin_span::{Symbol, kw};
 
 use crate::lang_items::{LangItem, LangItems};
 use crate::param_env::ParamEnv;
@@ -36,6 +36,7 @@ pub struct TypeSig {
     pub ctors: Vec<MethodSig>,
     pub variants: Vec<VariantSig>,
     pub components: Vec<Symbol>,
+    pub borrow_params: Vec<Symbol>,
 }
 
 impl TypeSig {
@@ -81,6 +82,27 @@ pub struct MethodSig {
     pub throws: Vec<Ty>,
     pub is_abstract: bool,
     pub is_final: bool,
+    pub borrows: RetBorrows,
+}
+
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum BorrowSource {
+    This,
+    Param(usize),
+    Class(Symbol),
+}
+
+#[derive(Clone, Debug, Default)]
+pub struct RetBorrows {
+    pub sources: Vec<BorrowSource>,
+    pub elided: bool,
+    elided_types: Vec<DefId>,
+}
+
+impl RetBorrows {
+    pub fn explicit(&self) -> Option<&[BorrowSource]> {
+        (!self.elided && !self.sources.is_empty()).then_some(self.sources.as_slice())
+    }
 }
 
 #[derive(Clone, Debug)]
@@ -111,7 +133,29 @@ impl<'a> Tcx<'a> {
             .items(units)
             .map(|(type_def, item)| tcx.collect_item(type_def.def, item))
             .collect();
+        tcx.resolve_elided_borrows();
         tcx
+    }
+
+    fn resolve_elided_borrows(&mut self) {
+        let borrowing: Vec<bool> = self
+            .types
+            .iter()
+            .map(|sig| !sig.borrow_params.is_empty())
+            .collect();
+        for sig in &mut self.types {
+            for method in sig.methods.values_mut().flatten() {
+                let borrows = &mut method.borrows;
+                if borrows
+                    .elided_types
+                    .iter()
+                    .any(|def| borrowing[def.index()])
+                {
+                    borrows.elided = true;
+                }
+                borrows.elided_types.clear();
+            }
+        }
     }
 
     pub fn sig(&self, def: DefId) -> &TypeSig {
@@ -147,7 +191,7 @@ impl<'a> Tcx<'a> {
     pub fn lower_ty(&self, ty: &ast::Ty) -> Ty {
         match &ty.kind {
             TyKind::Primitive(primitive) => Ty::Primitive(*primitive),
-            TyKind::Path { path, args } => {
+            TyKind::Path { path, args, .. } => {
                 let args: Vec<Ty> = args.iter().map(|arg| self.lower_ty(arg)).collect();
                 let Some(segment) = path.segments.last() else {
                     return Ty::Unknown;
@@ -385,6 +429,12 @@ impl<'a> Tcx<'a> {
             ctors: Vec::new(),
             variants: Vec::new(),
             components: Vec::new(),
+            borrow_params: generics
+                .params
+                .iter()
+                .filter(|param| param.kind == GenericParamKind::BorrowSource)
+                .map(|param| param.name.name)
+                .collect(),
         };
 
         if let ItemKind::Enum(def) = &item.kind {
@@ -414,7 +464,8 @@ impl<'a> Tcx<'a> {
                     sig.ctors.push(self.ctor_sig(ctor, vis, def_id));
                 }
                 MemberKind::Method(method) => {
-                    let method_sig = self.method_sig(member, method, vis, def_id);
+                    let method_sig =
+                        self.method_sig(member, method, vis, def_id, &sig.borrow_params);
                     sig.methods
                         .entry(method.name.name)
                         .or_default()
@@ -590,11 +641,16 @@ impl<'a> Tcx<'a> {
         method: &Method,
         vis: Visibility,
         owner: DefId,
+        class_sources: &[Symbol],
     ) -> MethodSig {
         let ret = match &method.ret {
             FnRetTy::Void(_) => Ty::Void,
             FnRetTy::Ty(ty) => self.lower_ty(ty),
         };
+        let mut borrows = RetBorrows::default();
+        if let FnRetTy::Ty(ty) = &method.ret {
+            self.collect_borrows(ty, &method.params, class_sources, &mut borrows);
+        }
         let is_abstract = member.inheritance.abstract_kw.is_some()
             || (method.body.is_none() && !is_intrinsic(&member.annotations));
         MethodSig {
@@ -610,6 +666,85 @@ impl<'a> Tcx<'a> {
             throws: self.lower_tys(&method.throws),
             is_abstract,
             is_final: member.inheritance.final_kw.is_some(),
+            borrows,
+        }
+    }
+
+    pub fn ret_borrows(
+        &self,
+        ty: &ast::Ty,
+        params: &[Param],
+        class_sources: &[Symbol],
+    ) -> RetBorrows {
+        let mut borrows = RetBorrows::default();
+        self.collect_borrows(ty, params, class_sources, &mut borrows);
+        let elided_types = std::mem::take(&mut borrows.elided_types);
+        if elided_types
+            .iter()
+            .any(|def| !self.sig(*def).borrow_params.is_empty())
+        {
+            borrows.elided = true;
+        }
+        borrows
+    }
+
+    fn collect_borrows(
+        &self,
+        ty: &ast::Ty,
+        params: &[Param],
+        class_sources: &[Symbol],
+        borrows: &mut RetBorrows,
+    ) {
+        let name_sources = |sources: &[Ident], borrows: &mut RetBorrows| {
+            for source in sources {
+                let found = if source.name == kw::This {
+                    Some(BorrowSource::This)
+                } else if let Some(index) = params
+                    .iter()
+                    .position(|param| param.name.name == source.name)
+                {
+                    Some(BorrowSource::Param(index))
+                } else {
+                    class_sources
+                        .contains(&source.name)
+                        .then_some(BorrowSource::Class(source.name))
+                };
+                if let Some(found) = found.filter(|found| !borrows.sources.contains(found)) {
+                    borrows.sources.push(found);
+                }
+            }
+        };
+        match &ty.kind {
+            TyKind::Primitive(_) => {}
+            TyKind::Ref { sources, ty, .. } => {
+                if sources.is_empty() {
+                    borrows.elided = true;
+                }
+                name_sources(sources, borrows);
+                self.collect_borrows(ty, params, class_sources, borrows);
+            }
+            TyKind::Path {
+                path,
+                sources,
+                args,
+            } => {
+                if sources.is_empty() {
+                    let def = path
+                        .segments
+                        .last()
+                        .and_then(|segment| self.resolutions.get(segment.span));
+                    if let Some(Res::Item(def)) = def {
+                        borrows.elided_types.push(def);
+                    }
+                }
+                name_sources(sources, borrows);
+                for arg in args {
+                    self.collect_borrows(arg, params, class_sources, borrows);
+                }
+            }
+            TyKind::Nullable(ty) | TyKind::Array(ty) => {
+                self.collect_borrows(ty, params, class_sources, borrows);
+            }
         }
     }
 
@@ -627,6 +762,7 @@ impl<'a> Tcx<'a> {
             throws: self.lower_tys(&ctor.throws),
             is_abstract: false,
             is_final: false,
+            borrows: RetBorrows::default(),
         }
     }
 
@@ -696,5 +832,6 @@ fn synthesized_method(
         throws: Vec::new(),
         is_abstract: false,
         is_final: true,
+        borrows: RetBorrows::default(),
     }
 }

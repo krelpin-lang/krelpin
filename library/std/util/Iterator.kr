@@ -1,6 +1,6 @@
 package std.util;
 
-interface Iterator<T> {
+interface Iterator[src]<T> {
     boolean hasNext();
 
     mut T next();

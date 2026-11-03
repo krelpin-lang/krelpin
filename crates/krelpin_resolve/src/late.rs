@@ -242,7 +242,14 @@ impl<'a> Resolver<'a> {
     fn resolve_ty(&mut self, ty: &Ty) {
         match &ty.kind {
             TyKind::Primitive(_) => {}
-            TyKind::Path { path, args } => {
+            TyKind::Path {
+                path,
+                sources,
+                args,
+            } => {
+                for source in sources {
+                    self.resolve_borrow_source(*source);
+                }
                 match path.segments.as_slice() {
                     [segment] => self.resolve_type_name(*segment),
                     segments => {
@@ -311,7 +318,7 @@ impl<'a> Resolver<'a> {
                         .with_span(source.span)
                         .with_help(
                             "a borrow source must name a parameter of the method, `this`, \
-                             or a `&` generic parameter of the class",
+                             or a borrow source of the class, like `src` in `Parser[src]`",
                         ),
                 );
             }

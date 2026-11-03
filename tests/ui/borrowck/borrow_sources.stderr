@@ -1,0 +1,48 @@
+error: `pick` returns a value borrowed from `b`, but its signature only borrows from `a`
+  --> tests/ui/borrowck/borrow_sources.kr:18:9
+   |
+17 |     static &[a] String pick(&String a, &String b) {
+   |                                                - `b` comes in here
+18 |         return b;
+   |         ^^^^^^^^^ this borrows from `b`
+   |
+   = help: list `b` among the borrow sources: `[a, b]`
+
+error: cannot borrow `names` as mutable because it is also borrowed as shared
+  --> tests/ui/borrowck/borrow_sources.kr:27:9
+   |
+26 |         Iterator<String> values = names.iterator();
+   |                                   ---------------- shared borrow of `names` happens here
+27 |         names.add("x");
+   |         ^^^^^^^^^^^^^^ mutable borrow happens here
+28 |         values.next();
+   |         ------------- the borrow is used later here
+
+error: `c` does not live long enough
+  --> tests/ui/borrowck/borrow_sources.kr:44:38
+   |
+44 |             chosen = Main.either(&b, &c, true);
+   |                                      ^^ borrowed value does not live long enough
+45 |         }
+   |          - `c` stops existing here while still borrowed
+
+error: `name` returns a value borrowed from `this`, but its signature only borrows from `src`
+  --> tests/ui/borrowck/borrow_sources.kr:73:9
+   |
+72 |     &[src] String name() {
+   |     ---------------------- `this` comes in here
+73 |         return &this.name;
+   |         ^^^^^^^^^^^^^^^^^^ this borrows from `this`
+   |
+   = help: list `this` among the borrow sources: `[src, this]`
+
+error: `text` does not live long enough
+  --> tests/ui/borrowck/borrow_sources.kr:92:33
+   |
+92 |             parser = new Parser(&text);
+   |                                 ^^^^^ borrowed value does not live long enough
+93 |         }
+   |          - `text` stops existing here while still borrowed
+
+error: aborting due to 5 previous errors
+

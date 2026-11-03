@@ -12,8 +12,8 @@ use krelpin_typeck::{Tcx, Ty};
 
 use crate::mir::{
     BasicBlock, BasicBlockData, Body, BodyId, BodySource, CaptureInfo, CaptureMode, Local,
-    LocalDecl, Mir, Place, PlaceElem, Rvalue, Statement, StatementKind, Terminator, TerminatorKind,
-    Unwind,
+    LocalDecl, Mir, Place, PlaceElem, ReturnSource, Rvalue, Statement, StatementKind, Terminator,
+    TerminatorKind, Unwind,
 };
 use crate::visit::for_each_local_mut;
 
@@ -119,6 +119,20 @@ impl<'a, 'h, 'tcx> Builder<'a, 'h, 'tcx> {
             builder.declare_arg(local);
         }
         let arg_count = builder.locals.len() - 1;
+        let ret_sources = body.ret_sources.as_ref().map(|sources| {
+            sources
+                .iter()
+                .filter_map(|source| match *source {
+                    hir::ReturnSource::Whole(id) => {
+                        builder.var(id).as_local().map(ReturnSource::Whole)
+                    }
+                    hir::ReturnSource::Contents(id, name) => builder
+                        .var(id)
+                        .as_local()
+                        .map(|local| ReturnSource::Contents(local, name)),
+                })
+                .collect()
+        });
         match &body.value {
             BodyValue::Block(block) => builder.lower_block(block),
             BodyValue::Expr(expr) => {
@@ -131,7 +145,7 @@ impl<'a, 'h, 'tcx> Builder<'a, 'h, 'tcx> {
             BodyKind::Constructor => BodySource::Constructor,
             BodyKind::FieldInit => BodySource::FieldInit,
         };
-        builder.finish(source, arg_count, Vec::new());
+        builder.finish(source, arg_count, Vec::new(), ret_sources);
     }
 
     #[allow(clippy::too_many_arguments)]
@@ -184,7 +198,7 @@ impl<'a, 'h, 'tcx> Builder<'a, 'h, 'tcx> {
             index: self.closures,
         };
         self.closures += 1;
-        builder.finish(source, arg_count, captures)
+        builder.finish(source, arg_count, captures, None)
     }
 
     fn finish(
@@ -192,6 +206,7 @@ impl<'a, 'h, 'tcx> Builder<'a, 'h, 'tcx> {
         source: BodySource,
         arg_count: usize,
         captures: Vec<CaptureInfo>,
+        ret_sources: Option<Vec<ReturnSource>>,
     ) -> BodyId {
         let fallthrough = if self.ret == Ty::Void {
             TerminatorKind::Return
@@ -207,6 +222,7 @@ impl<'a, 'h, 'tcx> Builder<'a, 'h, 'tcx> {
             source,
             locals,
             arg_count,
+            ret_sources,
             captures,
             blocks,
             span: self.hir.span,

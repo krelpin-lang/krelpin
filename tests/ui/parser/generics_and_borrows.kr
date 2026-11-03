@@ -1,4 +1,4 @@
-abstract class Parser<&src, T extends Comparable<T> & Cloneable> implements Iterator<T> {
+abstract class Parser[src]<T extends Comparable<T> & Cloneable> implements Iterator<T> {
     &[src] String input;
     Map<String, List<&String>> cache;
 

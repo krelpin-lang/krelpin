@@ -8,14 +8,14 @@ use krelpin_resolve::{Res, ResolverOutput};
 use krelpin_span::def_id::DefId;
 use krelpin_span::{Span, Symbol, kw};
 use krelpin_typeck::ty::{promote, widens};
-use krelpin_typeck::{Callee, LangItem, PatRes, Tcx, Ty, TypeckResults};
+use krelpin_typeck::{BorrowSource, Callee, LangItem, PatRes, Tcx, Ty, TypeckResults};
 
 use crate::captures::{captures, expr_captures};
 
 use crate::hir::{
     Arm, ArmBody, Block, Body, BodyKind, BodyValue, Catch, Closure, ClosureBody, ClosureKind,
-    Dispatch, Expr, ExprKind, Hir, LocalDecl, LocalId, LoopKind, Pat, PatKind, Stmt, StmtKind,
-    WithField,
+    Dispatch, Expr, ExprKind, Hir, LocalDecl, LocalId, LoopKind, Pat, PatKind, ReturnSource, Stmt,
+    StmtKind, WithField,
 };
 
 pub fn lower(
@@ -115,6 +115,30 @@ impl LoweringCtxt<'_, '_> {
             .map(|param| self.declare(param.name.name, param.name.span))
             .collect();
 
+        let ret_sources = match &member.kind {
+            MemberKind::Method(method) => match &method.ret {
+                FnRetTy::Ty(ty) => {
+                    let class_sources = &self.tcx.sig(self.owner).borrow_params;
+                    let borrows = self.tcx.ret_borrows(ty, &method.params, class_sources);
+                    borrows.explicit().map(|sources| {
+                        sources
+                            .iter()
+                            .filter_map(|source| match source {
+                                BorrowSource::This => self.this.map(ReturnSource::Whole),
+                                BorrowSource::Param(index) => {
+                                    params.get(*index).copied().map(ReturnSource::Whole)
+                                }
+                                BorrowSource::Class(name) => {
+                                    self.this.map(|this| ReturnSource::Contents(this, *name))
+                                }
+                            })
+                            .collect()
+                    })
+                }
+                FnRetTy::Void(_) => None,
+            },
+            _ => None,
+        };
         self.rets.push(ret.clone());
         let value = match &member.kind {
             MemberKind::Type(_) => return None,
@@ -142,6 +166,7 @@ impl LoweringCtxt<'_, '_> {
             params,
             locals: self.locals,
             ret,
+            ret_sources,
             value,
             span: member.span,
         })

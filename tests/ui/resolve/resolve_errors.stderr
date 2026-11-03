@@ -64,7 +64,7 @@ error: cannot find borrow source `other`
 22 |     &[other] String name() {
    |       ^^^^^
    |
-   = help: a borrow source must name a parameter of the method, `this`, or a `&` generic parameter of the class
+   = help: a borrow source must name a parameter of the method, `this`, or a borrow source of the class, like `src` in `Parser[src]`
 
 error: aborting due to 9 previous errors
 

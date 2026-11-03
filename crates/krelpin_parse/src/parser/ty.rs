@@ -2,6 +2,7 @@ use krelpin_ast::ast::{
     GenericParam, GenericParamKind, Generics, Ident, Path, PrimitiveTy, Ty, TyKind,
 };
 use krelpin_ast::token::TokenKind;
+use krelpin_errors::Diagnostic;
 use krelpin_span::kw;
 
 use super::{Expected, PResult, Parser};
@@ -86,9 +87,19 @@ impl Parser<'_> {
         }
 
         let path = self.parse_path()?;
+        let sources = if self.borrow_sources_ahead() {
+            self.bump();
+            self.parse_borrow_sources()?
+        } else {
+            Vec::new()
+        };
         let args = self.parse_generic_args()?;
         Ok(Ty {
-            kind: TyKind::Path { path, args },
+            kind: TyKind::Path {
+                path,
+                sources,
+                args,
+            },
             span: lo.to(self.prev_token.span),
         })
     }
@@ -147,6 +158,41 @@ impl Parser<'_> {
         Ok(tys)
     }
 
+    fn borrow_sources_ahead(&self) -> bool {
+        self.token.kind == TokenKind::OpenBracket
+            && matches!(self.look_ahead(1), TokenKind::Ident(_))
+            && matches!(
+                self.look_ahead(2),
+                TokenKind::CloseBracket | TokenKind::Comma
+            )
+    }
+
+    pub(crate) fn parse_type_generics(&mut self) -> PResult<Generics> {
+        let lo = self.token.span;
+        let mut sources = Vec::new();
+        if self.borrow_sources_ahead() {
+            self.bump();
+            for name in self.parse_borrow_sources()? {
+                if name.name == kw::This {
+                    self.error(name.span, "`this` cannot be declared as a borrow source");
+                    continue;
+                }
+                sources.push(GenericParam {
+                    name,
+                    kind: GenericParamKind::BorrowSource,
+                    span: name.span,
+                });
+            }
+        }
+        let mut generics = self.parse_generics()?;
+        if !sources.is_empty() {
+            sources.append(&mut generics.params);
+            generics.params = sources;
+            generics.span = lo.to(self.prev_token.span);
+        }
+        Ok(generics)
+    }
+
     pub(crate) fn parse_generics(&mut self) -> PResult<Generics> {
         let lo = self.token.span;
         if !self.eat_noexpect(TokenKind::Lt) {
@@ -187,10 +233,19 @@ impl Parser<'_> {
 
         if self.break_and_eat(TokenKind::And) {
             let name = self.parse_ident()?;
+            let span = lo.to(self.prev_token.span);
+            self.emit(
+                Diagnostic::error("borrow sources are not declared between `<` and `>`")
+                    .with_span(span)
+                    .with_help(format!(
+                        "declare them in brackets after the type name, like `Parser[{}]<T>`",
+                        name.name
+                    )),
+            );
             return Ok(GenericParam {
                 name,
                 kind: GenericParamKind::BorrowSource,
-                span: lo.to(self.prev_token.span),
+                span,
             });
         }
 

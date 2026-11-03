@@ -29,7 +29,8 @@ pub use crate::closure::FnSig;
 pub use crate::lang_items::{LangItem, LangItems};
 pub use crate::param_env::ParamEnv;
 pub use crate::sig::{
-    AdtKind, FieldSig, GenericParamSig, MethodSig, Tcx, TypeSig, VariantFieldSig, VariantSig,
+    AdtKind, BorrowSource, FieldSig, GenericParamSig, MethodSig, RetBorrows, Tcx, TypeSig,
+    VariantFieldSig, VariantSig,
 };
 pub use crate::ty::Ty;
 

@@ -42,6 +42,7 @@ pub struct Body {
     pub source: BodySource,
     pub locals: Vec<LocalDecl>,
     pub arg_count: usize,
+    pub ret_sources: Option<Vec<ReturnSource>>,
     pub captures: Vec<CaptureInfo>,
     pub blocks: Vec<BasicBlockData>,
     pub span: Span,
@@ -59,6 +60,12 @@ impl Body {
     pub fn args(&self) -> impl Iterator<Item = Local> {
         (1..=self.arg_count).map(|index| Local(index as u32))
     }
+}
+
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum ReturnSource {
+    Whole(Local),
+    Contents(Local, Symbol),
 }
 
 #[derive(Clone, Debug)]

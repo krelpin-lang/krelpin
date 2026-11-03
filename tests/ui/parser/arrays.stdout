@@ -47,6 +47,7 @@ CompilationUnit {
                                                     Ty {
                                                         kind: Path {
                                                             path: "String" @ 34..40,
+                                                            sources: [],
                                                             args: [],
                                                         },
                                                         span: 34..40,
@@ -176,6 +177,7 @@ CompilationUnit {
                                                                 Ty {
                                                                     kind: Path {
                                                                         path: "String" @ 105..111,
+                                                                        sources: [],
                                                                         args: [],
                                                                     },
                                                                     span: 105..111,
@@ -246,6 +248,7 @@ CompilationUnit {
                                                         ty: Ty {
                                                             kind: Path {
                                                                 path: "String" @ 146..152,
+                                                                sources: [],
                                                                 args: [],
                                                             },
                                                             span: 146..152,

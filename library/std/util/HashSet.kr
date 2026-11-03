@@ -17,5 +17,5 @@ class HashSet<T extends Hashable<T>> implements Set<T> {
     mut void clear();
 
     @Intrinsic
-    Iterator<T> iterator();
+    Iterator[this]<T> iterator();
 }
