@@ -6,10 +6,18 @@ use super::Parser;
 
 impl Parser<'_> {
     pub(crate) fn lambda_ahead(&self) -> bool {
-        match self.token.kind {
-            kind if is_plain_ident(kind) => self.look_ahead(1) == TokenKind::Arrow,
+        self.lambda_at(0) || self.move_lambda_ahead()
+    }
+
+    pub(crate) fn move_lambda_ahead(&self) -> bool {
+        self.token.kind == TokenKind::Ident(kw::Move) && self.lambda_at(1)
+    }
+
+    fn lambda_at(&self, start: usize) -> bool {
+        match self.look_ahead(start) {
+            kind if is_plain_ident(kind) => self.look_ahead(start + 1) == TokenKind::Arrow,
             TokenKind::OpenParen => self
-                .matching_paren(0)
+                .matching_paren(start)
                 .is_some_and(|close| self.look_ahead(close + 1) == TokenKind::Arrow),
             _ => false,
         }

@@ -202,6 +202,45 @@ impl<'a> Tcx<'a> {
         }
     }
 
+    pub fn is_copy(&self, ty: &Ty) -> bool {
+        self.is_copy_inner(ty, &mut Vec::new())
+    }
+
+    fn is_copy_inner(&self, ty: &Ty, visiting: &mut Vec<DefId>) -> bool {
+        match ty {
+            Ty::Primitive(_) | Ty::Null | Ty::Void | Ty::Unknown => true,
+            Ty::Ref { mutable, .. } => !mutable,
+            Ty::Nullable(inner) => self.is_copy_inner(inner, visiting),
+            Ty::Array(_) | Ty::Param(_) | Ty::External { .. } => false,
+            Ty::Adt { def, args, .. } => {
+                if self.lang_items.is(*def, LangItem::String) {
+                    return true;
+                }
+                if visiting.contains(def) {
+                    return false;
+                }
+                let sig = self.sig(*def);
+                let subst = self.subst_for(*def, args);
+                visiting.push(*def);
+                let copy = match sig.kind {
+                    AdtKind::Enum => sig
+                        .variants
+                        .iter()
+                        .flat_map(|variant| &variant.fields)
+                        .all(|field| self.is_copy_inner(&field.ty.subst(&subst), visiting)),
+                    AdtKind::Record => sig.components.iter().all(|name| {
+                        sig.fields.get(name).is_some_and(|field| {
+                            self.is_copy_inner(&field.ty.subst(&subst), visiting)
+                        })
+                    }),
+                    AdtKind::Class | AdtKind::Interface => false,
+                };
+                visiting.pop();
+                copy
+            }
+        }
+    }
+
     pub fn is_subclass(&self, sub: DefId, sup: DefId) -> bool {
         if sub == sup {
             return true;

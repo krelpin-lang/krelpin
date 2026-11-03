@@ -65,7 +65,14 @@ impl Body {
 pub struct CaptureInfo {
     pub name: Symbol,
     pub ty: Ty,
-    pub mutable: bool,
+    pub mode: CaptureMode,
+}
+
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum CaptureMode {
+    Value,
+    Ref,
+    RefMut,
 }
 
 #[derive(Clone, Copy, PartialEq, Eq, Hash, PartialOrd, Ord)]
@@ -126,6 +133,7 @@ pub enum StatementKind {
     Assign(Box<(Place, Rvalue)>),
     StorageLive(Local),
     StorageDead(Local),
+    FakeRead(Place),
 }
 
 #[derive(Clone, Debug, PartialEq)]

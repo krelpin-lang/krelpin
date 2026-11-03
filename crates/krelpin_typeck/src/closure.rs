@@ -1,4 +1,4 @@
-use krelpin_ast::ast::{Block, Expr, ExprKind, Ident, LambdaBody, LambdaParam};
+use krelpin_ast::ast::{Block, Expr, ExprKind, Ident, LambdaBody, LambdaParam, ReceiverKind};
 use krelpin_errors::Diagnostic;
 use krelpin_span::def_id::DefId;
 use krelpin_span::{Span, Symbol, kw};
@@ -28,6 +28,16 @@ impl Tcx<'_> {
         }
         match self.abstract_methods(*def, args).as_slice() {
             [(method, sig)] if method.generics.is_empty() => Some(sig.clone()),
+            _ => None,
+        }
+    }
+
+    pub fn fn_receiver(&self, ty: &Ty) -> Option<ReceiverKind> {
+        let Ty::Adt { def, args, .. } = ty else {
+            return None;
+        };
+        match self.abstract_methods(*def, args).as_slice() {
+            [(method, _)] => method.receiver,
             _ => None,
         }
     }
@@ -147,7 +157,7 @@ impl FnCtxt<'_, '_> {
             Ty::Unknown
         };
         match &expr.kind {
-            ExprKind::Lambda { params, body } => {
+            ExprKind::Lambda { params, body, .. } => {
                 self.check_lambda(expr.span, params, body, sig.as_ref())
             }
             ExprKind::MethodRef { expr: target, name } => {

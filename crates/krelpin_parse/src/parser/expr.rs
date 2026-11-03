@@ -482,6 +482,10 @@ impl Parser<'_> {
 
     fn parse_lambda(&mut self) -> PResult<Expr> {
         let lo = self.token.span;
+        let moves = self.move_lambda_ahead();
+        if moves {
+            self.bump();
+        }
         let params = if self.token.kind == TokenKind::OpenParen {
             self.parse_lambda_params()?
         } else {
@@ -503,6 +507,7 @@ impl Parser<'_> {
         Ok(self.mk_expr(
             lo,
             ExprKind::Lambda {
+                moves,
                 params,
                 body: Box::new(body),
             },

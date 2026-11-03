@@ -89,7 +89,13 @@ impl FnCtxt<'_, '_> {
                 let iter_ty = self.check_expr(iter);
                 let elem = self.element_ty(&iter_ty, iter.span);
                 let declared = self.lower_ty(ty);
-                if !self.is_assignable(&elem, &declared) {
+                let copied = match &elem {
+                    Ty::Ref { ty: inner, .. } if self.tcx.is_copy(inner) => {
+                        self.is_assignable(inner, &declared)
+                    }
+                    _ => false,
+                };
+                if !copied && !self.is_assignable(&elem, &declared) {
                     self.mismatch(ty.span, &declared, &elem);
                 }
                 self.locals.insert(name.span, declared);

@@ -689,7 +689,7 @@ impl<'a> Resolver<'a> {
                 self.resolve_ty(ty);
                 self.resolve_expr(expr);
             }
-            ExprKind::Lambda { params, body } => {
+            ExprKind::Lambda { params, body, .. } => {
                 let outer_jumps = std::mem::take(&mut self.jumps);
                 self.with_scope(|this| {
                     for param in params {

@@ -114,6 +114,10 @@ fn lambdas() {
     assert_eq!(expr("(int a, String b) -> a"), "((int a, String b) -> a)");
     assert_eq!(expr("() -> { run(); }"), "(() -> { ... })");
     assert_eq!(expr("list.map(x -> x + 1)"), "list.map(((x) -> (x + 1)))");
+    assert_eq!(expr("move x -> x"), "(move (x) -> x)");
+    assert_eq!(expr("move () -> { run(); }"), "(move () -> { ... })");
+    assert_eq!(expr("move(x)"), "move(x)");
+    assert_eq!(expr("move -> move"), "((move) -> move)");
 }
 
 #[test]

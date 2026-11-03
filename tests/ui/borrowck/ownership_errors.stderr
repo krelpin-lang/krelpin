@@ -1,0 +1,100 @@
+error: cannot assign to `this.balance` in a method that is not `mut`
+  --> tests/ui/borrowck/ownership_errors.kr:16:9
+   |
+16 |         this.balance = 0;
+   |         ^^^^^^^^^^^^^^^^ this changes the object
+   |
+   = help: mark the method `mut` to let it change `this`
+
+error: cannot borrow `this` as mutable in a method that is not `mut`
+  --> tests/ui/borrowck/ownership_errors.kr:17:9
+   |
+17 |         this.deposit(1);
+   |         ^^^^^^^^^^^^^^^ this changes the object
+   |
+   = help: mark the method `mut` to let it change `this`
+
+error: cannot move out of `this.notes`, which is borrowed
+  --> tests/ui/borrowck/ownership_errors.kr:21:16
+   |
+21 |         return this.notes;
+   |                ^^^^^^^^^^ value moved here
+   |
+   = note: `List<String>` values are moved instead of copied
+   = help: borrow it instead: `&this.notes`
+
+error: borrow of moved value: `first`
+  --> tests/ui/borrowck/ownership_errors.kr:31:9
+   |
+30 |         Account second = first;
+   |                          ----- value moved here
+31 |         first.deposit(1);
+   |         ^^^^^^^^^^^^^^^^ value borrowed here after move
+   |
+   = note: `first` has type `Account`, which is moved instead of copied
+
+error: borrow of moved value: `box.notes`
+  --> tests/ui/borrowck/ownership_errors.kr:34:9
+   |
+33 |         List<String> taken = box.notes;
+   |                              --------- value moved here
+34 |         box.notes.size();
+   |         ^^^^^^^^^^^^^^^^ value borrowed here after move
+   |
+   = note: `box.notes` has type `List<String>`, which is moved instead of copied
+
+error: use of moved value: `second`
+  --> tests/ui/borrowck/ownership_errors.kr:36:13
+   |
+36 |             Main.consume(second);
+   |             ^^^^^^^^^^^^^^^^^^^^ value moved here, in an earlier iteration of the loop
+   |
+   = note: `second` has type `Account`, which is moved instead of copied
+
+error: cannot borrow `list` as mutable because it is also borrowed as shared
+  --> tests/ui/borrowck/ownership_errors.kr:43:9
+   |
+42 |         &List<String> view = &list;
+   |                              ----- shared borrow of `list` happens here
+43 |         list.add("x");
+   |         ^^^^^^^^^^^^^ mutable borrow happens here
+44 |         view.size();
+   |         ----------- the borrow is used later here
+
+error: `text` does not live long enough
+  --> tests/ui/borrowck/ownership_errors.kr:51:20
+   |
+51 |             kept = &text;
+   |                    ^^^^^ borrowed value does not live long enough
+52 |         }
+   |          - `text` stops existing here while still borrowed
+
+error: a returned lambda borrows `names`, which belongs to this method
+  --> tests/ui/borrowck/ownership_errors.kr:58:16
+   |
+58 |         return () -> names.size();
+   |         -------------------------- the lambda is returned here
+   |                ^^^^^^^^^^^^^^^^^^ `names` is borrowed by the lambda here
+   |
+   = note: `names` stops existing when the method ends
+   = help: use a `move` lambda to give it its own copy
+
+error: cannot move `names` out of a lambda
+  --> tests/ui/borrowck/ownership_errors.kr:63:27
+   |
+63 |         return move () -> names;
+   |                           ^^^^^ value moved here
+   |
+   = note: the lambda can be called more than once, so it can only copy or borrow what it captured
+
+error: cannot move out of an element of `lists`
+  --> tests/ui/borrowck/ownership_errors.kr:67:16
+   |
+67 |         return lists[0];
+   |                ^^^^^^^^ value moved here
+   |
+   = note: `List<String>` values are moved instead of copied
+   = help: borrow the element instead
+
+error: aborting due to 11 previous errors
+

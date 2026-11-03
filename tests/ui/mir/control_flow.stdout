@@ -21,12 +21,14 @@ ctor Counter.Counter(_1: &mut Counter) -> void {
 }
 
 ctor Counter.Counter(_1: &mut Counter, _2: int) -> void {
+    let _3: int[];
     debug this => _1;
     debug start => _2;
 
     bb0: {
         (*_1).count = copy _2;
-        (*_1).slots = new int[const 4];
+        _3 = new int[const 4];
+        (*_1).slots = move _3;
         return;
     }
 }
@@ -95,7 +97,7 @@ fn Counter.name(_1: String) -> String {
     bb5: {
         StorageLive(_10);
         _10 = const "beta";
-        _0 = Add(move _10, const "!");
+        _0 = Add(copy _10, const "!");
         StorageDead(_10);
         goto -> bb1;
     }
@@ -107,7 +109,7 @@ fn Counter.name(_1: String) -> String {
     bb7: {
         _12 = new IllegalArgumentException;
         _13 = &mut _12;
-        IllegalArgumentException::IllegalArgumentException(move _13, move _1) -> [return: bb8, unwind continue];
+        IllegalArgumentException::IllegalArgumentException(move _13, copy _1) -> [return: bb8, unwind continue];
     }
 
     bb8: {
@@ -170,33 +172,29 @@ fn Counter.nested(_1: int) -> int {
 }
 
 fn Counter.curry(_1: int) -> Supplier<Function<int, int>> {
-    let _2: &int;
     debug base => _1;
 
     bb0: {
-        _2 = &_1;
-        _0 = Counter.curry::closure#0 [move _2];
+        _0 = Counter.curry::closure#0 [copy _1];
         return;
     }
 }
 
-fn Counter.curry::closure#0(_1: Supplier<Function<int, int>>) -> Function<int, int> {
-    capture base: &int;
-    let _2: &int;
+fn Counter.curry::closure#0(_1: &mut Supplier<Function<int, int>>) -> Function<int, int> {
+    capture base: int;
 
     bb0: {
-        _2 = &(*_1.base);
-        _0 = Counter.curry::closure#0::closure#0 [move _2];
+        _0 = Counter.curry::closure#0::closure#0 [copy (*_1).base];
         return;
     }
 }
 
-fn Counter.curry::closure#0::closure#0(_1: Function<int, int>, _2: int) -> int {
-    capture base: &int;
+fn Counter.curry::closure#0::closure#0(_1: &mut Function<int, int>, _2: int) -> int {
+    capture base: int;
     debug value => _2;
 
     bb0: {
-        _0 = Add(copy _2, copy (*_1.base));
+        _0 = Add(copy _2, copy (*_1).base);
         return;
     }
 }
@@ -245,9 +243,9 @@ fn Counter.deep(_1: Object) -> boolean {
 
     bb4: {
         StorageLive(_6);
-        _6 = move (((_1 as Pair).first as Pair).first as String);
+        _6 = copy (((_1 as Pair).first as Pair).first as String);
         StorageLive(_7);
-        _7 = move ((_1 as Pair).second as String);
+        _7 = copy ((_1 as Pair).second as String);
         _9 = &_6;
         _10 = &_7;
         _8 = Equatable::equals(move _9, move _10) -> [return: bb5, unwind continue];

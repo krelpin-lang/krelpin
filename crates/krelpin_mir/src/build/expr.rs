@@ -9,8 +9,8 @@ use krelpin_typeck::{AdtKind, Callee, LangItem, Ty};
 
 use super::Builder;
 use crate::mir::{
-    AggregateKind, BasicBlock, Check, ClosureTarget, Constant, Operand, Place, PlaceBase,
-    PlaceElem, Rvalue, TerminatorKind, UnaryOp,
+    AggregateKind, BasicBlock, CaptureInfo, CaptureMode, Check, ClosureTarget, Constant, Operand,
+    Place, PlaceBase, PlaceElem, Rvalue, TerminatorKind, UnaryOp,
 };
 
 pub(super) struct CallParts<'h> {
@@ -509,7 +509,10 @@ impl<'h> Builder<'_, 'h, '_> {
     ) -> Place {
         let target = self.as_place(place);
         match op {
-            None => self.expr_into(target.clone(), value),
+            None => {
+                let operand = self.as_operand(value);
+                self.assign(target.clone(), Rvalue::Use(operand), span);
+            }
             Some(op) => {
                 let current = self.operand_from_place(target.clone(), &place.ty, span);
                 let operand = self.as_operand(value);
@@ -627,11 +630,28 @@ impl<'h> Builder<'_, 'h, '_> {
         }
 
         let Some(receiver) = receiver.filter(|_| safe) else {
-            let mut operands: Vec<Operand> = receiver
-                .map(|receiver| self.as_operand(receiver))
+            let wants_mut = callee.method.receiver == Some(ReceiverKind::RefMut);
+            let staged = receiver.map(|receiver| self.stage_receiver(receiver, wants_mut));
+            let deferred = matches!(staged, Some(StagedReceiver::Place { .. }));
+            let args: Vec<Operand> = args
+                .iter()
+                .map(|arg| {
+                    let operand = self.as_operand(arg);
+                    match operand {
+                        Operand::Copy(_) | Operand::Move(_) if deferred => {
+                            let temp = self.temp(&arg.ty, arg.span);
+                            self.assign(Place::local(temp), Rvalue::Use(operand), arg.span);
+                            Operand::Move(Place::local(temp))
+                        }
+                        operand => operand,
+                    }
+                })
+                .collect();
+            let mut operands: Vec<Operand> = staged
+                .map(|staged| self.activate_receiver(staged, span))
                 .into_iter()
                 .collect();
-            operands.extend(args.iter().map(|arg| self.as_operand(arg)));
+            operands.extend(args);
             self.call(callee, dispatch, operands, dest, span);
             return;
         };
@@ -673,6 +693,65 @@ impl<'h> Builder<'_, 'h, '_> {
         self.call(callee, dispatch, operands, dest, span);
         self.goto(join, span);
         self.current = join;
+    }
+
+    fn stage_receiver(&mut self, receiver: &'h Expr, wants_mut: bool) -> StagedReceiver {
+        if let (true, Ty::Ref { mutable: false, ty }) = (wants_mut, &receiver.ty) {
+            return StagedReceiver::Place {
+                place: self.as_place(receiver).project(PlaceElem::Deref),
+                ty: ty.as_ref().clone(),
+                borrow: Some(true),
+            };
+        }
+        match &receiver.kind {
+            ExprKind::Borrow { mutable, expr } if self.is_place_expr(expr) => {
+                StagedReceiver::Place {
+                    place: self.as_place(expr),
+                    ty: expr.ty.clone(),
+                    borrow: Some(*mutable),
+                }
+            }
+            _ if self.is_place_expr(receiver) => StagedReceiver::Place {
+                place: self.as_place(receiver),
+                ty: receiver.ty.clone(),
+                borrow: None,
+            },
+            _ => StagedReceiver::Ready(self.as_operand(receiver)),
+        }
+    }
+
+    fn activate_receiver(&mut self, staged: StagedReceiver, span: Span) -> Operand {
+        match staged {
+            StagedReceiver::Ready(operand) => operand,
+            StagedReceiver::Place {
+                place,
+                ty,
+                borrow: None,
+            } => self.operand_from_place(place, &ty, span),
+            StagedReceiver::Place {
+                place,
+                ty,
+                borrow: Some(mutable),
+            } => {
+                let ref_ty = Ty::Ref {
+                    mutable,
+                    ty: Box::new(ty),
+                };
+                let temp = self.temp(&ref_ty, span);
+                self.assign(Place::local(temp), Rvalue::Ref { mutable, place }, span);
+                Operand::Move(Place::local(temp))
+            }
+        }
+    }
+
+    fn is_place_expr(&self, expr: &Expr) -> bool {
+        match &expr.kind {
+            ExprKind::Local(_) | ExprKind::Field { safe: false, .. } | ExprKind::Index { .. } => {
+                true
+            }
+            ExprKind::Static { owner, name } => self.variant_index(*owner, *name).is_none(),
+            _ => false,
+        }
     }
 
     pub(super) fn call(
@@ -820,30 +899,54 @@ impl<'h> Builder<'_, 'h, '_> {
 
     fn lower_closure(&mut self, dest: Place, closure: &'h Closure, ty: &Ty, span: Span) {
         let (target, operands) = match &closure.kind {
-            ClosureKind::Lambda { params, ret, body } => {
-                let id = self.build_closure(closure, params, ret, body, ty, span);
-                let operands = closure
+            ClosureKind::Lambda {
+                moves,
+                params,
+                ret,
+                body,
+            } => {
+                let captures: Vec<CaptureInfo> = closure
                     .captures
                     .iter()
                     .map(|capture| {
+                        let decl = self.hir.local(capture.local);
+                        let mode = if *moves || (!capture.mutable && self.is_copy(&decl.ty)) {
+                            CaptureMode::Value
+                        } else if capture.mutable {
+                            CaptureMode::RefMut
+                        } else {
+                            CaptureMode::Ref
+                        };
+                        CaptureInfo {
+                            name: decl.name,
+                            ty: decl.ty.clone(),
+                            mode,
+                        }
+                    })
+                    .collect();
+                let operands = closure
+                    .captures
+                    .iter()
+                    .zip(&captures)
+                    .map(|(capture, info)| {
                         let place = self.var(capture.local);
-                        let captured = self.hir.local(capture.local).ty.clone();
+                        let mutable = match info.mode {
+                            CaptureMode::Value => {
+                                return self.operand_from_place(place, &info.ty, span);
+                            }
+                            CaptureMode::Ref => false,
+                            CaptureMode::RefMut => true,
+                        };
                         let ref_ty = Ty::Ref {
-                            mutable: capture.mutable,
-                            ty: Box::new(captured),
+                            mutable,
+                            ty: Box::new(info.ty.clone()),
                         };
                         let temp = self.temp(&ref_ty, span);
-                        self.assign(
-                            Place::local(temp),
-                            Rvalue::Ref {
-                                mutable: capture.mutable,
-                                place,
-                            },
-                            span,
-                        );
+                        self.assign(Place::local(temp), Rvalue::Ref { mutable, place }, span);
                         Operand::Move(Place::local(temp))
                     })
                     .collect();
+                let id = self.build_closure(closure, captures, params, ret, body, ty, span);
                 (ClosureTarget::Lambda(id), operands)
             }
             ClosureKind::MethodRef {
@@ -881,6 +984,15 @@ impl<'h> Builder<'_, 'h, '_> {
             .iter()
             .position(|variant| variant.name.name == name)
     }
+}
+
+enum StagedReceiver {
+    Ready(Operand),
+    Place {
+        place: Place,
+        ty: Ty,
+        borrow: Option<bool>,
+    },
 }
 
 pub(super) fn deref(mut place: Place, ty: &Ty) -> Place {

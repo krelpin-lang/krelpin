@@ -118,11 +118,28 @@ dependencies = [
 ]
 
 [[package]]
+name = "krelpin_borrowck"
+version = "0.1.0"
+dependencies = [
+ "krelpin_ast",
+ "krelpin_errors",
+ "krelpin_expand",
+ "krelpin_hir",
+ "krelpin_mir",
+ "krelpin_parse",
+ "krelpin_resolve",
+ "krelpin_span",
+ "krelpin_sysroot",
+ "krelpin_typeck",
+]
+
+[[package]]
 name = "krelpin_driver"
 version = "0.1.0"
 dependencies = [
  "clap",
  "krelpin_ast",
+ "krelpin_borrowck",
  "krelpin_errors",
  "krelpin_expand",
  "krelpin_hir",

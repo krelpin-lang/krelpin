@@ -1,0 +1,40 @@
+error: cannot borrow `counter` as mutable because it is also borrowed as shared
+  --> tests/ui/borrowck/borrow_errors.kr:23:9
+   |
+22 |         &List<int> view = counter.history();
+   |                           ----------------- shared borrow of `counter` happens here
+23 |         counter.bump();
+   |         ^^^^^^^^^^^^^^ mutable borrow happens here
+24 |         view.size();
+   |         ----------- the borrow is used later here
+
+error: `text` does not live long enough
+  --> tests/ui/borrowck/borrow_errors.kr:31:22
+   |
+31 |             refs.add(&text);
+   |                      ^^^^^ borrowed value does not live long enough
+32 |         }
+   |          - `text` stops existing here while still borrowed
+
+error: cannot assign to `calls` because it is borrowed
+  --> tests/ui/borrowck/borrow_errors.kr:39:9
+   |
+38 |         Runnable task = () -> calls++;
+   |                         ------------- `calls` is borrowed by a lambda here
+39 |         calls = 5;
+   |         ^^^^^^^^^ `calls` is assigned here while it is borrowed
+40 |         task.run();
+   |         ---------- the borrow is used later here
+   |
+   = help: use a `move` lambda to give it its own copy
+
+error: cannot borrow `names` as mutable because it is also borrowed as shared
+  --> tests/ui/borrowck/borrow_errors.kr:45:13
+   |
+44 |         for (String name : names) {
+   |         --------------------------- shared borrow of `names` happens here
+45 |             names.add(name);
+   |             ^^^^^^^^^^^^^^^ mutable borrow happens here
+
+error: aborting due to 4 previous errors
+

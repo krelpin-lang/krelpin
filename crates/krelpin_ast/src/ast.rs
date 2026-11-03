@@ -525,6 +525,7 @@ pub enum ExprKind {
         expr: Box<Expr>,
     },
     Lambda {
+        moves: bool,
         params: Vec<LambdaParam>,
         body: Box<LambdaBody>,
     },

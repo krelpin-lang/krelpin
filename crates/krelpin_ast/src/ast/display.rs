@@ -132,11 +132,20 @@ impl fmt::Display for Expr {
             ExprKind::Ternary { cond, then, els } => write!(f, "({cond} ? {then} : {els})"),
             ExprKind::InstanceOf { expr, pat } => write!(f, "({expr} instanceof {pat})"),
             ExprKind::Cast { ty, expr } => write!(f, "(({ty}) {expr})"),
-            ExprKind::Lambda { params, body } => {
+            ExprKind::Lambda {
+                moves,
+                params,
+                body,
+            } => {
                 let params: Vec<String> = params.iter().map(LambdaParam::to_string).collect();
+                let prefix = if *moves { "move " } else { "" };
                 match body.as_ref() {
-                    LambdaBody::Expr(expr) => write!(f, "(({}) -> {expr})", params.join(", ")),
-                    LambdaBody::Block(_) => write!(f, "(({}) -> {{ ... }})", params.join(", ")),
+                    LambdaBody::Expr(expr) => {
+                        write!(f, "({prefix}({}) -> {expr})", params.join(", "))
+                    }
+                    LambdaBody::Block(_) => {
+                        write!(f, "({prefix}({}) -> {{ ... }})", params.join(", "))
+                    }
                 }
             }
             ExprKind::MethodRef { expr, name } => write!(f, "{expr}::{}", name.name),

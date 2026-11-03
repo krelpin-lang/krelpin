@@ -288,6 +288,7 @@ pub struct Closure {
 #[derive(Debug)]
 pub enum ClosureKind {
     Lambda {
+        moves: bool,
         params: Vec<LocalId>,
         ret: Ty,
         body: ClosureBody,

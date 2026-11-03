@@ -116,16 +116,18 @@ pub fn run(args: &Args, sess: &Session) {
         write_output(sess, emit.path.as_deref(), &rendered);
     }
 
-    if emits.iter().any(|emit| emit.kind == Emit::Mir) {
-        let mir = krelpin_mir::build(&hir, &typeck.tcx);
-        let bodies: Vec<_> = (0..mir.bodies.len())
-            .map(|index| krelpin_mir::BodyId(index as u32))
-            .filter(|&id| resolved.items.def(mir.body(id).owner).unit == user_unit)
-            .collect();
+    let mir = krelpin_mir::build(&hir, &typeck.tcx);
+    let all_bodies = (0..mir.bodies.len()).map(|index| krelpin_mir::BodyId(index as u32));
+    for emit in emits.iter().filter(|emit| emit.kind == Emit::Mir) {
+        let bodies = all_bodies
+            .clone()
+            .filter(|&id| resolved.items.def(mir.body(id).owner).unit == user_unit);
         let rendered = krelpin_mir::print(&mir, bodies, &typeck.tcx);
-        for emit in emits.iter().filter(|emit| emit.kind == Emit::Mir) {
-            write_output(sess, emit.path.as_deref(), &rendered);
-        }
+        write_output(sess, emit.path.as_deref(), &rendered);
+    }
+    krelpin_borrowck::check(&mir, all_bodies, &typeck.tcx, &sess.dcx);
+    if sess.dcx.has_errors() {
+        return;
     }
 
     for emit in &emits {

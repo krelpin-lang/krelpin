@@ -4,7 +4,9 @@ use krelpin_span::{Span, Symbol};
 use krelpin_typeck::{Callee, LangItem, MethodSig, Ty};
 
 use super::{Builder, Scope};
-use crate::mir::{BasicBlock, Constant, Local, Operand, Place, PlaceElem, Rvalue, TerminatorKind};
+use crate::mir::{
+    BasicBlock, Constant, Local, Operand, Place, PlaceElem, Rvalue, StatementKind, TerminatorKind,
+};
 
 struct IterMethods {
     iterator: Callee,
@@ -240,9 +242,24 @@ impl<'h> Builder<'_, 'h, '_> {
 
     fn lower_iterable_loop(&mut self, local: LocalId, iter: &'h Expr, body: &'h Block, span: Span) {
         let methods = self.iter_methods(&iter.ty);
-        let iterable = self.as_place(iter);
-        let receiver =
-            self.receiver_operand(iterable, &iter.ty, methods.iterator.method.receiver, span);
+        let iterable = self.as_deref_place(iter);
+        let collection = iter.ty.strip_refs().clone();
+        let borrowed = self.temp(
+            &Ty::Ref {
+                mutable: false,
+                ty: Box::new(collection.clone()),
+            },
+            span,
+        );
+        self.assign(
+            Place::local(borrowed),
+            Rvalue::Ref {
+                mutable: false,
+                place: iterable,
+            },
+            span,
+        );
+        let receiver = Operand::Copy(Place::local(borrowed));
         let iterator = self.temp(&methods.iterator.ret, span);
         self.call(
             &methods.iterator,
@@ -253,6 +270,7 @@ impl<'h> Builder<'_, 'h, '_> {
         );
 
         let header = self.goto_new(span);
+        self.push(StatementKind::FakeRead(Place::local(borrowed)), span);
         let has_next = self.temp(&Ty::BOOLEAN, span);
         let receiver = self.receiver_operand(
             Place::local(iterator),
@@ -295,16 +313,21 @@ impl<'h> Builder<'_, 'h, '_> {
         self.current = exit;
     }
 
-    fn bind_element(&mut self, local: LocalId, element: Place, elem: &Ty, span: Span) {
-        let local = self.declare_var(local);
-        let rvalue = match self.locals[local.index()].ty.clone() {
-            Ty::Ref { mutable, .. } if !matches!(elem, Ty::Ref { .. }) => Rvalue::Ref {
-                mutable,
-                place: element,
-            },
-            _ => Rvalue::Use(self.operand_from_place(element, elem, span)),
-        };
-        self.assign(Place::local(local), rvalue, span);
+    fn bind_element(&mut self, id: LocalId, element: Place, elem: &Ty, span: Span) {
+        match self.hir.local(id).ty.clone() {
+            Ty::Ref { mutable, .. } if !matches!(elem, Ty::Ref { .. }) => {
+                let local = self.declare_var(id);
+                self.assign(
+                    Place::local(local),
+                    Rvalue::Ref {
+                        mutable,
+                        place: element,
+                    },
+                    span,
+                );
+            }
+            _ => self.bind_var(id, element, elem, span),
+        }
     }
 
     fn iter_methods(&self, ty: &Ty) -> IterMethods {

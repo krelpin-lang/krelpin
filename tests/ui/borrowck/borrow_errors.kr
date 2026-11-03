@@ -1,0 +1,48 @@
+package shop;
+
+import std.util.List;
+import std.util.ArrayList;
+
+class Counter {
+    int count;
+    List<int> history = new ArrayList<>();
+
+    mut void bump() {
+        this.count++;
+    }
+
+    &List<int> history() {
+        return &this.history;
+    }
+}
+
+class Main {
+    static void stale() {
+        Counter counter = new Counter();
+        &List<int> view = counter.history();
+        counter.bump();
+        view.size();
+    }
+
+    static void stored() {
+        List<&String> refs = new ArrayList<>();
+        {
+            String text = "x";
+            refs.add(&text);
+        }
+        refs.size();
+    }
+
+    static void captured() {
+        int calls = 0;
+        Runnable task = () -> calls++;
+        calls = 5;
+        task.run();
+    }
+
+    static void invalidated(List<String> names) {
+        for (String name : names) {
+            names.add(name);
+        }
+    }
+}

@@ -1,5 +1,5 @@
 package std.function;
 
 interface Supplier<T> {
-    T get();
+    mut T get();
 }

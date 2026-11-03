@@ -55,7 +55,7 @@ class Main {
     static void main() {
         BankAccount account = new BankAccount("Ali", Kind.SAVINGS);
         account.withdraw(100);
-        Account view = account;
+        &Account view = &account;
         long left = view.balance();
         double ratio = (double) left / 3;
         int[] history = {1, 2, 3};

@@ -66,7 +66,7 @@ class Shapes {
         return best;
     }
 
-    static <A, B> List<B> map(List<A> values, Transform<A, B> transform) {
+    static <A, B> List<B> map(&List<A> values, Transform<A, B> transform) {
         List<B> result = new ArrayList<>();
         values.forEach(value -> result.add(transform.apply(value)));
         return result;
@@ -79,9 +79,9 @@ class Main {
         shapes.add(new Square(2.0));
         shapes.add(new Circle(1.5));
 
+        List<String> names = Shapes.map(&shapes, shape -> shape.describe());
+        List<double> areas = Shapes.map(&shapes, Shape::area);
         Shape biggest = Shapes.largest(shapes);
-        List<String> names = Shapes.map(shapes, shape -> shape.describe());
-        List<double> areas = Shapes.map(shapes, Shape::area);
 
         Consumer<String> print = Console::println;
         names.forEach(print);

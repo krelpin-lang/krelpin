@@ -82,15 +82,15 @@ fn mutable_receivers_are_reborrowed() {
 fn values_are_copied_or_moved_by_type() {
     assert_builds_to(
         "record Point(int x, int y) {}\n\
-         record Named(String name) {}\n\
-         class A { static void f(Point p, Named n, String s) {\n\
-         \x20   Point q = p; Point r = p; Named m = n; String t = s;\n\
+         record Bag(int[] items) {}\n\
+         class A { static void f(Point p, Bag n, String s) {\n\
+         \x20   Point q = p; Point r = p; Bag m = n; String t = s;\n\
          } }",
         &[
             "_4 = copy _1;",
             "_5 = copy _1;",
             "_6 = move _2;",
-            "_7 = move _3;",
+            "_7 = copy _3;",
         ],
     );
 }
@@ -188,7 +188,7 @@ fn records_are_built_from_components() {
          }",
         &[
             "_0 = User { name: const \"ada\", visits: const 1L };",
-            "_0 = User { name: move _1.name, visits: const 2L };",
+            "_0 = User { name: copy _1.name, visits: const 2L };",
         ],
     );
 }
@@ -196,7 +196,9 @@ fn records_are_built_from_components() {
 #[test]
 fn records_with_compact_constructors_call_them() {
     assert_builds_to(
-        "record Age(int years) { Age { if (years < 0) { throw new IllegalArgumentException(\"age\"); } } }\n\
+        "record Age(int years) {\n\
+         \x20   Age { if (years < 0) { throw new IllegalArgumentException(\"age\"); } }\n\
+         }\n\
          class A { static Age make() { return new Age(3); } }",
         &[
             "_1 = new Age;",
@@ -236,31 +238,36 @@ fn iterables_use_their_iterator() {
          } }",
         &[
             "_3 = &_1;",
-            "_4 = Iterable::iterator(move _3) -> [return: bb1, unwind continue];",
+            "_4 = Iterable::iterator(copy _3) -> [return: bb1, unwind continue];",
+            "FakeRead(_3);",
             "_5 = Iterator::hasNext(move _6) -> [return: bb2, unwind continue];",
             "_7 = Iterator::next(move _8) -> [return: bb5, unwind continue];",
-            "_9 = move _7;",
+            "_9 = copy _7;",
         ],
     );
 }
 
 #[test]
-fn closures_borrow_their_captures() {
+fn closures_capture_what_they_need() {
     assert_builds_to(
         "import std.function.Function;\n\
-         class A { static Function<int, int> f(int base) {\n\
-         \x20   int calls = 0;\n\
-         \x20   return (int value) -> { calls++; return value + base; };\n\
-         } }",
+         import std.function.Supplier;\n\
+         class A {\n\
+         \x20   static Function<int, int> f(int base, String name) {\n\
+         \x20       int calls = 0;\n\
+         \x20       return (int value) -> { calls++; return value + base + name.length(); };\n\
+         \x20   }\n\
+         \x20   static Supplier<String> g(String name) { return move () -> name; }\n\
+         }",
         &[
-            "_3 = &_1;",
-            "_4 = &mut _2;",
-            "_0 = A.f::closure#0 [move _3, move _4];",
-            "fn A.f::closure#0(_1: Function<int, int>, _2: int) -> int {",
-            "capture base: &int;",
+            "_0 = A.f::closure#0 [copy _1, copy _2, move _4];",
+            "fn A.f::closure#0(_1: &mut Function<int, int>, _2: int) -> int {",
+            "capture base: int;",
             "capture calls: &mut int;",
-            "(*_1.calls) = Add(copy (*_1.calls), const 1_int);",
-            "_0 = Add(copy _2, copy (*_1.base));",
+            "(*(*_1).calls) = Add(copy (*(*_1).calls), const 1_int);",
+            "_3 = Add(copy _2, copy (*_1).base);",
+            "_0 = A.g::closure#0 [copy _1];",
+            "capture name: String;",
         ],
     );
 }

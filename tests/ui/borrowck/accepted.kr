@@ -1,0 +1,81 @@
+package shop;
+
+import std.util.List;
+import std.util.ArrayList;
+import std.function.Supplier;
+import std.function.Function;
+
+record User(String name, String email, long visits) {}
+
+enum Tree {
+    Node(List<Tree> children),
+    Leaf(String label);
+
+    int size() {
+        return switch (this) {
+            case Node(List<Tree> children) -> children.size();
+            case Leaf(String label) -> label.length();
+        };
+    }
+}
+
+class Counter {
+    int count;
+    List<int> history = new ArrayList<>();
+
+    mut void bump() {
+        this.count++;
+        this.history.add(this.count);
+    }
+
+    mut void twice() {
+        this.bump();
+        this.bump();
+        this.history.add(this.history.size());
+    }
+
+    &List<int> history() {
+        return &this.history;
+    }
+
+    String label() {
+        String text = "count";
+        return text;
+    }
+}
+
+class Main {
+    static int total(&List<int> values) {
+        int sum = 0;
+        for (int value : values) {
+            sum += value;
+        }
+        return sum;
+    }
+
+    static void run() {
+        Counter counter = new Counter();
+        counter.bump();
+        int seen = Main.total(counter.history());
+        counter.bump();
+        User user = new User("ada", "a@x", 1L);
+        User renamed = user with { email = "b@x" };
+        String name = user.name + renamed.name;
+        List<String> names = new ArrayList<>();
+        names.add(name);
+        names.add(name);
+        int calls = 0;
+        names.forEach(each -> calls++);
+        Supplier<int> size = move () -> names.size();
+        Function<int, int> add = value -> value + seen;
+        List<Counter> counters = new ArrayList<>();
+        counters.add(counter);
+        String? maybe = null;
+        String chosen = maybe ?: "none";
+        String again = maybe ?: chosen;
+        Object any = user;
+        if (any instanceof User(String n, String e, long v)) {
+            String copy = n + e;
+        }
+    }
+}

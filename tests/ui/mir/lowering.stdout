@@ -159,10 +159,11 @@ fn Main.count(_1: List<String>) -> int {
         StorageLive(_2);
         _2 = const 0;
         _3 = &_1;
-        _4 = Iterable::iterator(move _3) -> [return: bb1, unwind continue];
+        _4 = Iterable::iterator(copy _3) -> [return: bb1, unwind continue];
     }
 
     bb1: {
+        FakeRead(_3);
         _6 = &_4;
         _5 = Iterator::hasNext(move _6) -> [return: bb2, unwind continue];
     }
@@ -184,7 +185,7 @@ fn Main.count(_1: List<String>) -> int {
 
     bb5: {
         StorageLive(_9);
-        _9 = move _7;
+        _9 = copy _7;
         _2 = Add(copy _2, const 1_int);
         StorageDead(_9);
         goto -> bb1;
@@ -214,7 +215,7 @@ fn Main.safe(_1: String?) -> int {
     }
 
     bb2: {
-        _2 = move _1;
+        _2 = copy _1;
         goto -> bb3;
     }
 
@@ -298,7 +299,7 @@ fn Main.rename(_1: User) -> User {
     debug user => _1;
 
     bb0: {
-        _0 = User { name: move _1.name, email: const "x@example.com", visits: copy _1.visits };
+        _0 = User { name: copy _1.name, email: const "x@example.com", visits: copy _1.visits };
         return;
     }
 }
@@ -369,22 +370,20 @@ fn Main.read(_1: int[], _2: int) -> int {
 }
 
 fn Main.adder(_1: int) -> Function<int, int> {
-    let _2: &int;
     debug amount => _1;
 
     bb0: {
-        _2 = &_1;
-        _0 = Main.adder::closure#0 [move _2];
+        _0 = Main.adder::closure#0 [copy _1];
         return;
     }
 }
 
-fn Main.adder::closure#0(_1: Function<int, int>, _2: int) -> int {
-    capture amount: &int;
+fn Main.adder::closure#0(_1: &mut Function<int, int>, _2: int) -> int {
+    capture amount: int;
     debug value => _2;
 
     bb0: {
-        _0 = Add(copy _2, copy (*_1.amount));
+        _0 = Add(copy _2, copy (*_1).amount);
         return;
     }
 }
@@ -443,7 +442,7 @@ fn Main.label(_1: int) -> String {
     }
 
     bb8: {
-        _0 = move _2;
+        _0 = copy _2;
         StorageDead(_5);
         StorageDead(_2);
         return;

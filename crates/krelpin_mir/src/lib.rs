@@ -9,4 +9,7 @@ mod tests;
 pub use crate::build::build;
 pub use crate::mir::*;
 pub use crate::pretty::print;
-pub use crate::visit::for_each_local_mut;
+pub use crate::visit::{
+    for_each_local_mut, operand_locals_of, place_locals_of, rvalue_locals_of,
+    terminator_input_locals_of,
+};

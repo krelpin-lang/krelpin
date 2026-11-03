@@ -5,9 +5,9 @@ use krelpin_hir::Dispatch;
 use krelpin_typeck::{Callee, Tcx, Ty};
 
 use crate::mir::{
-    AggregateKind, BasicBlock, Body, BodyId, BodySource, Check, ClosureTarget, Constant, Local,
-    Mir, Operand, Place, PlaceBase, PlaceElem, Rvalue, StatementKind, TerminatorKind, UnaryOp,
-    Unwind,
+    AggregateKind, BasicBlock, Body, BodyId, BodySource, CaptureMode, Check, ClosureTarget,
+    Constant, Local, Mir, Operand, Place, PlaceBase, PlaceElem, Rvalue, StatementKind,
+    TerminatorKind, UnaryOp, Unwind,
 };
 
 pub fn print(mir: &Mir, bodies: impl IntoIterator<Item = BodyId>, tcx: &Tcx<'_>) -> String {
@@ -50,7 +50,11 @@ impl Printer<'_, '_> {
             self.body.local(Local::RETURN).ty
         );
         for capture in &self.body.captures {
-            let mode = if capture.mutable { "&mut " } else { "&" };
+            let mode = match capture.mode {
+                CaptureMode::Value => "",
+                CaptureMode::Ref => "&",
+                CaptureMode::RefMut => "&mut ",
+            };
             let _ = writeln!(
                 self.out,
                 "    capture {}: {mode}{};",
@@ -79,6 +83,7 @@ impl Printer<'_, '_> {
                     }
                     StatementKind::StorageLive(local) => format!("StorageLive({local:?});"),
                     StatementKind::StorageDead(local) => format!("StorageDead({local:?});"),
+                    StatementKind::FakeRead(place) => format!("FakeRead({});", self.place(place)),
                 };
                 let _ = writeln!(self.out, "        {line}");
             }

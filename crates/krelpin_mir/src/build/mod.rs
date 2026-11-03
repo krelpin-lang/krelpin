@@ -4,14 +4,16 @@ mod stmt;
 
 use std::collections::{HashMap, HashSet};
 
+use krelpin_ast::ast::ReceiverKind;
 use krelpin_hir::{self as hir, BodyKind, BodyValue, ClosureBody, LocalId};
 use krelpin_span::def_id::DefId;
 use krelpin_span::{Span, Symbol};
-use krelpin_typeck::{AdtKind, Tcx, Ty};
+use krelpin_typeck::{Tcx, Ty};
 
 use crate::mir::{
-    BasicBlock, BasicBlockData, Body, BodyId, BodySource, CaptureInfo, Local, LocalDecl, Mir,
-    Place, PlaceElem, Rvalue, Statement, StatementKind, Terminator, TerminatorKind, Unwind,
+    BasicBlock, BasicBlockData, Body, BodyId, BodySource, CaptureInfo, CaptureMode, Local,
+    LocalDecl, Mir, Place, PlaceElem, Rvalue, Statement, StatementKind, Terminator, TerminatorKind,
+    Unwind,
 };
 use crate::visit::for_each_local_mut;
 
@@ -132,9 +134,11 @@ impl<'a, 'h, 'tcx> Builder<'a, 'h, 'tcx> {
         builder.finish(source, arg_count, Vec::new());
     }
 
+    #[allow(clippy::too_many_arguments)]
     fn build_closure(
         &mut self,
         closure: &'h hir::Closure,
+        captures: Vec<CaptureInfo>,
         params: &[LocalId],
         ret: &Ty,
         body: &'h ClosureBody,
@@ -142,19 +146,26 @@ impl<'a, 'h, 'tcx> Builder<'a, 'h, 'tcx> {
         span: Span,
     ) -> BodyId {
         let parent = self.id;
+        let env_ty = match self.tcx().fn_receiver(ty) {
+            Some(ReceiverKind::Owned) => ty.clone(),
+            Some(ReceiverKind::RefMut) => Ty::Ref {
+                mutable: true,
+                ty: Box::new(ty.clone()),
+            },
+            Some(ReceiverKind::Ref) | None => Ty::Ref {
+                mutable: false,
+                ty: Box::new(ty.clone()),
+            },
+        };
         let mut builder = Builder::new(self.cx, self.hir, ret.clone());
-        let env = builder.push_local(None, ty.clone(), span);
-        let mut captures = Vec::new();
-        for (index, capture) in closure.captures.iter().enumerate() {
-            let decl = self.hir.local(capture.local);
-            captures.push(CaptureInfo {
-                name: decl.name,
-                ty: decl.ty.clone(),
-                mutable: capture.mutable,
-            });
-            let place = Place::local(env)
-                .project(PlaceElem::Capture(index))
-                .project(PlaceElem::Deref);
+        let env = builder.push_local(None, env_ty.clone(), span);
+        let env_place = expr::deref(Place::local(env), &env_ty);
+        for (index, (capture, info)) in closure.captures.iter().zip(&captures).enumerate() {
+            let place = env_place.clone().project(PlaceElem::Capture(index));
+            let place = match info.mode {
+                CaptureMode::Value => place,
+                CaptureMode::Ref | CaptureMode::RefMut => place.project(PlaceElem::Deref),
+            };
             builder.vars.insert(capture.local, place);
         }
         for &param in params {
@@ -226,9 +237,15 @@ impl<'a, 'h, 'tcx> Builder<'a, 'h, 'tcx> {
     }
 
     fn declare_var(&mut self, id: LocalId) -> Local {
-        let decl = self.hir.local(id);
-        let local = self.push_local(Some(decl.name), decl.ty.clone(), decl.span);
+        let ty = self.hir.local(id).ty.clone();
+        let local = self.declare_var_as(id, ty);
         self.vars.insert(id, Place::local(local));
+        local
+    }
+
+    fn declare_var_as(&mut self, id: LocalId, ty: Ty) -> Local {
+        let decl = self.hir.local(id);
+        let local = self.push_local(Some(decl.name), ty, decl.span);
         self.push(StatementKind::StorageLive(local), decl.span);
         let scope = self.scopes.iter_mut().rev().find_map(|scope| match scope {
             Scope::Block { locals } => Some(locals),
@@ -238,6 +255,30 @@ impl<'a, 'h, 'tcx> Builder<'a, 'h, 'tcx> {
             locals.push(local);
         }
         local
+    }
+
+    fn bind_var(&mut self, id: LocalId, place: Place, ty: &Ty, span: Span) {
+        if self.is_copy(ty) || is_movable(&place) {
+            let local = self.declare_var(id);
+            let value = self.operand_from_place(place, ty, span);
+            self.assign(Place::local(local), Rvalue::Use(value), span);
+            return;
+        }
+        let ref_ty = Ty::Ref {
+            mutable: false,
+            ty: Box::new(ty.clone()),
+        };
+        let local = self.declare_var_as(id, ref_ty);
+        self.assign(
+            Place::local(local),
+            Rvalue::Ref {
+                mutable: false,
+                place,
+            },
+            span,
+        );
+        self.vars
+            .insert(id, Place::local(local).project(PlaceElem::Deref));
     }
 
     fn var(&self, id: LocalId) -> Place {
@@ -344,37 +385,7 @@ impl<'a, 'h, 'tcx> Builder<'a, 'h, 'tcx> {
     }
 
     fn is_copy(&self, ty: &Ty) -> bool {
-        self.is_copy_inner(ty, &mut Vec::new())
-    }
-
-    fn is_copy_inner(&self, ty: &Ty, visiting: &mut Vec<DefId>) -> bool {
-        match ty {
-            Ty::Primitive(_) | Ty::Null | Ty::Void | Ty::Unknown => true,
-            Ty::Ref { mutable, .. } => !mutable,
-            Ty::Nullable(inner) => self.is_copy_inner(inner, visiting),
-            Ty::Array(_) | Ty::Param(_) | Ty::External { .. } => false,
-            Ty::Adt { def, args, .. } => {
-                if visiting.contains(def) {
-                    return false;
-                }
-                let sig = self.tcx().sig(*def);
-                match sig.kind {
-                    AdtKind::Enum => sig.variants.iter().all(|variant| variant.fields.is_empty()),
-                    AdtKind::Record => {
-                        visiting.push(*def);
-                        let subst = self.tcx().subst_for(*def, args);
-                        let copy = sig.components.iter().all(|name| {
-                            sig.fields.get(name).is_some_and(|field| {
-                                self.is_copy_inner(&field.ty.subst(&subst), visiting)
-                            })
-                        });
-                        visiting.pop();
-                        copy
-                    }
-                    AdtKind::Class | AdtKind::Interface => false,
-                }
-            }
-        }
+        self.tcx().is_copy(ty)
     }
 }
 
@@ -465,4 +476,12 @@ fn remove_unused_locals(
         *local = renumbered[local.index()].expect("every mentioned local is kept");
     });
     kept
+}
+
+fn is_movable(place: &Place) -> bool {
+    matches!(place.base, crate::mir::PlaceBase::Local(_))
+        && place
+            .projection
+            .iter()
+            .all(|elem| !matches!(elem, PlaceElem::Deref | PlaceElem::Index(_)))
 }

@@ -586,7 +586,11 @@ impl LoweringCtxt<'_, '_> {
                     fields,
                 }
             }
-            ast::ExprKind::Lambda { params, body } => self.lower_lambda(params, body, &ty),
+            ast::ExprKind::Lambda {
+                moves,
+                params,
+                body,
+            } => self.lower_lambda(*moves, params, body, &ty),
             ast::ExprKind::MethodRef { expr: target, name } => self.lower_method_ref(target, *name),
             ast::ExprKind::Switch { scrutinee, arms } => ExprKind::Switch {
                 scrutinee: Box::new(self.lower_expr(scrutinee)),
@@ -722,7 +726,13 @@ impl LoweringCtxt<'_, '_> {
         }))
     }
 
-    fn lower_lambda(&mut self, params: &[LambdaParam], body: &LambdaBody, ty: &Ty) -> ExprKind {
+    fn lower_lambda(
+        &mut self,
+        moves: bool,
+        params: &[LambdaParam],
+        body: &LambdaBody,
+        ty: &Ty,
+    ) -> ExprKind {
         let first_inner = LocalId(self.locals.len() as u32);
         let params: Vec<LocalId> = params
             .iter()
@@ -737,7 +747,12 @@ impl LoweringCtxt<'_, '_> {
         self.rets.pop();
         let captures = captures(&body, first_inner);
         ExprKind::Closure(Box::new(Closure {
-            kind: ClosureKind::Lambda { params, ret, body },
+            kind: ClosureKind::Lambda {
+                moves,
+                params,
+                ret,
+                body,
+            },
             captures,
         }))
     }

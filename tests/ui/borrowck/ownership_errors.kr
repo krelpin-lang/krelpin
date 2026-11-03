@@ -1,0 +1,69 @@
+package shop;
+
+import std.util.List;
+import std.util.ArrayList;
+import std.function.Supplier;
+
+class Account {
+    int balance;
+    public List<String> notes = new ArrayList<>();
+
+    mut void deposit(int amount) {
+        this.balance += amount;
+    }
+
+    void audit() {
+        this.balance = 0;
+        this.deposit(1);
+    }
+
+    List<String> notes() {
+        return this.notes;
+    }
+}
+
+class Main {
+    static void consume(Account account) {}
+
+    static void moves() {
+        Account first = new Account();
+        Account second = first;
+        first.deposit(1);
+        Account box = new Account();
+        List<String> taken = box.notes;
+        box.notes.size();
+        for (int i = 0; i < 3; i++) {
+            Main.consume(second);
+        }
+    }
+
+    static void borrows() {
+        List<String> list = new ArrayList<>();
+        &List<String> view = &list;
+        list.add("x");
+        view.size();
+    }
+
+    static int dangling() {
+        &String? kept = null;
+        {
+            String text = "x";
+            kept = &text;
+        }
+        return kept?.length() ?: 0;
+    }
+
+    static Supplier<int> escape() {
+        List<String> names = new ArrayList<>();
+        return () -> names.size();
+    }
+
+    static Supplier<List<String>> once() {
+        List<String> names = new ArrayList<>();
+        return move () -> names;
+    }
+
+    static List<String> element(List<String>[] lists) {
+        return lists[0];
+    }
+}

@@ -272,14 +272,20 @@ impl Printer<'_, '_> {
             })
             .collect();
         match &closure.kind {
-            ClosureKind::Lambda { params, ret, body } => {
+            ClosureKind::Lambda {
+                moves,
+                params,
+                ret,
+                body,
+            } => {
                 let params: Vec<String> = params
                     .iter()
                     .map(|&local| format!("{}: {}", self.name(local), self.body.local(local).ty))
                     .collect();
+                let prefix = if *moves { "move " } else { "" };
                 let _ = write!(
                     self.out,
-                    "|{}| -> {ret} [{}] ",
+                    "{prefix}|{}| -> {ret} [{}] ",
                     params.join(", "),
                     captures.join(", ")
                 );

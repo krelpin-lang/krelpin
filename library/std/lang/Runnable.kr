@@ -1,5 +1,5 @@
 package std.lang;
 
 interface Runnable {
-    void run();
+    mut void run();
 }

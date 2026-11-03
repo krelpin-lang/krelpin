@@ -102,9 +102,7 @@ impl<'h> Builder<'_, 'h, '_> {
 
     pub(super) fn bind(&mut self, bindings: Vec<Binding>, span: Span) {
         for Binding { id, place, ty } in bindings {
-            let local = self.declare_var(id);
-            let value = self.operand_from_place(place, &ty, span);
-            self.assign(Place::local(local), Rvalue::Use(value), span);
+            self.bind_var(id, place, &ty, span);
         }
     }
 
