@@ -72,17 +72,46 @@ impl<W: Write> HumanEmitter<W> {
         )];
 
         let mut origins = Vec::new();
-        let span = diagnostic
-            .span
-            .map(|span| self.call_site(span, &mut origins));
-        let location =
-            span.and_then(|span| Some((span, self.source_map.lookup_char_pos(span.lo)?)));
-        let width = location.as_ref().map_or(1, |(_, loc)| digits(loc.line));
+        let mut annotations = Vec::new();
+        if let Some(span) = diagnostic.span {
+            let span = self.call_site(span, &mut origins);
+            if let Some(loc) = self.source_map.lookup_char_pos(span.lo) {
+                annotations.push(Annotation {
+                    span,
+                    loc,
+                    label: diagnostic.label.clone(),
+                    primary: true,
+                });
+            }
+        }
+        for secondary in &diagnostic.secondary {
+            let span = self.call_site(secondary.span, &mut Vec::new());
+            let Some(loc) = self.source_map.lookup_char_pos(span.lo) else {
+                continue;
+            };
+            let same_file = annotations
+                .first()
+                .is_some_and(|primary| Arc::ptr_eq(&primary.loc.file, &loc.file));
+            if same_file {
+                annotations.push(Annotation {
+                    span,
+                    loc,
+                    label: Some(secondary.label.clone()),
+                    primary: false,
+                });
+            }
+        }
+        let width = annotations
+            .iter()
+            .map(|annotation| digits(annotation.loc.line))
+            .max()
+            .unwrap_or(1);
         let pad = " ".repeat(width);
         let bar = self.paint(GUTTER, "|");
 
-        if let Some((span, loc)) = &location {
-            self.render_snippet(&mut lines, diagnostic, *span, loc, &pad);
+        let has_snippet = !annotations.is_empty();
+        if has_snippet {
+            self.render_snippet(&mut lines, diagnostic.level, annotations, &pad);
         }
 
         let children = diagnostic
@@ -95,7 +124,7 @@ impl<W: Write> HumanEmitter<W> {
             }))
             .collect::<Vec<_>>();
         if !children.is_empty() {
-            if location.is_some() {
+            if has_snippet {
                 lines.push(format!("{pad} {bar}"));
             }
             for (level, message) in children {
@@ -113,44 +142,64 @@ impl<W: Write> HumanEmitter<W> {
     fn render_snippet(
         &self,
         lines: &mut Vec<String>,
-        diagnostic: &Diagnostic,
-        span: Span,
-        loc: &Loc,
+        level: Level,
+        mut annotations: Vec<Annotation>,
         pad: &str,
     ) {
         let bar = self.paint(GUTTER, "|");
-        let text = loc.file.line(loc.line - 1);
-        let start = text
-            .char_indices()
-            .nth(loc.col - 1)
-            .map_or(text.len(), |(index, _)| index);
-        let end = (start + span.len() as usize).min(text.len());
-        let end = (end..=text.len())
-            .find(|&index| text.is_char_boundary(index))
-            .unwrap_or(text.len());
-
-        let indent = display_width(&text[..start]);
-        let carets = "^".repeat(display_width(&text[start..end]).max(1));
-        let label = diagnostic
-            .label
-            .as_ref()
-            .map_or(String::new(), |label| format!(" {label}"));
-        let marker = self.paint(level_color(diagnostic.level), &(carets + &label));
-
+        let primary = &annotations[0];
         lines.push(format!(
             "{pad}{} {}:{}:{}",
             self.paint(GUTTER, "-->"),
-            loc.file.name.display(),
-            loc.line,
-            loc.col,
+            primary.loc.file.name.display(),
+            primary.loc.line,
+            primary.loc.col,
         ));
         lines.push(format!("{pad} {bar}"));
-        lines.push(format!(
-            "{} {bar} {}",
-            self.paint(GUTTER, &loc.line.to_string()),
-            expand_tabs(text),
-        ));
-        lines.push(format!("{pad} {bar} {}{marker}", " ".repeat(indent)));
+
+        annotations.sort_by_key(|annotation| (annotation.loc.line, annotation.loc.col));
+        let mut previous: Option<usize> = None;
+        let mut index = 0;
+        while index < annotations.len() {
+            let line = annotations[index].loc.line;
+            if previous.is_some_and(|previous| line > previous + 1) {
+                lines.push(self.paint(GUTTER, "..."));
+            }
+            let file = Arc::clone(&annotations[index].loc.file);
+            let text = file.line(line - 1);
+            let number = format!("{line:>width$}", width = pad.len());
+            lines.push(format!(
+                "{} {bar} {}",
+                self.paint(GUTTER, &number),
+                expand_tabs(text),
+            ));
+            while index < annotations.len() && annotations[index].loc.line == line {
+                let annotation = &annotations[index];
+                let start = text
+                    .char_indices()
+                    .nth(annotation.loc.col - 1)
+                    .map_or(text.len(), |(index, _)| index);
+                let end = (start + annotation.span.len() as usize).min(text.len());
+                let end = (end..=text.len())
+                    .find(|&index| text.is_char_boundary(index))
+                    .unwrap_or(text.len());
+                let indent = display_width(&text[..start]);
+                let (mark, color) = if annotation.primary {
+                    ("^", level_color(level))
+                } else {
+                    ("-", GUTTER)
+                };
+                let marks = mark.repeat(display_width(&text[start..end]).max(1));
+                let label = annotation
+                    .label
+                    .as_ref()
+                    .map_or(String::new(), |label| format!(" {label}"));
+                let marker = self.paint(color, &(marks + &label));
+                lines.push(format!("{pad} {bar} {}{marker}", " ".repeat(indent)));
+                index += 1;
+            }
+            previous = Some(line);
+        }
     }
 
     fn call_site(&self, mut span: Span, origins: &mut Vec<String>) -> Span {
@@ -176,6 +225,13 @@ impl<W: Write> Emitter for HumanEmitter<W> {
         let _ = self.writer.write_all(rendered.as_bytes());
         let _ = self.writer.flush();
     }
+}
+
+struct Annotation {
+    span: Span,
+    loc: Loc,
+    label: Option<String>,
+    primary: bool,
 }
 
 fn level_color(level: Level) -> &'static str {

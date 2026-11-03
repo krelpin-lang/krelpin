@@ -6,7 +6,7 @@ mod tests;
 
 use std::sync::{Mutex, MutexGuard, PoisonError};
 
-pub use crate::diagnostic::{Diagnostic, Level, SubDiagnostic};
+pub use crate::diagnostic::{Diagnostic, Level, SpanLabel, SubDiagnostic};
 pub use crate::emitter::{DiagnosticBuffer, Emitter, HumanEmitter};
 
 pub struct DiagCtxt {

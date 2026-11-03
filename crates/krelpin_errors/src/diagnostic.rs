@@ -34,11 +34,18 @@ pub struct SubDiagnostic {
 }
 
 #[derive(Clone, Debug, PartialEq, Eq)]
+pub struct SpanLabel {
+    pub span: Span,
+    pub label: String,
+}
+
+#[derive(Clone, Debug, PartialEq, Eq)]
 pub struct Diagnostic {
     pub level: Level,
     pub message: String,
     pub span: Option<Span>,
     pub label: Option<String>,
+    pub secondary: Vec<SpanLabel>,
     pub children: Vec<SubDiagnostic>,
 }
 
@@ -49,6 +56,7 @@ impl Diagnostic {
             message: message.into(),
             span: None,
             label: None,
+            secondary: Vec::new(),
             children: Vec::new(),
         }
     }
@@ -68,6 +76,14 @@ impl Diagnostic {
 
     pub fn with_label(mut self, label: impl Into<String>) -> Diagnostic {
         self.label = Some(label.into());
+        self
+    }
+
+    pub fn with_secondary(mut self, span: Span, label: impl Into<String>) -> Diagnostic {
+        self.secondary.push(SpanLabel {
+            span,
+            label: label.into(),
+        });
         self
     }
 

@@ -38,6 +38,34 @@ error: unterminated double quote string
 }
 
 #[test]
+fn renders_secondary_labels_in_line_order() {
+    let src = "a = b;\nc(b);\n\n\n\n\n\n\n\nd(b);\n";
+    let first = src.find('b').unwrap() as u32;
+    let second = src[first as usize + 1..].find('b').unwrap() as u32 + first + 1;
+    let third = src.rfind('b').unwrap() as u32;
+    let diagnostic = Diagnostic::error("use of moved value: `b`")
+        .with_span(span(third, third + 1))
+        .with_label("value used here after move")
+        .with_secondary(span(first, first + 1), "value moved here")
+        .with_secondary(span(second, second + 1), "value moved again here");
+
+    let expected = "\
+error: use of moved value: `b`
+  --> main.kr:10:3
+   |
+ 1 | a = b;
+   |     - value moved here
+ 2 | c(b);
+   |   - value moved again here
+...
+10 | d(b);
+   |   ^ value used here after move
+
+";
+    assert_eq!(render(src, diagnostic), expected);
+}
+
+#[test]
 fn renders_without_span() {
     let diagnostic = Diagnostic::error("aborting due to 1 previous error");
     assert_eq!(
