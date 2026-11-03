@@ -22,7 +22,7 @@ class Student implements Comparable<Student> {
     }
 
     String report(String course) {
-        Grade? grade = this.grades.get(course);
+        Grade? grade = this.grades.get(&course);
         if (grade == null) {
             return this.name + ": no grade for " + course;
         }

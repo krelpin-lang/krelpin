@@ -12,6 +12,10 @@ impl BitSet {
         }
     }
 
+    pub(crate) fn len(&self) -> usize {
+        self.len
+    }
+
     pub(crate) fn insert(&mut self, index: usize) {
         self.words[index / 64] |= 1 << (index % 64);
     }

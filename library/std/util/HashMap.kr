@@ -5,23 +5,23 @@ class HashMap<K extends Hashable<K>, V> implements Map<K, V> {
     int size();
 
     @Intrinsic
-    V? get(K key);
+    (&[this] V)? get(&K key);
 
     @Intrinsic
     mut V? put(K key, V value);
 
     @Intrinsic
-    mut V? remove(K key);
+    mut V? remove(&K key);
 
     @Intrinsic
-    boolean containsKey(K key);
+    boolean containsKey(&K key);
 
     @Intrinsic
     mut void clear();
 
     @Intrinsic
-    Set<K> keySet();
+    Set<&[this] K> keySet();
 
     @Intrinsic
-    List<V> values();
+    List<&[this] V> values();
 }

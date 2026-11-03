@@ -8,7 +8,15 @@ use crate::ty::{Ty, promote, widens};
 
 impl Tcx<'_> {
     pub fn is_assignable(&self, env: &ParamEnv, from: &Ty, to: &Ty) -> bool {
-        let assignable = |from, to| self.is_assignable(env, from, to);
+        self.assignable(env, from, to, true)
+    }
+
+    pub fn is_assignable_exact(&self, env: &ParamEnv, from: &Ty, to: &Ty) -> bool {
+        self.assignable(env, from, to, false)
+    }
+
+    fn assignable(&self, env: &ParamEnv, from: &Ty, to: &Ty, copying: bool) -> bool {
+        let assignable = |from, to| self.assignable(env, from, to, copying);
         match (from, to) {
             (Ty::Unknown, _) | (_, Ty::Unknown) => true,
             _ if from == to => true,
@@ -36,6 +44,9 @@ impl Tcx<'_> {
                 } else {
                     assignable(from, to)
                 }
+            }
+            (Ty::Ref { ty: inner, .. }, to) if copying && self.is_copy(inner) => {
+                assignable(inner, to)
             }
             (Ty::Ref { .. }, _) | (_, Ty::Ref { .. }) => false,
             (Ty::Primitive(_) | Ty::Void, _) | (_, Ty::Primitive(_) | Ty::Void) => false,

@@ -528,7 +528,8 @@ impl Parser<'_> {
             let lo = self.token.span;
             self.bump();
             let path = self.parse_path()?;
-            let args = if self.token.kind == TokenKind::OpenParen {
+            let adjacent = self.token.span.lo == self.prev_token.span.hi;
+            let args = if self.token.kind == TokenKind::OpenParen && adjacent {
                 Some(self.parse_unparsed_delimited(TokenKind::OpenParen, TokenKind::CloseParen)?)
             } else {
                 None

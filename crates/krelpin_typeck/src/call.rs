@@ -50,6 +50,15 @@ impl FnCtxt<'_, '_> {
         }
     }
 
+    fn accepts_exact(&self, expr: &Expr, actual: &Ty, expected: &Ty) -> bool {
+        match self.closure_fits(expr, expected) {
+            Some(fits) => fits,
+            None => self
+                .tcx
+                .is_assignable_exact(&self.param_env, actual, expected),
+        }
+    }
+
     pub(crate) fn call(
         &mut self,
         candidates: Vec<(MethodSig, Subst)>,
@@ -75,11 +84,14 @@ impl FnCtxt<'_, '_> {
             return Ty::Unknown;
         }
 
-        let applicable = Phase::ALL.iter().find_map(|&phase| {
+        let attempts = Phase::ALL
+            .iter()
+            .flat_map(|&phase| [(phase, false), (phase, true)]);
+        let applicable = attempts.into_iter().find_map(|(phase, copying)| {
             let applicable: Vec<&Candidate> = arity_ok
                 .iter()
                 .copied()
-                .filter(|candidate| self.is_applicable(candidate, args, arg_tys, phase))
+                .filter(|candidate| self.is_applicable(candidate, args, arg_tys, phase, copying))
                 .collect();
             (!applicable.is_empty()).then_some((phase, applicable))
         });
@@ -204,13 +216,21 @@ impl FnCtxt<'_, '_> {
         args: &[Expr],
         arg_tys: &[Ty],
         phase: Phase,
+        copying: bool,
     ) -> bool {
         candidate.accepts_arity(args.len(), phase)
             && args
                 .iter()
                 .zip(arg_tys)
                 .enumerate()
-                .all(|(index, (arg, ty))| self.accepts(arg, ty, &candidate.param(index, phase)))
+                .all(|(index, (arg, ty))| {
+                    let expected = candidate.param(index, phase);
+                    if copying {
+                        self.accepts(arg, ty, &expected)
+                    } else {
+                        self.accepts_exact(arg, ty, &expected)
+                    }
+                })
     }
 
     fn most_specific<'c>(

@@ -9,9 +9,9 @@ interface Set<T> extends Iterable<T> {
 
     mut boolean add(T value);
 
-    mut boolean remove(T value);
+    mut boolean remove(&T value);
 
-    boolean contains(T value);
+    boolean contains(&T value);
 
     mut void clear();
 }

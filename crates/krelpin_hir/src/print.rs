@@ -466,6 +466,14 @@ impl Printer<'_, '_> {
                 self.expr(operand);
                 let _ = write!(self.out, " as {})", expr.ty);
             }
+            ExprKind::Deref {
+                expr: operand,
+                safe,
+            } => {
+                self.out.push_str(if *safe { "(?*" } else { "(*" });
+                self.expr(operand);
+                self.out.push(')');
+            }
             ExprKind::Switch { scrutinee, arms } => self.switch(scrutinee, arms),
             ExprKind::With { base, fields } => {
                 self.expr(base);

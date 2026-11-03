@@ -110,6 +110,7 @@ impl LoweringCtxt<'_, '_> {
             };
             self.this = Some(self.push_local(kw::This, ty, member.span));
         }
+        let member_params = params;
         let params: Vec<LocalId> = params
             .iter()
             .map(|param| self.declare(param.name.name, param.name.span))
@@ -139,6 +140,12 @@ impl LoweringCtxt<'_, '_> {
             },
             _ => None,
         };
+        let param_storage = match &member.kind {
+            MemberKind::Method(_) | MemberKind::Constructor(_) => {
+                self.tcx.param_storage(member_params)
+            }
+            MemberKind::Field(_) | MemberKind::Type(_) => Vec::new(),
+        };
         self.rets.push(ret.clone());
         let value = match &member.kind {
             MemberKind::Type(_) => return None,
@@ -167,6 +174,7 @@ impl LoweringCtxt<'_, '_> {
             locals: self.locals,
             ret,
             ret_sources,
+            param_storage,
             value,
             span: member.span,
         })
@@ -857,6 +865,7 @@ impl LoweringCtxt<'_, '_> {
 }
 
 fn coerce(expr: Expr, target: &Ty) -> Expr {
+    let expr = copy_through_ref(expr, target);
     let converts = match (&expr.ty, target) {
         (Ty::Primitive(from), Ty::Primitive(to)) => from != to,
         (Ty::Primitive(from), Ty::Nullable(to)) => **to != Ty::Primitive(*from),
@@ -871,6 +880,30 @@ fn coerce(expr: Expr, target: &Ty) -> Expr {
         span: expr.span,
         kind: ExprKind::Cast {
             expr: Box::new(expr),
+        },
+    }
+}
+
+fn copy_through_ref(expr: Expr, target: &Ty) -> Expr {
+    let is_ref = |ty: &Ty| matches!(ty, Ty::Ref { .. });
+    let (inner, safe) = match (&expr.ty, target) {
+        (Ty::Ref { ty, .. }, target) if !is_ref(target.non_null()) && !target.is_unknown() => {
+            (ty.as_ref().clone(), false)
+        }
+        (Ty::Nullable(nullable), Ty::Nullable(target)) if !is_ref(target) => {
+            match nullable.as_ref() {
+                Ty::Ref { ty, .. } => (ty.as_ref().clone().nullable(), true),
+                _ => return expr,
+            }
+        }
+        _ => return expr,
+    };
+    Expr {
+        ty: inner,
+        span: expr.span,
+        kind: ExprKind::Deref {
+            expr: Box::new(expr),
+            safe,
         },
     }
 }

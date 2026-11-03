@@ -20,7 +20,7 @@ error: mismatched types
  --> tests/ui/typeck/library_errors.kr:9:21
   |
 9 |         int count = names.get(0);
-  |                     ^^^^^^^^^^^^ expected `int`, found `String`
+  |                     ^^^^^^^^^^^^ expected `int`, found `&String`
 
 error: cannot index into a value of type `List<String>`
   --> tests/ui/typeck/library_errors.kr:10:25

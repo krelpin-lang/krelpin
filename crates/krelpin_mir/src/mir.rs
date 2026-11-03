@@ -5,7 +5,7 @@ use krelpin_ast::token::Lit;
 use krelpin_hir::Dispatch;
 use krelpin_span::def_id::DefId;
 use krelpin_span::{Span, Symbol};
-use krelpin_typeck::{Callee, Ty};
+use krelpin_typeck::{Callee, Storage, Ty};
 
 #[derive(Debug, Default)]
 pub struct Mir {
@@ -43,6 +43,7 @@ pub struct Body {
     pub locals: Vec<LocalDecl>,
     pub arg_count: usize,
     pub ret_sources: Option<Vec<ReturnSource>>,
+    pub arg_storage: Vec<Storage>,
     pub captures: Vec<CaptureInfo>,
     pub blocks: Vec<BasicBlockData>,
     pub span: Span,

@@ -7,7 +7,7 @@ interface List<T> extends Iterable<T> {
         return this.size() == 0;
     }
 
-    T get(int index);
+    &[this] T get(int index);
 
     mut T set(int index, T value);
 
@@ -17,11 +17,11 @@ interface List<T> extends Iterable<T> {
 
     mut T remove(int index);
 
-    boolean contains(T value) where T extends Equatable<T> {
+    boolean contains(&T value) where T extends Equatable<T> {
         return this.indexOf(value) >= 0;
     }
 
-    int indexOf(T value) where T extends Equatable<T>;
+    int indexOf(&T value) where T extends Equatable<T>;
 
     mut void clear();
 }

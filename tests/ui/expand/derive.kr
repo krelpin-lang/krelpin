@@ -28,7 +28,7 @@ class Register {
     HashMap<Payment, int> counts = new HashMap<>();
 
     mut void track(Payment payment) {
-        int? count = this.counts.get(payment);
+        int? count = this.counts.get(&payment);
         this.counts.put(payment, (count ?: 0) + 1);
     }
 

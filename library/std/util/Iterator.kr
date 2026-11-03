@@ -3,5 +3,5 @@ package std.util;
 interface Iterator[src]<T> {
     boolean hasNext();
 
-    mut T next();
+    mut &[src] T next();
 }

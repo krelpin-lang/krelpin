@@ -148,7 +148,7 @@ fn Main.count(_1: List<String>) -> int {
     let _4: Iterator<String>;
     let _5: boolean;
     let _6: &Iterator<String>;
-    let _7: String;
+    let _7: &String;
     let _8: &mut Iterator<String>;
     let _9: String;
     debug names => _1;
@@ -185,7 +185,7 @@ fn Main.count(_1: List<String>) -> int {
 
     bb5: {
         StorageLive(_9);
-        _9 = copy _7;
+        _9 = copy (*_7);
         _2 = Add(copy _2, const 1_int);
         StorageDead(_9);
         goto -> bb1;

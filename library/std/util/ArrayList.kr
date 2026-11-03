@@ -5,7 +5,7 @@ class ArrayList<T> implements List<T> {
     int size();
 
     @Intrinsic
-    T get(int index);
+    &[this] T get(int index);
 
     @Intrinsic
     mut T set(int index, T value);
@@ -20,7 +20,7 @@ class ArrayList<T> implements List<T> {
     mut T remove(int index);
 
     @Intrinsic
-    int indexOf(T value) where T extends Equatable<T>;
+    int indexOf(&T value) where T extends Equatable<T>;
 
     @Intrinsic
     mut void clear();

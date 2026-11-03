@@ -2,8 +2,8 @@ use std::collections::hash_map::Entry;
 use std::collections::{HashMap, HashSet};
 
 use krelpin_ast::ast::{
-    CompilationUnit, FieldStorage, Ident, Import, Item, ItemKind, Member, MemberKind, Method,
-    Variant, is_intrinsic,
+    CompilationUnit, FieldStorage, GenericParamKind, Ident, Import, Item, ItemKind, Member,
+    MemberKind, Method, Variant, is_intrinsic,
 };
 use krelpin_errors::{DiagCtxt, Diagnostic};
 use krelpin_span::def_id::DefId;
@@ -29,6 +29,7 @@ pub struct TypeDef {
     pub nested: HashMap<Symbol, DefId>,
     pub fields: HashMap<Symbol, FieldDef>,
     pub methods: HashMap<Symbol, Vec<MethodDef>>,
+    pub borrow_params: usize,
 }
 
 #[derive(Clone, Copy, Debug)]
@@ -132,6 +133,12 @@ fn collect_type(
         nested: HashMap::new(),
         fields: HashMap::new(),
         methods: HashMap::new(),
+        borrow_params: item
+            .generics()
+            .params
+            .iter()
+            .filter(|param| param.kind == GenericParamKind::BorrowSource)
+            .count(),
     };
 
     let members: &[Member] = match &item.kind {

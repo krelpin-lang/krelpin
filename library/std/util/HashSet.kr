@@ -8,10 +8,10 @@ class HashSet<T extends Hashable<T>> implements Set<T> {
     mut boolean add(T value);
 
     @Intrinsic
-    mut boolean remove(T value);
+    mut boolean remove(&T value);
 
     @Intrinsic
-    boolean contains(T value);
+    boolean contains(&T value);
 
     @Intrinsic
     mut void clear();

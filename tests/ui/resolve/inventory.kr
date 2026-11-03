@@ -56,7 +56,7 @@ class Main {
     static void main() {
         List<Item> items = new ArrayList<>();
         for (int i = 0; i < 3; i++) {
-            Object value = items.get(i);
+            &Object value = items.get(i);
             if (value instanceof Item item) {
                 Console.println(item.describe());
             }

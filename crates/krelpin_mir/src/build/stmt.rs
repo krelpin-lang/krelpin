@@ -326,7 +326,14 @@ impl<'h> Builder<'_, 'h, '_> {
                     span,
                 );
             }
-            _ => self.bind_var(id, element, elem, span),
+            Ty::Ref { .. } => self.bind_var(id, element, elem, span),
+            _ => match elem {
+                Ty::Ref { ty: inner, .. } => {
+                    let inner = inner.as_ref().clone();
+                    self.bind_var(id, element.project(PlaceElem::Deref), &inner, span);
+                }
+                _ => self.bind_var(id, element, elem, span),
+            },
         }
     }
 

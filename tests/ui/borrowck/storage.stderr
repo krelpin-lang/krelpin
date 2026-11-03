@@ -1,0 +1,30 @@
+error: `sneak` keeps `text` in `this`, but its signature does not allow it
+  --> tests/ui/borrowck/storage.kr:19:28
+   |
+19 |     mut void sneak(&String text) {
+   |     ------------------------------ `text` is still in `this` here
+   |                            ^^^^ `text` is only borrowed for this call
+   |
+   = note: a method can only keep a reference it was given when the parameter names a borrow source
+   = help: give `text` a borrow source of the class, like `&[src] String`
+
+error: `other` does not live long enough
+  --> tests/ui/borrowck/storage.kr:54:28
+   |
+54 |             cache.remember(&other);
+   |                            ^^^^^^ borrowed value does not live long enough
+55 |         }
+   |          - `other` stops existing here while still borrowed
+
+error: cannot borrow `names` as mutable because it is also borrowed as shared
+  --> tests/ui/borrowck/storage.kr:64:9
+   |
+63 |         names.forEach(name -> refs.add(name));
+   |         ------------------------------------- shared borrow of `names` happens here
+64 |         names.add("x");
+   |         ^^^^^^^^^^^^^^ mutable borrow happens here
+65 |         return refs.size();
+   |                ----------- the borrow is used later here
+
+error: aborting due to 3 previous errors
+

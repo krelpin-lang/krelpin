@@ -2,7 +2,7 @@ use std::collections::{HashSet, VecDeque};
 
 use krelpin_errors::{DiagCtxt, Diagnostic};
 use krelpin_mir::{
-    BasicBlock, Body, Local, Place, PlaceBase, PlaceElem, ReturnSource, StatementKind,
+    BasicBlock, Body, BodySource, Local, Place, PlaceBase, PlaceElem, ReturnSource, StatementKind,
     TerminatorKind, Unwind, place_locals_of, rvalue_locals_of, terminator_input_locals_of,
 };
 use krelpin_span::Span;
@@ -120,6 +120,7 @@ impl<'a, 'tcx> Checker<'a, 'tcx> {
                     self.report_escape(loan, span, "returned");
                 } else {
                     self.check_ret_sources(&held[Local::RETURN.index()], span);
+                    self.check_stores(held, span);
                 }
             }
             TerminatorKind::Throw {
@@ -203,6 +204,79 @@ impl<'a, 'tcx> Checker<'a, 'tcx> {
             sources.join(", ")
         ));
         self.emit(span, diagnostic);
+    }
+
+    fn check_stores(&mut self, held: &Holdings, span: Span) {
+        if let BodySource::Closure { .. } = self.body.source {
+            return;
+        }
+        for target in self.body.args() {
+            if !matches!(self.body.local(target).ty, Ty::Ref { mutable: true, .. }) {
+                continue;
+            }
+            for index in held[target.index()].iter() {
+                let loan = &self.loans.loans[index];
+                let (local, contents) = match loan.origin {
+                    LoanOrigin::Arg(local) => (local, false),
+                    LoanOrigin::ArgContents(local) => (local, true),
+                    LoanOrigin::Local => match base_local(&loan.place) {
+                        Some(local)
+                            if has_deref(&loan.place)
+                                && local.index() >= 1
+                                && local.index() <= self.body.arg_count =>
+                        {
+                            (local, false)
+                        }
+                        _ => continue,
+                    },
+                };
+                if local == target {
+                    continue;
+                }
+                let storage = self
+                    .body
+                    .arg_storage
+                    .get(local.index() - 1)
+                    .copied()
+                    .unwrap_or_default();
+                if storage.whole || (contents && storage.contents) {
+                    continue;
+                }
+                self.report_store(local, target, span);
+                return;
+            }
+        }
+    }
+
+    fn report_store(&mut self, stored: Local, target: Local, span: Span) {
+        let name = |local: Local| {
+            self.body
+                .local(local)
+                .name
+                .map_or_else(|| "value".to_owned(), |name| name.to_string())
+        };
+        let stored_name = name(stored);
+        let target_name = name(target);
+        let declaration = self.body.local(stored).span;
+        let diagnostic = Diagnostic::error(format!(
+            "`{}` keeps `{stored_name}` in `{target_name}`, but its signature does not allow it",
+            self.body.name
+        ))
+        .with_span(declaration)
+        .with_label(format!("`{stored_name}` is only borrowed for this call"))
+        .with_secondary(
+            span,
+            format!("`{stored_name}` is still in `{target_name}` here"),
+        )
+        .with_note(
+            "a method can only keep a reference it was given when the parameter names a \
+             borrow source",
+        )
+        .with_help(format!(
+            "give `{stored_name}` a borrow source of the class, like `&[src] {}`",
+            self.tys.describe_ty_of(stored)
+        ));
+        self.emit(declaration, diagnostic);
     }
 
     fn is_local_data(&self, loan: usize) -> bool {

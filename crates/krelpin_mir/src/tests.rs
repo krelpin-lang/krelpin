@@ -242,7 +242,7 @@ fn iterables_use_their_iterator() {
             "FakeRead(_3);",
             "_5 = Iterator::hasNext(move _6) -> [return: bb2, unwind continue];",
             "_7 = Iterator::next(move _8) -> [return: bb5, unwind continue];",
-            "_9 = copy _7;",
+            "_9 = copy (*_7);",
         ],
     );
 }

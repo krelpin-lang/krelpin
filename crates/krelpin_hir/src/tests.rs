@@ -164,9 +164,9 @@ fn closures_list_their_captures() {
          \x20   return calls;\n\
          } }",
         &[
-            "Iterable::forEach(&numbers_0, |n_4: int| -> void [&offset_2] \
-             Console::println(((n_4 + offset_2) as Object?)));",
-            "Iterable::forEach(&numbers_0, |n_5: int| -> void [&mut calls_3] {",
+            "Iterable::forEach(&numbers_0, |n_4: &int| -> void [&offset_2] \
+             Console::println((((*n_4) + offset_2) as Object?)));",
+            "Iterable::forEach(&numbers_0, |n_5: &int| -> void [&mut calls_3] {",
             "let bump_6: Runnable = ref Counter::bump on &mut counter_1;",
         ],
     );

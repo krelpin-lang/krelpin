@@ -2,7 +2,7 @@ use krelpin_ast::ast::{BinOp, ReceiverKind, UnOp};
 use krelpin_ast::token::Lit;
 use krelpin_span::def_id::DefId;
 use krelpin_span::{Span, Symbol};
-use krelpin_typeck::{Callee, Ty};
+use krelpin_typeck::{Callee, Storage, Ty};
 
 #[derive(Debug, Default)]
 pub struct Hir {
@@ -43,6 +43,7 @@ pub struct Body {
     pub locals: Vec<LocalDecl>,
     pub ret: Ty,
     pub ret_sources: Option<Vec<ReturnSource>>,
+    pub param_storage: Vec<Storage>,
     pub value: BodyValue,
     pub span: Span,
 }
@@ -261,6 +262,10 @@ pub enum ExprKind {
     },
     Cast {
         expr: Box<Expr>,
+    },
+    Deref {
+        expr: Box<Expr>,
+        safe: bool,
     },
     Switch {
         scrutinee: Box<Expr>,

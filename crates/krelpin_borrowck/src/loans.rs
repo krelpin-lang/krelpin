@@ -5,7 +5,7 @@ use krelpin_mir::{
     AggregateKind, BasicBlock, Body, Local, Operand, Place, Rvalue, StatementKind, TerminatorKind,
 };
 use krelpin_span::Span;
-use krelpin_typeck::{BorrowSource, Callee, Ty};
+use krelpin_typeck::{BorrowSource, Callee, Storage, Ty};
 
 use crate::bitset::BitSet;
 use crate::dataflow::{Forward, Location};
@@ -248,6 +248,35 @@ impl Forward for LoanData<'_, '_> {
         let passed: Vec<Passed> = (0..args.len())
             .map(|index| self.passed(state, callee, args, index))
             .collect();
+        for (index, arg) in args.iter().enumerate() {
+            let is_closure = operand_place(arg)
+                .map(|place| self.tys.place_ty(place))
+                .is_some_and(|ty| self.tys.tcx.fn_receiver(&ty).is_some());
+            if !is_closure {
+                continue;
+            }
+            let mut handed = BitSet::new(self.loans.len());
+            for (other, value) in passed.iter().enumerate() {
+                if other != index {
+                    handed.union(&value.held);
+                    handed.union(&value.contents);
+                }
+            }
+            if handed.is_empty() {
+                continue;
+            }
+            for loan in passed[index].held.iter() {
+                let loan = &self.loans[loan];
+                let holds = self.tys.may_hold_refs(&self.tys.place_ty(&loan.place));
+                if loan.mutable
+                    && loan.origin == LoanOrigin::Local
+                    && holds
+                    && let Some(local) = base_local(&loan.place)
+                {
+                    state[local.index()].union(&handed);
+                }
+            }
+        }
         for (index, arg) in passed.iter().enumerate() {
             if !matches!(arg.declared, DeclaredArg::Ref { mutable: true }) {
                 continue;
@@ -255,7 +284,7 @@ impl Forward for LoanData<'_, '_> {
             let mut stored = BitSet::new(self.loans.len());
             for (other, value) in passed.iter().enumerate() {
                 if other != index {
-                    stored.union(value.stored());
+                    stored.union(&value.stored());
                 }
             }
             if stored.is_empty() {
@@ -300,13 +329,24 @@ enum DeclaredArg {
 
 struct Passed {
     declared: DeclaredArg,
+    storage: Option<Storage>,
     held: BitSet,
     contents: BitSet,
 }
 
 impl Passed {
-    fn stored(&self) -> &BitSet {
-        &self.held
+    fn stored(&self) -> BitSet {
+        let mut stored = BitSet::new(self.held.len());
+        let Some(storage) = self.storage else {
+            return stored;
+        };
+        if storage.whole {
+            stored.union(&self.held);
+        }
+        if storage.contents {
+            stored.union(&self.contents);
+        }
+        stored
     }
 }
 
@@ -385,6 +425,20 @@ impl LoanData<'_, '_> {
                 }
             }
         };
+        let storage = match (has_receiver, index) {
+            (true, 0) => None,
+            _ => Some(
+                callee
+                    .method
+                    .storage
+                    .get(index - usize::from(has_receiver))
+                    .copied()
+                    .unwrap_or(Storage {
+                        whole: true,
+                        contents: true,
+                    }),
+            ),
+        };
         let held = self.operand_loans(state, &args[index]);
         let contents = match declared {
             DeclaredArg::Ref { .. } => self.contents(state, &held),
@@ -392,6 +446,7 @@ impl LoanData<'_, '_> {
         };
         Passed {
             declared,
+            storage,
             held,
             contents,
         }

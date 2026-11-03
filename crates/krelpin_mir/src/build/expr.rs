@@ -30,9 +30,30 @@ impl<'h> Builder<'_, 'h, '_> {
             | ExprKind::Null
             | ExprKind::Local(_)
             | ExprKind::Field { safe: false, .. }
+            | ExprKind::Deref { safe: false, .. }
             | ExprKind::Index { .. } => {
                 let operand = self.as_operand(expr);
                 self.assign(dest, Rvalue::Use(operand), span);
+            }
+            ExprKind::Deref {
+                expr: inner,
+                safe: true,
+            } => {
+                let reference = self.as_place(inner);
+                let (null, present) = self.null_branch(reference.clone(), span);
+                let join = self.new_block();
+                self.current = null;
+                self.assign(dest.clone(), Rvalue::Use(Constant::Null.into()), span);
+                self.goto(join, span);
+                self.current = present;
+                let operand = self.operand_from_place(
+                    reference.project(PlaceElem::Deref),
+                    expr.ty.non_null(),
+                    span,
+                );
+                self.assign(dest, Rvalue::Use(operand), span);
+                self.goto(join, span);
+                self.current = join;
             }
             ExprKind::Static { owner, name } => match self.variant_index(*owner, *name) {
                 Some(index) => self.assign(
@@ -246,6 +267,7 @@ impl<'h> Builder<'_, 'h, '_> {
             ExprKind::Local(_)
             | ExprKind::Static { .. }
             | ExprKind::Field { safe: false, .. }
+            | ExprKind::Deref { safe: false, .. }
             | ExprKind::Index { .. } => {
                 let place = self.as_place(expr);
                 self.operand_from_place(place, &expr.ty, span)
@@ -302,6 +324,10 @@ impl<'h> Builder<'_, 'h, '_> {
                 owner: *owner,
                 name: *name,
             }),
+            ExprKind::Deref {
+                expr: inner,
+                safe: false,
+            } => self.as_place(inner).project(PlaceElem::Deref),
             ExprKind::Index { base, index } => {
                 let array = self.as_deref_place(base);
                 let index = self.as_local(index);
@@ -746,9 +772,10 @@ impl<'h> Builder<'_, 'h, '_> {
 
     fn is_place_expr(&self, expr: &Expr) -> bool {
         match &expr.kind {
-            ExprKind::Local(_) | ExprKind::Field { safe: false, .. } | ExprKind::Index { .. } => {
-                true
-            }
+            ExprKind::Local(_)
+            | ExprKind::Field { safe: false, .. }
+            | ExprKind::Deref { safe: false, .. }
+            | ExprKind::Index { .. } => true,
             ExprKind::Static { owner, name } => self.variant_index(*owner, *name).is_none(),
             _ => false,
         }

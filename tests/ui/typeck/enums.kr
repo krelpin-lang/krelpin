@@ -90,6 +90,6 @@ class Drawing {
     static boolean sameWay(Direction a, Direction b) {
         HashSet<Direction> seen = new HashSet<>();
         seen.add(a);
-        return a == b && seen.contains(b);
+        return a == b && seen.contains(&b);
     }
 }

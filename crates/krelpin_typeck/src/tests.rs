@@ -556,7 +556,7 @@ fn collections_are_generic() {
     );
     body_ok(
         "Map<String, int> ages = new HashMap<>(); ages.put(\"Ali\", 30); \
-         int? age = ages.get(\"Ali\"); int years = age ?: 0;",
+         int? age = ages.get(&\"Ali\"); int years = age ?: 0;",
     );
     assert_eq!(
         in_body("List<String> names = new ArrayList<>(); int first = names.get(0);"),
@@ -571,7 +571,7 @@ fn collections_are_generic() {
         ["mismatched types"]
     );
     assert_eq!(
-        in_body("Map<String, int> ages = new HashMap<>(); int age = ages.get(\"Ali\");"),
+        in_body("Map<String, int> ages = new HashMap<>(); int age = ages.get(&\"Ali\");"),
         ["mismatched types"]
     );
     assert_eq!(
@@ -604,7 +604,7 @@ fn own_types_can_be_iterable() {
 fn primitives_are_the_only_number_types() {
     body_ok(
         "List<int> xs = new ArrayList<>(); xs.add(5); int first = xs.get(0); \
-         Map<String, int> ages = new HashMap<>(); int? age = ages.get(\"Ali\"); \
+         Map<String, int> ages = new HashMap<>(); int? age = ages.get(&\"Ali\"); \
          int? missing = null; Object any = 5; Comparable<int> order = 5;",
     );
     assert_eq!(
@@ -816,7 +816,7 @@ fn ambiguous_calls() {
 fn util(code: &str) -> String {
     format!(
         "class Util {{\n\
-         \x20   static <T> T first(List<T> xs) {{ return xs.get(0); }}\n\
+         \x20   static <T> &[xs] T first(&List<T> xs) {{ return xs.get(0); }}\n\
          \x20   static <T> T either(T a, T b) {{ return a; }}\n\
          \x20   static <T extends Comparable<T>> T max(T a, T b) {{\n\
          \x20       return a.compareTo(&b) >= 0 ? a : b;\n\
@@ -831,13 +831,13 @@ fn util(code: &str) -> String {
 #[test]
 fn generic_methods_infer_their_type_arguments() {
     ok(&util(
-        "List<String> names = new ArrayList<>(); String s = Util.first(names); \
+        "List<String> names = new ArrayList<>(); String s = Util.first(&names); \
          int i = Util.either(1, 2); String m = Util.max(\"a\", \"b\"); \
          List<String> xs = Util.listOf(\"a\", \"b\");",
     ));
     assert_eq!(
         errors(&util(
-            "List<String> names = new ArrayList<>(); int n = Util.first(names);"
+            "List<String> names = new ArrayList<>(); int n = Util.first(&names);"
         )),
         ["mismatched types"]
     );
@@ -1393,11 +1393,12 @@ fn hash_collections_need_hashable_keys() {
 #[test]
 fn list_lookups_need_equatable_elements() {
     ok(&points(
-        "List<Point> points = new ArrayList<>(); boolean has = points.contains(new Point(1));",
+        "List<Point> points = new ArrayList<>(); Point p = new Point(1); \
+         boolean has = points.contains(&p);",
     ));
     assert_eq!(
         errors(&points(
-            "List<Thing> things = new ArrayList<>(); things.contains(new Thing());"
+            "List<Thing> things = new ArrayList<>(); Thing t = new Thing(); things.contains(&t);"
         )),
         ["type `Thing` does not satisfy the bound of `T`"]
     );
@@ -1844,5 +1845,28 @@ fn records_are_taken_apart_with_patterns() {
             "return switch (line) { case Line(Point from) -> 0.0; };"
         )),
         ["this pattern has 1 field, but the record `Line` has 2 components"]
+    );
+}
+
+#[test]
+fn copyable_values_are_read_through_references() {
+    body_ok(
+        "List<String> names = new ArrayList<>(); String first = names.get(0); \
+         &String borrowed = names.get(0); String copied = borrowed; int n = borrowed.length();",
+    );
+    assert_eq!(
+        errors(
+            "import std.util.List;\n\
+             class A { static <T> T first(&List<T> xs) { return xs.get(0); } }"
+        ),
+        ["mismatched types"]
+    );
+    assert_eq!(
+        errors(
+            "import std.util.List;\n\
+             class Box {}\n\
+             class A { static Box first(&List<Box> xs) { return xs.get(0); } }"
+        ),
+        ["mismatched types"]
     );
 }

@@ -83,6 +83,13 @@ pub struct MethodSig {
     pub is_abstract: bool,
     pub is_final: bool,
     pub borrows: RetBorrows,
+    pub storage: Vec<Storage>,
+}
+
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
+pub struct Storage {
+    pub whole: bool,
+    pub contents: bool,
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -96,7 +103,6 @@ pub enum BorrowSource {
 pub struct RetBorrows {
     pub sources: Vec<BorrowSource>,
     pub elided: bool,
-    elided_types: Vec<DefId>,
 }
 
 impl RetBorrows {
@@ -133,29 +139,7 @@ impl<'a> Tcx<'a> {
             .items(units)
             .map(|(type_def, item)| tcx.collect_item(type_def.def, item))
             .collect();
-        tcx.resolve_elided_borrows();
         tcx
-    }
-
-    fn resolve_elided_borrows(&mut self) {
-        let borrowing: Vec<bool> = self
-            .types
-            .iter()
-            .map(|sig| !sig.borrow_params.is_empty())
-            .collect();
-        for sig in &mut self.types {
-            for method in sig.methods.values_mut().flatten() {
-                let borrows = &mut method.borrows;
-                if borrows
-                    .elided_types
-                    .iter()
-                    .any(|def| borrowing[def.index()])
-                {
-                    borrows.elided = true;
-                }
-                borrows.elided_types.clear();
-            }
-        }
     }
 
     pub fn sig(&self, def: DefId) -> &TypeSig {
@@ -496,6 +480,7 @@ impl<'a> Tcx<'a> {
         if !has_compact_ctor {
             sig.ctors.push(MethodSig {
                 params: self.param_tys(&record.components),
+                storage: self.param_storage(&record.components),
                 is_final: false,
                 ..synthesized_method(sig.name, def, None, Ty::Void)
             });
@@ -651,6 +636,7 @@ impl<'a> Tcx<'a> {
         if let FnRetTy::Ty(ty) = &method.ret {
             self.collect_borrows(ty, &method.params, class_sources, &mut borrows);
         }
+        let storage = self.param_storage(&method.params);
         let is_abstract = member.inheritance.abstract_kw.is_some()
             || (method.body.is_none() && !is_intrinsic(&member.annotations));
         MethodSig {
@@ -667,7 +653,54 @@ impl<'a> Tcx<'a> {
             is_abstract,
             is_final: member.inheritance.final_kw.is_some(),
             borrows,
+            storage,
         }
+    }
+
+    pub fn param_storage(&self, params: &[Param]) -> Vec<Storage> {
+        params
+            .iter()
+            .map(|param| match &param.ty.kind {
+                TyKind::Ref { sources, ty, .. } => Storage {
+                    whole: !sources.is_empty(),
+                    contents: self.mentions_storable(ty),
+                },
+                _ => Storage {
+                    whole: self.mentions_storable(&param.ty),
+                    contents: false,
+                },
+            })
+            .collect()
+    }
+
+    fn mentions_storable(&self, ty: &ast::Ty) -> bool {
+        match &ty.kind {
+            TyKind::Primitive(_) => false,
+            TyKind::Ref { sources, ty, .. } => !sources.is_empty() || self.mentions_storable(ty),
+            TyKind::Path {
+                path,
+                sources,
+                args,
+            } => {
+                let res = path
+                    .segments
+                    .last()
+                    .and_then(|segment| self.resolutions.get(segment.span));
+                let elided_view = matches!(
+                    res,
+                    Some(Res::Item(def)) if sources.is_empty() && self.view_def(def)
+                );
+                matches!(res, Some(Res::TypeParam(_)))
+                    || !sources.is_empty()
+                    || elided_view
+                    || args.iter().any(|arg| self.mentions_storable(arg))
+            }
+            TyKind::Nullable(ty) | TyKind::Array(ty) => self.mentions_storable(ty),
+        }
+    }
+
+    fn view_def(&self, def: DefId) -> bool {
+        self.items.def(def).borrow_params > 0
     }
 
     pub fn ret_borrows(
@@ -678,13 +711,6 @@ impl<'a> Tcx<'a> {
     ) -> RetBorrows {
         let mut borrows = RetBorrows::default();
         self.collect_borrows(ty, params, class_sources, &mut borrows);
-        let elided_types = std::mem::take(&mut borrows.elided_types);
-        if elided_types
-            .iter()
-            .any(|def| !self.sig(*def).borrow_params.is_empty())
-        {
-            borrows.elided = true;
-        }
         borrows
     }
 
@@ -734,7 +760,7 @@ impl<'a> Tcx<'a> {
                         .last()
                         .and_then(|segment| self.resolutions.get(segment.span));
                     if let Some(Res::Item(def)) = def {
-                        borrows.elided_types.push(def);
+                        borrows.elided |= self.view_def(def);
                     }
                 }
                 name_sources(sources, borrows);
@@ -763,6 +789,7 @@ impl<'a> Tcx<'a> {
             is_abstract: false,
             is_final: false,
             borrows: RetBorrows::default(),
+            storage: self.param_storage(&ctor.params),
         }
     }
 
@@ -833,5 +860,6 @@ fn synthesized_method(
         is_abstract: false,
         is_final: true,
         borrows: RetBorrows::default(),
+        storage: Vec::new(),
     }
 }

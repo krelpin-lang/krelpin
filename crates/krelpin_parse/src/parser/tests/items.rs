@@ -502,3 +502,10 @@ fn annotation_arguments_keep_their_tokens() {
         .expect("arguments");
     assert_eq!(args.tokens.len(), 3);
 }
+
+#[test]
+fn annotation_arguments_touch_the_name() {
+    let members = members("class A { @Intrinsic\n    (&String)? f(); @Derive(Equatable) int x; }");
+    assert_eq!(members[0].annotations[0].args, None);
+    assert!(members[1].annotations[0].args.is_some());
+}

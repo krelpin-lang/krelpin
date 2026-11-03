@@ -7,17 +7,17 @@ interface Map<K, V> {
         return this.size() == 0;
     }
 
-    V? get(K key);
+    (&[this] V)? get(&K key);
 
     mut V? put(K key, V value);
 
-    mut V? remove(K key);
+    mut V? remove(&K key);
 
-    boolean containsKey(K key);
+    boolean containsKey(&K key);
 
     mut void clear();
 
-    Set<K> keySet();
+    Set<&[this] K> keySet();
 
-    List<V> values();
+    List<&[this] V> values();
 }

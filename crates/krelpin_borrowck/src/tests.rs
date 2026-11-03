@@ -321,3 +321,67 @@ fn objects_keep_the_borrows_they_store() {
         ["`text` does not live long enough"]
     );
 }
+
+#[test]
+fn collections_lend_their_elements() {
+    ok("String first = names.get(0); names.add(\"x\"); int n = first.length();");
+    assert_eq!(
+        in_main("&String first = names.get(0); names.add(\"x\"); first.length();"),
+        ["cannot borrow `names` as mutable because it is also borrowed as shared"]
+    );
+}
+
+#[test]
+fn methods_keep_only_what_their_signature_allows() {
+    let cache = |code: &str| {
+        errors(&format!(
+            "class Cache[src] {{\n\
+             \x20   &[src] String kept;\n\
+             \x20   Cache(&[src] String first) {{ this.kept = first; }}\n\
+             \x20   mut void remember(&[src] String text) {{ this.kept = text; }}\n\
+             \x20   mut int measure(&String text) {{ return text.length(); }}\n\
+             }}\n\
+             class Main {{ static int run() {{ {code} }} }}"
+        ))
+    };
+    assert_eq!(
+        cache(
+            "String first = \"a\"; Cache cache = new Cache(&first);\n\
+             { String other = \"b\"; cache.measure(&other); }\n\
+             return cache.measure(&first);"
+        ),
+        Vec::<String>::new()
+    );
+    assert_eq!(
+        cache(
+            "String first = \"a\"; Cache cache = new Cache(&first);\n\
+             { String other = \"b\"; cache.remember(&other); }\n\
+             return cache.measure(&first);"
+        ),
+        ["`other` does not live long enough"]
+    );
+    assert_eq!(
+        errors(
+            "class Cache[src] {\n\
+             \x20   &[src] String kept;\n\
+             \x20   Cache(&[src] String first) { this.kept = first; }\n\
+             \x20   mut void sneak(&String text) { this.kept = text; }\n\
+             }"
+        ),
+        ["`sneak` keeps `text` in `this`, but its signature does not allow it"]
+    );
+}
+
+#[test]
+fn lambdas_keep_what_the_call_hands_them() {
+    assert_eq!(
+        in_main(
+            "List<&String> refs = new ArrayList<>();\n\
+             names.forEach(name -> refs.add(name));\n\
+             names.add(\"x\");\n\
+             refs.size();"
+        ),
+        ["cannot borrow `names` as mutable because it is also borrowed as shared"]
+    );
+    ok("int total = 0; names.forEach(name -> total += name.length()); names.add(\"x\");");
+}

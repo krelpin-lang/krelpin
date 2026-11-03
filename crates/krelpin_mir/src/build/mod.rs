@@ -8,7 +8,7 @@ use krelpin_ast::ast::ReceiverKind;
 use krelpin_hir::{self as hir, BodyKind, BodyValue, ClosureBody, LocalId};
 use krelpin_span::def_id::DefId;
 use krelpin_span::{Span, Symbol};
-use krelpin_typeck::{Tcx, Ty};
+use krelpin_typeck::{Storage, Tcx, Ty};
 
 use crate::mir::{
     BasicBlock, BasicBlockData, Body, BodyId, BodySource, CaptureInfo, CaptureMode, Local,
@@ -145,7 +145,13 @@ impl<'a, 'h, 'tcx> Builder<'a, 'h, 'tcx> {
             BodyKind::Constructor => BodySource::Constructor,
             BodyKind::FieldInit => BodySource::FieldInit,
         };
-        builder.finish(source, arg_count, Vec::new(), ret_sources);
+        let arg_storage = body
+            .this
+            .map(|_| Storage::default())
+            .into_iter()
+            .chain(body.param_storage.iter().copied())
+            .collect();
+        builder.finish(source, arg_count, Vec::new(), ret_sources, arg_storage);
     }
 
     #[allow(clippy::too_many_arguments)]
@@ -198,7 +204,7 @@ impl<'a, 'h, 'tcx> Builder<'a, 'h, 'tcx> {
             index: self.closures,
         };
         self.closures += 1;
-        builder.finish(source, arg_count, captures, None)
+        builder.finish(source, arg_count, captures, None, Vec::new())
     }
 
     fn finish(
@@ -207,6 +213,7 @@ impl<'a, 'h, 'tcx> Builder<'a, 'h, 'tcx> {
         arg_count: usize,
         captures: Vec<CaptureInfo>,
         ret_sources: Option<Vec<ReturnSource>>,
+        arg_storage: Vec<Storage>,
     ) -> BodyId {
         let fallthrough = if self.ret == Ty::Void {
             TerminatorKind::Return
@@ -223,6 +230,7 @@ impl<'a, 'h, 'tcx> Builder<'a, 'h, 'tcx> {
             locals,
             arg_count,
             ret_sources,
+            arg_storage,
             captures,
             blocks,
             span: self.hir.span,

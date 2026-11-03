@@ -1,0 +1,73 @@
+package shop;
+
+import std.util.List;
+import std.util.ArrayList;
+import std.util.HashMap;
+
+class Cache[src] {
+    &[src] String kept;
+    List<&[src] String> all = new ArrayList<>();
+
+    Cache(&[src] String first) {
+        this.kept = first;
+    }
+
+    mut void remember(&[src] String text) {
+        this.all.add(text);
+    }
+
+    mut void sneak(&String text) {
+        this.kept = text;
+    }
+
+    mut int measure(&String text) {
+        return text.length();
+    }
+}
+
+class Main {
+    static int lookups() {
+        HashMap<String, int> ages = new HashMap<>();
+        ages.put("ada", 36);
+        {
+            String key = "ada";
+            ages.remove(&key);
+        }
+        return ages.size();
+    }
+
+    static int measured() {
+        String first = "a";
+        Cache cache = new Cache(&first);
+        {
+            String other = "b";
+            cache.measure(&other);
+        }
+        return cache.measure(&first);
+    }
+
+    static int remembered() {
+        String first = "a";
+        Cache cache = new Cache(&first);
+        {
+            String other = "b";
+            cache.remember(&other);
+        }
+        return cache.measure(&first);
+    }
+}
+
+class Lambdas {
+    static int run(List<String> names) {
+        List<&String> refs = new ArrayList<>();
+        names.forEach(name -> refs.add(name));
+        names.add("x");
+        return refs.size();
+    }
+    static int fine(List<String> names) {
+        int total = 0;
+        names.forEach(name -> total += name.length());
+        names.add("x");
+        return total;
+    }
+}

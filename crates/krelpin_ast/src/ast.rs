@@ -116,6 +116,17 @@ pub struct Item {
     pub span: Span,
 }
 
+impl Item {
+    pub fn generics(&self) -> &Generics {
+        match &self.kind {
+            ItemKind::Class(class) => &class.generics,
+            ItemKind::Record(record) => &record.generics,
+            ItemKind::Interface(interface) => &interface.generics,
+            ItemKind::Enum(def) => &def.generics,
+        }
+    }
+}
+
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub enum ItemKind {
     Class(Class),

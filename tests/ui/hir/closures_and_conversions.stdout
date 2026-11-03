@@ -23,8 +23,8 @@ fn Main.compare(a_0: Money, b_1: Money, name_2: String?) -> boolean {
 fn Main.closures(numbers_0: List<int>, counter_1: Counter) -> int {
     let offset_2: int = 10;
     let calls_3: int = 0;
-    Iterable::forEach(&numbers_0, |n_4: int| -> void [&offset_2] Console::println(((n_4 + offset_2) as Object?)));
-    Iterable::forEach(&numbers_0, |n_5: int| -> void [&mut calls_3] {
+    Iterable::forEach(&numbers_0, |n_4: &int| -> void [&offset_2] Console::println((((*n_4) + offset_2) as Object?)));
+    Iterable::forEach(&numbers_0, |n_5: &int| -> void [&mut calls_3] {
         (calls_3++);
     });
     let length_6: Function<String, int> = ref String::length;
