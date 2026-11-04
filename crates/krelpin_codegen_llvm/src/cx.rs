@@ -46,7 +46,7 @@ pub(crate) struct Cx<'a, 'tcx> {
     pub glue: HashMap<(char, Ty), String>,
     pub table_shapes: HashMap<(Ty, Ty), String>,
     pub errors: Vec<Diagnostic>,
-    pub entry: Option<(usize, bool)>,
+    pub entry: Option<crate::main_fn::Compiled>,
     pub reported: HashSet<String>,
     pub closure_bodies: HashMap<(BodyId, Vec<Ty>), usize>,
     pub closure_types: HashMap<usize, String>,
@@ -104,15 +104,9 @@ impl<'a, 'tcx> Cx<'a, 'tcx> {
         }
     }
 
-    pub(crate) fn compile(&mut self, entry: BodyId) {
-        let takes_args = self.mir.body(entry).arg_count == 1;
-        let id = self.instance(Instance::Body {
-            body: entry,
-            args: Vec::new(),
-        });
-        self.entry = Some((id, takes_args));
+    pub(crate) fn compile(&mut self, entry: &crate::main_fn::Entry) {
         self.rt_key(RtKey::String);
-        self.prepare_main();
+        self.prepare_entry(entry);
         loop {
             while let Some(id) = self.queue.pop_front() {
                 let instance = self.instances[id].clone();
@@ -318,7 +312,7 @@ impl<'a, 'tcx> Cx<'a, 'tcx> {
     pub(crate) fn finish(mut self) -> String {
         let selectors = self.selector_slots();
         self.emit_descriptors(&selectors);
-        let main = self.emit_main();
+        let main = self.emit_entry();
         let mut out = String::new();
         out.push_str("; ModuleID = 'krelpin'\n\n");
         out.push_str("%KrTableShape = type { ptr, ptr, ptr, ptr, i64, i64, i64, i64 }\n");

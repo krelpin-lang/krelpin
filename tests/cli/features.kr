@@ -1,0 +1,52 @@
+class MathLib {
+    public static int square(int value) {
+        return value * value;
+    }
+
+    public static double half(double value) {
+        return value / 2;
+    }
+}
+
+class Main {
+    @Cfg(target_os = "linux")
+    static String platform() {
+        return "linux";
+    }
+
+    @Cfg(not(target_os = "linux"))
+    static String platform() {
+        return "other";
+    }
+
+    @Cfg(feature = "loud")
+    static String volume() {
+        return "LOUD";
+    }
+
+    @Cfg(not(feature = "loud"))
+    static String volume() {
+        return "quiet";
+    }
+
+    @Test
+    static void squaresNumbers() {
+        if (MathLib.square(4) != 16) {
+            throw new IllegalStateException("4 squared is not 16");
+        }
+    }
+
+    @Test
+    static void failsOnPurpose() {
+        throw new IllegalStateException("this test fails");
+    }
+
+    static void main() {
+        Console.println(Main.platform() + " " + Main.volume() + " " + MathLib.square(7));
+        switch (3) {
+            case 3 -> Console.println("three");
+            case 3 -> Console.println("again");
+            default -> Console.println("other");
+        }
+    }
+}

@@ -117,6 +117,12 @@ void kr_console_newline(void);
 KrString *kr_console_read_line(void);
 void kr_uncaught(const KrType *type, const KrString *message);
 void kr_report_thread(const KrType *type, const KrString *message);
+void kr_test_begin(int64_t count);
+void kr_test_passed(const char *name);
+void kr_test_failed(const char *name, const KrType *type, const KrString *message);
+int32_t kr_test_end(void);
+void kr_export_failed(const KrType *type, const KrString *message);
+void kr_once(_Atomic int32_t *state, void (*init)(void));
 
 bool kr_char_is_digit(int32_t c);
 bool kr_char_is_letter(int32_t c);

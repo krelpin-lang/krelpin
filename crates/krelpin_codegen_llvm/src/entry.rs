@@ -8,7 +8,7 @@ pub fn find_entry(
     mir: &Mir,
     tcx: &Tcx<'_>,
     is_user: impl Fn(DefId) -> bool,
-) -> Result<BodyId, Diagnostic> {
+) -> Result<BodyId, Box<Diagnostic>> {
     let main = Symbol::intern("main");
     let candidates: Vec<BodyId> = mir
         .bodies
@@ -25,14 +25,17 @@ pub fn find_entry(
         .collect();
     match candidates.as_slice() {
         [entry] => Ok(*entry),
-        [] => Err(Diagnostic::error("this program has no `main` method")
-            .with_help("add `static void main()` or `static void main(String[] args)` to a class")),
-        [first, second, ..] => Err(Diagnostic::error(
-            "this program has more than one `main` method",
-        )
-        .with_span(mir.body(*second).span)
-        .with_secondary(mir.body(*first).span, "the first `main` is here")
-        .with_help("keep a single `static void main()`")),
+        [] => Err(Box::new(
+            Diagnostic::error("this program has no `main` method").with_help(
+                "add `static void main()` or `static void main(String[] args)` to a class",
+            ),
+        )),
+        [first, second, ..] => Err(Box::new(
+            Diagnostic::error("this program has more than one `main` method")
+                .with_span(mir.body(*second).span)
+                .with_secondary(mir.body(*first).span, "the first `main` is here")
+                .with_help("keep a single `static void main()`"),
+        )),
     }
 }
 
@@ -59,4 +62,65 @@ fn is_entry(tcx: &Tcx<'_>, sig: &MethodSig) -> bool {
         [Ty::Array(elem)] => tcx.is_string(elem),
         _ => false,
     }
+}
+
+pub fn check_test(mir: &Mir, tcx: &Tcx<'_>, body: BodyId) -> Result<(), Box<Diagnostic>> {
+    let mir_body = mir.body(body);
+    let valid = mir_body.source == BodySource::Method
+        && method_of(tcx, mir_body.owner, mir_body.member).is_some_and(|sig| {
+            sig.receiver.is_none()
+                && sig.ret == Ty::Void
+                && sig.params.is_empty()
+                && sig.generics.is_empty()
+        });
+    if valid {
+        return Ok(());
+    }
+    Err(Box::new(
+        Diagnostic::error(format!(
+            "`@Test` methods must be written as `static void {}()`",
+            mir_body.name
+        ))
+        .with_span(mir_body.span)
+        .with_note("a test takes no arguments and fails by throwing an exception"),
+    ))
+}
+
+pub fn library_exports(
+    mir: &Mir,
+    tcx: &Tcx<'_>,
+    prefix: &str,
+    is_user: impl Fn(DefId) -> bool,
+) -> Vec<crate::main_fn::Export> {
+    let mut exports: Vec<crate::main_fn::Export> = Vec::new();
+    for (index, body) in mir.bodies.iter().enumerate() {
+        if body.source != BodySource::Method || !is_user(body.owner) {
+            continue;
+        }
+        let Some(sig) = method_of(tcx, body.owner, body.member) else {
+            continue;
+        };
+        let simple = |ty: &Ty| matches!(ty, Ty::Primitive(_) | Ty::Void);
+        let exported = sig.receiver.is_none()
+            && matches!(sig.vis, krelpin_ast::ast::Visibility::Public(_))
+            && sig.generics.is_empty()
+            && simple(&sig.ret)
+            && sig.params.iter().all(simple);
+        if !exported {
+            continue;
+        }
+        let class = tcx.sig(body.owner).name.name;
+        let base = format!("{prefix}_{class}_{}", body.name);
+        let mut symbol = base.clone();
+        let mut counter = 1;
+        while exports.iter().any(|export| export.symbol == symbol) {
+            counter += 1;
+            symbol = format!("{base}_{counter}");
+        }
+        exports.push(crate::main_fn::Export {
+            body: BodyId(index as u32),
+            symbol,
+        });
+    }
+    exports
 }

@@ -2,6 +2,7 @@
 
 #include <locale.h>
 #include <pthread.h>
+#include <sched.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -199,4 +200,69 @@ void kr_mutex_free(void *mutex) {
     }
     pthread_mutex_destroy(mutex);
     kr_free(mutex);
+}
+
+static int64_t tests_total;
+static int64_t tests_failed;
+static int64_t tests_passed;
+static char *failures;
+static size_t failures_len;
+
+void kr_test_begin(int64_t count) {
+    tests_total = count;
+    printf("\nrunning %lld test%s\n", (long long)count, count == 1 ? "" : "s");
+}
+
+void kr_test_passed(const char *name) {
+    tests_passed++;
+    printf("test %s ... ok\n", name);
+}
+
+void kr_test_failed(const char *name, const KrType *type, const KrString *message) {
+    tests_failed++;
+    printf("test %s ... FAILED\n", name);
+    char line[1024];
+    int len;
+    if (message == NULL) {
+        len = snprintf(line, sizeof line, "    %s: %s\n", name, type->name);
+    } else {
+        len = snprintf(line, sizeof line, "    %s: %s: %.*s\n", name, type->name,
+                       (int)message->len, message->data);
+    }
+    if (len < 0) {
+        return;
+    }
+    size_t size = (size_t)len < sizeof line ? (size_t)len : sizeof line - 1;
+    failures = kr_realloc(failures, (int64_t)(failures_len + size + 1));
+    memcpy(failures + failures_len, line, size);
+    failures_len += size;
+    failures[failures_len] = '\0';
+}
+
+int32_t kr_test_end(void) {
+    if (tests_failed > 0) {
+        printf("\nfailures:\n%s", failures);
+    }
+    printf("\ntest result: %s. %lld passed; %lld failed\n\n", tests_failed > 0 ? "FAILED" : "ok",
+           (long long)tests_passed, (long long)tests_failed);
+    kr_free(failures);
+    failures = NULL;
+    return tests_failed > 0 ? 101 : 0;
+}
+
+void kr_export_failed(const KrType *type, const KrString *message) {
+    kr_uncaught(type, message);
+    abort();
+}
+
+void kr_once(_Atomic int32_t *state, void (*init)(void)) {
+    int32_t expected = 0;
+    if (atomic_compare_exchange_strong(state, &expected, 1)) {
+        init();
+        atomic_store(state, 2);
+        return;
+    }
+    while (atomic_load(state) != 2) {
+        sched_yield();
+    }
 }

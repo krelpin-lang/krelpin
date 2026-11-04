@@ -1085,6 +1085,12 @@ pub(crate) fn runtime_signature(name: &str) -> &'static str {
         "kr_runtime_exit" => "declare void @kr_runtime_exit()",
         "kr_runtime_args" => "declare ptr @kr_runtime_args(ptr)",
         "kr_report_thread" => "declare void @kr_report_thread(ptr, ptr)",
+        "kr_test_begin" => "declare void @kr_test_begin(i64)",
+        "kr_test_passed" => "declare void @kr_test_passed(ptr)",
+        "kr_test_failed" => "declare void @kr_test_failed(ptr, ptr, ptr)",
+        "kr_test_end" => "declare i32 @kr_test_end()",
+        "kr_export_failed" => "declare void @kr_export_failed(ptr, ptr)",
+        "kr_once" => "declare void @kr_once(ptr, ptr)",
         _ => panic!("unknown runtime function `{name}`"),
     }
 }

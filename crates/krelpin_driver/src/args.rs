@@ -37,7 +37,7 @@ pub struct Args {
     #[arg(
         long,
         value_name = "SPEC",
-        help = "Configure the compilation environment. \
+        help = "Set a condition for `@Cfg`. \
                 SPEC supports the syntax `<NAME>[=\"<VALUE>\"]`"
     )]
     pub cfg: Vec<String>,
@@ -45,7 +45,8 @@ pub struct Args {
     #[arg(
         long,
         value_name = "SPEC",
-        help = "Provide list of expected cfgs for checking"
+        help = "Declare the names and values `@Cfg` may use, \
+                like `cfg(feature, values(\"fast\"))`"
     )]
     pub check_cfg: Vec<String>,
 
@@ -61,7 +62,8 @@ pub struct Args {
         short = 'l',
         value_name = "[<KIND>[:<MODIFIERS>]=]<NAME>[:<RENAME>]",
         help = "Link the generated crate(s) to the specified native library NAME. \
-                The optional KIND can be one of <static|framework|dylib> (default: dylib)"
+                The optional KIND can be one of <static|framework|dylib> (default: dylib) \
+                and MODIFIERS can be +whole-archive or +verbatim"
     )]
     pub link_libs: Vec<String>,
 
@@ -133,11 +135,11 @@ pub struct Args {
     #[arg(
         long,
         value_name = "OPT",
-        help = "Provide a detailed explanation of an error message"
+        help = "Explain a lint, or list every lint with `--explain lints`"
     )]
     pub explain: Option<String>,
 
-    #[arg(long, help = "Build a test harness")]
+    #[arg(long, help = "Build a test harness that runs the `@Test` methods")]
     pub test: bool,
 
     #[arg(
@@ -186,7 +188,7 @@ pub struct Args {
         short = 'Z',
         value_name = "FLAG",
         hide = true,
-        help = "Set an unstable option"
+        help = "Set an unstable option (needs `--edition future`)"
     )]
     pub unstable: Vec<String>,
 
@@ -202,7 +204,6 @@ pub enum CrateType {
     Dylib,
     Cdylib,
     Staticlib,
-    ProcMacro,
 }
 
 #[derive(ValueEnum, Clone, Copy, Debug, PartialEq, Eq)]
