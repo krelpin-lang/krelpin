@@ -11,6 +11,9 @@ mod main_fn;
 mod rtti;
 mod thunk;
 
+#[cfg(test)]
+mod tests;
+
 use krelpin_errors::DiagCtxt;
 use krelpin_mir::{BodyId, Mir};
 use krelpin_typeck::Tcx;

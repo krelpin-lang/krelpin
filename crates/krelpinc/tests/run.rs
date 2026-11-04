@@ -5,6 +5,14 @@ use std::process::Command;
 
 const BLESS_VAR: &str = "KRELPIN_BLESS";
 const VALGRIND_VAR: &str = "KRELPIN_VALGRIND";
+const OPT_LEVELS: [&str; 2] = ["0", "3"];
+
+struct Options<'a> {
+    root: &'a Path,
+    out_dir: &'a Path,
+    bless: bool,
+    valgrind: bool,
+}
 
 #[test]
 fn run() {
@@ -16,8 +24,6 @@ fn run() {
         eprintln!("skipping run tests: `clang` is not installed");
         return;
     }
-    let bless = env::var_os(BLESS_VAR).is_some();
-    let valgrind = env::var_os(VALGRIND_VAR).is_some();
     let mut files: Vec<PathBuf> = fs::read_dir(root.join("tests/run"))
         .expect("tests/run exists")
         .filter_map(Result::ok)
@@ -28,9 +34,21 @@ fn run() {
     assert!(!files.is_empty(), "no run tests found");
     let out_dir = env::temp_dir().join(format!("krelpin-run-{}", std::process::id()));
     fs::create_dir_all(&out_dir).expect("temporary directory is writable");
+    let options = Options {
+        root: &root,
+        out_dir: &out_dir,
+        bless: env::var_os(BLESS_VAR).is_some(),
+        valgrind: env::var_os(VALGRIND_VAR).is_some(),
+    };
+    let levels: &[&str] = if options.bless {
+        &OPT_LEVELS[..1]
+    } else {
+        &OPT_LEVELS
+    };
     let failures: Vec<String> = files
         .iter()
-        .filter_map(|file| run_test(&root, file, &out_dir, bless, valgrind))
+        .flat_map(|file| levels.iter().map(move |opt| (file, *opt)))
+        .filter_map(|(file, opt)| run_test(&options, file, opt))
         .collect();
     let _ = fs::remove_dir_all(&out_dir);
     assert!(
@@ -41,36 +59,32 @@ fn run() {
     );
 }
 
-fn run_test(
-    root: &Path,
-    file: &Path,
-    out_dir: &Path,
-    bless: bool,
-    valgrind: bool,
-) -> Option<String> {
+fn run_test(options: &Options<'_>, file: &Path, opt: &str) -> Option<String> {
     let relative = file
-        .strip_prefix(root)
+        .strip_prefix(options.root)
         .expect("test file is inside the workspace");
+    let name = format!("{} (-O{opt})", relative.display());
     let stem = file
         .file_stem()
         .expect("test file has a name")
         .to_string_lossy();
-    let exe = out_dir.join(stem.as_ref());
+    let exe = options.out_dir.join(format!("{stem}-O{opt}"));
     let build = Command::new(env!("CARGO_BIN_EXE_krelpinc"))
-        .current_dir(root)
+        .current_dir(options.root)
         .arg(relative)
+        .arg("-C")
+        .arg(format!("opt-level={opt}"))
         .arg("-o")
         .arg(&exe)
         .output()
         .expect("krelpinc runs");
     if !build.status.success() {
         return Some(format!(
-            "{}: failed to compile\n{}",
-            relative.display(),
+            "{name}: failed to compile\n{}",
             String::from_utf8_lossy(&build.stderr)
         ));
     }
-    let mut command = if valgrind {
+    let mut command = if options.valgrind {
         let mut command = Command::new("valgrind");
         command
             .args(["-q", "--leak-check=full", "--error-exitcode=99"])
@@ -79,46 +93,50 @@ fn run_test(
     } else {
         Command::new(&exe)
     };
-    let stdin_path = file.with_extension("stdin");
-    if let Ok(input) = fs::File::open(&stdin_path) {
+    if let Ok(input) = fs::File::open(file.with_extension("stdin")) {
         command.stdin(input);
     }
     let output = command
-        .current_dir(root)
+        .current_dir(options.root)
         .output()
         .expect("the test program runs");
     let code = output.status.code().unwrap_or(-1);
-    let mut actual_stderr = String::from_utf8_lossy(&output.stderr).into_owned();
+    let mut stderr = String::from_utf8_lossy(&output.stderr).into_owned();
     if code != 0 {
-        actual_stderr.push_str(&format!("exit code: {code}\n"));
+        stderr.push_str(&format!("exit code: {code}\n"));
     }
     let outputs = [
         (
             "stdout",
             String::from_utf8_lossy(&output.stdout).into_owned(),
         ),
-        ("stderr", actual_stderr),
+        ("stderr", stderr),
     ];
     let mismatches: Vec<String> = outputs
         .iter()
-        .filter_map(|(stream, actual)| {
-            let expected_path = file.with_extension(stream);
-            if bless {
-                if actual.is_empty() {
-                    let _ = fs::remove_file(&expected_path);
-                } else {
-                    fs::write(&expected_path, actual).expect("expected output is writable");
-                }
-                return None;
-            }
-            let expected = fs::read_to_string(&expected_path).unwrap_or_default();
-            (expected != *actual).then(|| {
-                format!(
-                    "{}: {stream} differs\n--- expected\n{expected}\n+++ actual\n{actual}",
-                    relative.display()
-                )
-            })
-        })
+        .filter_map(|(stream, actual)| compare(options, file, &name, stream, actual))
         .collect();
     (!mismatches.is_empty()).then(|| mismatches.join("\n"))
+}
+
+fn compare(
+    options: &Options<'_>,
+    file: &Path,
+    name: &str,
+    stream: &str,
+    actual: &str,
+) -> Option<String> {
+    let expected_path = file.with_extension(stream);
+    if options.bless {
+        if actual.is_empty() {
+            let _ = fs::remove_file(&expected_path);
+        } else {
+            fs::write(&expected_path, actual).expect("expected output is writable");
+        }
+        return None;
+    }
+    let expected = fs::read_to_string(&expected_path).unwrap_or_default();
+    (expected != actual).then(|| {
+        format!("{name}: {stream} differs\n--- expected\n{expected}\n+++ actual\n{actual}")
+    })
 }
