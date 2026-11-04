@@ -313,10 +313,21 @@ impl<'c, 'a, 'tcx> FnCx<'c, 'a, 'tcx> {
         if from == to {
             return value.to_owned();
         }
-        if let (Ty::Ref { ty: from_inner, .. }, Ty::Ref { ty: to_inner, .. }) =
-            (from, to.non_null())
-        {
-            return self.convert_reference(value, from_inner, to_inner);
+        if let Some((from_inner, nullable)) = reference_of(from) {
+            let from_inner = from_inner.clone();
+            return match reference_of(to) {
+                Some((to_inner, _)) if !nullable => {
+                    let to_inner = to_inner.clone();
+                    self.convert_reference(value, &from_inner, &to_inner)
+                }
+                _ if nullable => self.convert_nullable_reference(value, &from_inner, to),
+                Some(_) => value.to_owned(),
+                None => {
+                    let loaded = self.load(&from_inner, value);
+                    let copied = self.copy_value(&loaded, &from_inner);
+                    self.convert(&copied, &from_inner, to)
+                }
+            };
         }
         let from_shape = self.cx.shape(from);
         let to_shape = self.cx.shape(to);
@@ -371,6 +382,35 @@ impl<'c, 'a, 'tcx> FnCx<'c, 'a, 'tcx> {
             }
             _ => value.to_owned(),
         }
+    }
+
+    fn convert_nullable_reference(&mut self, pointer: &str, from: &Ty, to: &Ty) -> String {
+        let to_ll = self.ll(to);
+        let result = self.alloca(to);
+        let is_null = self.assign(format!("icmp eq ptr {pointer}, null"));
+        let present = self.label("refpresent");
+        let absent = self.label("refabsent");
+        let done = self.label("refdone");
+        self.line(format!(
+            "br i1 {is_null}, label %{absent}, label %{present}"
+        ));
+        self.start(&present);
+        let reference = Ty::Ref {
+            mutable: false,
+            ty: Box::new(from.clone()),
+        };
+        let converted = self.convert(pointer, &reference, to.non_null());
+        let converted = self.convert(&converted, to.non_null(), to);
+        self.line(format!("store {to_ll} {converted}, ptr {result}"));
+        self.line(format!("br label %{done}"));
+        self.start(&absent);
+        let null = self.cx.null_value(to);
+        self.line(format!("store {to_ll} {null}, ptr {result}"));
+        self.line(format!("br label %{done}"));
+        self.start(&done);
+        let value = self.assign(format!("load {to_ll}, ptr {result}"));
+        self.zero(to, &result);
+        value
     }
 
     fn convert_reference(&mut self, pointer: &str, from: &Ty, to: &Ty) -> String {
@@ -956,6 +996,17 @@ pub(crate) fn define(ret: &str, name: &str, params: &str, allocas: &str, body: &
 
 pub(crate) fn array_ll(elem_ll: &str) -> String {
     format!("{{ ptr, i64, [0 x {elem_ll}] }}")
+}
+
+fn reference_of(ty: &Ty) -> Option<(&Ty, bool)> {
+    match ty {
+        Ty::Ref { ty, .. } => Some((ty, false)),
+        Ty::Nullable(inner) => match inner.as_ref() {
+            Ty::Ref { ty, .. } => Some((ty, true)),
+            _ => None,
+        },
+        _ => None,
+    }
 }
 
 pub(crate) fn float_const(value: f64) -> String {

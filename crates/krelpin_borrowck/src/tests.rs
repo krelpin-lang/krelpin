@@ -445,3 +445,8 @@ fn assignments_through_references_need_mut() {
         ["cannot assign to `value`, because it is behind a `&` reference"]
     );
 }
+
+#[test]
+fn computed_divisors_are_checked_by_copy() {
+    ok("int a = 10; int b = 3; int c = a / (b - 1); int d = a % -b; int e = a / -1;");
+}

@@ -122,7 +122,35 @@ impl FnCtxt<'_, '_> {
             }
             return Ty::Unknown;
         };
-        let (resolved, probed) = self.infer_from_lambdas(chosen, args, phase);
+        let (mut resolved, probed) = self.infer_from_lambdas(chosen, args, phase);
+        let expected = self.call_expectations.remove(&name.span);
+        self.infer_from_expectation(&mut resolved, expected.as_ref());
+        let unknown_arg = arg_tys
+            .iter()
+            .zip(args)
+            .any(|(ty, arg)| !is_closure(arg) && !self.is_diamond(arg) && ty.references_unknown());
+        let unresolved: Vec<String> = resolved
+            .method
+            .generics
+            .iter()
+            .filter(|param| resolved.subst.get(&param.name).is_none_or(Ty::is_unknown))
+            .map(|param| format!("`{}`", param.name))
+            .collect();
+        if !unresolved.is_empty() && !unknown_arg {
+            self.emit(
+                Diagnostic::error(format!(
+                    "cannot infer {} of `{}`",
+                    if unresolved.len() == 1 {
+                        format!("the type argument {}", unresolved[0])
+                    } else {
+                        format!("the type arguments {}", unresolved.join(", "))
+                    },
+                    name.name
+                ))
+                .with_span(name.span)
+                .with_help("give the result a declared type, like `List<String> items = ...`"),
+            );
+        }
         let chosen = &resolved;
         self.check_call_bounds(chosen, name);
         self.check_vis(chosen.method.vis, chosen.method.owner, false, what, name);
@@ -147,6 +175,44 @@ impl FnCtxt<'_, '_> {
             }
         }
         chosen.ret.clone()
+    }
+
+    fn infer_from_expectation(&self, candidate: &mut Candidate, expected: Option<&Ty>) {
+        let Some(expected) = expected.filter(|ty| !ty.references_unknown()) else {
+            return;
+        };
+        let vars: Vec<Symbol> = candidate
+            .method
+            .generics
+            .iter()
+            .map(|param| param.name)
+            .filter(|name| candidate.subst.get(name).is_none_or(Ty::is_unknown))
+            .collect();
+        if vars.is_empty() {
+            return;
+        }
+        let mut partial = candidate.subst.clone();
+        for var in &vars {
+            partial.insert(*var, Ty::Param(*var));
+        }
+        let mut inferred = Subst::new();
+        self.infer(
+            &candidate.method.ret.subst(&partial),
+            expected,
+            &vars,
+            &mut inferred,
+        );
+        if inferred.is_empty() {
+            return;
+        }
+        candidate.subst.extend(inferred);
+        candidate.params = candidate
+            .method
+            .params
+            .iter()
+            .map(|param| param.subst(&candidate.subst))
+            .collect();
+        candidate.ret = candidate.method.ret.subst(&candidate.subst);
     }
 
     fn infer_from_lambdas(

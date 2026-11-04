@@ -1,0 +1,70 @@
+class Key implements Hashable<Key> {
+    private String name;
+
+    Key(String name) {
+        this.name = name;
+    }
+
+    boolean equals(&Key other) {
+        return this.name.equals(&other.name);
+    }
+
+    int hashCode() {
+        return this.name.length();
+    }
+}
+
+interface Named {
+    String name();
+}
+
+interface Labeled extends Named {
+    String label() {
+        return "[" + this.name() + "]";
+    }
+}
+
+abstract class Base<T> implements Labeled {
+    protected T payload;
+
+    Base(T payload) {
+        this.payload = payload;
+    }
+
+    abstract String describe(&T value);
+
+    String name() {
+        return this.describe(&this.payload);
+    }
+}
+
+class IntBase extends Base<int> {
+    IntBase(int value) {
+        super(value);
+    }
+
+    String describe(&int value) {
+        return "int:" + value;
+    }
+}
+
+class Main {
+    static void main() {
+        Map<Key, int> table = new HashMap<>();
+        table.put(new Key("ab"), 1);
+        table.put(new Key("cd"), 2);
+        table.put(new Key("ab"), 3);
+        int? found = table.get(&new Key("ab"));
+        int? missing = table.get(&new Key("zz"));
+        Console.println(table.size() + " " + found + " " + missing);
+        Labeled item = new IntBase(7);
+        Console.println(item.label());
+        List<Labeled> items = new ArrayList<>();
+        items.add(new IntBase(1));
+        items.add(new IntBase(2));
+        for (&Labeled labeled : items) {
+            Console.print(labeled.label());
+        }
+        Console.println();
+    }
+}

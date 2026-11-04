@@ -1,0 +1,72 @@
+class Inner {
+    private String name = "inner";
+
+    &String name() {
+        return &this.name;
+    }
+}
+
+class Outer {
+    private Inner inner = new Inner();
+    private List<String> items = new ArrayList<>();
+    private int total;
+
+    &Inner inner() {
+        return &this.inner;
+    }
+
+    mut void track() {
+        this.items.add("x");
+        this.total += this.items.size();
+    }
+}
+
+class Main {
+    static <T> (&T)? findFirst(&List<T> items) {
+        return null;
+    }
+
+    static (&String)? longest(&List<String> words) {
+        (&String)? best = null;
+        for (&String word : words) {
+            if (best == null || word.length() > best.length()) {
+                best = word;
+            }
+        }
+        return best;
+    }
+
+    static void main() {
+        List<int> numbers = new ArrayList<>();
+        numbers.add(1);
+        numbers.add(2);
+        numbers.set(0, numbers.get(1));
+        List<String> names = new ArrayList<>();
+        names.add("a");
+        names.add("bb");
+        names.set(0, names.get(1));
+        Map<String, int> counts = new HashMap<>();
+        counts.put("k", (counts.get("k") ?: 0) + 1);
+        counts.put("k", (counts.get("k") ?: 0) + 1);
+        List<String> copies = new ArrayList<>();
+        for (&String name : names) {
+            copies.add(name + "!");
+        }
+        String first = names.remove(0);
+        names.add(first);
+        Outer outer = new Outer();
+        outer.track();
+        Console.println(outer.inner().name());
+        String a = "short";
+        String b = "longer";
+        &String chosen = a.length() > b.length() ? &a : &b;
+        Console.println(chosen);
+        int counter = 0;
+        Runnable bump = () -> counter += 1;
+        bump.run();
+        Console.println(counter);
+        Console.println(longest(&copies));
+        Console.println(counts.get("k"));
+        Console.println(numbers.get(0) + " " + names.get(0));
+    }
+}

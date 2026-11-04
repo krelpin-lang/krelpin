@@ -20,6 +20,19 @@ class HashSet<T extends Hashable<T>> implements Set<T> {
         return new HashSetIterator<>(this);
     }
 
+    String toString() {
+        String text = "[";
+        boolean first = true;
+        for (&T value : this) {
+            if (!first) {
+                text = text + ", ";
+            }
+            first = false;
+            text = text + value;
+        }
+        return text + "]";
+    }
+
     @Intrinsic
     int slotCount();
 

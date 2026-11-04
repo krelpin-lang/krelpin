@@ -40,6 +40,24 @@ impl<'a, 'tcx> Cx<'a, 'tcx> {
             .map(|decl| decl.ty.subst(&subst))
             .collect();
         let ret = locals[0].clone();
+        if let Some((index, ty)) = locals.iter().enumerate().find(|(_, ty)| !is_concrete(ty)) {
+            let decl = &body.locals[index];
+            let what = decl.name.map_or_else(
+                || "a temporary value".to_owned(),
+                |name| format!("`{name}`"),
+            );
+            self.error(
+                krelpin_errors::Diagnostic::error(format!(
+                    "cannot generate code for `{}` because the type of {what} is not known",
+                    body.name
+                ))
+                .with_span(decl.span)
+                .with_label(format!("this has the type `{ty}`"))
+                .with_help("write the type arguments explicitly"),
+            );
+            let name = self.fn_name(id);
+            return format!("define internal void {name}() {{\n  unreachable\n}}\n");
+        }
         let closure = self.closure_bodies.get(&(body_id, args.to_vec())).copied();
         let static_id = self.instance_static(id);
         let previous = std::mem::replace(&mut self.current_static, static_id);
@@ -1272,6 +1290,15 @@ impl Cx<'_, '_> {
             .find(|method| method.member == member && method.name.name == name)
             .cloned()
             .unwrap_or_else(|| panic!("`{}` has no method `{name}`", sig.name.name))
+    }
+}
+
+pub(crate) fn is_concrete(ty: &Ty) -> bool {
+    match ty {
+        Ty::Param(_) | Ty::Unknown | Ty::External { .. } => false,
+        Ty::Adt { args, .. } => args.iter().all(is_concrete),
+        Ty::Ref { ty, .. } | Ty::Nullable(ty) | Ty::Array(ty) => is_concrete(ty),
+        Ty::Primitive(_) | Ty::Void | Ty::Null => true,
     }
 }
 

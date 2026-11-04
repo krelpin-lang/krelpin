@@ -1,0 +1,140 @@
+import std.function.Function;
+import std.function.Consumer;
+
+interface Visitor<R> {
+    R visitNumber(int value);
+    R visitPair(&Pair pair);
+}
+
+class Pair {
+    public int left;
+    public int right;
+
+    Pair(int left, int right) {
+        this.left = left;
+        this.right = right;
+    }
+
+    <R> R accept(&mut Visitor<R> visitor) {
+        return visitor.visitPair(this);
+    }
+}
+
+class Summer implements Visitor<int> {
+    int visitNumber(int value) {
+        return value;
+    }
+
+    int visitPair(&Pair pair) {
+        return pair.left + pair.right;
+    }
+}
+
+class Printer implements Visitor<String> {
+    String visitNumber(int value) {
+        return "#" + value;
+    }
+
+    String visitPair(&Pair pair) {
+        return "(" + pair.left + ", " + pair.right + ")";
+    }
+}
+
+class Temperature implements Comparable<Temperature> {
+    private double celsius;
+
+    Temperature(double celsius) {
+        this.celsius = celsius;
+    }
+
+    int compareTo(&Temperature other) {
+        return this.celsius < other.celsius ? -1 : this.celsius > other.celsius ? 1 : 0;
+    }
+
+    String toString() {
+        return this.celsius + "C";
+    }
+}
+
+enum Op {
+    ADD, SUB, MUL;
+
+    int apply(int a, int b) {
+        return switch (this) {
+            case ADD -> a + b;
+            case SUB -> a - b;
+            case MUL -> a * b;
+        };
+    }
+}
+
+class Main {
+    static <T extends Comparable<T>> void sort(&mut List<T> items) {
+        for (int i = 1; i < items.size(); i++) {
+            int j = i;
+            while (j > 0 && items.get(j - 1).compareTo(items.get(j)) > 0) {
+                T moved = items.remove(j);
+                items.add(j - 1, moved);
+                j--;
+            }
+        }
+    }
+
+    static <T> int count(&List<T> items, Function<&T, boolean> keep) {
+        int total = 0;
+        for (&T item : items) {
+            if (keep.apply(item)) {
+                total++;
+            }
+        }
+        return total;
+    }
+
+    static void main() {
+        Pair pair = new Pair(3, 4);
+        Visitor<int> summer = new Summer();
+        Visitor<String> printer = new Printer();
+        Console.println(pair.accept(&mut summer));
+        Console.println(pair.accept(&mut printer));
+        List<Temperature> temps = new ArrayList<>();
+        temps.add(new Temperature(21.5));
+        temps.add(new Temperature(-3.0));
+        temps.add(new Temperature(10.0));
+        Main.sort(&mut temps);
+        Console.println(temps.get(0) + " " + temps.get(1) + " " + temps.get(2));
+        List<int> numbers = new ArrayList<>();
+        for (int i = 0; i < 10; i++) {
+            numbers.add(i * i);
+        }
+        Main.sort(&mut numbers);
+        Console.println(Main.count(&numbers, n -> n % 2 == 0));
+        Console.println(Op.MUL.apply(6, 7) + " " + Op.SUB.apply(1, 2));
+        for (Op op : Op.values()) {
+            Console.print(op.name() + "=" + op.apply(10, 2) + ";");
+        }
+        Console.println();
+        List<String> words = new ArrayList<>();
+        words.add("delta");
+        words.add("alpha");
+        words.add("charlie");
+        Main.sort(&mut words);
+        StringBuilderish builder = new StringBuilderish();
+        words.forEach(word -> builder.append(word));
+        Console.println(builder.text());
+    }
+}
+
+class StringBuilderish {
+    private String text = "";
+
+    mut void append(&String part) {
+        if (!this.text.isEmpty()) {
+            this.text = this.text + ",";
+        }
+        this.text = this.text + part;
+    }
+
+    String text() {
+        return this.text;
+    }
+}

@@ -23,6 +23,7 @@ pub(crate) struct FnCtxt<'a, 'tcx> {
     pub(crate) narrowed: Vec<HashMap<Span, Ty>>,
     pub(crate) yields: Vec<Vec<Ty>>,
     pub(crate) inferred_returns: Vec<Vec<Ty>>,
+    pub(crate) call_expectations: HashMap<Span, Ty>,
     pub(crate) exceptions: ExceptionScope,
     pub(crate) results: TypeckResults,
 }
@@ -175,6 +176,7 @@ impl<'a, 'tcx> FnCtxt<'a, 'tcx> {
             narrowed: Vec::new(),
             yields: Vec::new(),
             inferred_returns: Vec::new(),
+            call_expectations: HashMap::new(),
             exceptions: ExceptionScope::default(),
             results: TypeckResults::default(),
         }

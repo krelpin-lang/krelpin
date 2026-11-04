@@ -80,9 +80,9 @@ void kr_uncaught(const KrType *type, const KrString *message) {
 void kr_report_thread(const KrType *type, const KrString *message) {
     fflush(stdout);
     if (message == NULL) {
-        fprintf(stderr, "Exception in thread %s\n", type->name);
+        fprintf(stderr, "Exception in a spawned thread: %s\n", type->name);
     } else {
-        fprintf(stderr, "Exception in thread %s: %.*s\n", type->name, (int)message->len,
+        fprintf(stderr, "Exception in a spawned thread: %s: %.*s\n", type->name, (int)message->len,
                 message->data);
     }
 }

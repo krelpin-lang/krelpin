@@ -59,6 +59,8 @@ fn run_test(root: &Path, file: &Path, bless: bool) -> Option<String> {
         "--emit=hir"
     } else if relative.starts_with("tests/ui/mir") {
         "--emit=mir"
+    } else if relative.starts_with("tests/ui/codegen") {
+        "--emit=ir=/dev/null"
     } else {
         "--emit=metadata"
     };

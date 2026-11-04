@@ -1,0 +1,13 @@
+error: this program has more than one `main` method
+ --> tests/ui/codegen/two_mains.kr:6:5
+  |
+2 |     static void main() {}
+  |     --------------------- the first `main` is here
+...
+6 |     static void main(String[] args) {}
+  |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  |
+  = help: keep a single `static void main()`
+
+error: aborting due to 1 previous error
+

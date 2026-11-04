@@ -1,0 +1,24 @@
+class Main {
+    static void main() {
+        int max = int.MAX_VALUE;
+        Console.println(max + 1);
+        Console.println(int.MIN_VALUE / -1);
+        Console.println(int.MIN_VALUE % -1);
+        Console.println(long.MAX_VALUE + " " + long.MIN_VALUE);
+        Console.println((byte) 200 + " " + (short) 70000 + " " + (int) 3000000000L);
+        Console.println((int) 1e20 + " " + (long) -1e30 + " " + (int) (0.0 / 0.0));
+        Console.println(1.0 / 0.0 + " " + -1.0 / 0.0 + " " + 0.0 / 0.0);
+        Console.println(5 / 2.0 + " " + 7 % 2.5);
+        char c = 'a';
+        int code = c;
+        Console.println(code + " " + (char) (code + 1));
+        Console.println(0.1f + 0.2f);
+        Console.println(1.0e-5 + " " + 123456789.0 + " " + 100.0 / 3.0);
+        Thread failing = new Thread(() -> {
+            throw new IllegalStateException("thread failed");
+        });
+        failing.start();
+        failing.join();
+        Console.println("after thread");
+    }
+}

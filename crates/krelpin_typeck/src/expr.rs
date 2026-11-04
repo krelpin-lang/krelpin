@@ -50,6 +50,9 @@ impl FnCtxt<'_, '_> {
             return expected.clone();
         }
 
+        if let ExprKind::MethodCall { name, .. } = &expr.kind {
+            self.call_expectations.insert(name.span, expected.clone());
+        }
         let actual = match &expr.kind {
             ExprKind::New { ty, args } => {
                 let actual = self.check_new(ty, args, expr.span, Some(expected));

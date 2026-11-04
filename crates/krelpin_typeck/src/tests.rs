@@ -1943,3 +1943,20 @@ fn loops_borrow_their_elements() {
          for (int n : numbers) { int z = n; }",
     );
 }
+
+#[test]
+fn generic_results_follow_the_expected_type() {
+    let src = |code: &str| {
+        format!(
+            "class Main {{\n\
+             \x20   static <T> List<T> empty() {{ return new ArrayList<>(); }}\n\
+             \x20   void run() {{ {code} }}\n\
+             }}"
+        )
+    };
+    ok(&src("List<String> names = Main.empty();"));
+    assert_eq!(
+        errors(&src("int size = Main.empty().size();")),
+        ["cannot infer the type argument `T` of `empty`"]
+    );
+}

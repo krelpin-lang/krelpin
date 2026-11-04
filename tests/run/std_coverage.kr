@@ -1,0 +1,64 @@
+record Point(int x, int y) {}
+
+enum Suit { HEARTS, SPADES }
+
+class Main {
+    static void main() {
+        Map<Point, String> names = new HashMap<>();
+        names.put(new Point(0, 0), "origin");
+        names.put(new Point(1, 2), "a");
+        Console.println(names.get(&new Point(0, 0)));
+        Console.println(names.containsKey(&new Point(5, 5)));
+        Set<Suit> suits = new HashSet<>();
+        suits.add(Suit.HEARTS);
+        suits.add(Suit.HEARTS);
+        suits.add(Suit.SPADES);
+        Console.println(suits.size());
+        Console.println(suits.remove(&Suit.HEARTS) + " " + suits.size());
+        List<&String> values = names.values();
+        Console.println(values.size());
+        names.clear();
+        Console.println(names.isEmpty());
+        Map<int, List<String>> groups = new HashMap<>();
+        for (int i = 0; i < 6; i++) {
+            if (!groups.containsKey(i % 3)) {
+                groups.put(i % 3, new ArrayList<>());
+            }
+            List<String>? group = groups.remove(i % 3);
+            if (group instanceof List<String> list) {
+                list.add("item" + i);
+                groups.put(i % 3, list);
+            }
+        }
+        Console.println(groups.get(1));
+        long big = long.parse("-9000000000");
+        Console.println(big + " " + double.parse("2.5e3") + " " + byte.parse("-12"));
+        try {
+            short.parse("70000");
+        } catch (NumberFormatException e) {
+            Console.println(e.getMessage());
+        }
+        Console.println('7'.isDigit() + " " + 'x'.isLetter() + " " + ' '.isWhitespace());
+        Console.println('q'.toUpperCase());
+        Console.println(true.hashCode() + " " + 'A'.hashCode() + " " + 10L.hashCode());
+        String shown = String.valueOf(3.5) + String.valueOf(null);
+        Console.println(shown + String.valueOf(new Point(1, 1)));
+        Console.println(new Point(1, 2).hashCode() == new Point(1, 2).hashCode());
+        String? line = Console.readLine();
+        Console.println("read: " + line);
+        Console.println(Console.readLine());
+        int[] data = new int[4];
+        data[2] = 7;
+        Console.println(data[0] + data[2]);
+        String[] words = {"x", "y"};
+        for (String word : words) {
+            Console.print(word);
+        }
+        Console.println();
+        Console.println(Math.pow(2.0, 10.0) + " " + Math.ceil(1.2) + " " + Math.min(2.5, 1.5));
+        double r = Math.random();
+        Console.println(r >= 0.0 && r < 1.0);
+        Console.println((-16 >> 2) + " " + (-16 >>> 28) + " " + (1 << 33));
+        Console.println((5 & 3) + " " + (5 ^ 3));
+    }
+}

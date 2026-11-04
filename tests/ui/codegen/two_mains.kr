@@ -1,0 +1,7 @@
+class First {
+    static void main() {}
+}
+
+class Second {
+    static void main(String[] args) {}
+}

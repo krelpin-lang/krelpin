@@ -1,0 +1,15 @@
+class Main {
+    static void main() {
+        Map<String, List<int>> scores = new HashMap<>();
+        scores.put("ali", new ArrayList<>());
+        scores.put("can", new ArrayList<>());
+        Set<String> tags = new HashSet<>();
+        tags.add("x");
+        tags.add("y");
+        Console.println(&scores);
+        Console.println(&tags);
+        List<List<String>> nested = new ArrayList<>();
+        nested.add(new ArrayList<>());
+        Console.println("nested " + nested);
+    }
+}

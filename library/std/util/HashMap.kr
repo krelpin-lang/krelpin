@@ -24,4 +24,17 @@ class HashMap<K extends Hashable<K>, V> implements Map<K, V> {
 
     @Intrinsic
     List<&V> values();
+
+    String toString() {
+        String text = "{";
+        boolean first = true;
+        for (&K key : this.keySet()) {
+            if (!first) {
+                text = text + ", ";
+            }
+            first = false;
+            text = text + key + "=" + this.get(key);
+        }
+        return text + "}";
+    }
 }

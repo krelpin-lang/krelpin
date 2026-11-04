@@ -1,0 +1,5 @@
+error: this program has no `main` method
+  = help: add `static void main()` or `static void main(String[] args)` to a class
+
+error: aborting due to 1 previous error
+

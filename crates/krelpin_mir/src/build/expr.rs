@@ -523,7 +523,11 @@ impl<'h> Builder<'_, 'h, '_> {
         {
             return;
         }
-        self.check(Check::NonZero(divisor.clone()), span);
+        let divisor = match divisor {
+            Operand::Move(place) => Operand::Copy(place.clone()),
+            other => other.clone(),
+        };
+        self.check(Check::NonZero(divisor), span);
     }
 
     pub(super) fn lower_assign(
@@ -656,8 +660,8 @@ impl<'h> Builder<'_, 'h, '_> {
         }
 
         let Some(receiver) = receiver.filter(|_| safe) else {
-            let wants_mut = callee.method.receiver == Some(ReceiverKind::RefMut);
-            let staged = receiver.map(|receiver| self.stage_receiver(receiver, wants_mut));
+            let staged =
+                receiver.map(|receiver| self.stage_receiver(receiver, callee.method.receiver));
             let deferred = matches!(staged, Some(StagedReceiver::Place { .. }));
             let args: Vec<Operand> = args
                 .iter()
@@ -721,12 +725,17 @@ impl<'h> Builder<'_, 'h, '_> {
         self.current = join;
     }
 
-    fn stage_receiver(&mut self, receiver: &'h Expr, wants_mut: bool) -> StagedReceiver {
-        if let (true, Ty::Ref { mutable: false, ty }) = (wants_mut, &receiver.ty) {
+    fn stage_receiver(&mut self, receiver: &'h Expr, kind: Option<ReceiverKind>) -> StagedReceiver {
+        let reborrow = match (kind, &receiver.ty) {
+            (Some(ReceiverKind::RefMut), Ty::Ref { mutable: false, ty }) => Some((true, ty)),
+            (Some(ReceiverKind::Ref), Ty::Ref { mutable: true, ty }) => Some((false, ty)),
+            _ => None,
+        };
+        if let Some((mutable, ty)) = reborrow {
             return StagedReceiver::Place {
                 place: self.as_place(receiver).project(PlaceElem::Deref),
                 ty: ty.as_ref().clone(),
-                borrow: Some(true),
+                borrow: Some(mutable),
             };
         }
         match &receiver.kind {

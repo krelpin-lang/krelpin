@@ -28,4 +28,15 @@ class ArrayList<T> implements List<T> {
     Iterator<T> iterator() {
         return new ArrayListIterator<>(this);
     }
+
+    String toString() {
+        String text = "[";
+        for (int i = 0; i < this.size(); i++) {
+            if (i > 0) {
+                text = text + ", ";
+            }
+            text = text + this.get(i);
+        }
+        return text + "]";
+    }
 }

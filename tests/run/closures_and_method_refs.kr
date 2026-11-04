@@ -1,0 +1,72 @@
+import std.function.Function;
+import std.function.Supplier;
+
+class Greeter {
+    private String greeting;
+
+    Greeter(String greeting) {
+        this.greeting = greeting;
+    }
+
+    String greet(String name) {
+        return this.greeting + ", " + name;
+    }
+
+    String toString() {
+        return "Greeter(" + this.greeting + ") from " + super.toString().length();
+    }
+}
+
+class Box {
+    public int value;
+
+    Box(int value) {
+        this.value = value;
+    }
+}
+
+interface Transformer {
+    <R> R transform(int value, Function<int, R> f);
+}
+
+class Doubler implements Transformer {
+    <R> R transform(int value, Function<int, R> f) {
+        return f.apply(value * 2);
+    }
+}
+
+class Main {
+    static Function<int, int> adder(int amount) {
+        return x -> x + amount;
+    }
+
+    static Supplier<Supplier<String>> nested(String text) {
+        return () -> () -> text + "!";
+    }
+
+    static void main() {
+        Greeter greeter = new Greeter("Merhaba");
+        Function<String, String> greet = greeter::greet;
+        Console.println(greet.apply("Ayse"));
+        List<Runnable> tasks = new ArrayList<>();
+        for (int i = 0; i < 3; i++) {
+            int index = i;
+            tasks.add(() -> Console.println("task " + index));
+        }
+        for (int i = 0; i < tasks.size(); i++) {
+            Runnable task = tasks.remove(0);
+            task.run();
+            i--;
+        }
+        Function<int, int> addFive = Main.adder(5);
+        Console.println(addFive.apply(10));
+        Console.println(Main.nested("deep").get().get());
+        Transformer t = new Doubler();
+        String shown = t.transform(21, n -> "value " + n);
+        int same = t.transform(4, n -> n + 1);
+        Console.println(shown + " " + same);
+        Box a = new Box(1);
+        Box b = new Box(1);
+        Console.println(greeter.toString().startsWith("Greeter(Merhaba)"));
+    }
+}
