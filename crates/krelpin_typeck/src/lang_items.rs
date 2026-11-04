@@ -41,6 +41,7 @@ lang_items! {
     Console: "std.lang.Console",
     Math: "std.lang.Math",
     Thread: "std.lang.Thread",
+    MacroBridge: "std.macros.Bridge",
     ArrayList: "std.util.ArrayList",
     HashMap: "std.util.HashMap",
     HashSet: "std.util.HashSet",

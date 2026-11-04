@@ -1,0 +1,128 @@
+package std.macros;
+
+import std.primitive.Int;
+
+final class Bridge {
+    private List<String> macros;
+    private String current;
+
+    Bridge() {
+        this.macros = new ArrayList<>();
+        this.current = "";
+    }
+
+    mut void declare(String name) {
+        this.macros.add(name);
+    }
+
+    mut void ready(String crateName) {
+        open();
+        String line = "krelpin-macro-server\t1\t" + escape(crateName);
+        for (&String name : this.macros) {
+            line = line + "\t" + escape(name);
+        }
+        send(line);
+    }
+
+    mut boolean next() {
+        String? line = receive();
+        if (line == null) {
+            return false;
+        }
+        String[] parts = line.split("\t");
+        if (parts.length != 2 || !parts[0].equals(&"expand")) {
+            throw new IllegalStateException("the compiler sent a malformed macro request");
+        }
+        this.current = unescape(parts[1]);
+        return true;
+    }
+
+    boolean calls(String name) {
+        return this.current.equals(&name);
+    }
+
+    TokenStream read() {
+        return readStream();
+    }
+
+    void reply(TokenStream output) {
+        send("ok\t" + output.size());
+        for (int i = 0; i < output.size(); i++) {
+            Token token = output.get(i);
+            send(kindName(token.kind) + "\t" + token.span.id + "\t" + escape(token.text));
+        }
+    }
+
+    void fail(&MacroError error) {
+        String message = error.getMessage() ?: "the macro failed";
+        send("error\t" + error.span().id + "\t" + escape(message));
+    }
+
+    void unknown() {
+        send("error\t-1\t" + escape("this crate has no macro `" + this.current + "`"));
+    }
+
+    static TokenStream lex(String source) {
+        send("lex\t" + escape(source));
+        return readStream();
+    }
+
+    private static TokenStream readStream() {
+        String header = receive() ?: "";
+        String[] parts = header.split("\t");
+        if (parts.length != 2 || !parts[0].equals(&"tokens")) {
+            throw new IllegalStateException(
+                "token streams can only be parsed while the compiler runs a macro");
+        }
+        int count = Int.parse(parts[1]);
+        TokenStream stream = new TokenStream();
+        for (int i = 0; i < count; i++) {
+            String line = receive() ?: "";
+            String[] fields = line.split("\t");
+            if (fields.length != 3) {
+                throw new IllegalStateException("the compiler sent a malformed token");
+            }
+            Token token = new Token(kindOf(fields[0]), unescape(fields[2]),
+                new Span(Int.parse(fields[1])));
+            stream.add(token);
+        }
+        return stream;
+    }
+
+    private static TokenKind kindOf(String name) {
+        if (name.equals(&"ident")) {
+            return TokenKind.IDENT;
+        }
+        if (name.equals(&"literal")) {
+            return TokenKind.LITERAL;
+        }
+        if (name.equals(&"doc")) {
+            return TokenKind.DOC;
+        }
+        return TokenKind.PUNCT;
+    }
+
+    private static String kindName(TokenKind kind) {
+        return switch (kind) {
+            case IDENT -> "ident";
+            case LITERAL -> "literal";
+            case PUNCT -> "punct";
+            case DOC -> "doc";
+        };
+    }
+
+    @Intrinsic
+    private static void open();
+
+    @Intrinsic
+    private static String? receive();
+
+    @Intrinsic
+    private static void send(String line);
+
+    @Intrinsic
+    private static String escape(String text);
+
+    @Intrinsic
+    private static String unescape(String text);
+}

@@ -1,0 +1,19 @@
+package std.macros;
+
+class MacroError extends RuntimeException {
+    private Span span;
+
+    MacroError(String message) {
+        super(message);
+        this.span = Span.callSite();
+    }
+
+    MacroError(String message, &Token at) {
+        super(message);
+        this.span = at.span;
+    }
+
+    Span span() {
+        return this.span;
+    }
+}

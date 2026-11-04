@@ -1,0 +1,142 @@
+package std.macros;
+
+import std.util.Iterator;
+
+final class TokenStream implements Iterable<Token> {
+    private List<Token> tokens;
+
+    TokenStream() {
+        this.tokens = new ArrayList<>();
+    }
+
+    static TokenStream parse(String source) {
+        return Bridge.lex(source);
+    }
+
+    int size() {
+        return this.tokens.size();
+    }
+
+    boolean isEmpty() {
+        return this.tokens.size() == 0;
+    }
+
+    Token get(int index) {
+        return this.tokens.get(index);
+    }
+
+    mut void add(Token token) {
+        this.tokens.add(token);
+    }
+
+    mut void insert(int index, Token token) {
+        this.tokens.add(index, token);
+    }
+
+    mut Token remove(int index) {
+        return this.tokens.remove(index);
+    }
+
+    mut void addAll(&TokenStream other) {
+        for (int i = 0; i < other.size(); i++) {
+            this.tokens.add(other.get(i));
+        }
+    }
+
+    mut void append(String source) {
+        TokenStream parsed = TokenStream.parse(source);
+        this.addAll(&parsed);
+    }
+
+    mut void insertAll(int index, &TokenStream other) {
+        for (int i = 0; i < other.size(); i++) {
+            this.tokens.add(index + i, other.get(i));
+        }
+    }
+
+    TokenStream slice(int begin, int end) {
+        if (begin < 0 || end > this.size() || begin > end) {
+            throw new IndexOutOfBoundsException(
+                "slice " + begin + ".." + end + " of " + this.size() + " tokens");
+        }
+        TokenStream part = new TokenStream();
+        for (int i = begin; i < end; i++) {
+            part.add(this.get(i));
+        }
+        return part;
+    }
+
+    int indexOf(String text) {
+        return this.indexOf(text, 0);
+    }
+
+    int indexOf(String text, int from) {
+        for (int i = from; i < this.size(); i++) {
+            if (this.get(i).text.equals(&text)) {
+                return i;
+            }
+        }
+        return -1;
+    }
+
+    int lastIndexOf(String text) {
+        for (int i = this.size() - 1; i >= 0; i--) {
+            if (this.get(i).text.equals(&text)) {
+                return i;
+            }
+        }
+        return -1;
+    }
+
+    int matching(int open) {
+        String opening = this.get(open).text;
+        String closing = closer(opening);
+        int depth = 0;
+        for (int i = open; i < this.size(); i++) {
+            Token token = this.get(i);
+            if (token.kind != TokenKind.PUNCT) {
+                continue;
+            }
+            if (token.text.equals(&opening)) {
+                depth++;
+            } else if (token.text.equals(&closing)) {
+                depth--;
+                if (depth == 0) {
+                    return i;
+                }
+            }
+        }
+        return -1;
+    }
+
+    Iterator<Token> iterator() {
+        return this.tokens.iterator();
+    }
+
+    String toString() {
+        String text = "";
+        for (int i = 0; i < this.size(); i++) {
+            if (i > 0) {
+                text = text + " ";
+            }
+            text = text + this.get(i).text;
+        }
+        return text;
+    }
+
+    private static String closer(String opening) {
+        if (opening.equals(&"(")) {
+            return ")";
+        }
+        if (opening.equals(&"[")) {
+            return "]";
+        }
+        if (opening.equals(&"{")) {
+            return "}";
+        }
+        if (opening.equals(&"<")) {
+            return ">";
+        }
+        throw new IllegalArgumentException("`" + opening + "` does not open a group");
+    }
+}

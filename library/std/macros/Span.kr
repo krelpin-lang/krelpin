@@ -1,0 +1,7 @@
+package std.macros;
+
+record Span(int id) {
+    static Span callSite() {
+        return new Span(-1);
+    }
+}

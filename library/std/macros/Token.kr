@@ -1,0 +1,63 @@
+package std.macros;
+
+record Token(TokenKind kind, String text, Span span) {
+    static Token ident(String name) {
+        return new Token(TokenKind.IDENT, name, Span.callSite());
+    }
+
+    static Token punct(String text) {
+        return new Token(TokenKind.PUNCT, text, Span.callSite());
+    }
+
+    static Token literal(String text) {
+        return new Token(TokenKind.LITERAL, text, Span.callSite());
+    }
+
+    static Token string(String value) {
+        String text = "\"";
+        for (char c : value.chars()) {
+            if (c == '"') {
+                text = text + "\\\"";
+            } else if (c == '\\') {
+                text = text + "\\\\";
+            } else if (c == '\n') {
+                text = text + "\\n";
+            } else if (c == '\t') {
+                text = text + "\\t";
+            } else if (c == '\r') {
+                text = text + "\\r";
+            } else {
+                text = text + c;
+            }
+        }
+        return literal(text + "\"");
+    }
+
+    boolean isIdent() {
+        return this.kind == TokenKind.IDENT;
+    }
+
+    boolean isIdent(String name) {
+        return this.kind == TokenKind.IDENT && this.text.equals(&name);
+    }
+
+    boolean isPunct(String text) {
+        return this.kind == TokenKind.PUNCT && this.text.equals(&text);
+    }
+
+    boolean isLiteral() {
+        return this.kind == TokenKind.LITERAL;
+    }
+
+    boolean isDoc() {
+        return this.kind == TokenKind.DOC;
+    }
+
+    Token withSpan(Span span) {
+        return new Token(this.kind, this.text, span);
+    }
+
+    String toString() {
+        return this.text;
+    }
+}

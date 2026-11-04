@@ -70,6 +70,9 @@ KrString *kr_console_read_line(void) {
 
 void kr_uncaught(const KrType *type, const KrString *message) {
     fflush(stdout);
+    if (kr_bridge_report(type, message)) {
+        return;
+    }
     if (message == NULL) {
         fprintf(stderr, "Exception in thread \"main\" %s\n", type->name);
     } else {

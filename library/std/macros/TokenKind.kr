@@ -1,0 +1,8 @@
+package std.macros;
+
+enum TokenKind {
+    IDENT,
+    LITERAL,
+    PUNCT,
+    DOC
+}

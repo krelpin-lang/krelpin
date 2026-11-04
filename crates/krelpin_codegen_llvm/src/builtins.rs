@@ -133,6 +133,9 @@ impl FnCx<'_, '_, '_> {
         if items.is(owner, LangItem::Thread) {
             return self.thread_builtin(name, builtin);
         }
+        if items.is(owner, LangItem::MacroBridge) {
+            return self.bridge_builtin(name);
+        }
         if items.is(owner, LangItem::AtomicInt)
             || items.is(owner, LangItem::AtomicLong)
             || items.is(owner, LangItem::AtomicBool)
@@ -779,6 +782,38 @@ impl FnCx<'_, '_, '_> {
             }
             _ => false,
         }
+    }
+
+    fn bridge_builtin(&mut self, name: &str) -> bool {
+        let string = self.cx.tcx.string_ty();
+        match name {
+            "open" => {
+                self.runtime("void", "kr_bridge_open", "");
+                self.line("ret void");
+            }
+            "receive" => {
+                let line = self.runtime("ptr", "kr_bridge_receive", "");
+                let ret = self.ret_ty.clone();
+                self.ret(&line, &ret);
+            }
+            "send" => {
+                self.runtime("void", "kr_bridge_send", "ptr %a0");
+                self.drop_value("%a0", &string);
+                self.line("ret void");
+            }
+            "escape" | "unescape" => {
+                let function = if name == "escape" {
+                    "kr_bridge_escape"
+                } else {
+                    "kr_bridge_unescape"
+                };
+                let text = self.runtime("ptr", function, "ptr %a0");
+                self.drop_value("%a0", &string);
+                self.ret(&text, &string);
+            }
+            _ => return false,
+        }
+        true
     }
 
     fn thread_builtin(&mut self, name: &str, builtin: &Builtin) -> bool {

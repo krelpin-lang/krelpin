@@ -151,6 +151,13 @@ bool kr_table_remove(KrTable *table, const KrTableShape *shape, const void *key,
 int64_t kr_table_slot_count(const KrTable *table);
 void *kr_table_slot(const KrTable *table, const KrTableShape *shape, int64_t index);
 
+void kr_bridge_open(void);
+KrString *kr_bridge_receive(void);
+void kr_bridge_send(const KrString *line);
+KrString *kr_bridge_escape(const KrString *text);
+KrString *kr_bridge_unescape(const KrString *text);
+bool kr_bridge_report(const KrType *type, const KrString *message);
+
 void kr_runtime_init(int argc, char **argv);
 void kr_runtime_exit(void);
 KrArray *kr_runtime_args(const KrType *array_type);
