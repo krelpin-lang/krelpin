@@ -71,7 +71,7 @@ impl FnCtxt<'_, '_> {
         let report = MatchCheck::new(self.tcx).analyze(scrutinee, arms);
         for span in report.unreachable {
             self.emit(
-                Diagnostic::warning("unreachable pattern")
+                Diagnostic::lint("unreachable_patterns", "unreachable pattern")
                     .with_span(span)
                     .with_label("the cases above already match every value of this pattern"),
             );

@@ -138,3 +138,37 @@ fn context_can_be_shared_between_threads() {
     assert_eq!(dcx.error_count(), 800);
     assert_eq!(buffer.diagnostics().len(), 800);
 }
+
+#[test]
+fn lint_levels_follow_the_flags() {
+    use crate::{LintLevel, LintLevels};
+    let mut levels = LintLevels::default();
+    assert_eq!(levels.level("unreachable_patterns").0, LintLevel::Warn);
+    levels.set("unreachable-patterns", LintLevel::Allow);
+    assert_eq!(levels.level("unreachable_patterns").0, LintLevel::Allow);
+    levels.set("warnings", LintLevel::Deny);
+    assert_eq!(levels.level("unnecessary_elvis").0, LintLevel::Deny);
+    assert_eq!(levels.level("unreachable_patterns").0, LintLevel::Allow);
+    levels.set("unnecessary_elvis", LintLevel::Forbid);
+    levels.set("unnecessary_elvis", LintLevel::Allow);
+    assert_eq!(levels.level("unnecessary_elvis").0, LintLevel::Forbid);
+    levels.force_warn("unreachable_patterns");
+    assert_eq!(levels.level("unreachable_patterns").0, LintLevel::Warn);
+    levels.cap(LintLevel::Warn);
+    assert_eq!(levels.level("unnecessary_elvis").0, LintLevel::Warn);
+}
+
+#[test]
+fn allowed_lints_are_not_emitted_and_denied_lints_are_errors() {
+    use crate::{Diagnostic, DiagnosticBuffer, LintLevel, LintLevels};
+    let buffer = DiagnosticBuffer::default();
+    let dcx = crate::DiagCtxt::new(buffer.clone());
+    let mut levels = LintLevels::default();
+    levels.set("unnecessary_elvis", LintLevel::Allow);
+    levels.set("unreachable_patterns", LintLevel::Deny);
+    dcx.set_lint_levels(levels);
+    dcx.emit(Diagnostic::lint("unnecessary_elvis", "hidden"));
+    dcx.emit(Diagnostic::lint("unreachable_patterns", "shown"));
+    assert_eq!(buffer.messages(), ["shown"]);
+    assert!(dcx.has_errors());
+}

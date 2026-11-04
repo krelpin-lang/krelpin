@@ -97,6 +97,8 @@ warning: unreachable pattern
    |
 49 |             case 2 -> "two";
    |                  ^ the cases above already match every value of this pattern
+   |
+   = note: `unreachable_patterns` is a warning by default; allow it with `-A unreachable_patterns`
 
 error: this `switch` expression does not cover every case
   --> tests/ui/typeck/enum_errors.kr:52:25
@@ -112,6 +114,8 @@ warning: unreachable pattern
    |
 57 |             case Empty -> "empty";
    |                  ^^^^^ the cases above already match every value of this pattern
+   |
+   = note: `unreachable_patterns` is a warning by default; allow it with `-A unreachable_patterns`
 
 error: aborting due to 14 previous errors
 

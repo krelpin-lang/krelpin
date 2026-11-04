@@ -47,6 +47,7 @@ pub struct Diagnostic {
     pub label: Option<String>,
     pub secondary: Vec<SpanLabel>,
     pub children: Vec<SubDiagnostic>,
+    pub lint: Option<&'static str>,
 }
 
 impl Diagnostic {
@@ -58,6 +59,7 @@ impl Diagnostic {
             label: None,
             secondary: Vec::new(),
             children: Vec::new(),
+            lint: None,
         }
     }
 
@@ -67,6 +69,13 @@ impl Diagnostic {
 
     pub fn warning(message: impl Into<String>) -> Diagnostic {
         Diagnostic::new(Level::Warning, message)
+    }
+
+    pub fn lint(lint: &'static str, message: impl Into<String>) -> Diagnostic {
+        Diagnostic {
+            lint: Some(lint),
+            ..Diagnostic::new(Level::Warning, message)
+        }
     }
 
     pub fn with_span(mut self, span: Span) -> Diagnostic {

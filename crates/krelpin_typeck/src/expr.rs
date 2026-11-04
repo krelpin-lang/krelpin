@@ -339,9 +339,12 @@ impl FnCtxt<'_, '_> {
             ty => {
                 if safe && !ty.is_unknown() {
                     self.emit(
-                        Diagnostic::warning("unnecessary `?.` on a value that is never null")
-                            .with_span(base.span)
-                            .with_help("use `.` instead"),
+                        Diagnostic::lint(
+                            "unnecessary_safe_call",
+                            "unnecessary `?.` on a value that is never null",
+                        )
+                        .with_span(base.span)
+                        .with_help("use `.` instead"),
                     );
                 }
                 (Receiver::Value(ty), false)
@@ -855,9 +858,12 @@ impl FnCtxt<'_, '_> {
                 Ty::Null | Ty::Unknown => right,
                 other => {
                     self.emit(
-                        Diagnostic::warning("the left side of `?:` can never be null")
-                            .with_span(lhs.span)
-                            .with_help("remove the `?:` and the default value"),
+                        Diagnostic::lint(
+                            "unnecessary_elvis",
+                            "the left side of `?:` can never be null",
+                        )
+                        .with_span(lhs.span)
+                        .with_help("remove the `?:` and the default value"),
                     );
                     self.common_or_error(other, &right, span, "the sides of `?:`")
                 }
