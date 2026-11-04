@@ -1,3 +1,6 @@
+use std::fmt;
+use std::sync::Arc;
+
 use krelpin_span::{Span, Symbol, kw};
 
 use crate::token::{Lit, Token};
@@ -50,7 +53,37 @@ pub struct MacroDef {
     pub docs: Vec<Symbol>,
     pub annotations: Vec<Annotation>,
     pub name: Ident,
+    pub body: Option<MacroBody>,
     pub span: Span,
+}
+
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct MacroBody {
+    pub params: Vec<Param>,
+    pub body: Block,
+    pub span: Span,
+}
+
+#[derive(Clone, Default, PartialEq, Eq)]
+pub struct CapturedTokens(Option<Arc<[Token]>>);
+
+impl CapturedTokens {
+    pub fn new(tokens: &[Token]) -> CapturedTokens {
+        CapturedTokens(Some(tokens.into()))
+    }
+
+    pub fn tokens(&self) -> Option<&[Token]> {
+        self.0.as_deref()
+    }
+}
+
+impl fmt::Debug for CapturedTokens {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self.tokens() {
+            Some(tokens) => write!(f, "CapturedTokens({})", tokens.len()),
+            None => f.write_str("CapturedTokens(None)"),
+        }
+    }
 }
 
 #[derive(Clone, Debug, PartialEq, Eq)]
@@ -105,7 +138,7 @@ pub enum FieldStorage {
     Static(Span),
 }
 
-#[derive(Clone, Debug, PartialEq, Eq)]
+#[derive(Clone, PartialEq, Eq)]
 pub struct Item {
     pub docs: Vec<Symbol>,
     pub annotations: Vec<Annotation>,
@@ -114,6 +147,21 @@ pub struct Item {
     pub name: Ident,
     pub kind: ItemKind,
     pub span: Span,
+    pub tokens: CapturedTokens,
+}
+
+impl fmt::Debug for Item {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.debug_struct("Item")
+            .field("docs", &self.docs)
+            .field("annotations", &self.annotations)
+            .field("vis", &self.vis)
+            .field("inheritance", &self.inheritance)
+            .field("name", &self.name)
+            .field("kind", &self.kind)
+            .field("span", &self.span)
+            .finish()
+    }
 }
 
 impl Item {
@@ -187,7 +235,7 @@ pub struct VariantField {
     pub name: Ident,
 }
 
-#[derive(Clone, Debug, PartialEq, Eq)]
+#[derive(Clone, PartialEq, Eq)]
 pub struct Member {
     pub docs: Vec<Symbol>,
     pub annotations: Vec<Annotation>,
@@ -195,6 +243,20 @@ pub struct Member {
     pub inheritance: Inheritance,
     pub kind: MemberKind,
     pub span: Span,
+    pub tokens: CapturedTokens,
+}
+
+impl fmt::Debug for Member {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.debug_struct("Member")
+            .field("docs", &self.docs)
+            .field("annotations", &self.annotations)
+            .field("vis", &self.vis)
+            .field("inheritance", &self.inheritance)
+            .field("kind", &self.kind)
+            .field("span", &self.span)
+            .finish()
+    }
 }
 
 #[derive(Clone, Debug, PartialEq, Eq)]

@@ -1,9 +1,10 @@
 use std::thread;
 
 use krelpin_ast::ast::{
-    CompilationUnit, FieldStorage, FnRetTy, GenericParamKind, Ident, MemberKind, ReceiverKind,
-    TyKind, Visibility,
+    CompilationUnit, FieldStorage, FnRetTy, GenericParamKind, Ident, ItemKind, MemberKind,
+    ReceiverKind, TyKind, Visibility,
 };
+use krelpin_ast::token::TokenKind;
 use krelpin_errors::{DiagCtxt, DiagnosticBuffer};
 use krelpin_span::SourceMap;
 
@@ -502,14 +503,50 @@ fn macro_declarations() {
     assert_eq!(unit.items.len(), 1);
     assert_eq!(unit.macros.len(), 1);
     assert_eq!(unit.macros[0].name.name.as_str(), "Derive");
+    assert!(unit.macros[0].body.is_none());
+    let unit =
+        parse_ok("macro Builder(TokenStream args, TokenStream item) { return item; }\nclass A {}");
+    let body = unit.macros[0].body.as_ref().expect("the macro has a body");
+    assert_eq!(body.params.len(), 2);
+    assert_eq!(body.params[1].name.name.as_str(), "item");
+    assert_eq!(body.body.stmts.len(), 1);
     assert_eq!(
         errors("macro Builder { }"),
-        ["macros written in Krelpin are not supported yet"]
+        ["the macro `Builder` has no parameters"]
     );
     assert_eq!(
         errors("public macro Builder;"),
         ["macros cannot have a visibility modifier"]
     );
+}
+
+#[test]
+fn annotated_declarations_capture_their_tokens() {
+    let unit = parse_ok("/** docs */\n@Getters\nclass A { @Trace int f() { return 1; } int g; }");
+    let tokens = unit.items[0]
+        .tokens
+        .tokens()
+        .expect("annotated items keep tokens");
+    assert!(matches!(tokens[0].kind, TokenKind::DocComment(_)));
+    assert_eq!(tokens[1].kind, TokenKind::At);
+    assert_eq!(
+        tokens.last().map(|token| token.kind),
+        Some(TokenKind::CloseBrace)
+    );
+    let ItemKind::Class(class) = &unit.items[0].kind else {
+        panic!("expected a class");
+    };
+    let traced = class.members[0]
+        .tokens
+        .tokens()
+        .expect("annotated members keep tokens");
+    assert_eq!(traced.first().map(|token| token.kind), Some(TokenKind::At));
+    assert_eq!(
+        traced.last().map(|token| token.kind),
+        Some(TokenKind::CloseBrace)
+    );
+    assert!(class.members[1].tokens.tokens().is_none());
+    assert!(parse_ok("class B {}").items[0].tokens.tokens().is_none());
 }
 
 #[test]

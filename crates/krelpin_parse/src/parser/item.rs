@@ -1,7 +1,8 @@
 use krelpin_ast::ast::{
-    Annotation, Class, CompilationUnit, Constructor, Enum, FieldStorage, FnRetTy, Generics, Ident,
-    Import, Inheritance, Interface, Item, ItemKind, MacroDef, Member, MemberKind, Path, Receiver,
-    ReceiverKind, Record, Ty, Variant, VariantField, Visibility, is_intrinsic,
+    Annotation, CapturedTokens, Class, CompilationUnit, Constructor, Enum, FieldStorage, FnRetTy,
+    Generics, Ident, Import, Inheritance, Interface, Item, ItemKind, MacroBody, MacroDef, Member,
+    MemberKind, Path, Receiver, ReceiverKind, Record, Ty, Variant, VariantField, Visibility,
+    is_intrinsic,
 };
 use krelpin_ast::token::TokenKind;
 use krelpin_errors::Diagnostic;
@@ -11,7 +12,7 @@ use super::lookahead::is_plain_ident;
 use super::{ErrorReported, Expected, PResult, Parser};
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
-pub(crate) enum Container {
+pub enum Container {
     Class,
     Record,
     Interface,
@@ -96,6 +97,28 @@ impl Parser<'_> {
         }
     }
 
+    pub(crate) fn parse_items_to_eof(&mut self) -> Vec<Item> {
+        let mut items = Vec::new();
+        let mut docs = Vec::new();
+        loop {
+            docs.extend(self.parse_docs());
+            if self.token.kind == TokenKind::Eof {
+                return items;
+            }
+            match self.parse_declaration(std::mem::take(&mut docs)) {
+                Ok(Declaration::Item(item)) => items.push(item),
+                Ok(Declaration::Macro(def)) => {
+                    self.emit(
+                        Diagnostic::error("a macro cannot define another macro")
+                            .with_span(def.span)
+                            .with_note("macros are only defined in `proc-macro` crates"),
+                    );
+                }
+                Err(_) => self.recover_to_next_item(),
+            }
+        }
+    }
+
     fn parse_package(&mut self) -> PResult<Path> {
         self.bump();
         let path = self.parse_path()?;
@@ -124,6 +147,7 @@ impl Parser<'_> {
 
     fn parse_declaration(&mut self, docs: Vec<Symbol>) -> PResult<Declaration> {
         let lo = self.token.span;
+        let start = self.index;
         let annotations = self.parse_annotations()?;
         let modifiers = self.parse_modifiers();
         if self.token.is_keyword(kw::Macro) {
@@ -139,8 +163,20 @@ impl Parser<'_> {
             self.expected = vec![Expected::Item];
             return Err(self.unexpected());
         };
-        self.parse_item(docs, annotations, &modifiers, container, lo)
-            .map(Declaration::Item)
+        let mut item = self.parse_item(docs, annotations, &modifiers, container, lo)?;
+        item.tokens = self.capture(start, !item.annotations.is_empty());
+        Ok(Declaration::Item(item))
+    }
+
+    fn capture(&self, start: usize, wanted: bool) -> CapturedTokens {
+        if !wanted {
+            return CapturedTokens::default();
+        }
+        let mut first = start;
+        while first > 0 && matches!(self.tokens[first - 1].kind, TokenKind::DocComment(_)) {
+            first -= 1;
+        }
+        CapturedTokens::new(&self.tokens[first..self.index])
     }
 
     fn parse_nested_type(
@@ -212,6 +248,7 @@ impl Parser<'_> {
             name,
             kind,
             span: lo.to(self.prev_token.span),
+            tokens: CapturedTokens::default(),
         })
     }
 
@@ -230,21 +267,36 @@ impl Parser<'_> {
             self.error(span, "macros cannot have a visibility modifier");
         }
         let name = self.parse_ident()?;
-        if self.token.kind == TokenKind::OpenBrace {
-            let body =
+        let body = if self.check(TokenKind::OpenParen) {
+            let body_lo = self.token.span;
+            let params = self.parse_params()?;
+            let body = self.parse_block()?;
+            Some(MacroBody {
+                params,
+                body,
+                span: body_lo.to(self.prev_token.span),
+            })
+        } else if self.check(TokenKind::OpenBrace) {
+            let block =
                 self.parse_unparsed_delimited(TokenKind::OpenBrace, TokenKind::CloseBrace)?;
             self.emit(
-                Diagnostic::error("macros written in Krelpin are not supported yet")
-                    .with_span(body.span)
-                    .with_note("only the macros of the standard library can be used for now"),
+                Diagnostic::error(format!("the macro `{}` has no parameters", name.name))
+                    .with_span(name.span.to(block.span))
+                    .with_help(format!(
+                        "write `macro {}(TokenStream args, TokenStream item) {{ ... }}`",
+                        name.name
+                    )),
             );
+            None
         } else {
             self.expect_semi()?;
-        }
+            None
+        };
         Ok(MacroDef {
             docs,
             annotations,
             name,
+            body,
             span: lo.to(self.prev_token.span),
         })
     }
@@ -502,7 +554,11 @@ impl Parser<'_> {
         }
     }
 
-    pub(crate) fn parse_members_to_eof(&mut self, owner: Ident) -> Vec<Member> {
+    pub(crate) fn parse_members_to_eof(
+        &mut self,
+        container: Container,
+        owner: Ident,
+    ) -> Vec<Member> {
         let mut members = Vec::new();
         loop {
             let docs = self.parse_docs();
@@ -512,7 +568,7 @@ impl Parser<'_> {
             if self.eat_noexpect(TokenKind::Semi) {
                 continue;
             }
-            match self.parse_member(docs, Container::Class, owner) {
+            match self.parse_member(docs, container, owner) {
                 Ok(member) => members.push(member),
                 Err(_) => {
                     self.recover_to_member_end();
@@ -698,13 +754,15 @@ impl Parser<'_> {
         owner: Ident,
     ) -> PResult<Member> {
         let lo = self.token.span;
+        let start = self.index;
         let annotations = self.parse_annotations()?;
         let modifiers = self.parse_modifiers();
         if self.token.is_keyword(kw::Struct) {
             return Err(self.reject_struct());
         }
         if let Some(nested) = type_container(self.token.kind) {
-            let item = self.parse_nested_type(docs, annotations, &modifiers, nested, lo)?;
+            let mut item = self.parse_nested_type(docs, annotations, &modifiers, nested, lo)?;
+            item.tokens = self.capture(start, !item.annotations.is_empty());
             return Ok(Member {
                 docs: Vec::new(),
                 annotations: Vec::new(),
@@ -712,10 +770,12 @@ impl Parser<'_> {
                 inheritance: Inheritance::default(),
                 span: item.span,
                 kind: MemberKind::Type(Box::new(item)),
+                tokens: CapturedTokens::default(),
             });
         }
         let kind = self.parse_member_kind(owner, &modifiers)?;
         self.validate_member(container, &annotations, &modifiers, &kind);
+        let tokens = self.capture(start, !annotations.is_empty());
 
         Ok(Member {
             docs,
@@ -724,6 +784,7 @@ impl Parser<'_> {
             inheritance: modifiers.inheritance,
             kind,
             span: lo.to(self.prev_token.span),
+            tokens,
         })
     }
 

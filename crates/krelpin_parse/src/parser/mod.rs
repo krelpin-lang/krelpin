@@ -7,10 +7,12 @@ mod pat;
 mod stmt;
 mod ty;
 
+pub use self::item::Container;
+
 #[cfg(test)]
 mod tests;
 
-use krelpin_ast::ast::{CompilationUnit, Ident, Member, Ty};
+use krelpin_ast::ast::{CompilationUnit, Ident, Item, Member, Ty};
 use krelpin_ast::token::{Token, TokenKind};
 use krelpin_errors::{DiagCtxt, Diagnostic};
 use krelpin_span::{Span, Symbol};
@@ -27,7 +29,20 @@ pub fn parse_tys(tokens: Vec<Token>, dcx: &DiagCtxt) -> Option<Vec<Ty>> {
 }
 
 pub fn parse_members(tokens: Vec<Token>, owner: Ident, dcx: &DiagCtxt) -> Vec<Member> {
-    Parser::new(tokens, dcx).parse_members_to_eof(owner)
+    Parser::new(tokens, dcx).parse_members_to_eof(Container::Class, owner)
+}
+
+pub fn parse_members_of(
+    tokens: Vec<Token>,
+    container: Container,
+    owner: Ident,
+    dcx: &DiagCtxt,
+) -> Vec<Member> {
+    Parser::new(tokens, dcx).parse_members_to_eof(container, owner)
+}
+
+pub fn parse_items(tokens: Vec<Token>, dcx: &DiagCtxt) -> Vec<Item> {
+    Parser::new(tokens, dcx).parse_items_to_eof()
 }
 
 #[derive(Clone, Copy, Debug)]
