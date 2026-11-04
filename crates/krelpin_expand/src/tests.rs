@@ -12,6 +12,10 @@ struct Expanded {
 }
 
 fn expand_str(src: &str) -> Expanded {
+    expand_with(src, &crate::CfgSet::default())
+}
+
+fn expand_with(src: &str, cfg: &crate::CfgSet) -> Expanded {
     let source_map = SourceMap::new();
     let buffer = DiagnosticBuffer::default();
     let dcx = DiagCtxt::new(buffer.clone());
@@ -21,7 +25,7 @@ fn expand_str(src: &str) -> Expanded {
         .load_std(&source_map, &dcx);
     let file = source_map.new_source_file("test.kr", src.to_owned());
     units.push(parser::parse(lexer::lex(&file, &dcx), &dcx));
-    crate::expand(&mut units, &source_map, &dcx);
+    crate::expand_with_cfg(&mut units, &source_map, &dcx, cfg);
     Expanded {
         unit: units.pop().expect("the test unit"),
         errors: buffer.messages(),
@@ -162,4 +166,70 @@ fn records_only_derive_comparable() {
         errors("@Derive(Comparable) record Point(int x, int y);"),
         Vec::<String>::new()
     );
+}
+
+fn linux() -> crate::CfgSet {
+    let mut cfg = crate::CfgSet::default();
+    cfg.insert("unix", None);
+    cfg.insert("target_os", Some("linux"));
+    cfg.insert_spec("feature=\"fast\"").expect("a valid cfg");
+    cfg
+}
+
+#[test]
+fn cfg_keeps_only_matching_members() {
+    let expanded = expand_with(
+        "class A {\n\
+         \x20   @Cfg(unix) void onUnix() {}\n\
+         \x20   @Cfg(windows) void onWindows() {}\n\
+         \x20   @Cfg(target_os = \"linux\") void onLinux() {}\n\
+         \x20   @Cfg(not(feature = \"fast\")) void slow() {}\n\
+         \x20   @Cfg(all(unix, any(windows, feature = \"fast\"))) void both() {}\n\
+         }",
+        &linux(),
+    );
+    assert_eq!(expanded.errors, Vec::<String>::new());
+    assert_eq!(method_names(&expanded.unit), ["onUnix", "onLinux", "both"]);
+}
+
+#[test]
+fn cfg_removes_whole_items() {
+    let expanded = expand_with("@Cfg(windows) class A {} class B {}", &linux());
+    assert_eq!(expanded.unit.items.len(), 1);
+}
+
+#[test]
+fn cfg_reports_malformed_conditions() {
+    assert_eq!(
+        expand_with("class A { @Cfg(target_os = 5) void f() {} }", &linux()).errors,
+        ["expected a string after `target_os =` in `@Cfg`"]
+    );
+    assert_eq!(
+        expand_with("class A { @Cfg(unix, windows) void f() {} }", &linux()).errors,
+        ["`@Cfg` takes exactly one condition"]
+    );
+}
+
+#[test]
+fn check_cfg_reports_unexpected_names_and_values() {
+    let mut cfg = linux();
+    cfg.add_check("cfg(feature, values(\"fast\", \"small\"))")
+        .expect("a valid check");
+    let expanded = expand_with(
+        "class A {\n\
+         \x20   @Cfg(feature = \"small\") void a() {}\n\
+         \x20   @Cfg(feature = \"tiny\") void b() {}\n\
+         \x20   @Cfg(fature) void c() {}\n\
+         \x20   @Cfg(target_os = \"linux\") void d() {}\n\
+         }",
+        &cfg,
+    );
+    assert_eq!(
+        expanded.errors,
+        [
+            "unexpected `@Cfg` value `\"tiny\"` for `feature`",
+            "unexpected `@Cfg` condition name `fature`"
+        ]
+    );
+    assert!(cfg.add_check("feature").is_err());
 }

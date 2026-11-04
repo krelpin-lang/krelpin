@@ -1,3 +1,4 @@
+mod cfg;
 mod derive;
 mod item;
 mod table;
@@ -9,12 +10,29 @@ use krelpin_ast::ast::{Annotation, CompilationUnit, Item, ItemKind, Member, Memb
 use krelpin_errors::{DiagCtxt, Diagnostic};
 use krelpin_span::SourceMap;
 
+pub use crate::cfg::{CfgSet, WELL_KNOWN};
 pub use crate::table::BuiltinMacro;
 use crate::table::{MacroScope, MacroTable};
 
-const BUILTIN_ATTRIBUTES: &[&str] = &["Intrinsic"];
+const BUILTIN_ATTRIBUTES: &[&str] = &["Intrinsic", "Test"];
 
 pub fn expand(units: &mut [CompilationUnit], source_map: &SourceMap, dcx: &DiagCtxt) {
+    expand_with_cfg(units, source_map, dcx, &CfgSet::default());
+}
+
+pub fn expand_with_cfg(
+    units: &mut [CompilationUnit],
+    source_map: &SourceMap,
+    dcx: &DiagCtxt,
+    cfg: &CfgSet,
+) {
+    for unit in units.iter_mut() {
+        unit.items
+            .retain_mut(|item| configure(&mut item.annotations, cfg, dcx));
+        for item in &mut unit.items {
+            configure_item(item, cfg, dcx);
+        }
+    }
     let table = MacroTable::collect(units, dcx);
     for unit in units.iter_mut() {
         let scope = MacroScope::new(&table, unit);
@@ -104,6 +122,33 @@ impl ExpandCtxt<'_> {
 
     fn emit(&self, diagnostic: Diagnostic) {
         self.dcx.emit(diagnostic);
+    }
+}
+
+fn configure(annotations: &mut Vec<Annotation>, cfg: &CfgSet, dcx: &DiagCtxt) -> bool {
+    let mut keep = true;
+    annotations.retain(|annotation| {
+        if !annotation.is("Cfg") {
+            return true;
+        }
+        keep &= cfg.evaluate(annotation, dcx);
+        false
+    });
+    keep
+}
+
+fn configure_item(item: &mut Item, cfg: &CfgSet, dcx: &DiagCtxt) {
+    let members: &mut Vec<Member> = match &mut item.kind {
+        ItemKind::Class(class) => &mut class.members,
+        ItemKind::Record(def) => &mut def.members,
+        ItemKind::Interface(interface) => &mut interface.members,
+        ItemKind::Enum(def) => &mut def.members,
+    };
+    members.retain_mut(|member| configure(&mut member.annotations, cfg, dcx));
+    for member in members {
+        if let MemberKind::Type(nested) = &mut member.kind {
+            configure_item(nested, cfg, dcx);
+        }
     }
 }
 
