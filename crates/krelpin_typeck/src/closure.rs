@@ -87,12 +87,13 @@ impl Tcx<'_> {
     }
 }
 
-fn callee(method: &MethodSig, sig: FnSig) -> Callee {
+fn callee(method: &MethodSig, sig: FnSig, subst: &Subst) -> Callee {
     Callee {
         method: method.clone(),
         params: sig.params,
         ret: sig.ret,
         packs_varargs: false,
+        subst: subst.clone(),
     }
 }
 
@@ -172,7 +173,7 @@ impl FnCtxt<'_, '_> {
     pub(crate) fn check_closure_args(&mut self, args: &[Expr]) -> Vec<Ty> {
         args.iter()
             .map(|arg| {
-                if is_closure(arg) {
+                if is_closure(arg) || self.is_diamond(arg) {
                     Ty::Unknown
                 } else {
                     self.check_expr(arg)
@@ -183,10 +184,29 @@ impl FnCtxt<'_, '_> {
 
     pub(crate) fn finish_closure_args(&mut self, args: &[Expr]) {
         for arg in args {
-            if is_closure(arg) && !self.results.expr_types.contains_key(&arg.span) {
+            if self.results.expr_types.contains_key(&arg.span) {
+                continue;
+            }
+            if is_closure(arg) {
                 self.check_closure(arg, &Ty::Unknown);
+            } else if self.is_diamond(arg) {
+                self.check_expr(arg);
             }
         }
+    }
+
+    pub(crate) fn is_diamond(&self, expr: &Expr) -> bool {
+        let ExprKind::New { ty, .. } = &expr.kind else {
+            return false;
+        };
+        let krelpin_ast::ast::TyKind::Path { args, .. } = &ty.kind else {
+            return false;
+        };
+        args.is_empty()
+            && matches!(
+                self.tcx.lower_ty(ty),
+                Ty::Adt { def, .. } if !self.tcx.sig(def).generics.is_empty()
+            )
     }
 
     fn check_lambda(
@@ -245,6 +265,49 @@ impl FnCtxt<'_, '_> {
         self.ret = outer_ret;
         self.yields = outer_yields;
         self.exceptions = outer_exceptions;
+    }
+
+    pub(crate) fn probe_lambda(
+        &mut self,
+        params: &[LambdaParam],
+        body: &LambdaBody,
+        sig: &FnSig,
+    ) -> Option<Ty> {
+        if params.len() != sig.params.len() {
+            return None;
+        }
+        for (param, expected) in params.iter().zip(&sig.params) {
+            let ty = match &param.ty {
+                Some(ty) => self.lower_ty(ty),
+                None => expected.clone(),
+            };
+            self.locals.insert(param.name.span, ty);
+        }
+        let outer_ret = std::mem::replace(&mut self.ret, Ty::Unknown);
+        let outer_yields = std::mem::take(&mut self.yields);
+        let probe = FnSig {
+            ret: Ty::Unknown,
+            ..sig.clone()
+        };
+        let outer_exceptions = std::mem::replace(
+            &mut self.exceptions,
+            ExceptionScope::for_lambda(Some(&probe)),
+        );
+        let ty = match body {
+            LambdaBody::Expr(body) => Some(self.check_expr(body)),
+            LambdaBody::Block(block) => {
+                self.inferred_returns.push(Vec::new());
+                self.check_block(block);
+                let returns = self.inferred_returns.pop().unwrap_or_default();
+                returns
+                    .into_iter()
+                    .reduce(|a, b| self.tcx.common_ty(&self.param_env, &a, &b).unwrap_or(a))
+            }
+        };
+        self.ret = outer_ret;
+        self.yields = outer_yields;
+        self.exceptions = outer_exceptions;
+        ty
     }
 
     fn check_lambda_block(&mut self, block: &Block, ret: &Ty) {
@@ -312,7 +375,7 @@ impl FnCtxt<'_, '_> {
             return ctors.iter().find_map(|ctor| {
                 let ctor_sig = instantiate(ctor, &subst);
                 fits(&ctor_sig.params, &sig.params)
-                    .then(|| (ty.clone(), Some(callee(ctor, ctor_sig))))
+                    .then(|| (ty.clone(), Some(callee(ctor, ctor_sig, &subst))))
             });
         }
 
@@ -334,7 +397,12 @@ impl FnCtxt<'_, '_> {
                         }),
                         (None, false) => false,
                     };
-                    matches.then(|| (method_sig.ret.clone(), Some(callee(&method, method_sig))))
+                    matches.then(|| {
+                        (
+                            method_sig.ret.clone(),
+                            Some(callee(&method, method_sig, &subst)),
+                        )
+                    })
                 })
         })
     }

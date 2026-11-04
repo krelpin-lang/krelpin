@@ -217,7 +217,9 @@ impl<'h> Builder<'_, 'h, '_> {
         fail: BasicBlock,
         span: Span,
     ) -> Place {
-        if self.statically_is(ty, tested) {
+        let may_be_null =
+            matches!(ty.strip_refs(), Ty::Nullable(_)) && !matches!(tested, Ty::Nullable(_));
+        if !may_be_null && self.statically_is(ty, tested) {
             return place;
         }
         let is = self.temp(&Ty::BOOLEAN, span);
@@ -307,6 +309,7 @@ impl<'h> Builder<'_, 'h, '_> {
             }],
             ret: Ty::BOOLEAN,
             packs_varargs: false,
+            subst: tcx.subst_for(equatable, &[ty.non_null().clone()]),
         }
     }
 }

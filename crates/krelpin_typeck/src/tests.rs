@@ -1875,3 +1875,71 @@ fn copyable_values_are_read_through_references() {
         ["mismatched types"]
     );
 }
+
+#[test]
+fn diamonds_take_their_arguments_from_the_context() {
+    body_ok(
+        "List<String> names = new ArrayList<>(); \
+         Map<String, List<int>> groups = new HashMap<>(); \
+         groups.put(\"a\", new ArrayList<>());",
+    );
+    assert_eq!(
+        in_body("Object any = new ArrayList<>();"),
+        ["cannot infer the type arguments of `ArrayList<>`"]
+    );
+}
+
+#[test]
+fn lambdas_decide_generic_results() {
+    let src = |code: &str| {
+        format!(
+            "import std.function.Supplier;\n\
+             class Main {{\n\
+             \x20   static <R> R call(Supplier<R> make) {{ return make.get(); }}\n\
+             \x20   void run() {{ {code} }}\n\
+             }}"
+        )
+    };
+    ok(&src(
+        "int five = Main.call(() -> 5); String text = Main.call(() -> { return \"x\"; });",
+    ));
+    assert_eq!(
+        errors(&src("String text = Main.call(() -> 5);")),
+        ["mismatched types"]
+    );
+}
+
+#[test]
+fn assignments_write_through_mutable_references() {
+    ok("class Main {\n\
+        \x20   static void bump(&mut int value) { value = 3; value += 1; value++; }\n\
+        \x20   static void rebind(&mut int a, &mut int b) { &mut int r = a; r = b; r = 5; }\n\
+        }");
+    assert_eq!(
+        errors("class Main { static void set(&mut int value) { value = \"x\"; } }"),
+        ["mismatched types"]
+    );
+}
+
+#[test]
+fn this_is_typed_by_the_receiver() {
+    ok("class Node {\n\
+        \x20   &Node self() { return this; }\n\
+        \x20   mut &mut Node change() { return this; }\n\
+        }");
+    assert_eq!(
+        errors("class Node { Node copy() { return this; } }"),
+        ["mismatched types"]
+    );
+}
+
+#[test]
+fn loops_borrow_their_elements() {
+    body_ok(
+        "List<Point> points = new ArrayList<>(); \
+         for (&Point point : points) { int x = point.sum(); } \
+         for (Point point : points) { int y = point.sum(); } \
+         List<int> numbers = new ArrayList<>(); \
+         for (int n : numbers) { int z = n; }",
+    );
+}

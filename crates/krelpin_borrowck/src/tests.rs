@@ -432,3 +432,16 @@ fn lambdas_keep_what_the_call_hands_them() {
     );
     ok("int total = 0; names.forEach(name -> total += name.length()); names.add(\"x\");");
 }
+
+#[test]
+fn assignments_through_references_need_mut() {
+    assert_eq!(
+        errors(
+            "class A {\n\
+             \x20   static void bump(&mut int value) { value += 1; value = 2; }\n\
+             \x20   static void read(&int value) { value += 1; }\n\
+             }"
+        ),
+        ["cannot assign to `value`, because it is behind a `&` reference"]
+    );
+}

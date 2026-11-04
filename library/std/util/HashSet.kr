@@ -16,6 +16,13 @@ class HashSet<T extends Hashable<T>> implements Set<T> {
     @Intrinsic
     mut void clear();
 
+    Iterator<T> iterator() {
+        return new HashSetIterator<>(this);
+    }
+
     @Intrinsic
-    Iterator<T> iterator();
+    int slotCount();
+
+    @Intrinsic
+    (&T)? slotAt(int index);
 }

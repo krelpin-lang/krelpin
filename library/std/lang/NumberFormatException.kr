@@ -1,0 +1,11 @@
+package std.lang;
+
+class NumberFormatException extends IllegalArgumentException {
+    NumberFormatException() {
+        super();
+    }
+
+    NumberFormatException(String message) {
+        super(message);
+    }
+}

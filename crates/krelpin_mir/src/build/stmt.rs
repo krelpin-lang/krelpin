@@ -1,7 +1,7 @@
 use krelpin_ast::ast::{BinOp, PrimitiveTy};
 use krelpin_hir::{Block, Catch, Dispatch, Expr, LocalId, LoopKind, Stmt, StmtKind};
 use krelpin_span::{Span, Symbol};
-use krelpin_typeck::{Callee, LangItem, MethodSig, Ty};
+use krelpin_typeck::{Callee, LangItem, MethodSig, Subst, Ty};
 
 use super::{Builder, Scope};
 use crate::mir::{
@@ -314,6 +314,26 @@ impl<'h> Builder<'_, 'h, '_> {
     }
 
     fn bind_element(&mut self, id: LocalId, element: Place, elem: &Ty, span: Span) {
+        let depth = |ty: &Ty| {
+            let mut depth = 0;
+            let mut current = ty;
+            while let Ty::Ref { ty, .. } = current {
+                depth += 1;
+                current = ty;
+            }
+            depth
+        };
+        let wanted = depth(&self.hir.local(id).ty).max(1);
+        let mut element = element;
+        let mut elem = elem.clone();
+        while depth(&elem) > wanted {
+            let Ty::Ref { ty: inner, .. } = elem else {
+                break;
+            };
+            element = element.project(PlaceElem::Deref);
+            elem = *inner;
+        }
+        let elem = &elem;
         match self.hir.local(id).ty.clone() {
             Ty::Ref { mutable, .. } if !matches!(elem, Ty::Ref { .. }) => {
                 let local = self.declare_var(id);
@@ -350,7 +370,8 @@ impl<'h> Builder<'_, 'h, '_> {
             .upcast(*def, args, iterable)
             .unwrap_or_else(|| unreachable!("`{ty}` is checked to be `Iterable`"));
         let iterator = self.method(iterable, "iterator");
-        let iterator_ret = iterator.ret.subst(&tcx.subst_for(iterable, &iterable_args));
+        let iterable_subst = tcx.subst_for(iterable, &iterable_args);
+        let iterator_ret = iterator.ret.subst(&iterable_subst);
         let Ty::Adt {
             def: iterator_def,
             args: iterator_args,
@@ -364,9 +385,9 @@ impl<'h> Builder<'_, 'h, '_> {
         let next = self.method(*iterator_def, "next");
         let next_ret = next.ret.subst(&subst);
         IterMethods {
-            iterator: callee(iterator, iterator_ret.clone()),
-            has_next: callee(has_next, Ty::BOOLEAN),
-            next: callee(next, next_ret),
+            iterator: callee(iterator, iterator_ret.clone(), iterable_subst),
+            has_next: callee(has_next, Ty::BOOLEAN, subst.clone()),
+            next: callee(next, next_ret, subst),
         }
     }
 
@@ -474,12 +495,13 @@ impl<'h> Builder<'_, 'h, '_> {
     }
 }
 
-fn callee(method: MethodSig, ret: Ty) -> Callee {
+fn callee(method: MethodSig, ret: Ty, subst: Subst) -> Callee {
     Callee {
         params: Vec::new(),
         ret,
         method,
         packs_varargs: false,
+        subst,
     }
 }
 

@@ -223,8 +223,13 @@ impl<'a, 'h, 'tcx> Builder<'a, 'h, 'tcx> {
         self.terminate(fallthrough, self.hir.span);
         let mut blocks = simplify(self.blocks);
         let locals = remove_unused_locals(self.locals, arg_count, &mut blocks);
+        let member = match source {
+            BodySource::Closure { .. } => None,
+            _ => Some(self.hir.member),
+        };
         let body = Body {
             owner: self.hir.owner,
+            member,
             name: self.hir.name,
             source,
             locals,

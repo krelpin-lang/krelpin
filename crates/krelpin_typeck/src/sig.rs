@@ -84,6 +84,7 @@ pub struct MethodSig {
     pub is_final: bool,
     pub borrows: RetBorrows,
     pub storage: Vec<Storage>,
+    pub member: Option<u32>,
 }
 
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
@@ -331,7 +332,7 @@ impl<'a> Tcx<'a> {
         }
     }
 
-    pub(crate) fn supertypes(&self, def: DefId) -> Vec<(DefId, Subst)> {
+    pub fn supertypes(&self, def: DefId) -> Vec<(DefId, Subst)> {
         let mut out = Vec::new();
         let self_args: Vec<Ty> = self
             .sig(def)
@@ -428,7 +429,8 @@ impl<'a> Tcx<'a> {
             self.collect_components(&mut sig, def_id, def);
         }
 
-        for member in members {
+        for (index, member) in members.iter().enumerate() {
+            let index = index as u32;
             let vis = match member.vis {
                 _ if kind == AdtKind::Interface => Visibility::Public(member.span),
                 vis => vis,
@@ -445,11 +447,16 @@ impl<'a> Tcx<'a> {
                     });
                 }
                 MemberKind::Constructor(ctor) => {
-                    sig.ctors.push(self.ctor_sig(ctor, vis, def_id));
+                    sig.ctors.push(MethodSig {
+                        member: Some(index),
+                        ..self.ctor_sig(ctor, vis, def_id)
+                    });
                 }
                 MemberKind::Method(method) => {
-                    let method_sig =
-                        self.method_sig(member, method, vis, def_id, &sig.borrow_params);
+                    let method_sig = MethodSig {
+                        member: Some(index),
+                        ..self.method_sig(member, method, vis, def_id, &sig.borrow_params)
+                    };
                     sig.methods
                         .entry(method.name.name)
                         .or_default()
@@ -651,6 +658,7 @@ impl<'a> Tcx<'a> {
             is_final: member.inheritance.final_kw.is_some(),
             borrows,
             storage,
+            member: None,
         }
     }
 
@@ -787,6 +795,7 @@ impl<'a> Tcx<'a> {
             is_final: false,
             borrows: RetBorrows::default(),
             storage: self.param_storage(&ctor.params, &ctor.keeps),
+            member: None,
         }
     }
 
@@ -858,5 +867,6 @@ fn synthesized_method(
         is_final: true,
         borrows: RetBorrows::default(),
         storage: Vec::new(),
+        member: None,
     }
 }

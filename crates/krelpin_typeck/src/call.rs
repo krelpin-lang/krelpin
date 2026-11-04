@@ -1,6 +1,6 @@
-use krelpin_ast::ast::{Expr, Ident};
+use krelpin_ast::ast::{Expr, ExprKind, Ident, LambdaBody};
 use krelpin_errors::Diagnostic;
-use krelpin_span::Symbol;
+use krelpin_span::{Span, Symbol};
 
 use crate::Callee;
 use crate::check::{FnCtxt, plural};
@@ -18,6 +18,7 @@ impl Phase {
     const ALL: [Phase; 2] = [Phase::Fixed, Phase::Variadic];
 }
 
+#[derive(Clone)]
 struct Candidate {
     method: MethodSig,
     subst: Subst,
@@ -113,15 +114,16 @@ impl FnCtxt<'_, '_> {
         };
 
         let Some(chosen) = self.most_specific(&applicable, args.len(), phase) else {
-            let unknown_arg = args
-                .iter()
-                .zip(arg_tys)
-                .any(|(arg, ty)| !is_closure(arg) && ty.references_unknown());
+            let unknown_arg = args.iter().zip(arg_tys).any(|(arg, ty)| {
+                !is_closure(arg) && !self.is_diamond(arg) && ty.references_unknown()
+            });
             if !unknown_arg {
                 self.report_ambiguity(&applicable, name);
             }
             return Ty::Unknown;
         };
+        let (resolved, probed) = self.infer_from_lambdas(chosen, args, phase);
+        let chosen = &resolved;
         self.check_call_bounds(chosen, name);
         self.check_vis(chosen.method.vis, chosen.method.owner, false, what, name);
         self.results.callees.insert(
@@ -131,17 +133,87 @@ impl FnCtxt<'_, '_> {
                 params: chosen.params.clone(),
                 ret: chosen.ret.clone(),
                 packs_varargs: phase == Phase::Variadic,
+                subst: chosen.subst.clone(),
             },
         );
         for thrown in &chosen.method.throws {
             self.raise(thrown.subst(&chosen.subst), name.span);
         }
         for (index, arg) in args.iter().enumerate() {
-            if is_closure(arg) {
+            if is_closure(arg) && !probed.contains(&index) {
                 self.check_closure(arg, &chosen.param(index, phase));
+            } else if self.is_diamond(arg) {
+                self.check_expr_coerce(arg, &chosen.param(index, phase));
             }
         }
         chosen.ret.clone()
+    }
+
+    fn infer_from_lambdas(
+        &mut self,
+        chosen: &Candidate,
+        args: &[Expr],
+        phase: Phase,
+    ) -> (Candidate, Vec<usize>) {
+        let mut candidate = chosen.clone();
+        let mut probed = Vec::new();
+        let unresolved = |candidate: &Candidate| -> Vec<Symbol> {
+            candidate
+                .method
+                .generics
+                .iter()
+                .map(|param| param.name)
+                .filter(|name| candidate.subst.get(name).is_none_or(Ty::is_unknown))
+                .collect()
+        };
+        for (index, arg) in args.iter().enumerate() {
+            let vars = unresolved(&candidate);
+            if vars.is_empty() {
+                break;
+            }
+            let ExprKind::Lambda { params, body, .. } = &arg.kind else {
+                continue;
+            };
+            let mut partial = candidate.subst.clone();
+            for var in &vars {
+                partial.insert(*var, Ty::Param(*var));
+            }
+            let Some(raw) = param_for_inference(&candidate.method, index, args.len(), &Ty::Unknown)
+            else {
+                continue;
+            };
+            let expected = raw.subst(&partial);
+            let Some(sig) = self.tcx.fn_sig(&expected) else {
+                continue;
+            };
+            let mentions = |ty: &Ty| vars.iter().any(|var| ty.mentions_param(*var));
+            if !mentions(&sig.ret) || sig.params.iter().any(mentions) {
+                continue;
+            }
+            let Some(body_ty) = self.probe_lambda(params, body, &sig) else {
+                continue;
+            };
+            probed.push(index);
+            let mut inferred = Subst::new();
+            self.infer(&sig.ret, &body_ty, &vars, &mut inferred);
+            candidate.subst.extend(inferred);
+            candidate.params = candidate
+                .method
+                .params
+                .iter()
+                .map(|param| param.subst(&candidate.subst))
+                .collect();
+            candidate.ret = candidate.method.ret.subst(&candidate.subst);
+            let final_ty = candidate.param(index, phase);
+            if let Some(final_sig) = self.tcx.fn_sig(&final_ty)
+                && final_sig.ret != Ty::Void
+                && let LambdaBody::Expr(body) = body.as_ref()
+            {
+                self.require_assignable(body, &body_ty, &final_sig.ret);
+            }
+            self.results.expr_types.insert(arg.span, final_ty);
+        }
+        (candidate, probed)
     }
 
     fn instantiate(&self, method: MethodSig, mut subst: Subst, arg_tys: &[Ty]) -> Candidate {
@@ -351,5 +423,80 @@ fn plural_args(count: usize, variadic: bool) -> String {
         format!("at least {}", plural(count.saturating_sub(1), "argument"))
     } else {
         plural(count, "argument")
+    }
+}
+
+impl FnCtxt<'_, '_> {
+    pub(crate) fn infer_diamond(
+        &mut self,
+        ty: Ty,
+        arg_tys: &[Ty],
+        span: Span,
+        expected: Option<&Ty>,
+    ) -> Ty {
+        let Ty::Adt { def, name, args } = &ty else {
+            return ty;
+        };
+        let sig = self.tcx.sig(*def);
+        if !args.is_empty() || sig.generics.is_empty() {
+            return ty;
+        }
+        let vars: Vec<Symbol> = sig.generics.iter().map(|param| param.name).collect();
+        let own: Vec<Ty> = vars.iter().map(|var| Ty::Param(*var)).collect();
+        let mut inferred = Subst::new();
+        if let Some(Ty::Adt {
+            def: expected_def,
+            args: expected_args,
+            ..
+        }) = expected.map(|expected| expected.non_null().strip_refs())
+            && let Some(upcast) = self.tcx.upcast(*def, &own, *expected_def)
+        {
+            for (pattern, actual) in upcast.iter().zip(expected_args) {
+                self.infer(pattern, actual, &vars, &mut inferred);
+            }
+        }
+        if vars.iter().any(|var| !inferred.contains_key(var)) {
+            let ctors: Vec<MethodSig> = sig
+                .ctors
+                .iter()
+                .filter(|ctor| ctor.params.len() == arg_tys.len())
+                .cloned()
+                .collect();
+            for ctor in ctors {
+                let mut from_args = inferred.clone();
+                for (param, arg) in ctor.params.iter().zip(arg_tys) {
+                    self.infer(param, arg, &vars, &mut from_args);
+                }
+                if vars.iter().all(|var| from_args.contains_key(var)) {
+                    inferred = from_args;
+                    break;
+                }
+            }
+        }
+        let missing: Vec<String> = vars
+            .iter()
+            .filter(|var| !inferred.contains_key(var))
+            .map(|var| format!("`{var}`"))
+            .collect();
+        if !missing.is_empty() {
+            self.emit(
+                Diagnostic::error(format!("cannot infer the type arguments of `{name}<>`"))
+                    .with_span(span)
+                    .with_note(format!("nothing here decides {}", missing.join(", ")))
+                    .with_help(format!(
+                        "write them explicitly, like `new {name}<{}>()`",
+                        vec!["..."; vars.len()].join(", ")
+                    )),
+            );
+            return Ty::Unknown;
+        }
+        Ty::Adt {
+            def: *def,
+            name: *name,
+            args: vars
+                .iter()
+                .map(|var| inferred.remove(var).unwrap_or(Ty::Unknown))
+                .collect(),
+        }
     }
 }

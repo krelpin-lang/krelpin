@@ -50,7 +50,14 @@ impl FnCtxt<'_, '_> {
             return expected.clone();
         }
 
-        let actual = self.check_expr(expr);
+        let actual = match &expr.kind {
+            ExprKind::New { ty, args } => {
+                let actual = self.check_new(ty, args, expr.span, Some(expected));
+                self.results.expr_types.insert(expr.span, actual.clone());
+                actual
+            }
+            _ => self.check_expr(expr),
+        };
         self.require_assignable(expr, &actual, expected);
         actual
     }
@@ -103,7 +110,7 @@ impl FnCtxt<'_, '_> {
                 Ty::Void
             }
             ExprKind::Index { expr: base, index } => self.check_index(base, index),
-            ExprKind::New { ty, args } => self.check_new(ty, args, expr.span),
+            ExprKind::New { ty, args } => self.check_new(ty, args, expr.span, None),
             ExprKind::NewArray { elem, len } => {
                 self.check_expr_coerce(len, &Ty::INT);
                 Ty::Array(Box::new(self.lower_ty(elem)))
@@ -696,15 +703,28 @@ impl FnCtxt<'_, '_> {
         self.call(candidates, args, arg_tys, name, "constructor");
     }
 
-    fn check_new(&mut self, ty: &krelpin_ast::ast::Ty, args: &[Expr], span: Span) -> Ty {
-        let ty = self.new_object_ty(ty, args, span);
+    fn check_new(
+        &mut self,
+        ty: &krelpin_ast::ast::Ty,
+        args: &[Expr],
+        span: Span,
+        expected: Option<&Ty>,
+    ) -> Ty {
+        let ty = self.new_object_ty(ty, args, span, expected);
         self.finish_closure_args(args);
         ty
     }
 
-    fn new_object_ty(&mut self, ty: &krelpin_ast::ast::Ty, args: &[Expr], span: Span) -> Ty {
+    fn new_object_ty(
+        &mut self,
+        ty: &krelpin_ast::ast::Ty,
+        args: &[Expr],
+        span: Span,
+        expected: Option<&Ty>,
+    ) -> Ty {
         let ty = self.lower_ty(ty);
         let arg_tys = self.check_closure_args(args);
+        let ty = self.infer_diamond(ty, &arg_tys, span, expected);
 
         match &ty {
             Ty::Adt {
@@ -959,6 +979,16 @@ impl FnCtxt<'_, '_> {
         }
 
         match op {
+            None if matches!(target, Ty::Ref { mutable: true, .. }) => {
+                let actual = self.check_expr(rhs);
+                if matches!(actual, Ty::Ref { .. } | Ty::Null | Ty::Unknown) {
+                    self.require_assignable(rhs, &actual, &target);
+                } else {
+                    let inner = target.strip_refs().clone();
+                    self.require_assignable(rhs, &actual, &inner);
+                    return inner;
+                }
+            }
             None => {
                 self.check_expr_coerce(rhs, &target);
             }

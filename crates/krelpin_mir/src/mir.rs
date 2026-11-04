@@ -38,6 +38,7 @@ pub enum BodySource {
 #[derive(Debug)]
 pub struct Body {
     pub owner: DefId,
+    pub member: Option<u32>,
     pub name: Symbol,
     pub source: BodySource,
     pub locals: Vec<LocalDecl>,

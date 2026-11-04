@@ -32,7 +32,7 @@ pub use crate::sig::{
     AdtKind, BorrowSource, FieldSig, GenericParamSig, MethodSig, RetBorrows, Storage, Tcx, TypeSig,
     VariantFieldSig, VariantSig,
 };
-pub use crate::ty::Ty;
+pub use crate::ty::{Subst, Ty};
 
 #[derive(Debug, Default)]
 pub struct TypeckResults {
@@ -67,6 +67,7 @@ pub struct Callee {
     pub params: Vec<Ty>,
     pub ret: Ty,
     pub packs_varargs: bool,
+    pub subst: Subst,
 }
 
 pub struct TypeckOutput<'a> {

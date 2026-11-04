@@ -90,9 +90,7 @@ impl FnCtxt<'_, '_> {
                 let elem = self.element_ty(&iter_ty, iter.span);
                 let declared = self.lower_ty(ty);
                 let copied = match &elem {
-                    Ty::Ref { ty: inner, .. } if self.tcx.is_copy(inner) => {
-                        self.is_assignable(inner, &declared)
-                    }
+                    Ty::Ref { ty: inner, .. } => self.is_assignable(inner, &declared),
                     _ => false,
                 };
                 if !copied && !self.is_assignable(&elem, &declared) {
@@ -167,6 +165,12 @@ impl FnCtxt<'_, '_> {
                         .with_help("remove the value, or change the return type of the method"),
                 );
             }
+            (Some(value), Ty::Unknown) if !self.inferred_returns.is_empty() => {
+                let ty = self.check_expr(value);
+                if let Some(returns) = self.inferred_returns.last_mut() {
+                    returns.push(ty);
+                }
+            }
             (Some(value), ret) => {
                 self.check_expr_coerce(value, ret);
             }
@@ -205,12 +209,12 @@ impl FnCtxt<'_, '_> {
             _ => return Ty::Unknown,
         };
 
-        match iter_ty {
-            Ty::Ref { .. } if !elem.is_unknown() => Ty::Ref {
-                mutable: false,
-                ty: Box::new(elem),
-            },
-            _ => elem,
+        if elem.is_unknown() || matches!(elem, Ty::Ref { .. }) {
+            return elem;
+        }
+        Ty::Ref {
+            mutable: false,
+            ty: Box::new(elem),
         }
     }
 

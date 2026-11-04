@@ -1,0 +1,11 @@
+package std.sync;
+
+final class MutexGuard<T> borrows mutex {
+    private MutexGuard() {}
+
+    @Intrinsic
+    &T get();
+
+    @Intrinsic
+    mut &mut T getMut();
+}

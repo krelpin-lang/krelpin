@@ -256,7 +256,7 @@ pub struct Receiver {
     pub span: Span,
 }
 
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
 pub enum ReceiverKind {
     Owned,
     Ref,
@@ -305,7 +305,7 @@ pub enum TyKind {
     Array(Box<Ty>),
 }
 
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
 pub enum PrimitiveTy {
     Boolean,
     Byte,

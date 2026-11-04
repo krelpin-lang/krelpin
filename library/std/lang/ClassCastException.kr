@@ -1,0 +1,11 @@
+package std.lang;
+
+class ClassCastException extends RuntimeException {
+    ClassCastException() {
+        super();
+    }
+
+    ClassCastException(String message) {
+        super(message);
+    }
+}

@@ -1,7 +1,7 @@
 use std::collections::{HashMap, HashSet};
 
 use krelpin_ast::ast::{
-    CompilationUnit, FieldStorage, FnRetTy, ItemKind, Member, MemberKind, Param,
+    CompilationUnit, FieldStorage, FnRetTy, ItemKind, Member, MemberKind, Param, ReceiverKind,
 };
 use krelpin_errors::Diagnostic;
 use krelpin_span::def_id::DefId;
@@ -22,6 +22,7 @@ pub(crate) struct FnCtxt<'a, 'tcx> {
     pub(crate) locals: HashMap<Span, Ty>,
     pub(crate) narrowed: Vec<HashMap<Span, Ty>>,
     pub(crate) yields: Vec<Vec<Ty>>,
+    pub(crate) inferred_returns: Vec<Vec<Ty>>,
     pub(crate) exceptions: ExceptionScope,
     pub(crate) results: TypeckResults,
 }
@@ -104,18 +105,21 @@ fn check_member<'a, 'tcx>(tcx: &'a Tcx<'tcx>, owner: DefId, member: &Member) -> 
                     .get(&field.name.name)
                     .map(|f| f.ty.clone());
                 let expected = ty.unwrap_or(Ty::Unknown);
-                if matches!(
+                fcx.self_ty = if matches!(
                     field.storage,
                     FieldStorage::Static(_) | FieldStorage::Const(_)
                 ) {
-                    fcx.self_ty = Ty::Unknown;
-                }
+                    Ty::Unknown
+                } else {
+                    receiver_ty(tcx, owner, ReceiverKind::RefMut)
+                };
                 fcx.check_expr_coerce(init, &expected);
             }
             fcx
         }
         MemberKind::Constructor(ctor) => {
             let mut fcx = FnCtxt::new(tcx, owner, Ty::Void);
+            fcx.self_ty = receiver_ty(tcx, owner, ReceiverKind::RefMut);
             fcx.exceptions = ExceptionScope::declared(tcx.lower_tys(&ctor.throws));
             fcx.declare_params(&ctor.params);
             fcx.check_block(&ctor.body);
@@ -131,9 +135,10 @@ fn check_member<'a, 'tcx>(tcx: &'a Tcx<'tcx>, owner: DefId, member: &Member) -> 
                 .param_env
                 .with_generics(&tcx.generic_params(&method.generics))
                 .with_where_bounds(&tcx.where_bounds(&method.where_clause));
-            if method.receiver.is_none() {
-                fcx.self_ty = Ty::Unknown;
-            }
+            fcx.self_ty = match &method.receiver {
+                Some(receiver) => receiver_ty(tcx, owner, receiver.kind),
+                None => Ty::Unknown,
+            };
             fcx.exceptions = ExceptionScope::declared(tcx.lower_tys(&method.throws));
             fcx.declare_params(&method.params);
             if let Some(body) = &method.body {
@@ -144,6 +149,17 @@ fn check_member<'a, 'tcx>(tcx: &'a Tcx<'tcx>, owner: DefId, member: &Member) -> 
             }
             fcx
         }
+    }
+}
+
+fn receiver_ty(tcx: &Tcx<'_>, owner: DefId, receiver: ReceiverKind) -> Ty {
+    let self_ty = tcx.self_ty(owner);
+    match receiver {
+        ReceiverKind::Owned => self_ty,
+        ReceiverKind::Ref | ReceiverKind::RefMut => Ty::Ref {
+            mutable: receiver == ReceiverKind::RefMut,
+            ty: Box::new(self_ty),
+        },
     }
 }
 
@@ -158,6 +174,7 @@ impl<'a, 'tcx> FnCtxt<'a, 'tcx> {
             locals: HashMap::new(),
             narrowed: Vec::new(),
             yields: Vec::new(),
+            inferred_returns: Vec::new(),
             exceptions: ExceptionScope::default(),
             results: TypeckResults::default(),
         }

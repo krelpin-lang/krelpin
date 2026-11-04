@@ -7,7 +7,7 @@ use krelpin_span::def_id::DefId;
 
 pub type Subst = HashMap<Symbol, Ty>;
 
-#[derive(Clone, Debug, PartialEq, Eq)]
+#[derive(Clone, Debug, PartialEq, Eq, Hash)]
 pub enum Ty {
     Primitive(PrimitiveTy),
     Void,
@@ -51,6 +51,17 @@ impl Ty {
             }
             Ty::Ref { ty, .. } | Ty::Nullable(ty) | Ty::Array(ty) => ty.references_unknown(),
             Ty::Primitive(_) | Ty::Void | Ty::Null | Ty::Param(_) => false,
+        }
+    }
+
+    pub fn mentions_param(&self, name: Symbol) -> bool {
+        match self {
+            Ty::Param(param) => *param == name,
+            Ty::Adt { args, .. } | Ty::External { args, .. } => {
+                args.iter().any(|arg| arg.mentions_param(name))
+            }
+            Ty::Ref { ty, .. } | Ty::Nullable(ty) | Ty::Array(ty) => ty.mentions_param(name),
+            Ty::Primitive(_) | Ty::Void | Ty::Null | Ty::Unknown => false,
         }
     }
 

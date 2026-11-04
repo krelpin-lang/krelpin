@@ -32,7 +32,7 @@ pub fn lower(
             ItemKind::Interface(interface) => &interface.members,
             ItemKind::Enum(def) => &def.members,
         };
-        for member in members {
+        for (index, member) in members.iter().enumerate() {
             let cx = LoweringCtxt {
                 tcx,
                 resolved,
@@ -44,7 +44,7 @@ pub fn lower(
                 rets: Vec::new(),
                 yields: Vec::new(),
             };
-            if let Some(body) = cx.lower_member(member) {
+            if let Some(body) = cx.lower_member(index as u32, member) {
                 hir.bodies.push(body);
             }
         }
@@ -65,7 +65,7 @@ struct LoweringCtxt<'a, 'tcx> {
 }
 
 impl LoweringCtxt<'_, '_> {
-    fn lower_member(mut self, member: &Member) -> Option<Body> {
+    fn lower_member(mut self, index: u32, member: &Member) -> Option<Body> {
         let (name, kind, receiver, params, ret): (_, _, _, &[Param], _) = match &member.kind {
             MemberKind::Type(_) => return None,
             MemberKind::Field(field) => {
@@ -162,6 +162,7 @@ impl LoweringCtxt<'_, '_> {
         };
         Some(Body {
             owner: self.owner,
+            member: index,
             name,
             kind,
             receiver,
@@ -543,7 +544,10 @@ impl LoweringCtxt<'_, '_> {
                 let operand = self.lower_expr(operand);
                 let operand = match op {
                     UnOp::Neg | UnOp::BitNot => coerce(operand, &ty),
-                    _ => operand,
+                    UnOp::Not => operand,
+                    UnOp::PreInc | UnOp::PreDec | UnOp::PostInc | UnOp::PostDec => {
+                        deref_all(operand)
+                    }
                 };
                 ExprKind::Unary {
                     op: *op,
@@ -565,6 +569,18 @@ impl LoweringCtxt<'_, '_> {
             ast::ExprKind::Assign { op, lhs, rhs } => {
                 let place = self.lower_expr(lhs);
                 let value = self.lower_expr(rhs);
+                let writes_through = match (op, &place.ty) {
+                    (None, Ty::Ref { mutable: true, .. }) => {
+                        !matches!(value.ty, Ty::Ref { .. } | Ty::Null | Ty::Unknown)
+                    }
+                    (Some(_), Ty::Ref { .. }) => true,
+                    _ => false,
+                };
+                let place = if writes_through {
+                    deref_all(place)
+                } else {
+                    place
+                };
                 let value = match (op, &value.ty, &place.ty) {
                     (None, _, _) => coerce(value, &place.ty),
                     (Some(_), Ty::Primitive(from), Ty::Primitive(to)) if widens(*from, *to) => {
@@ -717,7 +733,10 @@ impl LoweringCtxt<'_, '_> {
             {
                 (coerce(lhs, ty), coerce(rhs, ty))
             }
-            BinOp::Shl | BinOp::Shr | BinOp::UShr => (coerce(lhs, ty), rhs),
+            BinOp::Shl | BinOp::Shr | BinOp::UShr => {
+                let amount = rhs.ty.strip_refs().clone();
+                (coerce(lhs, ty), coerce(rhs, &amount))
+            }
             BinOp::Elvis => (lhs, coerce(rhs, ty)),
             _ => (lhs, rhs),
         };
@@ -752,6 +771,7 @@ impl LoweringCtxt<'_, '_> {
             }],
             ret: Ty::BOOLEAN,
             packs_varargs: false,
+            subst: self.tcx.subst_for(equatable, std::slice::from_ref(operand)),
         }))
     }
 
@@ -898,6 +918,21 @@ fn coerce(expr: Expr, target: &Ty) -> Expr {
     }
 }
 
+fn deref_all(mut expr: Expr) -> Expr {
+    while let Ty::Ref { ty, .. } = &expr.ty {
+        let inner = ty.as_ref().clone();
+        expr = Expr {
+            ty: inner,
+            span: expr.span,
+            kind: ExprKind::Deref {
+                expr: Box::new(expr),
+                safe: false,
+            },
+        };
+    }
+    expr
+}
+
 fn copy_through_ref(expr: Expr, target: &Ty) -> Expr {
     let is_ref = |ty: &Ty| matches!(ty, Ty::Ref { .. });
     let (inner, safe) = match (&expr.ty, target) {
@@ -923,7 +958,7 @@ fn copy_through_ref(expr: Expr, target: &Ty) -> Expr {
 }
 
 fn promote_operands(lhs: Expr, rhs: Expr) -> (Expr, Expr) {
-    let target = match (&lhs.ty, &rhs.ty) {
+    let target = match (lhs.ty.strip_refs(), rhs.ty.strip_refs()) {
         (Ty::Primitive(a), Ty::Primitive(b)) => promote(*a, *b),
         _ => None,
     };

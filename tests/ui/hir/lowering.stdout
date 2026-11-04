@@ -1,4 +1,4 @@
-field Register.history(this_0: &mut Register) -> ArrayList<Money> = new ArrayList();
+field Register.history(this_0: &mut Register) -> ArrayList<Money> = new ArrayList<Money>();
 
 ctor Register.Register(this_0: &mut Register, count_1: int) -> void {
     this_0.count = count_1;

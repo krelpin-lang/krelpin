@@ -1,0 +1,33 @@
+package std.util;
+
+final class HashSetIterator<T extends Hashable<T>> borrows src implements Iterator<T> {
+    private &HashSet<T> set;
+    private int next;
+
+    HashSetIterator(&HashSet<T> set) keeps set {
+        this.set = set;
+        this.next = 0;
+    }
+
+    boolean hasNext() {
+        int index = this.next;
+        int count = this.set.slotCount();
+        while (index < count && this.set.slotAt(index) == null) {
+            index++;
+        }
+        return index < count;
+    }
+
+    mut &T next() borrows src {
+        int count = this.set.slotCount();
+        while (this.next < count) {
+            int index = this.next;
+            this.next = index + 1;
+            (&T)? slot = this.set.slotAt(index);
+            if (slot != null) {
+                return slot;
+            }
+        }
+        throw new IllegalStateException("the iterator has no more elements");
+    }
+}

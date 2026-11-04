@@ -35,6 +35,7 @@ pub enum BodyKind {
 #[derive(Debug)]
 pub struct Body {
     pub owner: DefId,
+    pub member: u32,
     pub name: Symbol,
     pub kind: BodyKind,
     pub receiver: Option<ReceiverKind>,
