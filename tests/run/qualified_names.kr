@@ -1,0 +1,17 @@
+class Main {
+    static std.lang.String describe(std.util.List<std.lang.String> names) {
+        return names.size() + " names";
+    }
+
+    static void main() {
+        std.util.ArrayList<String> names = new std.util.ArrayList<>();
+        names.add("ada");
+        names.add("grace");
+        Console.println(describe(names));
+        try {
+            throw new std.lang.IllegalStateException("qualified");
+        } catch (std.lang.IllegalStateException error) {
+            Console.println(error.getMessage());
+        }
+    }
+}

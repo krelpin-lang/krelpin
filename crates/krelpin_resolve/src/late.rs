@@ -591,7 +591,7 @@ impl<'a> Resolver<'a> {
 
     fn resolve_type_path(&mut self, segments: &[Ident]) -> Option<DefId> {
         let (first, rest) = segments.split_first()?;
-        let mut def = match self.lookup_type(first.name) {
+        let def = match self.lookup_type(first.name) {
             Some(Res::Item(def)) => {
                 self.resolutions.record(first.span, Res::Item(def));
                 def
@@ -604,8 +604,24 @@ impl<'a> Resolver<'a> {
                 self.resolve_type_name(*first);
                 return None;
             }
-            _ => return None,
+            _ => return self.resolve_qualified_type(segments),
         };
+        self.resolve_nested_types(def, rest)
+    }
+
+    fn resolve_qualified_type(&mut self, segments: &[Ident]) -> Option<DefId> {
+        let (package_len, def) = (1..segments.len()).find_map(|len| {
+            let package = PackagePath::from_idents(&segments[..len]);
+            self.table
+                .lookup(&package, segments[len].name)
+                .map(|def| (len, def))
+        })?;
+        self.resolutions
+            .record(segments[package_len].span, Res::Item(def));
+        self.resolve_nested_types(def, &segments[package_len + 1..])
+    }
+
+    fn resolve_nested_types(&mut self, mut def: DefId, rest: &[Ident]) -> Option<DefId> {
         for segment in rest {
             let Some(nested) = self.table.nested(def, segment.name) else {
                 self.emit(
