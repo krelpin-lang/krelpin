@@ -1,0 +1,35 @@
+class Main {
+    static AtomicInt HITS = new AtomicInt(0);
+    static Mutex<List<String>> LOG = new Mutex<>(new ArrayList<>());
+
+    static void work(String name) {
+        for (int i = 0; i < 1000; i++) {
+            Main.HITS.increment();
+        }
+        MutexGuard<List<String>> guard = Main.LOG.lock();
+        guard.getMut().add(name);
+    }
+
+    static void main() {
+        List<Thread> threads = new ArrayList<>();
+        for (int i = 0; i < 4; i++) {
+            String name = "worker-" + i;
+            Thread thread = new Thread(() -> Main.work(name));
+            thread.start();
+            threads.add(thread);
+        }
+        while (!threads.isEmpty()) {
+            Thread thread = threads.remove(0);
+            thread.join();
+        }
+        Console.println(Main.HITS.get());
+        MutexGuard<List<String>> guard = Main.LOG.lock();
+        Console.println(guard.get().size());
+        AtomicLong total = new AtomicLong(5);
+        Console.println(total.addAndGet(10) + " " + total.compareAndSet(15, 1) + " " + total.get());
+        AtomicBool flag = new AtomicBool(false);
+        flag.set(true);
+        Console.println(flag.get());
+        Thread.sleep(1);
+    }
+}

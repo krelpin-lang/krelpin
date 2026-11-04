@@ -1,0 +1,4 @@
+3
+Add(Num(1), Num(2))
+Node[value=1, next=Node[value=2, next=Node[value=3, next=null]]]
+6

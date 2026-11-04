@@ -130,14 +130,69 @@ pub fn run(args: &Args, sess: &Session) {
         return;
     }
 
-    for emit in &emits {
-        match emit.kind {
-            Emit::Tokens | Emit::Ast | Emit::Hir | Emit::Mir | Emit::Metadata => {}
-            kind => sess.dcx.emit(Diagnostic::error(format!(
-                "`--emit={}` is not supported yet",
-                value_name(kind)
-            ))),
+    let wants_code = |kind: Emit| matches!(kind, Emit::Ir | Emit::Asm | Emit::Obj | Emit::Link);
+    if !emits.iter().any(|emit| wants_code(emit.kind)) {
+        return;
+    }
+    let entry = krelpin_codegen_llvm::find_entry(&mir, &typeck.tcx, |def| {
+        resolved.items.def(def).unit == user_unit
+    });
+    let entry = match entry {
+        Ok(entry) => entry,
+        Err(diagnostic) => {
+            sess.dcx.emit(diagnostic);
+            return;
         }
+    };
+    let Some(ir) = krelpin_codegen_llvm::codegen(&mir, &typeck.tcx, entry, &sess.dcx) else {
+        return;
+    };
+    let runtime_dir = sysroot.root().join("library/runtime");
+    for emit in emits.iter().filter(|emit| wants_code(emit.kind)) {
+        let path = output_path(args, emit);
+        if emit.kind == Emit::Ir {
+            write_output(sess, Some(&path), &ir);
+            continue;
+        }
+        let kind = match emit.kind {
+            Emit::Asm => krelpin_codegen_llvm::OutputKind::Asm,
+            Emit::Obj => krelpin_codegen_llvm::OutputKind::Object,
+            _ => krelpin_codegen_llvm::OutputKind::Executable,
+        };
+        let options = krelpin_codegen_llvm::LinkOptions {
+            runtime_dir: &runtime_dir,
+            opt_level: args.opt_level(),
+            debuginfo: args.debuginfo_level() > 0,
+            output: &path,
+            kind,
+        };
+        if let Err(message) = krelpin_codegen_llvm::link(&ir, &options) {
+            sess.dcx
+                .emit(Diagnostic::error(format!("linking failed: {message}")));
+        }
+    }
+}
+
+fn output_path(args: &Args, emit: &Spec<Emit>) -> std::path::PathBuf {
+    if let Some(path) = &emit.path {
+        return path.clone();
+    }
+    if let Some(path) = &args.output {
+        return path.clone();
+    }
+    let extension = match emit.kind {
+        Emit::Ir => "ll",
+        Emit::Asm => "s",
+        Emit::Obj => "o",
+        _ => "",
+    };
+    let mut name = args.crate_name();
+    if !extension.is_empty() {
+        name = format!("{name}.{extension}");
+    }
+    match &args.out_dir {
+        Some(dir) => dir.join(name),
+        None => std::path::PathBuf::from(name),
     }
 }
 

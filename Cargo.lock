@@ -134,12 +134,26 @@ dependencies = [
 ]
 
 [[package]]
+name = "krelpin_codegen_llvm"
+version = "0.1.0"
+dependencies = [
+ "krelpin_ast",
+ "krelpin_errors",
+ "krelpin_hir",
+ "krelpin_lexer",
+ "krelpin_mir",
+ "krelpin_span",
+ "krelpin_typeck",
+]
+
+[[package]]
 name = "krelpin_driver"
 version = "0.1.0"
 dependencies = [
  "clap",
  "krelpin_ast",
  "krelpin_borrowck",
+ "krelpin_codegen_llvm",
  "krelpin_errors",
  "krelpin_expand",
  "krelpin_hir",

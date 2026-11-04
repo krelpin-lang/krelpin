@@ -1,0 +1,133 @@
+record Person(String name, int age) {}
+
+class Counter {
+    public static AtomicInt CREATED = new AtomicInt(0);
+    public const int LIMIT = 3;
+
+    private int value;
+
+    Counter() {
+        Counter.CREATED.increment();
+    }
+
+    mut int next() {
+        this.value += 1;
+        return this.value;
+    }
+}
+
+class Main {
+    static String describe(Object? value) {
+        if (value == null) {
+            return "nothing";
+        }
+        if (value instanceof String text) {
+            return "text of length " + text.length();
+        }
+        if (value instanceof Person person) {
+            return "person " + person.name;
+        }
+        return "something else: " + value;
+    }
+
+    static String grade(int score) {
+        return switch (score / 10) {
+            case 10, 9 -> "A";
+            case 8 -> "B";
+            case 7 -> "C";
+            default -> "F";
+        };
+    }
+
+    static int dayNumber(String day) {
+        switch (day) {
+            case "mon" -> {
+                return 1;
+            }
+            case "tue" -> {
+                return 2;
+            }
+            default -> {
+                return 0;
+            }
+        }
+    }
+
+    static void main() {
+        Map<String, int> ages = new HashMap<>();
+        ages.put("Ali", 30);
+        ages.put("Ayse", 25);
+        ages.put("Ali", 31);
+        Console.println(ages.size());
+        int? ali = ages.get("Ali");
+        Console.println(ali);
+        Console.println(ages.get("Mehmet"));
+        Console.println(ages.containsKey("Ayse"));
+        int? removed = ages.remove("Ayse");
+        Console.println(removed);
+        Console.println(ages.size());
+        for (&String key : ages.keySet()) {
+            Console.println("key " + key);
+        }
+        Set<String> seen = new HashSet<>();
+        Console.println(seen.add("x"));
+        Console.println(seen.add("x"));
+        Console.println(seen.contains("x"));
+        Console.println(seen.isEmpty());
+        for (&String item : seen) {
+            Console.println("item " + item);
+        }
+        List<Person> people = new ArrayList<>();
+        people.add(new Person("Zeynep", 41));
+        people.add(new Person("Can", 19));
+        people.add(1, new Person("Deniz", 33));
+        Console.println(people.size());
+        Console.println(people.get(1));
+        Person last = people.remove(2);
+        Console.println(last);
+        Console.println(people.indexOf(&new Person("Deniz", 33)));
+        Console.println(people.contains(&new Person("Nobody", 1)));
+        String text = "  Merhaba Dünya  ";
+        String trimmed = text.trim();
+        Console.println(trimmed + "|" + trimmed.length());
+        Console.println(trimmed.toUpperCase());
+        Console.println(trimmed.substring(0, 7));
+        Console.println(trimmed.indexOf("Dünya"));
+        Console.println(trimmed.replace("a", "4"));
+        Console.println("ab".repeat(3));
+        String[] parts = "a,b,c".split(",");
+        Console.println(parts.length + " " + parts[2]);
+        Console.println(String.join("-", "x", "y", "z"));
+        Console.println("abc".compareTo(&"abd"));
+        Console.println("abc".hashCode());
+        Console.println(trimmed.startsWith("Mer") + " " + trimmed.endsWith("x"));
+        char[] chars = "héllo".chars();
+        Console.println(chars.length + " " + chars[1]);
+        Console.println(int.parse("123") + 1);
+        try {
+            int.parse("12x");
+        } catch (NumberFormatException e) {
+            Console.println(e.getMessage());
+        }
+        Console.println(describe(null));
+        Console.println(describe("hey"));
+        Console.println(describe(new Person("Ece", 7)));
+        Console.println(describe(42));
+        Console.println(grade(95) + grade(81) + grade(42));
+        Console.println(dayNumber("tue") + dayNumber("sun"));
+        Counter a = new Counter();
+        Counter b = new Counter();
+        Console.println(a.next() + a.next() + b.next());
+        Console.println(Counter.CREATED.get() + " " + Counter.LIMIT);
+        String? maybe = null;
+        Console.println(maybe ?: "default");
+        maybe = "set";
+        Console.println(maybe?.length());
+        Console.println(Math.sqrt(16.0) + " " + Math.max(3, 7) + " " + Math.abs(-2.5));
+        Console.println(Math.round(2.5) + " " + Math.floor(-1.5));
+        double d = 10;
+        float f = 1.5f;
+        Console.println(d / 4 + " " + f * 2);
+        Console.println((int) 3.99 + " " + (long) -2.5 + " " + (char) 66);
+    }
+}

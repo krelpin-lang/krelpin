@@ -1,0 +1,5 @@
+caught bottom reached
+inner finally
+outer caught inner
+String cannot be cast to Resource
+about to fail

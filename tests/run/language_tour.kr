@@ -1,0 +1,95 @@
+record Point(int x, int y) {}
+
+enum Color { RED, GREEN, BLUE }
+
+enum Shape {
+    Circle(double radius),
+    Rect(double width, double height)
+}
+
+abstract class Animal {
+    protected String name;
+
+    Animal(String name) {
+        this.name = name;
+    }
+
+    abstract String sound();
+
+    String describe() {
+        return this.name + " says " + this.sound();
+    }
+}
+
+class Dog extends Animal {
+    Dog(String name) {
+        super(name);
+    }
+
+    String sound() {
+        return "woof";
+    }
+}
+
+class Cat extends Animal {
+    private int lives = 9;
+
+    Cat(String name) {
+        super(name);
+    }
+
+    String sound() {
+        return "meow (" + this.lives + " lives)";
+    }
+}
+
+class Main {
+    static double area(Shape shape) {
+        return switch (shape) {
+            case Circle(double r) -> Math.PI * r * r;
+            case Rect(double w, double h) -> w * h;
+        };
+    }
+
+    static int fib(int n) {
+        if (n < 2) {
+            return n;
+        }
+        return fib(n - 1) + fib(n - 2);
+    }
+
+    static void main() {
+        Point p = new Point(1, 2);
+        Point q = p with { x = 5 };
+        Console.println(p);
+        Console.println(q);
+        Console.println(p == q);
+        Console.println(p.equals(&new Point(1, 2)));
+        Color c = Color.GREEN;
+        Console.println(c);
+        Console.println(c.ordinal());
+        Console.println(c.name());
+        Console.println(area(Shape.Circle(1.0)));
+        Console.println(area(Shape.Rect(2.0, 3.5)));
+        List<Animal> animals = new ArrayList<>();
+        animals.add(new Dog("Rex"));
+        animals.add(new Cat("Tom"));
+        for (&Animal animal : animals) {
+            Console.println(animal.describe());
+        }
+        Console.println(fib(20));
+        int[] numbers = {5, 3, 8, 1};
+        int sum = 0;
+        for (int n : numbers) {
+            sum += n;
+        }
+        Console.println("sum=" + sum + " len=" + numbers.length);
+        long big = 1L << 40;
+        Console.println(big);
+        Console.println(7 / 2 + " " + 7 % 3 + " " + (-7 / 2) + " " + 7.0 / 2);
+        char ch = 'A';
+        ch++;
+        Console.println(ch);
+        Console.println(Color.values().length);
+    }
+}

@@ -1,0 +1,29 @@
+enum Expr {
+    Num(int value),
+    Add(Expr left, Expr right)
+}
+record Node(int value, Node? next) {}
+class Main {
+    static int eval(&Expr e) {
+        return switch (e) {
+            case Num(int v) -> v;
+            case Add(Expr l, Expr r) -> eval(&l) + eval(&r);
+        };
+    }
+    static int sum(&Node node) {
+        int rest = 0;
+        if (node.next instanceof Node next) {
+            rest = sum(&next);
+        }
+        return node.value + rest;
+    }
+
+    static void main() {
+        Expr e = Expr.Add(Expr.Num(1), Expr.Num(2));
+        Console.println(eval(&e));
+        Console.println(&e);
+        Node list = new Node(1, new Node(2, new Node(3, null)));
+        Console.println(&list);
+        Console.println(sum(&list));
+    }
+}

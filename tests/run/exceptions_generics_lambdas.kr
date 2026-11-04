@@ -1,0 +1,115 @@
+import std.function.Function;
+import std.function.Supplier;
+import std.function.Consumer;
+
+class InsufficientFunds extends Exception {
+    InsufficientFunds(String message) {
+        super(message);
+    }
+}
+
+class Account {
+    private int balance;
+
+    Account(int balance) {
+        this.balance = balance;
+    }
+
+    mut void withdraw(int amount) throws InsufficientFunds {
+        if (amount > this.balance) {
+            throw new InsufficientFunds("need " + amount + " but have " + this.balance);
+        }
+        this.balance -= amount;
+    }
+
+    int balance() {
+        return this.balance;
+    }
+}
+
+class Box<T> {
+    private T value;
+
+    Box(T value) {
+        this.value = value;
+    }
+
+    &T get() {
+        return &this.value;
+    }
+
+    <R> Box<R> map(Function<&T, R> f) {
+        return new Box<>(f.apply(&this.value));
+    }
+}
+
+interface Greeter {
+    String name();
+
+    String greet() {
+        return "Hello, " + this.name() + "!";
+    }
+}
+
+class English implements Greeter {
+    String name() {
+        return "world";
+    }
+}
+
+class Main {
+    static <T extends Comparable<T>> &T max(&T a, &T b) borrows a, b {
+        return a.compareTo(b) >= 0 ? a : b;
+    }
+
+    static int divide(int a, int b) {
+        return a / b;
+    }
+
+    static void main() {
+        Account account = new Account(100);
+        try {
+            account.withdraw(30);
+            account.withdraw(100);
+            Console.println("unreachable");
+        } catch (InsufficientFunds e) {
+            Console.println("caught: " + e.getMessage());
+        } finally {
+            Console.println("balance: " + account.balance());
+        }
+        try {
+            Console.println(divide(1, 0));
+        } catch (ArithmeticException e) {
+            Console.println("arith: " + e.getMessage());
+        }
+        try {
+            int[] xs = new int[3];
+            xs[5] = 1;
+        } catch (IndexOutOfBoundsException e) {
+            Console.println("index: " + e.getMessage());
+        }
+        Box<String> box = new Box<>("krelpin");
+        Box<int> lengths = box.map(s -> s.length());
+        Console.println(lengths.get());
+        Console.println(max(&3, &9));
+        Console.println(max(&"apple", &"banana"));
+        Greeter greeter = new English();
+        Console.println(greeter.greet());
+        int counter = 0;
+        Runnable bump = () -> counter += 1;
+        bump.run();
+        bump.run();
+        Console.println("counter=" + counter);
+        int base = 10;
+        Function<int, int> add = x -> x + base;
+        Console.println(add.apply(5));
+        Supplier<String> hello = () -> "hi";
+        Console.println(hello.get());
+        Function<String, int> len = String::length;
+        Console.println(len.apply("four"));
+        List<String> names = new ArrayList<>();
+        names.add("b");
+        names.add("a");
+        names.forEach(name -> Console.println("name " + name));
+    }
+}

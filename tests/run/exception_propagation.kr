@@ -1,0 +1,49 @@
+class Resource {
+    private String name;
+
+    Resource(String name) {
+        this.name = name;
+    }
+
+    String name() {
+        return this.name;
+    }
+}
+
+class Main {
+    static int depth(int n) {
+        List<Resource> held = new ArrayList<>();
+        held.add(new Resource("level " + n));
+        if (n == 0) {
+            throw new IllegalStateException("bottom reached");
+        }
+        return depth(n - 1) + held.size();
+    }
+
+    static void main() {
+        try {
+            depth(5);
+        } catch (IllegalStateException e) {
+            Console.println("caught " + e.getMessage());
+        }
+        try {
+            try {
+                throw new RuntimeException("inner");
+            } finally {
+                Console.println("inner finally");
+            }
+        } catch (RuntimeException e) {
+            Console.println("outer caught " + e.getMessage());
+        }
+        Object value = "text";
+        try {
+            Resource r = (Resource) value;
+            Console.println(r.name());
+        } catch (ClassCastException e) {
+            Console.println(e.getMessage());
+        }
+        Console.println("about to fail");
+        depth(2);
+        Console.println("never printed");
+    }
+}

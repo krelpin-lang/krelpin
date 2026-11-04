@@ -1,0 +1,16 @@
+blob with area 0.0
+square with area 4.0
+cube with area 6.0
+Range[start=3, end=10] has length 7
+rejected: start must not exceed end
+b a null 0
+0 1 6
+12 -1
+finally runs
+1
+total 18
+n 10
+even odd
+1
+>> hi
+true false

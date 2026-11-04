@@ -1,0 +1,167 @@
+import std.function.Function;
+import std.function.Supplier;
+import std.function.Predicate;
+
+class Shape {
+    protected String label;
+
+    Shape(String label) {
+        this.label = label;
+    }
+
+    double area() {
+        return 0.0;
+    }
+
+    String show() {
+        return this.label + " with area " + this.area();
+    }
+}
+
+class Square extends Shape {
+    private double side;
+
+    Square(double side) {
+        super("square");
+        this.side = side;
+    }
+
+    double area() {
+        return this.side * this.side;
+    }
+}
+
+class Cube extends Square {
+    Cube(double side) {
+        super(side);
+        this.label = "cube";
+    }
+
+    double area() {
+        return super.area() * 6;
+    }
+}
+
+record Range(int start, int end) {
+    Range {
+        if (start > end) {
+            throw new IllegalArgumentException("start must not exceed end");
+        }
+    }
+
+    int length() {
+        return this.end - this.start;
+    }
+}
+
+interface Stack<T> {
+    mut void push(T value);
+    mut T? pop();
+    int size();
+}
+
+class ArrayStack<T> implements Stack<T> {
+    private List<T> items = new ArrayList<>();
+
+    mut void push(T value) {
+        this.items.add(value);
+    }
+
+    mut T? pop() {
+        if (this.items.size() == 0) {
+            return null;
+        }
+        return this.items.remove(this.items.size() - 1);
+    }
+
+    int size() {
+        return this.items.size();
+    }
+}
+
+class Main {
+    static int sum(int... values) {
+        int total = 0;
+        for (int value : values) {
+            total += value;
+        }
+        return total;
+    }
+
+    static String classify(int n) {
+        return n % 2 == 0 ? "even" : "odd";
+    }
+
+    static int findFirst(&int[][] grid, int target) {
+        for (int row = 0; row < grid.length; row++) {
+            for (int col = 0; col < grid[row].length; col++) {
+                if (grid[row][col] == target) {
+                    return row * 10 + col;
+                }
+            }
+        }
+        return -1;
+    }
+
+    static int tryFinally() {
+        int x = 1;
+        try {
+            return x;
+        } finally {
+            Console.println("finally runs");
+        }
+    }
+
+    static void main() {
+        List<Shape> shapes = new ArrayList<>();
+        shapes.add(new Shape("blob"));
+        shapes.add(new Square(2.0));
+        shapes.add(new Cube(1.0));
+        for (&Shape shape : shapes) {
+            Console.println(shape.show());
+        }
+        Range range = new Range(3, 10);
+        Console.println(range + " has length " + range.length());
+        try {
+            Range bad = new Range(5, 1);
+            Console.println(bad);
+        } catch (IllegalArgumentException e) {
+            Console.println("rejected: " + e.getMessage());
+        }
+        Stack<String> stack = new ArrayStack<>();
+        stack.push("a");
+        stack.push("b");
+        Console.println(stack.pop() + " " + stack.pop() + " " + stack.pop() + " " + stack.size());
+        Console.println(sum() + " " + sum(1) + " " + sum(1, 2, 3));
+        int[][] grid = {{1, 2}, {3, 4, 5}, {}};
+        Console.println(findFirst(&grid, 5) + " " + findFirst(&grid, 9));
+        Console.println(tryFinally());
+        int total = 0;
+        for (int i = 0; i < 10; i++) {
+            if (i == 3) {
+                continue;
+            }
+            if (i == 7) {
+                break;
+            }
+            total += i;
+        }
+        Console.println("total " + total);
+        int n = 0;
+        do {
+            n += 2;
+        } while (n < 9);
+        Console.println("n " + n);
+        Function<int, String> parity = Main::classify;
+        Console.println(parity.apply(4) + " " + parity.apply(7));
+        Supplier<ArrayStack<int>> factory = ArrayStack::new;
+        ArrayStack<int> fresh = factory.get();
+        fresh.push(9);
+        Console.println(fresh.size());
+        String prefix = ">> ";
+        Function<String, String> decorate = s -> prefix + s;
+        Console.println(decorate.apply("hi"));
+        Predicate<String> empty = String::isEmpty;
+        Console.println(empty.test("") + " " + empty.test("x"));
+    }
+}
