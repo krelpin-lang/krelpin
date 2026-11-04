@@ -6,7 +6,7 @@ error: `pick` returns a value borrowed from `b`, but its signature only borrows 
 18 |         return b;
    |         ^^^^^^^^^ this borrows from `b`
    |
-   = help: list `b` among the borrow sources: `[a, b]`
+   = help: add `b` to the borrow sources: `borrows a, b`
 
 error: cannot borrow `names` as mutable because it is also borrowed as shared
   --> tests/ui/borrowck/borrow_sources.kr:27:9
@@ -34,7 +34,7 @@ error: `name` returns a value borrowed from `this`, but its signature only borro
 73 |         return &this.name;
    |         ^^^^^^^^^^^^^^^^^^ this borrows from `this`
    |
-   = help: list `this` among the borrow sources: `[src, this]`
+   = help: add `this` to the borrow sources: `borrows src, this`
 
 error: `text` does not live long enough
   --> tests/ui/borrowck/borrow_sources.kr:92:33

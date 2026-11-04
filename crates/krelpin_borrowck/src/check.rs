@@ -149,14 +149,7 @@ impl<'a, 'tcx> Checker<'a, 'tcx> {
             let (local, contents) = match loan.origin {
                 LoanOrigin::Arg(local) => (local, false),
                 LoanOrigin::ArgContents(local) => (local, true),
-                LoanOrigin::Local => {
-                    let local = base_local(&loan.place)?;
-                    let is_arg = local.index() >= 1 && local.index() <= self.body.arg_count;
-                    if !is_arg || !has_deref(&loan.place) {
-                        return None;
-                    }
-                    (local, false)
-                }
+                LoanOrigin::Local => return None,
             };
             let permitted = allowed.iter().any(|source| match *source {
                 ReturnSource::Whole(allowed) => allowed == local,
@@ -200,7 +193,7 @@ impl<'a, 'tcx> Checker<'a, 'tcx> {
         .with_label(format!("this borrows from `{borrowed}`"))
         .with_secondary(loan.span, format!("`{borrowed}` comes in here"))
         .with_help(format!(
-            "list `{borrowed}` among the borrow sources: `[{}]`",
+            "add `{borrowed}` to the borrow sources: `borrows {}`",
             sources.join(", ")
         ));
         self.emit(span, diagnostic);
@@ -219,16 +212,7 @@ impl<'a, 'tcx> Checker<'a, 'tcx> {
                 let (local, contents) = match loan.origin {
                     LoanOrigin::Arg(local) => (local, false),
                     LoanOrigin::ArgContents(local) => (local, true),
-                    LoanOrigin::Local => match base_local(&loan.place) {
-                        Some(local)
-                            if has_deref(&loan.place)
-                                && local.index() >= 1
-                                && local.index() <= self.body.arg_count =>
-                        {
-                            (local, false)
-                        }
-                        _ => continue,
-                    },
+                    LoanOrigin::Local => continue,
                 };
                 if local == target {
                     continue;

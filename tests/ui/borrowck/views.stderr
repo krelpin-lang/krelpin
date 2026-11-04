@@ -1,0 +1,30 @@
+error: `search` does not live long enough
+  --> tests/ui/borrowck/views.kr:52:20
+   |
+52 |             best = search.first();
+   |                    ^^^^^^^^^^^^^^ borrowed value does not live long enough
+53 |         }
+   |          - `search` stops existing here while still borrowed
+
+error: cannot borrow `products` as mutable because it is also borrowed as shared
+  --> tests/ui/borrowck/views.kr:60:9
+   |
+58 |         Cheapest search = new Cheapest(&products);
+   |                                        --------- shared borrow of `products` happens here
+...
+60 |         products.add(new Product("silgi", 5));
+   |         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ mutable borrow happens here
+61 |         Console.println(best.name);
+   |         -------------------------- the borrow is used later here
+
+error: `products` does not live long enough
+  --> tests/ui/borrowck/views.kr:69:44
+   |
+69 |             Cheapest search = new Cheapest(&products);
+   |                                            ^^^^^^^^^ borrowed value does not live long enough
+...
+71 |         }
+   |          - `products` stops existing here while still borrowed
+
+error: aborting due to 3 previous errors
+

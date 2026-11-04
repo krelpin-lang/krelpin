@@ -2,14 +2,15 @@ use std::collections::{HashMap, HashSet};
 
 use krelpin_ast::ast::ReceiverKind;
 use krelpin_mir::{
-    AggregateKind, BasicBlock, Body, Local, Operand, Place, Rvalue, StatementKind, TerminatorKind,
+    AggregateKind, BasicBlock, Body, Local, Operand, Place, PlaceElem, Rvalue, StatementKind,
+    TerminatorKind,
 };
 use krelpin_span::Span;
 use krelpin_typeck::{BorrowSource, Callee, Storage, Ty};
 
 use crate::bitset::BitSet;
 use crate::dataflow::{Forward, Location};
-use crate::places::{PlaceTys, base_local, has_deref, operand_place};
+use crate::places::{PlaceTys, base_local, operand_place};
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub(crate) enum LoanOrigin {
@@ -65,7 +66,7 @@ impl<'a, 'tcx> LoanData<'a, 'tcx> {
             let Ty::Ref { mutable, .. } = decl.ty else {
                 continue;
             };
-            let place = Place::local(local).project(krelpin_mir::PlaceElem::Deref);
+            let place = Place::local(local).project(PlaceElem::Deref);
             arg_loans.push((local, loans.len()));
             loans.push(Loan {
                 place: place.clone(),
@@ -124,23 +125,37 @@ impl<'a, 'tcx> LoanData<'a, 'tcx> {
     }
 
     fn operand_loans(&self, state: &Holdings, operand: &Operand) -> BitSet {
-        let Some(place) = operand_place(operand) else {
-            return BitSet::new(self.loans.len());
-        };
+        match operand_place(operand) {
+            Some(place) => self.place_loans(state, place),
+            None => BitSet::new(self.loans.len()),
+        }
+    }
+
+    fn place_loans(&self, state: &Holdings, place: &Place) -> BitSet {
+        self.place_loans_within(state, place, &mut BitSet::new(self.loans.len()))
+    }
+
+    fn place_loans_within(&self, state: &Holdings, place: &Place, active: &mut BitSet) -> BitSet {
         let Some(local) = base_local(place) else {
             return BitSet::new(self.loans.len());
         };
-        if has_deref(place) {
-            self.contents(state, &state[local.index()])
-        } else {
-            state[local.index()].clone()
+        match referent(place) {
+            Some(reference) => {
+                let references = self.place_loans_within(state, &reference, active);
+                self.contents_within(state, &references, active)
+            }
+            None => state[local.index()].clone(),
         }
     }
 
     fn contents(&self, state: &Holdings, held: &BitSet) -> BitSet {
+        self.contents_within(state, held, &mut BitSet::new(self.loans.len()))
+    }
+
+    fn contents_within(&self, state: &Holdings, held: &BitSet, active: &mut BitSet) -> BitSet {
         let mut contents = BitSet::new(self.loans.len());
-        for loan in held.iter() {
-            let loan = &self.loans[loan];
+        for index in held.iter() {
+            let loan = &self.loans[index];
             match loan.origin {
                 LoanOrigin::Arg(local) | LoanOrigin::ArgContents(local) => {
                     if let Some(&index) = self.contents_loans.get(&local) {
@@ -148,9 +163,12 @@ impl<'a, 'tcx> LoanData<'a, 'tcx> {
                     }
                 }
                 LoanOrigin::Local => {
-                    if let Some(local) = base_local(&loan.place) {
-                        contents.union(&state[local.index()]);
+                    if active.contains(index) {
+                        continue;
                     }
+                    active.insert(index);
+                    contents.union(&self.place_loans_within(state, &loan.place, active));
+                    active.remove(index);
                 }
             }
         }
@@ -164,10 +182,8 @@ impl<'a, 'tcx> LoanData<'a, 'tcx> {
                 if let Some(&loan) = self.at.get(&location) {
                     held.insert(loan);
                 }
-                if has_deref(place)
-                    && let Some(local) = base_local(place)
-                {
-                    held.union(&state[local.index()]);
+                if let Some(reference) = referent(place) {
+                    held.union(&self.place_loans(state, &reference));
                 }
             }
             Rvalue::Use(operand) | Rvalue::Cast(operand, _) => {
@@ -451,6 +467,17 @@ impl LoanData<'_, '_> {
             contents,
         }
     }
+}
+
+fn referent(place: &Place) -> Option<Place> {
+    let at = place
+        .projection
+        .iter()
+        .rposition(|elem| matches!(elem, PlaceElem::Deref))?;
+    Some(Place {
+        base: place.base,
+        projection: place.projection[..at].to_vec(),
+    })
 }
 
 fn contains_param(ty: &Ty) -> bool {

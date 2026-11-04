@@ -1,0 +1,74 @@
+package shop;
+
+import std.util.List;
+import std.util.ArrayList;
+
+class Product {
+    public String name;
+    public int price;
+
+    Product(String name, int price) {
+        this.name = name;
+        this.price = price;
+    }
+}
+
+class Cheapest borrows products {
+    &List<Product> products;
+
+    Cheapest(&List<Product> products) keeps products {
+        this.products = products;
+    }
+
+    &Product find() borrows products {
+        &Product best = this.products.get(0);
+        for (&Product p : this.products) {
+            if (p.price < best.price) {
+                best = p;
+            }
+        }
+        return best;
+    }
+
+    &Product first() {
+        return this.products.get(0);
+    }
+}
+
+class Main {
+    static void outlivesTheSearch(List<Product> products) {
+        &Product best;
+        {
+            Cheapest search = new Cheapest(&products);
+            best = search.find();
+        }
+        Console.println(best.name);
+    }
+
+    static void outlivesTheSearcher(List<Product> products) {
+        &Product best;
+        {
+            Cheapest search = new Cheapest(&products);
+            best = search.first();
+        }
+        Console.println(best.name);
+    }
+
+    static void changedWhileSearched(List<Product> products) {
+        Cheapest search = new Cheapest(&products);
+        &Product best = search.find();
+        products.add(new Product("silgi", 5));
+        Console.println(best.name);
+    }
+
+    static void outlivesTheProducts() {
+        &Product best;
+        {
+            List<Product> products = new ArrayList<>();
+            products.add(new Product("kalem", 10));
+            Cheapest search = new Cheapest(&products);
+            best = search.find();
+        }
+        Console.println(best.name);
+    }
+}
