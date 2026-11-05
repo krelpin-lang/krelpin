@@ -1,5 +1,7 @@
 package shop;
 
+import std.util.ArrayList;
+
 record Money(long cents, String currency) {}
 
 enum Payment {

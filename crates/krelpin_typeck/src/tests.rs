@@ -16,7 +16,8 @@ fn diagnostics(src: &str) -> Vec<Diagnostic> {
 
 fn check_str(src: &str) -> (crate::TypeckResults, Vec<Diagnostic>, SourceMap) {
     let source_map = SourceMap::new();
-    let file = source_map.new_source_file("test.kr", src.to_owned());
+    let src = format!("import std.sync.*;\nimport std.util.*;\n{src}");
+    let file = source_map.new_source_file("test.kr", src.clone());
     let buffer = DiagnosticBuffer::default();
     let dcx = DiagCtxt::new(buffer.clone());
 
@@ -1723,7 +1724,11 @@ fn results_record_callees_and_fields() {
         let mut spans: Vec<_> = results
             .callees
             .iter()
-            .filter(|(span, _)| (span.hi.0 as usize) <= src.len())
+            .filter(|(span, _)| {
+                source_map
+                    .lookup_char_pos(span.lo)
+                    .is_some_and(|loc| loc.file.name.as_os_str() == "test.kr")
+            })
             .filter(|(span, _)| source_map.span_to_snippet(**span).as_deref() == Some(name))
             .map(|(_, callee)| callee.clone())
             .collect();

@@ -1,59 +1,59 @@
 error: no method named `lenght` found for `String`
- --> tests/ui/typeck/library_errors.kr:4:25
+ --> tests/ui/typeck/library_errors.kr:9:25
   |
-4 |         int size = name.lenght();
+9 |         int size = name.lenght();
   |                         ^^^^^^ method not found
 
 error: mismatched types
- --> tests/ui/typeck/library_errors.kr:5:38
-  |
-5 |         String part = name.substring("0");
-  |                                      ^^^ expected `int`, found `String`
+  --> tests/ui/typeck/library_errors.kr:10:38
+   |
+10 |         String part = name.substring("0");
+   |                                      ^^^ expected `int`, found `String`
 
 error: mismatched types
- --> tests/ui/typeck/library_errors.kr:8:19
-  |
-8 |         names.add(42);
-  |                   ^^ expected `String`, found `int`
+  --> tests/ui/typeck/library_errors.kr:13:19
+   |
+13 |         names.add(42);
+   |                   ^^ expected `String`, found `int`
 
 error: mismatched types
- --> tests/ui/typeck/library_errors.kr:9:21
-  |
-9 |         int count = names.get(0);
-  |                     ^^^^^^^^^^^^ expected `int`, found `&String`
+  --> tests/ui/typeck/library_errors.kr:14:21
+   |
+14 |         int count = names.get(0);
+   |                     ^^^^^^^^^^^^ expected `int`, found `&String`
 
 error: cannot index into a value of type `List<String>`
-  --> tests/ui/typeck/library_errors.kr:10:25
+  --> tests/ui/typeck/library_errors.kr:15:25
    |
-10 |         String second = names[1];
+15 |         String second = names[1];
    |                         ^^^^^
    |
    = help: use `.get(index)` instead
 
 error: cannot iterate over a value of type `Map<String, int>`
-  --> tests/ui/typeck/library_errors.kr:13:27
+  --> tests/ui/typeck/library_errors.kr:18:27
    |
-13 |         for (String key : ages) {}
+18 |         for (String key : ages) {}
    |                           ^^^^
    |
    = note: `for` loops work with arrays and types that implement `Iterable`
 
 error: mismatched types
-  --> tests/ui/typeck/library_errors.kr:15:19
+  --> tests/ui/typeck/library_errors.kr:20:19
    |
-15 |         int big = 5L;
+20 |         int big = 5L;
    |                   ^^ expected `int`, found `long`
 
 error: constructor `Console` of `Console` is private
-  --> tests/ui/typeck/library_errors.kr:16:27
+  --> tests/ui/typeck/library_errors.kr:21:27
    |
-16 |         Console console = new Console();
+21 |         Console console = new Console();
    |                           ^^^^^^^^^^^^^ private constructor
 
 error: mismatched types
-  --> tests/ui/typeck/library_errors.kr:17:23
+  --> tests/ui/typeck/library_errors.kr:22:23
    |
-17 |         String line = Console.readLine();
+22 |         String line = Console.readLine();
    |                       ^^^^^^^^^^^^^^^^^^ expected `String`, found `String?`
    |
    = help: this value may be `null`; use `?:` to give a default, or check `!= null` first

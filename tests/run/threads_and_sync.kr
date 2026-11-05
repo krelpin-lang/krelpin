@@ -1,3 +1,11 @@
+import std.sync.AtomicBool;
+import std.sync.AtomicInt;
+import std.sync.AtomicLong;
+import std.sync.Mutex;
+import std.sync.MutexGuard;
+import std.util.ArrayList;
+import std.util.List;
+
 class Main {
     static AtomicInt HITS = new AtomicInt(0);
     static Mutex<List<String>> LOG = new Mutex<>(new ArrayList<>());

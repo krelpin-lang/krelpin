@@ -1,3 +1,6 @@
+import std.util.ArrayList;
+import std.util.List;
+
 record Point(int x, int y) {}
 
 enum Color { RED, GREEN, BLUE }

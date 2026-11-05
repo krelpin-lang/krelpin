@@ -1,5 +1,7 @@
 package geometry;
 
+import std.util.HashSet;
+
 enum Shape {
     Circle(double radius),
     Rect(double width, double height),

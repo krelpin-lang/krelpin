@@ -154,7 +154,8 @@ fn equality_of_objects_calls_equals() {
 #[test]
 fn closures_list_their_captures() {
     assert_lowers_to(
-        "class Counter { int count; mut void bump() { this.count++; } }\n\
+        "import std.util.List;\n\
+         class Counter { int count; mut void bump() { this.count++; } }\n\
          class A { static int f(List<int> numbers, Counter counter) {\n\
          \x20   int offset = 1;\n\
          \x20   int calls = 0;\n\

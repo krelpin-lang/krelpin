@@ -1,6 +1,8 @@
 import std.function.Function;
 import std.function.Supplier;
 import std.function.Consumer;
+import std.util.ArrayList;
+import std.util.List;
 
 class InsufficientFunds extends Exception {
     InsufficientFunds(String message) {

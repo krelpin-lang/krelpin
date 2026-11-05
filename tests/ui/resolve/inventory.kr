@@ -1,6 +1,9 @@
 package shop;
 
 import shop.money.Price;
+import std.sync.AtomicInt;
+import std.util.ArrayList;
+import std.util.List;
 
 interface Priced {
     &Price price();

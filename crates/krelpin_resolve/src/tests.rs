@@ -334,7 +334,7 @@ fn catch_and_lambda_parameters() {
     assert_eq!(
         in_method(
             "try { arg = 1; } catch (Exception e) { Console.println(e); } \
-             List<int> xs = null; xs.forEach(x -> Console.println(x + arg));"
+             std.util.List<int> xs = null; xs.forEach(x -> Console.println(x + arg));"
         ),
         Vec::<String>::new()
     );
@@ -342,21 +342,53 @@ fn catch_and_lambda_parameters() {
 
 #[test]
 fn prelude_types_come_from_the_standard_library() {
-    let resolved = resolve_str(
-        "class A { List<String> names; AtomicInt count; Object any; Comparable<A> order; }",
-    );
+    let resolved = resolve_str("class A { String name; Object any; Comparable<A> order; }");
     assert_eq!(resolved.errors, Vec::<String>::new());
-    assert_eq!(
-        resolved.res_at("List", 0),
-        resolved.std_type("std.util.List")
-    );
     assert_eq!(
         resolved.res_at("String", 0),
         resolved.std_type("std.lang.String")
     );
     assert_eq!(
-        resolved.res_at("AtomicInt", 0),
+        resolved.res_at("Comparable", 0),
+        resolved.std_type("std.lang.Comparable")
+    );
+}
+
+#[test]
+fn only_std_lang_is_in_the_prelude() {
+    assert_eq!(
+        errors("class A { List<String> names; AtomicInt count; }"),
+        [
+            "cannot find type `List` in this scope",
+            "cannot find type `AtomicInt` in this scope"
+        ]
+    );
+    assert_eq!(
+        resolve_str("class A { ArrayList<String> names; }").helps,
+        ["import it with `import std.util.ArrayList;`"]
+    );
+    let resolved = resolve_str(
+        "import std.util.List;\nimport std.sync.*;\n\
+         class A { List<String> names; AtomicInt count; }",
+    );
+    assert_eq!(resolved.errors, Vec::<String>::new());
+    assert_eq!(
+        resolved.res_at("List<", 0),
+        resolved.std_type("std.util.List")
+    );
+    assert_eq!(
+        resolved.res_at("AtomicInt count", 0),
         resolved.std_type("std.sync.AtomicInt")
+    );
+}
+
+#[test]
+fn qualified_type_names_resolve_without_imports() {
+    let resolved = resolve_str("class A { std.util.List<String> names; }");
+    assert_eq!(resolved.errors, Vec::<String>::new());
+    assert_eq!(
+        resolved.res_at("List", 0),
+        resolved.std_type("std.util.List")
     );
 }
 

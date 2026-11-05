@@ -1,3 +1,6 @@
+import std.util.ArrayList;
+import std.util.List;
+
 class Resource {
     private String name;
 

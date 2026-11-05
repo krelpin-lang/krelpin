@@ -1,5 +1,7 @@
 package shop;
 
+import std.util.HashMap;
+
 @Derive(Comparable)
 record Money(long cents, String currency) {}
 

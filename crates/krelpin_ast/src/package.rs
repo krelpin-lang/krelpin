@@ -3,7 +3,7 @@ use std::fmt;
 use crate::ast::{CompilationUnit, Ident};
 use krelpin_span::Symbol;
 
-const PRELUDE: &[&str] = &["std.lang", "std.util", "std.sync"];
+const PRELUDE: &[&str] = &["std.lang"];
 
 #[derive(Clone, Debug, Default, PartialEq, Eq, Hash)]
 pub struct PackagePath(Vec<Symbol>);

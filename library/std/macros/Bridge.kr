@@ -1,6 +1,8 @@
 package std.macros;
 
 import std.primitive.Int;
+import std.util.ArrayList;
+import std.util.List;
 
 final class Bridge {
     private List<String> macros;

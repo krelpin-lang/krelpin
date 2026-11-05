@@ -1,3 +1,8 @@
+import std.util.ArrayList;
+import std.util.HashMap;
+import std.util.List;
+import std.util.Map;
+
 class Key implements Hashable<Key> {
     private String name;
 

@@ -1,3 +1,10 @@
+import std.util.ArrayList;
+import std.util.HashMap;
+import std.util.HashSet;
+import std.util.List;
+import std.util.Map;
+import std.util.Set;
+
 class Main {
     static void main() {
         Map<String, List<int>> scores = new HashMap<>();

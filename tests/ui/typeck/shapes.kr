@@ -1,6 +1,8 @@
 package geometry;
 
 import std.function.Consumer;
+import std.util.ArrayList;
+import std.util.List;
 
 interface Shape extends Comparable<Shape> {
     double area();

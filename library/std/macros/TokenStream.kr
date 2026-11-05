@@ -1,6 +1,8 @@
 package std.macros;
 
+import std.util.ArrayList;
 import std.util.Iterator;
+import std.util.List;
 
 final class TokenStream implements Iterable<Token> {
     private List<Token> tokens;

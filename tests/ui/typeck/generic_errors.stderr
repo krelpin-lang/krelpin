@@ -1,19 +1,19 @@
 error: `List` takes 1 type argument but 2 were supplied
-  --> tests/ui/typeck/generic_errors.kr:13:9
+  --> tests/ui/typeck/generic_errors.kr:15:9
    |
-13 |         List<String, int>? pairs = null;
+15 |         List<String, int>? pairs = null;
    |         ^^^^^^^^^^^^^^^^^
 
 error: type `Thing` does not satisfy the bound of `T`
-  --> tests/ui/typeck/generic_errors.kr:15:16
+  --> tests/ui/typeck/generic_errors.kr:17:16
    |
-15 |         Sorted<Thing>? things = null;
+17 |         Sorted<Thing>? things = null;
    |                ^^^^^ `Thing` is not a `Comparable<Thing>`
 
 error: type `Thing` does not satisfy the bound of `T`
-  --> tests/ui/typeck/generic_errors.kr:16:27
+  --> tests/ui/typeck/generic_errors.kr:18:27
    |
-16 |         Thing best = Util.max(new Thing(), new Thing());
+18 |         Thing best = Util.max(new Thing(), new Thing());
    |                           ^^^ `Thing` is not a `Comparable<Thing>`
 
 error: aborting due to 3 previous errors

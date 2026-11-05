@@ -287,11 +287,23 @@ impl<'a> Resolver<'a> {
         }
 
         if !self.scope.has_unknown_glob {
-            self.emit(
+            let mut diagnostic =
                 Diagnostic::error(format!("cannot find type `{}` in this scope", name.name))
                     .with_span(name.span)
-                    .with_label("not found in this scope"),
-            );
+                    .with_label("not found in this scope");
+            let mut candidates: Vec<String> = self
+                .table
+                .packages
+                .iter()
+                .filter(|(_, types)| types.contains_key(&name.name))
+                .map(|(package, _)| format!("`import {package}.{};`", name.name))
+                .collect();
+            candidates.sort();
+            if !candidates.is_empty() {
+                diagnostic =
+                    diagnostic.with_help(format!("import it with {}", candidates.join(" or ")));
+            }
+            self.emit(diagnostic);
         }
     }
 
