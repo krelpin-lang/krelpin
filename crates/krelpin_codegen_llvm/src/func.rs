@@ -896,6 +896,11 @@ impl<'c, 'a, 'tcx> FnCx<'c, 'a, 'tcx> {
             let value = self.load(ty, address);
             return self.prim_to_string(&value, primitive);
         }
+        if self.cx.shape(ty) == Shape::Ptr(PtrKind::Ref) {
+            // A reference field shows the value it points at.
+            let value = self.load(ty, address);
+            return self.stringify(&value, ty);
+        }
         if self.cx.is_ptr(ty) {
             let value = self.load(ty, address);
             return self.stringify_nullable(&value, ty);

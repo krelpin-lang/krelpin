@@ -513,7 +513,7 @@ impl LoweringCtxt<'_, '_> {
             },
             ast::ExprKind::Index { expr: base, index } => ExprKind::Index {
                 base: Box::new(self.lower_expr(base)),
-                index: Box::new(self.lower_expr(index)),
+                index: Box::new(coerce(self.lower_expr(index), &Ty::INT)),
             },
             ast::ExprKind::New { args, .. } => match self.callee(expr.span) {
                 Some(found) => ExprKind::New {
@@ -526,7 +526,7 @@ impl LoweringCtxt<'_, '_> {
                 },
             },
             ast::ExprKind::NewArray { len, .. } => ExprKind::NewArray {
-                len: Box::new(self.lower_expr(len)),
+                len: Box::new(coerce(self.lower_expr(len), &Ty::INT)),
             },
             ast::ExprKind::ArrayInit { elems, .. } => {
                 let elem = match &ty {
@@ -903,7 +903,10 @@ fn coerce(expr: Expr, target: &Ty) -> Expr {
         ty: inner,
     } = target
     {
-        let lends = !matches!(expr.ty, Ty::Ref { .. } | Ty::Null | Ty::Unknown);
+        // `&int` passed as `&&int` is lent too: the outer reference points
+        // at a temporary holding the inner one.
+        let lends =
+            !matches!(expr.ty, Ty::Null | Ty::Unknown) && ref_depth(&expr.ty) < ref_depth(target);
         if lends && !inner.is_unknown() {
             let value = coerce(expr, inner);
             return Expr {
@@ -933,6 +936,15 @@ fn coerce(expr: Expr, target: &Ty) -> Expr {
             expr: Box::new(expr),
         },
     }
+}
+
+fn ref_depth(mut ty: &Ty) -> usize {
+    let mut depth = 0;
+    while let Ty::Ref { ty: inner, .. } = ty {
+        depth += 1;
+        ty = inner;
+    }
+    depth
 }
 
 fn deref_all(mut expr: Expr) -> Expr {

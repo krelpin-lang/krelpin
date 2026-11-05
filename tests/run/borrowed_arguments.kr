@@ -1,3 +1,10 @@
+enum Value {
+    Num(&int value),
+    Text(&String text)
+}
+
+record Labeled(&int value, (&String)? label) {}
+
 class Main {
     static void show(&long? value) {
         Console.println(value);
@@ -15,5 +22,21 @@ class Main {
         int x = 4;
         &int r = &x;
         Console.println(twice(&r));
+        // A value or a shallower reference is lent through a temporary.
+        Console.println(twice(&x));
+        Console.println(twice(5));
+
+        // Indexes and lengths are read through references and widened.
+        int[] data = new int[&4];
+        byte one = 1;
+        data[one] = 3;
+        data[&2] = 7;
+        Console.println(data[&one] + data[r - 2]);
+
+        // Reference fields show the value they point at.
+        String hi = "hi";
+        Console.println(Value.Num(&x));
+        Console.println(Value.Text(&hi));
+        Console.println(new Labeled(&x, null));
     }
 }
