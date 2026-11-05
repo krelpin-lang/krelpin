@@ -22,4 +22,8 @@ final class Short implements Comparable<short>, Hashable<short> {
 
     @Intrinsic
     int hashCode();
+
+    String format(String spec) {
+        return Format.integer(this, spec);
+    }
 }

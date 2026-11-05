@@ -1,0 +1,8 @@
+class Main {
+    static void main() {
+        String? maybe = null;
+        int count = 2;
+        Console.println("nullable ${maybe:>4}");
+        Console.println("unknown ${count.lenght()}");
+    }
+}

@@ -1,0 +1,6 @@
+class Main {
+    static void main() {
+        Console.println("empty ${} here");
+        Console.println("open ${count
+    }
+}

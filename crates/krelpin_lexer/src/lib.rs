@@ -1,4 +1,5 @@
 mod cursor;
+pub mod interpolate;
 mod literal;
 mod scan;
 mod token;

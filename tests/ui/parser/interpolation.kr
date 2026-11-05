@@ -1,0 +1,9 @@
+class Main {
+    static void main() {
+        int count = 2;
+        Console.println("""
+            spec ${count:.x}
+            """);
+        Console.println("two ${count count}");
+    }
+}

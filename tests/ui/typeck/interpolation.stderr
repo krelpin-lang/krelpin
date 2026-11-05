@@ -1,0 +1,16 @@
+error: value of type `String?` may be null
+ --> tests/ui/typeck/interpolation.kr:5:37
+  |
+5 |         Console.println("nullable ${maybe:>4}");
+  |                                     ^^^^^
+  |
+  = help: check `!= null` first, or give a default with `?:`
+
+error: no method named `lenght` found for `int`
+ --> tests/ui/typeck/interpolation.kr:6:42
+  |
+6 |         Console.println("unknown ${count.lenght()}");
+  |                                          ^^^^^^ method not found
+
+error: aborting due to 2 previous errors
+

@@ -1,0 +1,5 @@
+class Main {
+    static void main() {
+        Console.println("unknown $nope and ${missing + 1}");
+    }
+}

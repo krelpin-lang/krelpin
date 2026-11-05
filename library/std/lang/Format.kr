@@ -1,0 +1,42 @@
+package std.lang;
+
+final class Format {
+    private Format() {}
+
+    static String integer(long value, String spec) {
+        String? text = formatLong(value, spec);
+        if (text == null) {
+            throw invalid(spec, "an integer");
+        }
+        return text;
+    }
+
+    static String decimal(double value, String spec) {
+        String? text = formatDouble(value, spec);
+        if (text == null) {
+            throw invalid(spec, "a decimal number");
+        }
+        return text;
+    }
+
+    static String text(String value, String spec) {
+        String? text = formatText(value, spec);
+        if (text == null) {
+            throw invalid(spec, "text");
+        }
+        return text;
+    }
+
+    private static IllegalArgumentException invalid(String spec, String what) {
+        return new IllegalArgumentException("the format `" + spec + "` cannot be used on " + what);
+    }
+
+    @Intrinsic
+    private static String? formatLong(long value, String spec);
+
+    @Intrinsic
+    private static String? formatDouble(double value, String spec);
+
+    @Intrinsic
+    private static String? formatText(String value, String spec);
+}

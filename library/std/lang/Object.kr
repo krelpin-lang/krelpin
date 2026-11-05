@@ -3,4 +3,8 @@ package std.lang;
 class Object {
     @Intrinsic
     String toString();
+
+    String format(String spec) {
+        return Format.text(this.toString(), spec);
+    }
 }

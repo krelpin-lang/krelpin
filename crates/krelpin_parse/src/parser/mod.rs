@@ -1,5 +1,6 @@
 mod diagnostics;
 mod expr;
+mod interpolation;
 mod item;
 mod lookahead;
 mod member;

@@ -205,6 +205,12 @@ impl Parser<'_> {
 
     fn parse_primary(&mut self) -> PResult<Expr> {
         let lo = self.token.span;
+        if let TokenKind::Literal(lit) = self.token.kind
+            && Self::is_interpolated(lit)
+        {
+            self.bump();
+            return self.parse_interpolated(lit, lo);
+        }
         let kind = match self.token.kind {
             TokenKind::Literal(lit) => ExprKind::Lit(lit),
             TokenKind::Ident(kw::True) => ExprKind::Bool(true),

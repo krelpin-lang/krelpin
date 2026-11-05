@@ -162,3 +162,42 @@ fn with_expressions() {
         "(users[0] with { visits = (n + 1) })"
     );
 }
+
+#[test]
+fn interpolated_strings_become_concatenations() {
+    assert_eq!(expr(r#""Hi $name!""#), r#"(("Hi " + (&name)) + "!")"#);
+    assert_eq!(expr(r#""${a + b}""#), r#"("" + (&(a + b)))"#);
+    assert_eq!(
+        expr(r#""[${price:>8.2}] ${ok ? 1 : 2}""#),
+        r#"((("[" + (&price).format(">8.2")) + "] ") + (&(ok ? 1 : 2)))"#
+    );
+    assert_eq!(
+        expr(r#""${"in ${x}"}\$y""#),
+        r#"(("" + (&("in " + (&x)))) + "\$y")"#
+    );
+    assert_eq!(expr(r#""plain $ text""#), r#""plain $ text""#);
+}
+
+#[test]
+fn interpolation_errors() {
+    assert_eq!(
+        super::errors(r#"class A { void f() { g("${x:.q}"); } }"#),
+        ["invalid format spec `.q`"]
+    );
+    assert_eq!(
+        super::errors(r#"class A { void f() { g("${x +}"); } }"#),
+        ["expected expression, found `}`"]
+    );
+    assert_eq!(
+        super::errors(r#"class A { void f() { g("${x y}"); } }"#),
+        ["unexpected tokens in an interpolation"]
+    );
+    assert_eq!(
+        super::errors(r#"class A { void f() { g("${}"); } }"#),
+        ["empty interpolation"]
+    );
+    assert_eq!(
+        super::errors(r#"class A { void f() { g("${x"); } }"#).first(),
+        Some(&"this `${` is never closed".to_owned())
+    );
+}

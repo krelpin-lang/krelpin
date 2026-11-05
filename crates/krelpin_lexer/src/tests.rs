@@ -228,3 +228,99 @@ fn text_blocks() {
 
     assert_eq!(kinds("\"\"\"\nopen"), [lit(text_block(false), 8)]);
 }
+
+#[test]
+fn interpolations_keep_strings_whole() {
+    for literal in [
+        r#""a ${f("x")} b""#,
+        r#""${m.get("}")}""#,
+        r#""${"${"deep"}"}""#,
+        r#""${'}'}""#,
+    ] {
+        let src = format!("{literal} x");
+        assert_eq!(
+            kinds(&src),
+            [lit(str_lit(true), literal.len() as u32), TokenKind::Ident],
+            "{literal}"
+        );
+    }
+    assert_eq!(
+        kinds("\"${a\nb}\""),
+        [
+            lit(str_lit(false), 4),
+            TokenKind::Ident,
+            TokenKind::CloseBrace,
+            lit(str_lit(false), 1),
+        ]
+    );
+}
+
+mod interpolation {
+    use crate::interpolate::{ErrorKind, Piece, parse_spec, pieces, spec_colon, texts};
+    use crate::unescape::Mode;
+
+    #[test]
+    fn splits_text_names_and_expressions() {
+        assert_eq!(
+            pieces("Hi $name, ${a + b}!"),
+            Ok(vec![
+                Piece::Text(0..3),
+                Piece::Name(4..8),
+                Piece::Text(8..10),
+                Piece::Expr(12..17),
+                Piece::Text(18..19),
+            ])
+        );
+        assert_eq!(
+            pieces("cost \\$5 and $ alone"),
+            Ok(vec![Piece::Text(0..20)])
+        );
+        assert_eq!(pieces(r#"${f("}")}"#), Ok(vec![Piece::Expr(2..8)]));
+        assert_eq!(pieces("x ${ }").map_err(|e| e.kind), Err(ErrorKind::Empty));
+        assert_eq!(
+            pieces("x ${a").map_err(|e| e.kind),
+            Err(ErrorKind::Unclosed)
+        );
+    }
+
+    #[test]
+    fn cooks_the_text_between_interpolations() {
+        let content = "a\\t${x}\\$b$y";
+        let pieces = pieces(content).expect("valid");
+        assert_eq!(texts(content, &pieces, Mode::Str), ["a\t", "$b", ""]);
+        let block = "\n    head ${x}\n      tail\n    ";
+        let pieces = crate::interpolate::pieces(block).expect("valid");
+        assert_eq!(
+            texts(block, &pieces, Mode::TextBlock),
+            ["head ", "\n  tail\n"]
+        );
+    }
+
+    #[test]
+    fn finds_the_format_colon() {
+        assert_eq!(spec_colon("price:.2"), Some(5));
+        assert_eq!(spec_colon("a ? b : c"), None);
+        assert_eq!(spec_colon("a ? b : c:>4"), Some(9));
+        assert_eq!(spec_colon("x ?: y"), None);
+        assert_eq!(spec_colon("List::of"), None);
+        assert_eq!(spec_colon(r#"m.get(":")"#), None);
+        assert_eq!(spec_colon("f(a ? b : c):x"), Some(12));
+    }
+
+    #[test]
+    fn parses_format_specs() {
+        let spec = parse_spec("*^+#010.3e").expect("valid");
+        assert_eq!(spec.fill, Some('*'));
+        assert_eq!(spec.align, Some('^'));
+        assert!(spec.plus && spec.alternate && spec.zero);
+        assert_eq!(spec.width, Some(10));
+        assert_eq!(spec.precision, Some(3));
+        assert_eq!(spec.kind, Some('e'));
+        assert_eq!(parse_spec(">8").map(|spec| spec.width), Ok(Some(8)));
+        assert_eq!(parse_spec("").map(|spec| spec.width), Ok(None));
+        assert!(parse_spec(".").is_err());
+        assert!(parse_spec("q").is_err());
+        assert!(parse_spec("5x!").is_err());
+        assert!(parse_spec("99999").is_err());
+    }
+}

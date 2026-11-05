@@ -1,0 +1,22 @@
+Merhaba Ada, yaşın 36, toplam 72!
+fiyat: 1234.57 |       1234.6 | 1.234568e+03 | 1235
+[Ada   ] [   Ada] [  Ada  ] [***Ada***] [Ad]
+[00036] [+36] [0x24] [100100] [FF] [-007]
+[0o44] [-0xFF] [36  |] [36.00] [3.7]
+admin=true grade=A:  A missing=null
+nested inner ADA and yes
+ternary with spec 1234.6
+dollar $name and $ alone and price $5
+Rapor:
+  isim: Ada
+  yaş:    36
+
+[-0.50] [Infinity] [-Infinity] [  NaN]
+[  çğü] [ş**] [İst]
+area=12.0 shape=   Circle[r=2.0]
+color=RED   | list=  []|
+box(    42)
+first=  x size=1
+money=1234.05 TL custom=<1234.05 TL>
+the format `#x` cannot be used on text
+the format `b` cannot be used on a decimal number

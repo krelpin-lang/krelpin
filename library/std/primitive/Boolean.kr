@@ -20,4 +20,8 @@ final class Boolean implements Comparable<boolean>, Hashable<boolean> {
 
     @Intrinsic
     int hashCode();
+
+    String format(String spec) {
+        return Format.text("" + this, spec);
+    }
 }

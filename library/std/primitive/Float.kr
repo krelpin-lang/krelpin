@@ -22,4 +22,8 @@ final class Float implements Comparable<float>, Hashable<float> {
 
     @Intrinsic
     int hashCode();
+
+    String format(String spec) {
+        return Format.decimal(this, spec);
+    }
 }

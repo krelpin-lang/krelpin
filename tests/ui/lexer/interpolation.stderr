@@ -1,0 +1,18 @@
+error: empty interpolation
+ --> tests/ui/lexer/interpolation.kr:3:32
+  |
+3 |         Console.println("empty ${} here");
+  |                                ^^^
+  |
+  = help: put an expression between the braces, or write `\$` for a `$`
+
+error: this `${` is never closed
+ --> tests/ui/lexer/interpolation.kr:4:31
+  |
+4 |         Console.println("open ${count
+  |                               ^^^^^^^
+  |
+  = help: add a closing `}`
+
+error: aborting due to 2 previous errors
+

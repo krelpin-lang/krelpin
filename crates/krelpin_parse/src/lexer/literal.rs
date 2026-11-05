@@ -2,6 +2,7 @@ use std::ops::Range;
 
 use krelpin_ast::token::{Lit, LitKind};
 use krelpin_errors::Diagnostic;
+use krelpin_lexer::interpolate::{self, Piece};
 use krelpin_lexer::unescape::{self, EscapeError, Mode};
 use krelpin_lexer::{Base, LiteralKind};
 use krelpin_span::{BytePos, Span, Symbol};
@@ -190,7 +191,17 @@ impl StringReader<'_> {
         let content_lo = start + delimiter;
 
         if !terminated {
-            self.report_unterminated(quote, start, end);
+            let content = self.str_from_to(content_lo, end);
+            let unclosed = match quote {
+                Quote::Char => None,
+                Quote::Str | Quote::TextBlock => interpolate::pieces(content)
+                    .err()
+                    .filter(|error| error.kind == interpolate::ErrorKind::Unclosed),
+            };
+            match unclosed {
+                Some(error) => self.report_interpolation_error(content_lo, &error),
+                None => self.report_unterminated(quote, start, end),
+            }
             return (
                 LitKind::Err,
                 Symbol::intern(self.str_from_to(content_lo, end)),
@@ -213,14 +224,49 @@ impl StringReader<'_> {
             kind = LitKind::Err;
         }
 
-        unescape::unescape(content, quote.mode(), |range, result| {
-            if let Err(error) = result {
-                self.report_escape_error(content, content_lo, range, error);
-                kind = LitKind::Err;
-            }
-        });
+        let texts = match quote {
+            Quote::Char => std::iter::once(0..content.len()).collect(),
+            Quote::Str | Quote::TextBlock => match interpolate::pieces(content) {
+                Ok(pieces) => pieces
+                    .into_iter()
+                    .filter_map(|piece| match piece {
+                        Piece::Text(range) => Some(range),
+                        Piece::Expr(_) | Piece::Name(_) => None,
+                    })
+                    .collect(),
+                Err(error) => {
+                    self.report_interpolation_error(content_lo, &error);
+                    kind = LitKind::Err;
+                    Vec::new()
+                }
+            },
+        };
+        for text in texts {
+            unescape::unescape(&content[text.clone()], quote.mode(), |range, result| {
+                if let Err(error) = result {
+                    let range = text.start + range.start..text.start + range.end;
+                    self.report_escape_error(content, content_lo, range, error);
+                    kind = LitKind::Err;
+                }
+            });
+        }
 
         (kind, Symbol::intern(content))
+    }
+
+    fn report_interpolation_error(&self, content_lo: BytePos, error: &interpolate::Error) {
+        let span = Span::new(
+            content_lo + error.range.start as u32,
+            content_lo + error.range.end as u32,
+        );
+        let diagnostic = match error.kind {
+            interpolate::ErrorKind::Unclosed => {
+                Diagnostic::error("this `${` is never closed").with_help("add a closing `}`")
+            }
+            interpolate::ErrorKind::Empty => Diagnostic::error("empty interpolation")
+                .with_help("put an expression between the braces, or write `\\$` for a `$`"),
+        };
+        self.dcx.emit(diagnostic.with_span(span));
     }
 
     fn report_unterminated(&self, quote: Quote, start: BytePos, end: BytePos) {

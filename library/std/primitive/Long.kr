@@ -22,4 +22,8 @@ final class Long implements Comparable<long>, Hashable<long> {
 
     @Intrinsic
     int hashCode();
+
+    String format(String spec) {
+        return Format.integer(this, spec);
+    }
 }

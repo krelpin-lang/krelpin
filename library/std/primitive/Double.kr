@@ -22,4 +22,8 @@ final class Double implements Comparable<double>, Hashable<double> {
 
     @Intrinsic
     int hashCode();
+
+    String format(String spec) {
+        return Format.decimal(this, spec);
+    }
 }

@@ -9,7 +9,11 @@ use krelpin_lexer::{self as raw, Cursor};
 use krelpin_span::{BytePos, SourceFile, Span, Symbol};
 
 pub fn lex(file: &SourceFile, dcx: &DiagCtxt) -> Vec<Token> {
-    let mut reader = StringReader::new(file, dcx);
+    lex_str(&file.src, file.start_pos, dcx)
+}
+
+pub fn lex_str(src: &str, start_pos: BytePos, dcx: &DiagCtxt) -> Vec<Token> {
+    let mut reader = StringReader::new(src, start_pos, dcx);
     let mut tokens: Vec<Token> = Vec::new();
 
     loop {
@@ -42,12 +46,12 @@ struct StringReader<'a> {
 }
 
 impl<'a> StringReader<'a> {
-    fn new(file: &'a SourceFile, dcx: &'a DiagCtxt) -> StringReader<'a> {
+    fn new(src: &'a str, start_pos: BytePos, dcx: &'a DiagCtxt) -> StringReader<'a> {
         StringReader {
-            src: &file.src,
-            start_pos: file.start_pos,
-            pos: file.start_pos,
-            cursor: Cursor::new(&file.src),
+            src,
+            start_pos,
+            pos: start_pos,
+            cursor: Cursor::new(src),
             dcx,
         }
     }

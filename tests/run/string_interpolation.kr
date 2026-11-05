@@ -1,0 +1,94 @@
+import std.util.ArrayList;
+import std.util.List;
+
+interface Shape {
+    double area();
+}
+
+record Circle(double r) implements Shape {
+    double area() {
+        return 3.0 * this.r * this.r;
+    }
+}
+
+enum Color {
+    RED,
+    GREEN
+}
+
+class Box<T> {
+    private T value;
+
+    Box(T value) {
+        this.value = value;
+    }
+
+    String show() {
+        return "box(${this.value:>6})";
+    }
+}
+
+class Money {
+    private long cents;
+
+    Money(long cents) {
+        this.cents = cents;
+    }
+
+    String toString() {
+        return "${this.cents / 100}.${this.cents % 100:02} TL";
+    }
+
+    String format(String spec) {
+        return "<" + this.toString().format(spec) + ">";
+    }
+}
+
+class Main {
+    static void main() {
+        String name = "Ada";
+        int age = 36;
+        double price = 1234.5678;
+        boolean admin = true;
+        char grade = 'A';
+        String? missing = null;
+        Console.println("Merhaba $name, yaşın $age, toplam ${age * 2}!");
+        Console.println("fiyat: ${price:.2} | ${price:>12.1} | ${price:e} | ${price:.0}");
+        Console.println("[${name:<6}] [${name:>6}] [${name:^7}] [${name:*^9}] [${name:.2}]");
+        Console.println("[${age:05}] [${age:+}] [${age:#x}] [${age:b}] [${255:X}] [${-7:04}]");
+        Console.println("[${age:#o}] [${-255:#X}] [${age:<4}|] [${age:.2}] [${3.7f:.1}]");
+        Console.println("admin=$admin grade=$grade:${grade:>3} missing=$missing");
+        Console.println("nested ${"inner ${name.toUpperCase()}"} and ${admin ? "yes" : "no"}");
+        Console.println("ternary with spec ${age > 30 ? price : 0.0:.1}");
+        Console.println("dollar \$name and $ alone and price \$5");
+        Console.println("""
+            Rapor:
+              isim: $name
+              yaş:  ${age:>4}
+            """);
+        Console.println("[${-0.5:+.2}] [${1.0 / 0.0}] [${-1.0 / 0.0:>6}] [${0.0 / 0.0:>5}]");
+        Console.println("[${"çğü":>5}] [${"ş":*<3}] [${"İstanbul":.3}]");
+
+        Shape shape = new Circle(2.0);
+        Console.println("area=${shape.area():.1} shape=${shape:>16}");
+        Console.println("color=${Color.RED:<6}| list=${new ArrayList<String>():>4}|");
+        Box<int> box = new Box<>(42);
+        Console.println(box.show());
+        List<String> names = new ArrayList<>();
+        names.add("x");
+        Console.println("first=${names.get(0):>3} size=${names.size()}");
+        Money money = new Money(123405);
+        Console.println("money=$money custom=${money:>10}");
+
+        try {
+            Console.println("x".format("#x"));
+        } catch (IllegalArgumentException error) {
+            Console.println(error.getMessage());
+        }
+        try {
+            Console.println(Format.decimal(1.5, "b"));
+        } catch (IllegalArgumentException error) {
+            Console.println(error.getMessage());
+        }
+    }
+}

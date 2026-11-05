@@ -136,6 +136,9 @@ impl FnCx<'_, '_, '_> {
         if items.is(owner, LangItem::MacroBridge) {
             return self.bridge_builtin(name);
         }
+        if items.is(owner, LangItem::Format) {
+            return self.format_builtin(name);
+        }
         if items.is(owner, LangItem::AtomicInt)
             || items.is(owner, LangItem::AtomicLong)
             || items.is(owner, LangItem::AtomicBool)
@@ -782,6 +785,24 @@ impl FnCx<'_, '_, '_> {
             }
             _ => false,
         }
+    }
+
+    fn format_builtin(&mut self, name: &str) -> bool {
+        let string = self.cx.tcx.string_ty();
+        let (function, value) = match name {
+            "formatLong" => ("kr_format_long", "i64 %a0"),
+            "formatDouble" => ("kr_format_double", "double %a0"),
+            "formatText" => ("kr_format_text", "ptr %a0"),
+            _ => return false,
+        };
+        let text = self.runtime("ptr", function, &format!("{value}, ptr %a1"));
+        if name == "formatText" {
+            self.drop_value("%a0", &string);
+        }
+        self.drop_value("%a1", &string);
+        let ret = self.ret_ty.clone();
+        self.ret(&text, &ret);
+        true
     }
 
     fn bridge_builtin(&mut self, name: &str) -> bool {

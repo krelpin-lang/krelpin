@@ -43,4 +43,8 @@ final class Char implements Comparable<char>, Hashable<char> {
 
     @Intrinsic
     int hashCode();
+
+    String format(String spec) {
+        return Format.text("" + this, spec);
+    }
 }

@@ -1,0 +1,14 @@
+error: cannot find value `nope` in this scope
+ --> tests/ui/resolve/interpolation.kr:3:35
+  |
+3 |         Console.println("unknown $nope and ${missing + 1}");
+  |                                   ^^^^ not found in this scope
+
+error: cannot find value `missing` in this scope
+ --> tests/ui/resolve/interpolation.kr:3:46
+  |
+3 |         Console.println("unknown $nope and ${missing + 1}");
+  |                                              ^^^^^^^ not found in this scope
+
+error: aborting due to 2 previous errors
+

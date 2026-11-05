@@ -112,6 +112,12 @@ impl Cursor<'_> {
                         self.bump();
                     }
                 }
+                '$' if quote == '"' && self.second() == '{' => {
+                    self.bump();
+                    if !self.interpolation(false) {
+                        return false;
+                    }
+                }
                 _ => {
                     self.bump();
                 }
@@ -133,10 +139,53 @@ impl Cursor<'_> {
                 '\\' => {
                     self.bump();
                 }
+                '$' if self.first() == '{' && !self.interpolation(true) => return false,
                 _ => {}
             }
         }
         false
+    }
+
+    fn interpolation(&mut self, multiline: bool) -> bool {
+        self.bump();
+        let mut depth = 1usize;
+        loop {
+            match self.first() {
+                EOF_CHAR if self.is_eof() => return false,
+                '\n' if !multiline => return false,
+                '{' => {
+                    depth += 1;
+                    self.bump();
+                }
+                '}' => {
+                    self.bump();
+                    depth -= 1;
+                    if depth == 0 {
+                        return true;
+                    }
+                }
+                '"' => {
+                    self.bump();
+                    let closed = if self.first() == '"' && self.second() == '"' {
+                        self.text_block()
+                    } else {
+                        self.quoted('"')
+                    };
+                    if !closed {
+                        return false;
+                    }
+                }
+                '\'' => {
+                    self.bump();
+                    if !self.quoted('\'') {
+                        return false;
+                    }
+                }
+                _ => {
+                    self.bump();
+                }
+            }
+        }
     }
 
     fn finish_literal(&mut self, kind: LiteralKind) -> TokenKind {

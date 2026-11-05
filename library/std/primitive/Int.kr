@@ -22,4 +22,8 @@ final class Int implements Comparable<int>, Hashable<int> {
 
     @Intrinsic
     int hashCode();
+
+    String format(String spec) {
+        return Format.integer(this, spec);
+    }
 }

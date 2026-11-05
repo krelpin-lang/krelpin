@@ -122,6 +122,7 @@ fn scan_escape(chars: &mut Chars<'_>) -> Result<char, EscapeError> {
         '"' => '"',
         '\'' => '\'',
         '\\' => '\\',
+        '$' => '$',
         'u' => return scan_unicode(chars),
         '0'..='7' => scan_octal(c, chars),
         _ => return Err(EscapeError::InvalidEscape),

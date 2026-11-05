@@ -112,6 +112,9 @@ KrString *kr_string_cast(const void *object, const KrString *target);
 KrString *kr_string_number_format(const KrString *text);
 bool kr_parse_long(const KrString *text, int64_t min, int64_t max, int64_t *out);
 bool kr_parse_double(const KrString *text, double *out);
+KrString *kr_format_long(int64_t value, const KrString *spec);
+KrString *kr_format_double(double value, const KrString *spec);
+KrString *kr_format_text(const KrString *value, const KrString *spec);
 
 void kr_console_print(const KrString *string);
 void kr_console_newline(void);
