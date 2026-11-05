@@ -11,6 +11,8 @@
 static FILE *bridge_in;
 static FILE *bridge_out;
 
+static bool report_uncaught(const KrType *type, const KrString *message);
+
 void kr_bridge_open(void) {
     if (bridge_out != NULL) {
         return;
@@ -34,6 +36,7 @@ void kr_bridge_open(void) {
     if (bridge_in == NULL || bridge_out == NULL) {
         kr_panic("couldn't open the macro bridge");
     }
+    kr_uncaught_hook = report_uncaught;
 }
 
 KrString *kr_bridge_receive(void) {
@@ -135,7 +138,7 @@ KrString *kr_bridge_unescape(const KrString *text) {
     return string;
 }
 
-bool kr_bridge_report(const KrType *type, const KrString *message) {
+static bool report_uncaught(const KrType *type, const KrString *message) {
     if (bridge_out == NULL) {
         return false;
     }

@@ -68,9 +68,11 @@ KrString *kr_console_read_line(void) {
     return string;
 }
 
+bool (*kr_uncaught_hook)(const KrType *type, const KrString *message);
+
 void kr_uncaught(const KrType *type, const KrString *message) {
     fflush(stdout);
-    if (kr_bridge_report(type, message)) {
+    if (kr_uncaught_hook != NULL && kr_uncaught_hook(type, message)) {
         return;
     }
     if (message == NULL) {

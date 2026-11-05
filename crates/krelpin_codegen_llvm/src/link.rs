@@ -84,6 +84,14 @@ impl Target {
         ]
     }
 
+    fn gc_flag(&self) -> &'static str {
+        if self.os == "macos" {
+            "-Wl,-dead_strip"
+        } else {
+            "-Wl,--gc-sections"
+        }
+    }
+
     fn shared_flag(&self) -> &'static str {
         if self.os == "macos" {
             "-dynamiclib"
@@ -159,8 +167,7 @@ fn build(ir: &str, options: &LinkOptions<'_>, work: &Path) -> Result<(), String>
             run(&mut command, &compiler, options.verbose)?;
             let runtime = runtime_objects(options, &compiler, work)?;
             let _ = fs::remove_file(options.output);
-            let archiver =
-                env::var_os("KRELPIN_AR").map_or_else(|| PathBuf::from("ar"), PathBuf::from);
+            let archiver = archiver();
             let mut archive = Command::new(&archiver);
             archive
                 .arg("crs")
@@ -170,15 +177,16 @@ fn build(ir: &str, options: &LinkOptions<'_>, work: &Path) -> Result<(), String>
             run(&mut archive, &archiver, options.verbose)
         }
         OutputKind::Executable | OutputKind::SharedLib => {
-            let runtime = runtime_objects(options, &compiler, work)?;
+            let runtime = runtime_archive(options, &compiler, work)?;
             if let Some(linker) = options.linker {
                 command.arg(format!("-fuse-ld={}", linker.display()));
             }
             if options.kind == OutputKind::SharedLib {
                 command.arg(options.target.shared_flag());
             }
+            command.arg(options.target.gc_flag());
             command.args(["-x", "ir"]).arg(&ir_path);
-            command.args(["-x", "none"]).args(&runtime);
+            command.args(["-x", "none"]).arg(&runtime);
             command.args(options.libraries);
             command.args(["-lpthread", "-lm"]);
             command.args(options.link_args);
@@ -190,7 +198,12 @@ fn build(ir: &str, options: &LinkOptions<'_>, work: &Path) -> Result<(), String>
 
 fn common_flags(command: &mut Command, options: &LinkOptions<'_>) {
     command.arg(format!("--target={}", options.target.triple));
-    command.args(["-fPIC", "-Wno-override-module"]);
+    command.args([
+        "-fPIC",
+        "-ffunction-sections",
+        "-fdata-sections",
+        "-Wno-override-module",
+    ]);
     if let Some(cpu) = options.target_cpu {
         if options.target.arch == "x86_64" {
             command.arg(format!("-march={cpu}"));
@@ -198,6 +211,10 @@ fn common_flags(command: &mut Command, options: &LinkOptions<'_>) {
             command.arg(format!("-mcpu={cpu}"));
         }
     }
+}
+
+fn archiver() -> PathBuf {
+    env::var_os("KRELPIN_AR").map_or_else(|| PathBuf::from("ar"), PathBuf::from)
 }
 
 fn compiler() -> PathBuf {
@@ -245,6 +262,7 @@ fn runtime_objects(
         .collect();
     sources.sort();
     let mut hasher = DefaultHasher::new();
+    RUNTIME_FLAGS.hash(&mut hasher);
     compiler.hash(&mut hasher);
     options.target.triple.hash(&mut hasher);
     options.target_cpu.hash(&mut hasher);
@@ -279,7 +297,8 @@ fn runtime_objects(
         let mut command = Command::new(compiler);
         common_flags(&mut command, options);
         command
-            .args(["-O2", "-std=c11", "-c"])
+            .args(RUNTIME_FLAGS)
+            .args(["-c"])
             .arg("-I")
             .arg(runtime_dir)
             .arg(source)
@@ -302,6 +321,33 @@ fn runtime_objects(
     } else {
         Ok(built)
     }
+}
+
+const RUNTIME_FLAGS: &[&str] = &["-O2", "-std=c11", "-fvisibility=hidden"];
+
+fn runtime_archive(
+    options: &LinkOptions<'_>,
+    compiler: &Path,
+    work: &Path,
+) -> Result<PathBuf, String> {
+    let objects = runtime_objects(options, compiler, work)?;
+    let dir = objects
+        .first()
+        .and_then(|object| object.parent())
+        .ok_or_else(|| "the runtime has no sources".to_owned())?;
+    let archive = dir.join("libkrelpin_runtime.a");
+    if archive.exists() {
+        return Ok(archive);
+    }
+    let partial = dir.join(format!("libkrelpin_runtime.a.{}", std::process::id()));
+    let _ = fs::remove_file(&partial);
+    let archiver = archiver();
+    let mut command = Command::new(&archiver);
+    command.arg("crs").arg(&partial).args(&objects);
+    run(&mut command, &archiver, options.verbose)?;
+    fs::rename(&partial, &archive)
+        .map_err(|error| format!("couldn't write `{}`: {error}", archive.display()))?;
+    Ok(archive)
 }
 
 fn cache_dir() -> PathBuf {

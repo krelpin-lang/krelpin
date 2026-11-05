@@ -68,6 +68,7 @@ typedef struct {
 
 extern const KrType kr_string_type;
 extern _Thread_local void *kr_pending;
+extern bool (*kr_uncaught_hook)(const KrType *type, const KrString *message);
 
 void *kr_alloc(int64_t size);
 void *kr_realloc(void *pointer, int64_t size);
@@ -156,7 +157,6 @@ KrString *kr_bridge_receive(void);
 void kr_bridge_send(const KrString *line);
 KrString *kr_bridge_escape(const KrString *text);
 KrString *kr_bridge_unescape(const KrString *text);
-bool kr_bridge_report(const KrType *type, const KrString *message);
 
 void kr_runtime_init(int argc, char **argv);
 void kr_runtime_exit(void);

@@ -370,7 +370,7 @@ impl Cx<'_, '_> {
         }
         let global = self.rt[rt].global.clone();
         let linkage = if matches!(key, RtKey::String) {
-            ""
+            "hidden "
         } else {
             "internal "
         };

@@ -378,3 +378,79 @@ fn macros_work_on_parsed_items_and_quotes() {
     assert_eq!(stdout(&run), "HIGH\n");
     let _ = fs::remove_dir_all(&dir);
 }
+
+fn symbols(path: &Path, dynamic: bool) -> Option<Vec<String>> {
+    let mut command = Command::new("nm");
+    if dynamic {
+        command.arg("-D");
+    }
+    let output = command.arg("--defined-only").arg(path).output().ok()?;
+    output.status.success().then(|| {
+        stdout(&output)
+            .lines()
+            .filter_map(|line| line.split_whitespace().nth(2).map(str::to_owned))
+            .collect()
+    })
+}
+
+#[test]
+fn binaries_keep_only_the_runtime_they_use() {
+    if !has_clang() {
+        return;
+    }
+    let dir = scratch("runtime-gc");
+    let source = dir.join("hello.kr");
+    fs::write(
+        &source,
+        "class Main {\n    static void main() {\n        Console.println(\"hi\");\n    }\n}\n",
+    )
+    .expect("the source is writable");
+    let program = dir.join("hello");
+    let built = krelpinc(&[
+        source.to_str().expect("utf-8 path"),
+        "-o",
+        program.to_str().expect("utf-8 path"),
+    ]);
+    assert!(built.status.success(), "{}", stderr(&built));
+    let run = Command::new(&program).output().expect("the program runs");
+    assert_eq!(stdout(&run), "hi\n");
+    let Some(defined) = symbols(&program, false) else {
+        return;
+    };
+    assert!(defined.iter().any(|name| name == "kr_console_print"));
+    for unused in [
+        "kr_bridge_open",
+        "kr_table_insert",
+        "kr_thread_spawn",
+        "kr_test_begin",
+    ] {
+        assert!(
+            !defined.iter().any(|name| name == unused),
+            "`{unused}` was linked in"
+        );
+    }
+
+    let built = krelpinc(&[
+        SOURCE,
+        "--crate-type",
+        "cdylib",
+        "--out-dir",
+        dir.to_str().expect("utf-8 path"),
+    ]);
+    assert!(built.status.success(), "{}", stderr(&built));
+    let library = dir.join(if cfg!(target_os = "macos") {
+        "libfeatures.dylib"
+    } else {
+        "libfeatures.so"
+    });
+    if let Some(exported) = symbols(&library, true) {
+        assert!(exported.iter().any(|name| name.ends_with("features_init")));
+        assert!(
+            exported
+                .iter()
+                .all(|name| name.trim_start_matches('_').starts_with("features_")),
+            "{exported:?}"
+        );
+    }
+    let _ = fs::remove_dir_all(&dir);
+}
