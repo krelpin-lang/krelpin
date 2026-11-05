@@ -2084,3 +2084,20 @@ fn values_that_cannot_be_built_or_called() {
         ["cannot tell what type this closure has"]
     );
 }
+
+#[test]
+fn constructor_calls_only_start_constructors() {
+    assert_eq!(
+        errors("class A { void f() { String s = \"a\" + this(); } }"),
+        ["`this(...)` can only be the first statement of a constructor"]
+    );
+    assert_eq!(
+        errors("class A { A() { int x = 1; this(x); } A(int x) {} }"),
+        ["`this(...)` can only be the first statement of a constructor"]
+    );
+    assert_eq!(
+        errors("class A { void f() { super(); } }"),
+        ["`super(...)` can only be the first statement of a constructor"]
+    );
+    ok("class A { A() { this(1); } A(int x) { super(); } }");
+}

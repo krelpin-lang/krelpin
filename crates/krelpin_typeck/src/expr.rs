@@ -97,6 +97,28 @@ impl FnCtxt<'_, '_> {
                 safe,
             } => self.check_method_call(receiver.as_deref(), *name, args, *safe),
             ExprKind::Call { callee, args } => {
+                if self.delegation != Some(expr.span) {
+                    let keyword = if matches!(callee.kind, ExprKind::Super) {
+                        "super"
+                    } else {
+                        "this"
+                    };
+                    self.emit(
+                        Diagnostic::error(format!(
+                            "`{keyword}(...)` can only be the first statement of a constructor"
+                        ))
+                        .with_span(expr.span)
+                        .with_help(if keyword == "this" {
+                            "to make a new object, write `new` and the class name"
+                        } else {
+                            "the superclass constructor runs once, before the rest of the constructor"
+                        }),
+                    );
+                    for arg in args {
+                        self.check_expr(arg);
+                    }
+                    return Ty::Unknown;
+                }
                 let arg_tys = self.check_closure_args(args);
                 let target = match callee.kind {
                     ExprKind::Super => self.tcx.sig(self.owner).superclass.clone(),

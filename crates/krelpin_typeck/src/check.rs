@@ -1,7 +1,8 @@
 use std::collections::{HashMap, HashSet};
 
 use krelpin_ast::ast::{
-    CompilationUnit, FieldStorage, FnRetTy, ItemKind, Member, MemberKind, Param, ReceiverKind,
+    CompilationUnit, ExprKind, FieldStorage, FnRetTy, ItemKind, Member, MemberKind, Param,
+    ReceiverKind, StmtKind,
 };
 use krelpin_errors::Diagnostic;
 use krelpin_span::def_id::DefId;
@@ -26,6 +27,9 @@ pub(crate) struct FnCtxt<'a, 'tcx> {
     pub(crate) call_expectations: HashMap<Span, Ty>,
     pub(crate) exceptions: ExceptionScope,
     pub(crate) results: TypeckResults,
+    /// The `this(...)` or `super(...)` call that starts the constructor
+    /// being checked, the only place such a call may appear.
+    pub(crate) delegation: Option<Span>,
 }
 
 impl Tcx<'_> {
@@ -124,6 +128,12 @@ fn check_member<'a, 'tcx>(tcx: &'a Tcx<'tcx>, owner: DefId, member: &Member) -> 
             fcx.self_ty = receiver_ty(tcx, owner, ReceiverKind::RefMut);
             fcx.exceptions = ExceptionScope::declared(tcx.lower_tys(&ctor.throws));
             fcx.declare_params(&ctor.params);
+            fcx.delegation = ctor.body.stmts.first().and_then(|stmt| match &stmt.kind {
+                StmtKind::Expr(expr) if matches!(expr.kind, ExprKind::Call { .. }) => {
+                    Some(expr.span)
+                }
+                _ => None,
+            });
             fcx.check_block(&ctor.body);
             fcx
         }
@@ -180,6 +190,7 @@ impl<'a, 'tcx> FnCtxt<'a, 'tcx> {
             call_expectations: HashMap::new(),
             exceptions: ExceptionScope::default(),
             results: TypeckResults::default(),
+            delegation: None,
         }
     }
 
