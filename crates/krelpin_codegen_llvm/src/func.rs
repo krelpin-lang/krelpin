@@ -467,11 +467,13 @@ impl<'c, 'a, 'tcx> FnCx<'c, 'a, 'tcx> {
                     "getelementptr inbounds {box_ty}, ptr {object}, i32 0, i32 1"
                 ))
             }
-            (_, Shape::NullableValue(inner)) if inner.as_ref() == from => {
+            // A widened number or a value wrapped as nullable has a different
+            // layout, so the borrow points at a converted copy.
+            (Shape::Prim(_), Shape::Prim(_)) | (_, Shape::NullableValue(_)) => {
                 let value = self.load(from, pointer);
-                let wrapped = self.pack_nullable("true", &value, to);
+                let converted = self.convert(&value, from, to);
                 let slot = self.alloca(to);
-                self.store(to, &wrapped, &slot);
+                self.store(to, &converted, &slot);
                 slot
             }
             _ => pointer.to_owned(),

@@ -1,0 +1,15 @@
+class Main {
+    static <T extends Comparable<T>> &T max(&T a, &T b) {
+        return a.compareTo(b) >= 0 ? a : b;
+    }
+
+    static void show(&long? value) {
+        Console.println(value);
+    }
+
+    static void main() {
+        Console.println(max(&3, &-0.0));
+        Console.println(max(&-7, &2.5));
+        show(&9);
+    }
+}
