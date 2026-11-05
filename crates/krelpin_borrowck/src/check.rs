@@ -518,6 +518,26 @@ impl<'a, 'tcx> Checker<'a, 'tcx> {
             return;
         }
         let loan = &self.loans.loans[index];
+        if self.is_temporary(&loan.place) && matches!(access, Access::Write | Access::Move) {
+            // The compiler's own temporary is reused or dropped while
+            // something still points at it, like `list.add(new R(i * 10))`
+            // for a record holding `&int`.
+            let mut diagnostic = Diagnostic::error("temporary value dropped while borrowed")
+                .with_span(loan.span)
+                .with_label("this creates a temporary value which is freed while still in use")
+                .with_help(
+                    "store the value in a local variable that lives as long as the reference",
+                );
+            let holders = self.holders(location, held, index);
+            if let Some(later) = self
+                .later_use(location, &holders)
+                .filter(|later| *later != loan.span)
+            {
+                diagnostic = diagnostic.with_secondary(later, "the borrow is used later here");
+            }
+            self.emit(loan.span, diagnostic);
+            return;
+        }
         let borrowed = self.tys.describe(&loan.place);
         let kind = if loan.mutable { "mutable" } else { "shared" };
         let (message, label) = match access {
@@ -566,6 +586,13 @@ impl<'a, 'tcx> Checker<'a, 'tcx> {
             diagnostic = diagnostic.with_help("use a `move` lambda to give it its own copy");
         }
         self.emit(span, diagnostic);
+    }
+
+    /// Whether `place` is a whole temporary the compiler made, which has no
+    /// name to show the user.
+    fn is_temporary(&self, place: &Place) -> bool {
+        matches!(place.base, PlaceBase::Local(local)
+            if self.body.local(local).name.is_none() && place.projection.is_empty())
     }
 
     fn holders(&self, location: Location, held: &Holdings, index: usize) -> BitSet {

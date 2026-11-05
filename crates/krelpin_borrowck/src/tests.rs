@@ -450,3 +450,13 @@ fn assignments_through_references_need_mut() {
 fn computed_divisors_are_checked_by_copy() {
     ok("int a = 10; int b = 3; int c = a / (b - 1); int d = a % -b; int e = a / -1;");
 }
+
+#[test]
+fn temporaries_cannot_outlive_their_statement() {
+    assert_eq!(
+        errors(
+            "import std.util.*; record R(&int value) {} class A { static void f() { List<R> all = new ArrayList<>(); for (int i = 0; i < 3; i++) { all.add(new R(i * 10)); } Console.println(all); } }"
+        ),
+        ["temporary value dropped while borrowed"]
+    );
+}
