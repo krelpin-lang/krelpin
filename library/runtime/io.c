@@ -11,22 +11,50 @@
 
 #include "krelpin.h"
 
-static _Thread_local int last_error;
+/* An errno value, or one of these for errors the C library doesn't name. */
+enum {
+    ERROR_NUL_IN_PATH = -1,
+    ERROR_NOT_UTF8 = -2,
+};
 
-static char *c_text(const KrString *text) {
-    char *copy = kr_alloc(text->len + 1);
-    memcpy(copy, text->data, (size_t)text->len);
-    copy[text->len] = 0;
-    return copy;
-}
+static _Thread_local int last_error;
 
 static bool failed(void) {
     last_error = errno != 0 ? errno : EIO;
     return false;
 }
 
+static bool failed_with(int error) {
+    last_error = error;
+    return false;
+}
+
+/* A NUL-terminated copy of a path, or NULL when the path contains a NUL
+ * byte: the C library would silently cut it short there. */
+static char *c_path(const KrString *path) {
+    if (memchr(path->data, 0, (size_t)path->len) != NULL) {
+        failed_with(ERROR_NUL_IN_PATH);
+        return NULL;
+    }
+    char *copy = kr_alloc(path->len + 1);
+    memcpy(copy, path->data, (size_t)path->len);
+    copy[path->len] = 0;
+    return copy;
+}
+
+/* Text read from a file must be UTF-8, like every string. */
+static KrString *checked_text(const char *bytes, int64_t len) {
+    if (!kr_utf8_valid(bytes, len)) {
+        failed_with(ERROR_NOT_UTF8);
+        return NULL;
+    }
+    return kr_string_new(bytes, len);
+}
+
 KrString *kr_io_last_error(void) {
-    const char *message = strerror(last_error);
+    const char *message = last_error == ERROR_NUL_IN_PATH ? "the path contains a NUL character"
+                          : last_error == ERROR_NOT_UTF8  ? "the data is not valid UTF-8"
+                                                          : strerror(last_error);
     return kr_string_new(message, (int64_t)strlen(message));
 }
 
@@ -57,7 +85,10 @@ bool kr_io_write_file(const KrString *path, const KrString *text, bool append) {
 }
 
 static int status(const KrString *path, struct stat *info) {
-    char *name = c_text(path);
+    char *name = c_path(path);
+    if (name == NULL) {
+        return -1;
+    }
     int result = stat(name, info);
     kr_free(name);
     return result;
@@ -89,7 +120,10 @@ int64_t kr_io_size(const KrString *path) {
 }
 
 bool kr_io_remove(const KrString *path) {
-    char *name = c_text(path);
+    char *name = c_path(path);
+    if (name == NULL) {
+        return false;
+    }
     errno = 0;
     int result = remove(name);
     kr_free(name);
@@ -97,7 +131,13 @@ bool kr_io_remove(const KrString *path) {
 }
 
 bool kr_io_create_directories(const KrString *path) {
-    char *name = c_text(path);
+    if (path->len == 0) {
+        return failed_with(ENOENT);
+    }
+    char *name = c_path(path);
+    if (name == NULL) {
+        return false;
+    }
     errno = 0;
     for (char *at = name + 1;; at++) {
         bool end = *at == 0;
@@ -129,7 +169,10 @@ static int compare_names(const void *a, const void *b) {
 }
 
 KrArray *kr_io_list(const KrString *path, const KrType *array_type) {
-    char *name = c_text(path);
+    char *name = c_path(path);
+    if (name == NULL) {
+        return NULL;
+    }
     errno = 0;
     DIR *dir = opendir(name);
     kr_free(name);
@@ -161,7 +204,7 @@ KrArray *kr_io_list(const KrString *path, const KrType *array_type) {
     array->len = count;
     KrString **out = (KrString **)array->data;
     for (int64_t i = 0; i < count; i++) {
-        out[i] = kr_string_new(names[i], (int64_t)strlen(names[i]));
+        out[i] = kr_string_from_lossy(names[i], (int64_t)strlen(names[i]));
         kr_free(names[i]);
     }
     kr_free(names);
@@ -169,7 +212,10 @@ KrArray *kr_io_list(const KrString *path, const KrType *array_type) {
 }
 
 void *kr_file_open(const KrString *path, int32_t mode) {
-    char *name = c_text(path);
+    char *name = c_path(path);
+    if (name == NULL) {
+        return NULL;
+    }
     const char *flags = mode == 0 ? "rb" : (mode == 1 ? "wb" : "ab");
     errno = 0;
     FILE *file = fopen(name, flags);
@@ -212,7 +258,7 @@ KrString *kr_file_read_line(void *file) {
             len--;
         }
     }
-    KrString *text = kr_string_new(line, len);
+    KrString *text = checked_text(line, len);
     free(line);
     return text;
 }
@@ -238,7 +284,7 @@ KrString *kr_file_read_all(void *file) {
         failed();
         return NULL;
     }
-    KrString *text = kr_string_new(buffer, len);
+    KrString *text = checked_text(buffer, len);
     kr_free(buffer);
     return text;
 }
@@ -262,13 +308,16 @@ void kr_system_exit(int32_t code) {
 }
 
 KrString *kr_system_env(const KrString *name) {
-    char *key = c_text(name);
+    char *key = c_path(name);
+    if (key == NULL) {
+        return NULL;
+    }
     const char *value = getenv(key);
     kr_free(key);
     if (value == NULL) {
         return NULL;
     }
-    return kr_string_new(value, (int64_t)strlen(value));
+    return kr_string_from_lossy(value, (int64_t)strlen(value));
 }
 
 int64_t kr_system_millis(void) {

@@ -29,7 +29,7 @@ KrArray *kr_runtime_args(const KrType *array_type) {
     array->len = count;
     KrString **out = (KrString **)array->data;
     for (int64_t i = 0; i < count; i++) {
-        out[i] = kr_string_new(saved_argv[i + 1], (int64_t)strlen(saved_argv[i + 1]));
+        out[i] = kr_string_from_lossy(saved_argv[i + 1], (int64_t)strlen(saved_argv[i + 1]));
     }
     return array;
 }
@@ -58,7 +58,7 @@ KrString *kr_console_read_line(void) {
     while (len > 0 && (line[len - 1] == '\n' || line[len - 1] == '\r')) {
         len--;
     }
-    KrString *string = kr_string_new(line, len);
+    KrString *string = kr_string_from_lossy(line, len);
     free(line);
     return string;
 }

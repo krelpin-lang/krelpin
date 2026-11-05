@@ -86,6 +86,8 @@ bool kr_instance_of(const void *object, const KrType *target);
 _Noreturn void kr_panic(const char *message);
 
 KrString *kr_string_new(const char *bytes, int64_t len);
+KrString *kr_string_from_lossy(const char *bytes, int64_t len);
+bool kr_utf8_valid(const char *bytes, int64_t len);
 void kr_string_retain(KrString *string);
 void kr_string_release(void *string);
 KrString *kr_string_concat(const KrString *a, const KrString *b);

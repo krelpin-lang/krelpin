@@ -2,6 +2,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <strings.h>
 
 #include "krelpin.h"
 
@@ -56,6 +57,56 @@ static int encode(int32_t c, char *out) {
     return 4;
 }
 
+/* The length of the well-formed UTF-8 sequence at `at`, or 0 when the bytes
+ * there are not one: a stray continuation byte, a truncated sequence, an
+ * overlong encoding, a surrogate or a code point above U+10FFFF. */
+static int64_t sequence_length(const unsigned char *bytes, int64_t len, int64_t at) {
+    unsigned char lead = bytes[at];
+    if (lead < 0x80) {
+        return 1;
+    }
+    int64_t extra;
+    int32_t min;
+    if (lead >= 0xC2 && lead <= 0xDF) {
+        extra = 1;
+        min = 0x80;
+    } else if (lead >= 0xE0 && lead <= 0xEF) {
+        extra = 2;
+        min = 0x800;
+    } else if (lead >= 0xF0 && lead <= 0xF4) {
+        extra = 3;
+        min = 0x10000;
+    } else {
+        return 0;
+    }
+    if (at + extra >= len) {
+        return 0;
+    }
+    int32_t c = lead & (0x3F >> extra);
+    for (int64_t k = 1; k <= extra; k++) {
+        unsigned char next = bytes[at + k];
+        if ((next & 0xC0) != 0x80) {
+            return 0;
+        }
+        c = (c << 6) | (next & 0x3F);
+    }
+    if (c < min || c > 0x10FFFF || (c >= 0xD800 && c <= 0xDFFF)) {
+        return 0;
+    }
+    return extra + 1;
+}
+
+bool kr_utf8_valid(const char *bytes, int64_t len) {
+    for (int64_t at = 0; at < len;) {
+        int64_t step = sequence_length((const unsigned char *)bytes, len, at);
+        if (step == 0) {
+            return false;
+        }
+        at += step;
+    }
+    return true;
+}
+
 static KrString *allocate(int64_t len) {
     KrString *string = kr_alloc((int64_t)sizeof(KrString) + len + 1);
     string->type = &kr_string_type;
@@ -69,6 +120,29 @@ KrString *kr_string_new(const char *bytes, int64_t len) {
     memcpy(string->data, bytes, (size_t)len);
     string->chars = count_chars(bytes, len);
     return string;
+}
+
+KrString *kr_string_from_lossy(const char *bytes, int64_t len) {
+    if (kr_utf8_valid(bytes, len)) {
+        return kr_string_new(bytes, len);
+    }
+    /* Each invalid byte becomes U+FFFD, which takes three bytes. */
+    char *buffer = kr_alloc(len * 3 + 1);
+    int64_t out = 0;
+    for (int64_t at = 0; at < len;) {
+        int64_t step = sequence_length((const unsigned char *)bytes, len, at);
+        if (step == 0) {
+            out += encode(0xFFFD, buffer + out);
+            at++;
+        } else {
+            memcpy(buffer + out, bytes + at, (size_t)step);
+            out += step;
+            at += step;
+        }
+    }
+    KrString *result = kr_string_new(buffer, out);
+    kr_free(buffer);
+    return result;
 }
 
 static KrString *from_c(const char *text) {
@@ -197,31 +271,47 @@ KrString *kr_string_to_lower(const KrString *string) {
     return map_chars(string, kr_char_to_lower_full);
 }
 
+/* Trimming removes characters with the Unicode White_Space property, the
+ * same set as `Char.isWhitespace`. */
+static int64_t skip_space_forward(const KrString *string, int64_t at) {
+    while (at < string->len) {
+        int64_t next = at;
+        if (!kr_char_is_whitespace(decode((const unsigned char *)string->data, string->len, &next))) {
+            break;
+        }
+        at = next;
+    }
+    return at;
+}
+
+static int64_t skip_space_backward(const KrString *string, int64_t begin, int64_t end) {
+    while (end > begin) {
+        int64_t start = end - 1;
+        while (start > begin && ((unsigned char)string->data[start] & 0xC0) == 0x80) {
+            start--;
+        }
+        int64_t at = start;
+        if (!kr_char_is_whitespace(decode((const unsigned char *)string->data, end, &at))) {
+            break;
+        }
+        end = start;
+    }
+    return end;
+}
+
 KrString *kr_string_trim(const KrString *string) {
-    int64_t begin = 0;
-    int64_t end = string->len;
-    while (begin < end && (unsigned char)string->data[begin] <= ' ') {
-        begin++;
-    }
-    while (end > begin && (unsigned char)string->data[end - 1] <= ' ') {
-        end--;
-    }
+    int64_t begin = skip_space_forward(string, 0);
+    int64_t end = skip_space_backward(string, begin, string->len);
     return kr_string_new(string->data + begin, end - begin);
 }
 
 KrString *kr_string_trim_start(const KrString *string) {
-    int64_t begin = 0;
-    while (begin < string->len && (unsigned char)string->data[begin] <= ' ') {
-        begin++;
-    }
+    int64_t begin = skip_space_forward(string, 0);
     return kr_string_new(string->data + begin, string->len - begin);
 }
 
 KrString *kr_string_trim_end(const KrString *string) {
-    int64_t end = string->len;
-    while (end > 0 && (unsigned char)string->data[end - 1] <= ' ') {
-        end--;
-    }
+    int64_t end = skip_space_backward(string, 0, string->len);
     return kr_string_new(string->data, end);
 }
 
@@ -519,8 +609,56 @@ bool kr_parse_long(const KrString *text, int64_t min, int64_t max, int64_t *out)
     return true;
 }
 
+/* Accepts what Rust's `f64::from_str` accepts: an optional sign, then decimal
+ * digits with an optional fraction and exponent, or `inf`, `infinity` or `nan`
+ * in any case. Unlike `strtod`, no surrounding whitespace and no hex. */
+static bool is_decimal_number(const KrString *text) {
+    int64_t at = 0;
+    if (at < text->len && (text->data[at] == '+' || text->data[at] == '-')) {
+        at++;
+    }
+    int64_t rest = text->len - at;
+    const char *words[] = {"inf", "infinity", "nan"};
+    for (size_t i = 0; i < sizeof words / sizeof words[0]; i++) {
+        if ((int64_t)strlen(words[i]) == rest &&
+            strncasecmp(text->data + at, words[i], (size_t)rest) == 0) {
+            return true;
+        }
+    }
+    int64_t digits = 0;
+    while (at < text->len && text->data[at] >= '0' && text->data[at] <= '9') {
+        at++;
+        digits++;
+    }
+    if (at < text->len && text->data[at] == '.') {
+        at++;
+        while (at < text->len && text->data[at] >= '0' && text->data[at] <= '9') {
+            at++;
+            digits++;
+        }
+    }
+    if (digits == 0) {
+        return false;
+    }
+    if (at < text->len && (text->data[at] == 'e' || text->data[at] == 'E')) {
+        at++;
+        if (at < text->len && (text->data[at] == '+' || text->data[at] == '-')) {
+            at++;
+        }
+        int64_t exponent = 0;
+        while (at < text->len && text->data[at] >= '0' && text->data[at] <= '9') {
+            at++;
+            exponent++;
+        }
+        if (exponent == 0) {
+            return false;
+        }
+    }
+    return at == text->len;
+}
+
 bool kr_parse_double(const KrString *text, double *out) {
-    if (text->len == 0) {
+    if (!is_decimal_number(text)) {
         return false;
     }
     char *buffer = terminated(text);
