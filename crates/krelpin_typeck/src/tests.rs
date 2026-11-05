@@ -1416,9 +1416,10 @@ fn chars_are_unicode_scalars() {
         "char smile = '😀'; char last = char.MAX_VALUE; int code = smile; \
          char[] letters = \"Ayşe 😀\".chars(); boolean letter = letters[2].isLetter();",
     );
+    body_ok("String s = \"x\"; char c = s.charAt(0);");
     assert_eq!(
-        in_body("String s = \"x\"; char c = s.charAt(0);"),
-        ["no method named `charAt` found for `String`"]
+        in_body("String s = \"x\"; String c = s.charAt(0);"),
+        ["mismatched types"]
     );
 }
 

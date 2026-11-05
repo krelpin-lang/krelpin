@@ -139,6 +139,18 @@ impl FnCx<'_, '_, '_> {
         if items.is(owner, LangItem::Format) {
             return self.format_builtin(name);
         }
+        if items.is(owner, LangItem::StringBuilder) {
+            return self.builder_builtin(name, builtin);
+        }
+        if items.is(owner, LangItem::System) {
+            return self.system_builtin(name, builtin);
+        }
+        if items.is(owner, LangItem::Files) {
+            return self.files_builtin(name, builtin);
+        }
+        if items.is(owner, LangItem::FileReader) || items.is(owner, LangItem::FileWriter) {
+            return self.file_builtin(name, builtin);
+        }
         if items.is(owner, LangItem::AtomicInt)
             || items.is(owner, LangItem::AtomicLong)
             || items.is(owner, LangItem::AtomicBool)
@@ -544,15 +556,51 @@ impl FnCx<'_, '_, '_> {
                 );
                 (value, string.clone())
             }
-            "indexOf" => {
+            "indexOf" if builtin.params.len() > 2 => {
                 let text = arg_string(self, 0);
+                let from = builtin.arg(1);
                 (
                     self.runtime(
                         "i32",
-                        "kr_string_index_of",
-                        &format!("ptr {this}, ptr {text}"),
+                        "kr_string_index_of_from",
+                        &format!("ptr {this}, ptr {text}, i32 {from}"),
                     ),
                     Ty::INT,
+                )
+            }
+            "indexOf" | "lastIndexOf" => {
+                let text = arg_string(self, 0);
+                let function = if name == "indexOf" {
+                    "kr_string_index_of"
+                } else {
+                    "kr_string_last_index_of"
+                };
+                (
+                    self.runtime("i32", function, &format!("ptr {this}, ptr {text}")),
+                    Ty::INT,
+                )
+            }
+            "charAt" => {
+                let index = builtin.arg(0);
+                let c = self.runtime(
+                    "i32",
+                    "kr_string_char_at",
+                    &format!("ptr {this}, i32 {index}"),
+                );
+                let missing = self.assign(format!("icmp slt i32 {c}, 0"));
+                let len = self.runtime("i32", "kr_string_length", &format!("ptr {this}"));
+                self.throw_out_of_bounds(&missing, &index, &len);
+                (c, Ty::CHAR)
+            }
+            "trimStart" | "trimEnd" => {
+                let function = if name == "trimStart" {
+                    "kr_string_trim_start"
+                } else {
+                    "kr_string_trim_end"
+                };
+                (
+                    self.runtime("ptr", function, &format!("ptr {this}")),
+                    string.clone(),
                 )
             }
             "startsWith" | "endsWith" | "equals" => {
@@ -657,6 +705,21 @@ impl FnCx<'_, '_, '_> {
                 }
                 if name == "println" {
                     self.runtime("void", "kr_console_newline", "");
+                }
+                self.line("ret void");
+                true
+            }
+            "eprint" | "eprintln" => {
+                if !builtin.params.is_empty() {
+                    let ty = builtin.params[0].clone();
+                    let text = self.stringify("%a0", &ty);
+                    self.runtime("void", "kr_console_eprint", &format!("ptr {text}"));
+                    self.drop_value(&text, &string);
+                    self.drop_value("%a0", &ty);
+                }
+                if name == "eprintln" {
+                    let newline = self.cx.string_literal("\n");
+                    self.runtime("void", "kr_console_eprint", &format!("ptr {newline}"));
                 }
                 self.line("ret void");
                 true
@@ -785,6 +848,194 @@ impl FnCx<'_, '_, '_> {
             }
             _ => false,
         }
+    }
+
+    fn throw_out_of_bounds(&mut self, failed: &str, index: &str, len: &str) {
+        let fail = self.fail_label();
+        let ok = self.label("inbounds");
+        let bad = self.label("outofbounds");
+        self.line(format!("br i1 {failed}, label %{bad}, label %{ok}"));
+        self.start(&bad);
+        let wide_index = self.assign(format!("sext i32 {index} to i64"));
+        let wide_len = self.assign(format!("sext i32 {len} to i64"));
+        let message = self.runtime(
+            "ptr",
+            "kr_string_bounds",
+            &format!("i64 {wide_index}, i64 {wide_len}"),
+        );
+        self.throw_with(LangItem::IndexOutOfBoundsException, &message, &fail);
+        self.line("unreachable");
+        self.start(&ok);
+    }
+
+    fn runtime_call(
+        &mut self,
+        function: &'static str,
+        ret_ll: &str,
+        builtin: &Builtin,
+        extra: &[String],
+    ) {
+        let mut args = Vec::new();
+        for (index, param) in builtin.params.iter().enumerate() {
+            let ll = self.ll(param);
+            args.push(format!("{ll} %a{index}"));
+        }
+        args.extend(extra.iter().cloned());
+        let result = self.runtime(ret_ll, function, &args.join(", "));
+        for (index, param) in builtin.params.clone().iter().enumerate() {
+            if self.cx.needs_drop(param) {
+                self.drop_value(&format!("%a{index}"), param);
+            }
+        }
+        if ret_ll == "void" {
+            self.line("ret void");
+        } else {
+            let ret = self.ret_ty.clone();
+            self.ret(&result, &ret);
+        }
+    }
+
+    fn system_builtin(&mut self, name: &str, builtin: &Builtin) -> bool {
+        match name {
+            "exit" => {
+                self.runtime("void", "kr_system_exit", "i32 %a0");
+                self.line("unreachable");
+            }
+            "env" => self.runtime_call("kr_system_env", "ptr", builtin, &[]),
+            "currentTimeMillis" => self.runtime_call("kr_system_millis", "i64", builtin, &[]),
+            "nanoTime" => self.runtime_call("kr_system_nanos", "i64", builtin, &[]),
+            _ => return false,
+        }
+        true
+    }
+
+    fn files_builtin(&mut self, name: &str, builtin: &Builtin) -> bool {
+        let (function, ret_ll) = match name {
+            "lastError" => ("kr_io_last_error", "ptr"),
+            "lastFailed" => ("kr_io_failed", "i1"),
+            "readFile" => ("kr_io_read_file", "ptr"),
+            "writeFile" => ("kr_io_write_file", "i1"),
+            "exists" => ("kr_io_exists", "i1"),
+            "isFile" => ("kr_io_is_file", "i1"),
+            "isDirectory" => ("kr_io_is_directory", "i1"),
+            "sizeOf" => ("kr_io_size", "i64"),
+            "remove" => ("kr_io_remove", "i1"),
+            "makeDirectories" => ("kr_io_create_directories", "i1"),
+            "listDirectory" => {
+                let array = Ty::Array(Box::new(self.cx.tcx.string_ty()));
+                let descriptor = self.cx.rt_global(RtKey::Array(array.clone()));
+                self.cx.drop_array_fn(&array);
+                self.runtime_call("kr_io_list", "ptr", builtin, &[format!("ptr {descriptor}")]);
+                return true;
+            }
+            _ => return false,
+        };
+        self.runtime_call(function, ret_ll, builtin, &[]);
+        true
+    }
+
+    fn file_builtin(&mut self, name: &str, builtin: &Builtin) -> bool {
+        let ty = builtin.self_ty.clone();
+        let string = self.cx.tcx.string_ty();
+        let object = self.assign("load ptr, ptr %a0");
+        let slot = self.native_addr(&object, &ty, 0);
+        let handle = self.assign(format!("load ptr, ptr {slot}"));
+        match name {
+            "openRaw" => {
+                let mode = match builtin.params.get(2) {
+                    Some(_) => self.assign("select i1 %a2, i32 2, i32 1"),
+                    None => "0".to_owned(),
+                };
+                let file = self.runtime("ptr", "kr_file_open", &format!("ptr %a1, i32 {mode}"));
+                self.drop_value("%a1", &string);
+                self.runtime("void", "kr_file_close", &format!("ptr {handle}"));
+                self.line(format!("store ptr {file}, ptr {slot}"));
+                let opened = self.assign(format!("icmp ne ptr {file}, null"));
+                self.line(format!("ret i1 {opened}"));
+            }
+            "writeRaw" => {
+                let written =
+                    self.runtime("i1", "kr_file_write", &format!("ptr {handle}, ptr %a1"));
+                self.drop_value("%a1", &string);
+                self.line(format!("ret i1 {written}"));
+            }
+            "flushRaw" => {
+                let flushed = self.runtime("i1", "kr_file_flush", &format!("ptr {handle}"));
+                self.line(format!("ret i1 {flushed}"));
+            }
+            "readLineRaw" | "readAllRaw" => {
+                let function = if name == "readLineRaw" {
+                    "kr_file_read_line"
+                } else {
+                    "kr_file_read_all"
+                };
+                let text = self.runtime("ptr", function, &format!("ptr {handle}"));
+                let ret = self.ret_ty.clone();
+                self.ret(&text, &ret);
+            }
+            _ => return false,
+        }
+        true
+    }
+
+    fn builder_builtin(&mut self, name: &str, builtin: &Builtin) -> bool {
+        let ty = builtin.self_ty.clone();
+        let string = self.cx.tcx.string_ty();
+        let object = self.assign("load ptr, ptr %a0");
+        let native = self.native_addr(&object, &ty, 0);
+        match name {
+            "append" => {
+                self.runtime(
+                    "void",
+                    "kr_builder_append",
+                    &format!("ptr {native}, ptr %a1"),
+                );
+                self.drop_value("%a1", &string);
+                self.line("ret void");
+            }
+            "insert" => {
+                let inserted = self.runtime(
+                    "i1",
+                    "kr_builder_insert",
+                    &format!("ptr {native}, i32 %a1, ptr %a2"),
+                );
+                self.drop_value("%a2", &string);
+                let failed = self.assign(format!("xor i1 {inserted}, true"));
+                let len = self.runtime("i32", "kr_builder_length", &format!("ptr {native}"));
+                self.throw_out_of_bounds(&failed, "%a1", &len);
+                self.line("ret void");
+            }
+            "truncate" => {
+                let len = self.runtime("i32", "kr_builder_length", &format!("ptr {native}"));
+                let done = self.runtime(
+                    "i1",
+                    "kr_builder_truncate",
+                    &format!("ptr {native}, i32 %a1"),
+                );
+                let failed = self.assign(format!("xor i1 {done}, true"));
+                self.throw_out_of_bounds(&failed, "%a1", &len);
+                self.line("ret void");
+            }
+            "reverse" | "clear" => {
+                let function = if name == "reverse" {
+                    "kr_builder_reverse"
+                } else {
+                    "kr_builder_clear"
+                };
+                self.runtime("void", function, &format!("ptr {native}"));
+                self.line("ret void");
+            }
+            "length" => {
+                let len = self.runtime("i32", "kr_builder_length", &format!("ptr {native}"));
+                self.line(format!("ret i32 {len}"));
+            }
+            "toString" => {
+                let text = self.runtime("ptr", "kr_builder_to_string", &format!("ptr {native}"));
+                self.ret(&text, &string);
+            }
+            _ => return false,
+        }
+        true
     }
 
     fn format_builtin(&mut self, name: &str) -> bool {

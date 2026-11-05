@@ -1,0 +1,34 @@
+package std.io;
+
+final class Path {
+    private Path() {}
+
+    static String join(String base, String child) {
+        if (base.isEmpty() || child.startsWith("/")) {
+            return child;
+        }
+        if (base.endsWith("/")) {
+            return base + child;
+        }
+        return "$base/$child";
+    }
+
+    static String fileName(String path) {
+        int slash = path.lastIndexOf("/");
+        return slash < 0 ? path : path.substring(slash + 1);
+    }
+
+    static String parent(String path) {
+        int slash = path.lastIndexOf("/");
+        if (slash < 0) {
+            return "";
+        }
+        return slash == 0 ? "/" : path.substring(0, slash);
+    }
+
+    static String extension(String path) {
+        String name = fileName(path);
+        int dot = name.lastIndexOf(".");
+        return dot <= 0 ? "" : name.substring(dot + 1);
+    }
+}

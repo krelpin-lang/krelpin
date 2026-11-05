@@ -1,0 +1,39 @@
+package std.lang;
+
+final class StringBuilder {
+    StringBuilder() {}
+
+    @Intrinsic
+    mut void append(String text);
+
+    mut void append(char c) {
+        this.append("" + c);
+    }
+
+    mut void appendLine(String text) {
+        this.append(text);
+        this.append("\n");
+    }
+
+    @Intrinsic
+    int length();
+
+    boolean isEmpty() {
+        return this.length() == 0;
+    }
+
+    @Intrinsic
+    mut void insert(int index, String text);
+
+    @Intrinsic
+    mut void truncate(int length);
+
+    @Intrinsic
+    mut void reverse();
+
+    @Intrinsic
+    mut void clear();
+
+    @Intrinsic
+    String toString();
+}

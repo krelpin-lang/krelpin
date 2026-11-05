@@ -1,0 +1,12 @@
+item 0,item 1,item 2,item 3,item 4
+len=34 text=item 0,item 1,item 2,item 3,item 4
+[item 0,item 1,item 2,item 3,item 4]
+İüğç 4 false
+[] true
+Index 5 out of bounds for length 0
+[Merhaba Dünya  ] [  Merhaba Dünya] [false] [true]
+[ ] 6 14
+-1
+true 3
+Index 99 out of bounds for length 17
+100000

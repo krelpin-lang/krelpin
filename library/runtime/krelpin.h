@@ -47,6 +47,13 @@ typedef struct {
 } KrArray;
 
 typedef struct {
+    char *data;
+    int64_t len;
+    int64_t cap;
+    int64_t chars;
+} KrBuilder;
+
+typedef struct {
     int32_t (*hash)(const void *key);
     bool (*eq)(const void *a, const void *b);
     void (*drop_key)(void *key);
@@ -92,6 +99,11 @@ bool kr_string_ends_with(const KrString *string, const KrString *suffix);
 KrString *kr_string_to_upper(const KrString *string);
 KrString *kr_string_to_lower(const KrString *string);
 KrString *kr_string_trim(const KrString *string);
+KrString *kr_string_trim_start(const KrString *string);
+KrString *kr_string_trim_end(const KrString *string);
+int32_t kr_string_char_at(const KrString *string, int32_t index);
+int32_t kr_string_index_of_from(const KrString *string, const KrString *text, int32_t from);
+int32_t kr_string_last_index_of(const KrString *string, const KrString *text);
 KrString *kr_string_replace(const KrString *string, const KrString *target,
                             const KrString *replacement);
 KrString *kr_string_repeat(const KrString *string, int32_t count);
@@ -154,6 +166,38 @@ void *kr_table_insert(KrTable *table, const KrTableShape *shape, void *entry, bo
 bool kr_table_remove(KrTable *table, const KrTableShape *shape, const void *key, void *out);
 int64_t kr_table_slot_count(const KrTable *table);
 void *kr_table_slot(const KrTable *table, const KrTableShape *shape, int64_t index);
+
+void kr_builder_append(KrBuilder *builder, const KrString *text);
+bool kr_builder_insert(KrBuilder *builder, int32_t index, const KrString *text);
+bool kr_builder_truncate(KrBuilder *builder, int32_t length);
+void kr_builder_reverse(KrBuilder *builder);
+KrString *kr_builder_to_string(const KrBuilder *builder);
+int32_t kr_builder_length(const KrBuilder *builder);
+void kr_builder_clear(KrBuilder *builder);
+void kr_builder_free(KrBuilder *builder);
+
+KrString *kr_io_last_error(void);
+bool kr_io_failed(void);
+KrString *kr_io_read_file(const KrString *path);
+bool kr_io_write_file(const KrString *path, const KrString *text, bool append);
+bool kr_io_exists(const KrString *path);
+bool kr_io_is_file(const KrString *path);
+bool kr_io_is_directory(const KrString *path);
+int64_t kr_io_size(const KrString *path);
+bool kr_io_remove(const KrString *path);
+bool kr_io_create_directories(const KrString *path);
+KrArray *kr_io_list(const KrString *path, const KrType *array_type);
+void *kr_file_open(const KrString *path, int32_t mode);
+bool kr_file_write(void *file, const KrString *text);
+bool kr_file_flush(void *file);
+KrString *kr_file_read_line(void *file);
+KrString *kr_file_read_all(void *file);
+void kr_file_close(void *file);
+void kr_console_eprint(const KrString *string);
+_Noreturn void kr_system_exit(int32_t code);
+KrString *kr_system_env(const KrString *name);
+int64_t kr_system_millis(void);
+int64_t kr_system_nanos(void);
 
 void kr_bridge_open(void);
 KrString *kr_bridge_receive(void);

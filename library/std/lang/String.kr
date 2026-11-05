@@ -8,8 +8,15 @@ final class String implements Comparable<String>, Hashable<String> {
         return this.length() == 0;
     }
 
+    boolean isBlank() {
+        return this.trim().isEmpty();
+    }
+
     @Intrinsic
     char[] chars();
+
+    @Intrinsic
+    char charAt(int index);
 
     @Intrinsic
     String substring(int begin);
@@ -19,6 +26,12 @@ final class String implements Comparable<String>, Hashable<String> {
 
     @Intrinsic
     int indexOf(String text);
+
+    @Intrinsic
+    int indexOf(String text, int from);
+
+    @Intrinsic
+    int lastIndexOf(String text);
 
     boolean contains(String text) {
         return this.indexOf(text) >= 0;
@@ -38,6 +51,29 @@ final class String implements Comparable<String>, Hashable<String> {
 
     @Intrinsic
     String trim();
+
+    @Intrinsic
+    String trimStart();
+
+    @Intrinsic
+    String trimEnd();
+
+    boolean equalsIgnoreCase(&String other) {
+        return this.toLowerCase().equals(&other.toLowerCase());
+    }
+
+    String[] lines() {
+        String[] parts = this.replace("\r\n", "\n").split("\n");
+        int count = parts.length;
+        if (count > 0 && parts[count - 1].isEmpty()) {
+            count--;
+        }
+        String[] lines = new String[count];
+        for (int i = 0; i < count; i++) {
+            lines[i] = parts[i];
+        }
+        return lines;
+    }
 
     @Intrinsic
     String replace(String target, String replacement);

@@ -328,7 +328,11 @@ impl Cx<'_, '_> {
             vec!["ptr", "i64", "i64"]
         } else if items.is(def, LangItem::HashMap) || items.is(def, LangItem::HashSet) {
             vec!["ptr", "i64", "i64", "i64", "ptr", "i64"]
+        } else if items.is(def, LangItem::StringBuilder) {
+            vec!["ptr", "i64", "i64", "i64"]
         } else if items.is(def, LangItem::Thread)
+            || items.is(def, LangItem::FileReader)
+            || items.is(def, LangItem::FileWriter)
             || items.is(def, LangItem::Mutex)
             || items.is(def, LangItem::MutexGuard)
         {

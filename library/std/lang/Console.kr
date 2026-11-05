@@ -19,5 +19,20 @@ final class Console {
     static void println(&Object? value);
 
     @Intrinsic
+    static void eprint(Object? value);
+
+    @Intrinsic
+    static void eprint(&Object? value);
+
+    @Intrinsic
+    static void eprintln();
+
+    @Intrinsic
+    static void eprintln(Object? value);
+
+    @Intrinsic
+    static void eprintln(&Object? value);
+
+    @Intrinsic
     static String? readLine();
 }

@@ -205,6 +205,53 @@ KrString *kr_string_trim(const KrString *string) {
     return kr_string_new(string->data + begin, end - begin);
 }
 
+KrString *kr_string_trim_start(const KrString *string) {
+    int64_t begin = 0;
+    while (begin < string->len && (unsigned char)string->data[begin] <= ' ') {
+        begin++;
+    }
+    return kr_string_new(string->data + begin, string->len - begin);
+}
+
+KrString *kr_string_trim_end(const KrString *string) {
+    int64_t end = string->len;
+    while (end > 0 && (unsigned char)string->data[end - 1] <= ' ') {
+        end--;
+    }
+    return kr_string_new(string->data, end);
+}
+
+int32_t kr_string_char_at(const KrString *string, int32_t index) {
+    if (index < 0 || index >= string->chars) {
+        return -1;
+    }
+    int64_t at = kr_string_byte_offset(string, index);
+    return decode((const unsigned char *)string->data, string->len, &at);
+}
+
+int32_t kr_string_index_of_from(const KrString *string, const KrString *text, int32_t from) {
+    if (from < 0) {
+        from = 0;
+    }
+    if (from > string->chars) {
+        return -1;
+    }
+    int64_t at = find_bytes(string, text, kr_string_byte_offset(string, from));
+    if (at < 0) {
+        return -1;
+    }
+    return (int32_t)count_chars(string->data, at);
+}
+
+int32_t kr_string_last_index_of(const KrString *string, const KrString *text) {
+    for (int64_t i = string->len - text->len; i >= 0; i--) {
+        if (memcmp(string->data + i, text->data, (size_t)text->len) == 0) {
+            return (int32_t)count_chars(string->data, i);
+        }
+    }
+    return -1;
+}
+
 KrString *kr_string_replace(const KrString *string, const KrString *target,
                             const KrString *replacement) {
     if (target->len == 0) {

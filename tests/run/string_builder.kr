@@ -1,0 +1,42 @@
+class Main {
+    static void main() {
+        StringBuilder sb = new StringBuilder();
+        for (int i = 0; i < 5; i++) {
+            sb.append("item $i");
+            sb.append(',');
+        }
+        sb.truncate(sb.length() - 1);
+        Console.println(sb.toString());
+        Console.println("len=${sb.length()} text=$sb");
+        sb.insert(0, "[");
+        sb.append("]");
+        sb.appendLine("");
+        Console.print(sb.toString());
+        StringBuilder u = new StringBuilder();
+        u.append("çğüİ");
+        u.reverse();
+        Console.println("$u ${u.length()} ${u.isEmpty()}");
+        u.clear();
+        Console.println("[$u] ${u.isEmpty()}");
+        try {
+            u.insert(5, "x");
+        } catch (IndexOutOfBoundsException error) {
+            Console.println(error.getMessage());
+        }
+        String s = "  Merhaba Dünya  ";
+        Console.println("[${s.trimStart()}] [${s.trimEnd()}] [${s.isBlank()}] [${"  ".isBlank()}]");
+        Console.println("[${s.charAt(9)}] ${s.indexOf("a", 6)} ${s.lastIndexOf("a")}");
+        Console.println(s.indexOf("zz", 1));
+        Console.println("${"ABC".equalsIgnoreCase(&"abc")} ${"a\nb\r\nc\n".lines().length}");
+        try {
+            Console.println(s.charAt(99));
+        } catch (IndexOutOfBoundsException error) {
+            Console.println(error.getMessage());
+        }
+        StringBuilder big = new StringBuilder();
+        for (int i = 0; i < 100000; i++) {
+            big.append("x");
+        }
+        Console.println(big.length());
+    }
+}

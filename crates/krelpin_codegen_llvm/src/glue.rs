@@ -407,6 +407,13 @@ impl FnCx<'_, '_, '_> {
                 "kr_table_free",
                 &format!("ptr {table}, ptr {shape}"),
             );
+        } else if items.is(def, LangItem::FileReader) || items.is(def, LangItem::FileWriter) {
+            let handle = self.native_addr(object, ty, 0);
+            let handle = self.assign(format!("load ptr, ptr {handle}"));
+            self.runtime("void", "kr_file_close", &format!("ptr {handle}"));
+        } else if items.is(def, LangItem::StringBuilder) {
+            let builder = self.native_addr(object, ty, 0);
+            self.runtime("void", "kr_builder_free", &format!("ptr {builder}"));
         } else if items.is(def, LangItem::Thread) {
             let handle = self.native_addr(object, ty, 0);
             let handle = self.assign(format!("load ptr, ptr {handle}"));

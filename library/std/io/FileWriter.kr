@@ -1,0 +1,47 @@
+package std.io;
+
+final class FileWriter {
+    private FileWriter() {}
+
+    static FileWriter create(String path) throws IOException {
+        return open(path, false);
+    }
+
+    static FileWriter append(String path) throws IOException {
+        return open(path, true);
+    }
+
+    mut void write(String text) throws IOException {
+        if (!this.writeRaw(text)) {
+            throw new IOException("couldn't write: ${Files.lastError()}");
+        }
+    }
+
+    mut void writeLine(String text) throws IOException {
+        this.write(text);
+        this.write("\n");
+    }
+
+    mut void flush() throws IOException {
+        if (!this.flushRaw()) {
+            throw new IOException("couldn't flush: ${Files.lastError()}");
+        }
+    }
+
+    private static FileWriter open(String path, boolean append) throws IOException {
+        FileWriter writer = new FileWriter();
+        if (!writer.openRaw(path, append)) {
+            throw Files.failure("open", path);
+        }
+        return writer;
+    }
+
+    @Intrinsic
+    private mut boolean openRaw(String path, boolean append);
+
+    @Intrinsic
+    private mut boolean writeRaw(String text);
+
+    @Intrinsic
+    private mut boolean flushRaw();
+}

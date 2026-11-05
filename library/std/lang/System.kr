@@ -1,0 +1,17 @@
+package std.lang;
+
+final class System {
+    private System() {}
+
+    @Intrinsic
+    static void exit(int code);
+
+    @Intrinsic
+    static String? env(String name);
+
+    @Intrinsic
+    static long currentTimeMillis();
+
+    @Intrinsic
+    static long nanoTime();
+}

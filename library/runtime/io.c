@@ -1,0 +1,284 @@
+#define _GNU_SOURCE
+
+#include <dirent.h>
+#include <errno.h>
+#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
+#include <sys/stat.h>
+#include <time.h>
+#include <unistd.h>
+
+#include "krelpin.h"
+
+static _Thread_local int last_error;
+
+static char *c_text(const KrString *text) {
+    char *copy = kr_alloc(text->len + 1);
+    memcpy(copy, text->data, (size_t)text->len);
+    copy[text->len] = 0;
+    return copy;
+}
+
+static bool failed(void) {
+    last_error = errno != 0 ? errno : EIO;
+    return false;
+}
+
+KrString *kr_io_last_error(void) {
+    const char *message = strerror(last_error);
+    return kr_string_new(message, (int64_t)strlen(message));
+}
+
+bool kr_io_failed(void) {
+    return last_error != 0;
+}
+
+KrString *kr_io_read_file(const KrString *path) {
+    void *file = kr_file_open(path, 0);
+    if (file == NULL) {
+        return NULL;
+    }
+    KrString *text = kr_file_read_all(file);
+    kr_file_close(file);
+    return text;
+}
+
+bool kr_io_write_file(const KrString *path, const KrString *text, bool append) {
+    void *file = kr_file_open(path, append ? 2 : 1);
+    if (file == NULL) {
+        return false;
+    }
+    bool written = kr_file_write(file, text);
+    if (fclose(file) != 0 && written) {
+        return failed();
+    }
+    return written;
+}
+
+static int status(const KrString *path, struct stat *info) {
+    char *name = c_text(path);
+    int result = stat(name, info);
+    kr_free(name);
+    return result;
+}
+
+bool kr_io_exists(const KrString *path) {
+    struct stat info;
+    return status(path, &info) == 0;
+}
+
+bool kr_io_is_file(const KrString *path) {
+    struct stat info;
+    return status(path, &info) == 0 && S_ISREG(info.st_mode);
+}
+
+bool kr_io_is_directory(const KrString *path) {
+    struct stat info;
+    return status(path, &info) == 0 && S_ISDIR(info.st_mode);
+}
+
+int64_t kr_io_size(const KrString *path) {
+    struct stat info;
+    errno = 0;
+    if (status(path, &info) != 0) {
+        failed();
+        return -1;
+    }
+    return (int64_t)info.st_size;
+}
+
+bool kr_io_remove(const KrString *path) {
+    char *name = c_text(path);
+    errno = 0;
+    int result = remove(name);
+    kr_free(name);
+    return result == 0 || failed();
+}
+
+bool kr_io_create_directories(const KrString *path) {
+    char *name = c_text(path);
+    errno = 0;
+    for (char *at = name + 1;; at++) {
+        bool end = *at == 0;
+        if (*at == '/' || end) {
+            char saved = *at;
+            *at = 0;
+            if (mkdir(name, 0777) != 0 && errno != EEXIST) {
+                kr_free(name);
+                return failed();
+            }
+            *at = saved;
+        }
+        if (end) {
+            break;
+        }
+    }
+    struct stat info;
+    bool directory = stat(name, &info) == 0 && S_ISDIR(info.st_mode);
+    kr_free(name);
+    if (!directory) {
+        errno = ENOTDIR;
+        return failed();
+    }
+    return true;
+}
+
+static int compare_names(const void *a, const void *b) {
+    return strcmp(*(char *const *)a, *(char *const *)b);
+}
+
+KrArray *kr_io_list(const KrString *path, const KrType *array_type) {
+    char *name = c_text(path);
+    errno = 0;
+    DIR *dir = opendir(name);
+    kr_free(name);
+    if (dir == NULL) {
+        failed();
+        return NULL;
+    }
+    int64_t count = 0;
+    int64_t cap = 16;
+    char **names = kr_alloc(cap * (int64_t)sizeof(char *));
+    struct dirent *entry;
+    while ((entry = readdir(dir)) != NULL) {
+        if (strcmp(entry->d_name, ".") == 0 || strcmp(entry->d_name, "..") == 0) {
+            continue;
+        }
+        if (count == cap) {
+            cap *= 2;
+            names = kr_realloc(names, cap * (int64_t)sizeof(char *));
+        }
+        size_t len = strlen(entry->d_name);
+        names[count] = kr_alloc((int64_t)len + 1);
+        memcpy(names[count], entry->d_name, len + 1);
+        count++;
+    }
+    closedir(dir);
+    qsort(names, (size_t)count, sizeof(char *), compare_names);
+    KrArray *array = kr_alloc((int64_t)sizeof(KrArray) + count * (int64_t)sizeof(void *));
+    array->type = array_type;
+    array->len = count;
+    KrString **out = (KrString **)array->data;
+    for (int64_t i = 0; i < count; i++) {
+        out[i] = kr_string_new(names[i], (int64_t)strlen(names[i]));
+        kr_free(names[i]);
+    }
+    kr_free(names);
+    return array;
+}
+
+void *kr_file_open(const KrString *path, int32_t mode) {
+    char *name = c_text(path);
+    const char *flags = mode == 0 ? "rb" : (mode == 1 ? "wb" : "ab");
+    errno = 0;
+    FILE *file = fopen(name, flags);
+    kr_free(name);
+    if (file == NULL) {
+        failed();
+    }
+    return file;
+}
+
+bool kr_file_write(void *file, const KrString *text) {
+    errno = 0;
+    if (fwrite(text->data, 1, (size_t)text->len, file) != (size_t)text->len) {
+        return failed();
+    }
+    return true;
+}
+
+bool kr_file_flush(void *file) {
+    errno = 0;
+    return fflush(file) == 0 || failed();
+}
+
+KrString *kr_file_read_line(void *file) {
+    char *line = NULL;
+    size_t cap = 0;
+    errno = 0;
+    last_error = 0;
+    ssize_t len = getline(&line, &cap, file);
+    if (len < 0) {
+        free(line);
+        if (ferror(file)) {
+            failed();
+        }
+        return NULL;
+    }
+    if (len > 0 && line[len - 1] == '\n') {
+        len--;
+        if (len > 0 && line[len - 1] == '\r') {
+            len--;
+        }
+    }
+    KrString *text = kr_string_new(line, len);
+    free(line);
+    return text;
+}
+
+KrString *kr_file_read_all(void *file) {
+    int64_t cap = 4096;
+    int64_t len = 0;
+    char *buffer = kr_alloc(cap);
+    errno = 0;
+    for (;;) {
+        if (len == cap) {
+            cap *= 2;
+            buffer = kr_realloc(buffer, cap);
+        }
+        size_t read = fread(buffer + len, 1, (size_t)(cap - len), file);
+        len += (int64_t)read;
+        if (read == 0) {
+            break;
+        }
+    }
+    if (ferror(file)) {
+        kr_free(buffer);
+        failed();
+        return NULL;
+    }
+    KrString *text = kr_string_new(buffer, len);
+    kr_free(buffer);
+    return text;
+}
+
+void kr_file_close(void *file) {
+    if (file != NULL) {
+        fclose(file);
+    }
+}
+
+void kr_console_eprint(const KrString *string) {
+    fflush(stdout);
+    fwrite(string->data, 1, (size_t)string->len, stderr);
+}
+
+void kr_system_exit(int32_t code) {
+    kr_runtime_exit();
+    fflush(stdout);
+    fflush(stderr);
+    exit(code);
+}
+
+KrString *kr_system_env(const KrString *name) {
+    char *key = c_text(name);
+    const char *value = getenv(key);
+    kr_free(key);
+    if (value == NULL) {
+        return NULL;
+    }
+    return kr_string_new(value, (int64_t)strlen(value));
+}
+
+int64_t kr_system_millis(void) {
+    struct timespec now;
+    clock_gettime(CLOCK_REALTIME, &now);
+    return (int64_t)now.tv_sec * 1000 + now.tv_nsec / 1000000;
+}
+
+int64_t kr_system_nanos(void) {
+    struct timespec now;
+    clock_gettime(CLOCK_MONOTONIC, &now);
+    return (int64_t)now.tv_sec * 1000000000 + now.tv_nsec;
+}

@@ -1,0 +1,19 @@
+satır 1
+satır 2
+satır 3
+lines=3 size=27
+file=true dir=true
+read: entry 0
+read: entry 1
+read: entry 2
+read: last
+all=24 chars
+entry    log.txt ext=txt
+entry  notes.txt ext=txt
+notes.txt | deeper
+[] [/] []
+true
+true
+cleaned=true
+env=unset
+clock=true

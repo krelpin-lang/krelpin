@@ -1,0 +1,38 @@
+package std.io;
+
+final class FileReader {
+    private FileReader() {}
+
+    static FileReader open(String path) throws IOException {
+        FileReader reader = new FileReader();
+        if (!reader.openRaw(path)) {
+            throw Files.failure("open", path);
+        }
+        return reader;
+    }
+
+    mut String? readLine() throws IOException {
+        String? line = this.readLineRaw();
+        if (line == null && Files.lastFailed()) {
+            throw new IOException("couldn't read a line: ${Files.lastError()}");
+        }
+        return line;
+    }
+
+    mut String readAll() throws IOException {
+        String? text = this.readAllRaw();
+        if (text == null) {
+            throw new IOException("couldn't read the file: ${Files.lastError()}");
+        }
+        return text;
+    }
+
+    @Intrinsic
+    private mut boolean openRaw(String path);
+
+    @Intrinsic
+    private mut String? readLineRaw();
+
+    @Intrinsic
+    private mut String? readAllRaw();
+}

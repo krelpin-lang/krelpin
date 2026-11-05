@@ -1,0 +1,94 @@
+package std.io;
+
+final class Files {
+    private Files() {}
+
+    static String readString(String path) throws IOException {
+        String? text = readFile(path);
+        if (text == null) {
+            throw failure("read", path);
+        }
+        return text;
+    }
+
+    static String[] readLines(String path) throws IOException {
+        return readString(path).lines();
+    }
+
+    static void writeString(String path, String text) throws IOException {
+        if (!writeFile(path, text, false)) {
+            throw failure("write", path);
+        }
+    }
+
+    static void appendString(String path, String text) throws IOException {
+        if (!writeFile(path, text, true)) {
+            throw failure("append to", path);
+        }
+    }
+
+    @Intrinsic
+    static boolean exists(String path);
+
+    @Intrinsic
+    static boolean isFile(String path);
+
+    @Intrinsic
+    static boolean isDirectory(String path);
+
+    static long size(String path) throws IOException {
+        long size = sizeOf(path);
+        if (size < 0) {
+            throw failure("read the size of", path);
+        }
+        return size;
+    }
+
+    static void delete(String path) throws IOException {
+        if (!remove(path)) {
+            throw failure("delete", path);
+        }
+    }
+
+    static void createDirectories(String path) throws IOException {
+        if (!makeDirectories(path)) {
+            throw failure("create the directory", path);
+        }
+    }
+
+    static String[] list(String directory) throws IOException {
+        String[]? names = listDirectory(directory);
+        if (names == null) {
+            throw failure("list", directory);
+        }
+        return names;
+    }
+
+    static IOException failure(String action, String path) {
+        return new IOException("couldn't $action `$path`: ${lastError()}");
+    }
+
+    @Intrinsic
+    static String lastError();
+
+    @Intrinsic
+    static boolean lastFailed();
+
+    @Intrinsic
+    private static String? readFile(String path);
+
+    @Intrinsic
+    private static boolean writeFile(String path, String text, boolean append);
+
+    @Intrinsic
+    private static long sizeOf(String path);
+
+    @Intrinsic
+    private static boolean remove(String path);
+
+    @Intrinsic
+    private static boolean makeDirectories(String path);
+
+    @Intrinsic
+    private static String[]? listDirectory(String path);
+}
