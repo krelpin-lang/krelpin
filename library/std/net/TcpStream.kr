@@ -1,0 +1,254 @@
+package std.net;
+
+import std.io.Files;
+import std.io.IOException;
+
+/**
+ * A TCP connection, made with `connect` or returned by
+ * `TcpListener.accept`.
+ *
+ * Reads block until data arrives and writes until the data is handed to
+ * the system. Text is UTF-8; use `read` and `writeBytes` for binary data.
+ *
+ * ```
+ * TcpStream stream = TcpStream.connect("example.com:80");
+ * stream.write("GET / HTTP/1.0\r\nHost: example.com\r\n\r\n");
+ * String? status = stream.readLine(); // "HTTP/1.0 200 OK"
+ * ```
+ *
+ * The connection is closed when the stream is dropped. Writing to a
+ * connection the peer has closed throws an `IOException`; it never kills
+ * the program with `SIGPIPE`.
+ */
+final class TcpStream {
+    private TcpStream() {}
+
+    /**
+     * Connects to `address`, written as `host:port`. A host name is resolved
+     * and each of its addresses is tried in turn.
+     *
+     * # Throws
+     *
+     * `IOException` if the address is malformed or can't be resolved, or
+     * no address accepts the connection.
+     */
+    static TcpStream connect(String address) throws IOException {
+        TcpStream stream = new TcpStream();
+        if (!stream.connectRaw(address)) {
+            throw new IOException("couldn't connect to `$address`: ${Files.lastError()}");
+        }
+        return stream;
+    }
+
+    /**
+     * Waits for the next client of `listener` and returns the connection.
+     * The same as `listener.accept()`.
+     *
+     * # Throws
+     *
+     * `IOException` if accepting fails or times out.
+     */
+    static TcpStream accept(&mut TcpListener listener) throws IOException {
+        TcpStream stream = new TcpStream();
+        if (!stream.acceptRaw(listener)) {
+            throw new IOException("couldn't accept a connection: ${Files.lastError()}");
+        }
+        return stream;
+    }
+
+    /**
+     * Returns the next line without its `\n` or `\r\n`, or `null` once the
+     * peer has closed the connection. A last line without a line ending is
+     * still returned.
+     *
+     * Bytes read past the line are kept for the next call to `readLine`,
+     * `read` or `readAll`.
+     *
+     * # Throws
+     *
+     * `IOException` if reading fails or times out, or the line isn't valid
+     * UTF-8.
+     */
+    mut String? readLine() throws IOException {
+        String? line = this.readLineRaw();
+        if (line == null && Files.lastFailed()) {
+            throw new IOException("couldn't read a line: ${Files.lastError()}");
+        }
+        return line;
+    }
+
+    /**
+     * Reads until the peer closes the connection and returns everything
+     * that arrived.
+     *
+     * # Throws
+     *
+     * `IOException` if reading fails or times out, or the text isn't valid
+     * UTF-8.
+     */
+    mut String readAll() throws IOException {
+        String? text = this.readAllRaw();
+        if (text == null) {
+            throw new IOException("couldn't read the connection: ${Files.lastError()}");
+        }
+        return text;
+    }
+
+    /**
+     * Waits for data and returns up to `max` bytes of it. An empty array
+     * means the peer has closed the connection.
+     *
+     * # Throws
+     *
+     * `IllegalArgumentException` if `max` isn't positive.
+     * `IOException` if reading fails or times out.
+     */
+    mut byte[] read(int max) throws IOException {
+        if (max <= 0) {
+            throw new IllegalArgumentException("read: `max` must be positive, not $max");
+        }
+        byte[]? bytes = this.readRaw(max);
+        if (bytes == null) {
+            throw new IOException("couldn't read the connection: ${Files.lastError()}");
+        }
+        return bytes;
+    }
+
+    /**
+     * Sends `text` as UTF-8, all of it.
+     *
+     * # Throws
+     *
+     * `IOException` if sending fails or times out, or the peer has closed
+     * the connection.
+     */
+    mut void write(String text) throws IOException {
+        if (!this.writeRaw(text)) {
+            throw new IOException("couldn't write to the connection: ${Files.lastError()}");
+        }
+    }
+
+    /**
+     * Sends all of `bytes`.
+     *
+     * # Throws
+     *
+     * `IOException` if sending fails or times out, or the peer has closed
+     * the connection.
+     */
+    mut void writeBytes(&byte[] bytes) throws IOException {
+        if (!this.writeBytesRaw(bytes)) {
+            throw new IOException("couldn't write to the connection: ${Files.lastError()}");
+        }
+    }
+
+    /**
+     * Tells the peer that nothing more will be sent, while still allowing
+     * reads. The peer's reads then see the end of the stream, which is how
+     * a client says it has sent its whole request.
+     *
+     * ```
+     * stream.write(request);
+     * stream.shutdownWrite();
+     * String response = stream.readAll();
+     * ```
+     */
+    mut void shutdownWrite() throws IOException {
+        if (!this.shutdownWriteRaw()) {
+            throw new IOException("couldn't shut the connection down: ${Files.lastError()}");
+        }
+    }
+
+    /** Returns the address of the other end of the connection. */
+    SocketAddr peerAddr() throws IOException {
+        String? address = this.peerAddrRaw();
+        if (address == null) {
+            throw new IOException("couldn't get the peer address: ${Files.lastError()}");
+        }
+        return SocketAddr.parse(address);
+    }
+
+    /** Returns the address of this end of the connection. */
+    SocketAddr localAddr() throws IOException {
+        String? address = this.localAddrRaw();
+        if (address == null) {
+            throw new IOException("couldn't get the local address: ${Files.lastError()}");
+        }
+        return SocketAddr.parse(address);
+    }
+
+    /**
+     * Makes reads give up after `millis` milliseconds without data. `0`
+     * waits forever, which is the default.
+     *
+     * # Throws
+     *
+     * `IOException` if `millis` is negative or the system refuses.
+     */
+    mut void setReadTimeout(long millis) throws IOException {
+        if (!this.setTimeoutRaw(millis, false)) {
+            throw new IOException("couldn't set the timeout: ${Files.lastError()}");
+        }
+    }
+
+    /**
+     * Makes writes give up after `millis` milliseconds without progress.
+     * `0` waits forever, which is the default.
+     *
+     * # Throws
+     *
+     * `IOException` if `millis` is negative or the system refuses.
+     */
+    mut void setWriteTimeout(long millis) throws IOException {
+        if (!this.setTimeoutRaw(millis, true)) {
+            throw new IOException("couldn't set the timeout: ${Files.lastError()}");
+        }
+    }
+
+    /**
+     * Turns Nagle's algorithm off (`true`) or on. With it off, small writes
+     * are sent at once instead of being collected, which lowers latency for
+     * request-response protocols.
+     */
+    mut void setNoDelay(boolean noDelay) throws IOException {
+        if (!this.setNoDelayRaw(noDelay)) {
+            throw new IOException("couldn't set TCP_NODELAY: ${Files.lastError()}");
+        }
+    }
+
+    @Intrinsic
+    private mut boolean connectRaw(String address);
+
+    @Intrinsic
+    private mut boolean acceptRaw(&mut TcpListener listener);
+
+    @Intrinsic
+    private mut String? readLineRaw();
+
+    @Intrinsic
+    private mut String? readAllRaw();
+
+    @Intrinsic
+    private mut byte[]? readRaw(int max);
+
+    @Intrinsic
+    private mut boolean writeRaw(String text);
+
+    @Intrinsic
+    private mut boolean writeBytesRaw(&byte[] bytes);
+
+    @Intrinsic
+    private mut boolean shutdownWriteRaw();
+
+    @Intrinsic
+    private String? peerAddrRaw();
+
+    @Intrinsic
+    private String? localAddrRaw();
+
+    @Intrinsic
+    private mut boolean setTimeoutRaw(long millis, boolean writing);
+
+    @Intrinsic
+    private mut boolean setNoDelayRaw(boolean noDelay);
+}

@@ -1,0 +1,16 @@
+package std.net;
+
+/**
+ * A message received by a `UdpSocket`, with the address it came from.
+ *
+ * ```
+ * Datagram message = socket.receive(1500);
+ * socket.send(message.data, message.sender.toString()); // echo it back
+ * ```
+ */
+record Datagram(byte[] data, SocketAddr sender) {
+    /** Returns the data as text, or `null` when it isn't valid UTF-8. */
+    String? text() {
+        return String.fromUtf8(&this.data);
+    }
+}

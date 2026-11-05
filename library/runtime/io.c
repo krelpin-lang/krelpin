@@ -1,6 +1,7 @@
 #define _GNU_SOURCE
 
 #include <dirent.h>
+#include <netdb.h>
 #include <errno.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -15,9 +16,13 @@
 enum {
     ERROR_NUL_IN_PATH = -1,
     ERROR_NOT_UTF8 = -2,
+    ERROR_RESOLVE = -3,
+    ERROR_BAD_ADDRESS = -4,
 };
 
 static _Thread_local int last_error;
+/* The `getaddrinfo` error behind ERROR_RESOLVE. */
+static _Thread_local int resolve_error;
 
 static bool failed(void) {
     last_error = errno != 0 ? errno : EIO;
@@ -52,10 +57,51 @@ static KrString *checked_text(const char *bytes, int64_t len) {
 }
 
 KrString *kr_io_last_error(void) {
-    const char *message = last_error == ERROR_NUL_IN_PATH ? "the path contains a NUL character"
-                          : last_error == ERROR_NOT_UTF8  ? "the data is not valid UTF-8"
-                                                          : strerror(last_error);
+    const char *message;
+    switch (last_error) {
+    case ERROR_NUL_IN_PATH:
+        message = "the path contains a NUL character";
+        break;
+    case ERROR_NOT_UTF8:
+        message = "the data is not valid UTF-8";
+        break;
+    case ERROR_RESOLVE:
+        message = gai_strerror(resolve_error);
+        break;
+    case ERROR_BAD_ADDRESS:
+        message = "expected an address like `127.0.0.1:8080`, `[::1]:8080` or `localhost:8080`";
+        break;
+    default:
+        message = strerror(last_error);
+        break;
+    }
     return kr_string_new(message, (int64_t)strlen(message));
+}
+
+bool kr_io_fail(int error) {
+    last_error = error != 0 ? error : EIO;
+    return false;
+}
+
+bool kr_io_fail_errno(void) {
+    return failed();
+}
+
+bool kr_io_fail_resolve(int error) {
+    resolve_error = error;
+    return failed_with(ERROR_RESOLVE);
+}
+
+bool kr_io_fail_bad_address(void) {
+    return failed_with(ERROR_BAD_ADDRESS);
+}
+
+bool kr_io_fail_not_utf8(void) {
+    return failed_with(ERROR_NOT_UTF8);
+}
+
+void kr_io_clear_error(void) {
+    last_error = 0;
 }
 
 bool kr_io_failed(void) {

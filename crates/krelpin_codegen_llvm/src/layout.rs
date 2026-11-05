@@ -24,6 +24,14 @@ pub(crate) enum PtrKind {
     Null,
 }
 
+/// The socket classes of `std.net`, which keep their socket in a native slot.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub(crate) enum NetClass {
+    Listener,
+    Stream,
+    Udp,
+}
+
 #[derive(Clone, Debug)]
 pub(crate) struct ClassField {
     pub owner: DefId,
@@ -321,6 +329,26 @@ impl Cx<'_, '_> {
         fields
     }
 
+    pub(crate) fn net_class(&self, def: DefId) -> Option<NetClass> {
+        let items = &self.tcx.lang_items;
+        if items.is(def, LangItem::TcpListener) {
+            Some(NetClass::Listener)
+        } else if items.is(def, LangItem::TcpStream) {
+            Some(NetClass::Stream)
+        } else if items.is(def, LangItem::UdpSocket) {
+            Some(NetClass::Udp)
+        } else {
+            None
+        }
+    }
+
+    pub(crate) fn net_class_of(&self, ty: &Ty) -> Option<NetClass> {
+        match ty {
+            Ty::Adt { def, .. } => self.net_class(*def),
+            _ => None,
+        }
+    }
+
     pub(crate) fn native_fields(&self, def: DefId) -> Vec<&'static str> {
         let items = &self.tcx.lang_items;
         if items.is(def, LangItem::ArrayList) {
@@ -332,6 +360,9 @@ impl Cx<'_, '_> {
         } else if items.is(def, LangItem::Thread)
             || items.is(def, LangItem::FileReader)
             || items.is(def, LangItem::FileWriter)
+            || items.is(def, LangItem::TcpListener)
+            || items.is(def, LangItem::TcpStream)
+            || items.is(def, LangItem::UdpSocket)
             || items.is(def, LangItem::Mutex)
             || items.is(def, LangItem::MutexGuard)
         {

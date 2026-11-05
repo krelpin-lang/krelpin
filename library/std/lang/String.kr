@@ -42,6 +42,28 @@ final class String implements Comparable<String>, Hashable<String> {
     char[] chars();
 
     /**
+     * Returns the UTF-8 encoding of this string as a new array.
+     *
+     * ```
+     * "hé".bytes() // [104, -61, -87]
+     * ```
+     */
+    @Intrinsic
+    byte[] bytes();
+
+    /**
+     * Decodes `bytes` as UTF-8, or returns `null` when they aren't valid
+     * UTF-8.
+     *
+     * ```
+     * byte[] data = "hé".bytes();
+     * String.fromUtf8(&data) // "hé"
+     * ```
+     */
+    @Intrinsic
+    static String? fromUtf8(&byte[] bytes);
+
+    /**
      * Returns the character at `index`, counting from 0.
      *
      * Each call walks the string from the start when it contains non-ASCII

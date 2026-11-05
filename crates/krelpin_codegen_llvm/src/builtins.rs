@@ -7,7 +7,7 @@ use krelpin_typeck::{AdtKind, LangItem, Ty};
 use crate::cx::Cx;
 use crate::func::{FnCx, array_ll};
 use crate::instance::{Instance, Thunk};
-use crate::layout::{PtrKind, Shape};
+use crate::layout::{NetClass, PtrKind, Shape};
 use crate::rtti::RtKey;
 
 struct Builtin {
@@ -150,6 +150,9 @@ impl FnCx<'_, '_, '_> {
         }
         if items.is(owner, LangItem::FileReader) || items.is(owner, LangItem::FileWriter) {
             return self.file_builtin(name, builtin);
+        }
+        if let Some(class) = self.cx.net_class(owner) {
+            return self.net_builtin(class, name, builtin);
         }
         if items.is(owner, LangItem::AtomicInt)
             || items.is(owner, LangItem::AtomicLong)
@@ -521,6 +524,13 @@ impl FnCx<'_, '_, '_> {
             self.ret(&text, &string);
             return true;
         }
+        if name == "fromUtf8" {
+            let bytes = self.assign("load ptr, ptr %a0");
+            let text = self.runtime("ptr", "kr_string_from_utf8", &format!("ptr {bytes}"));
+            let ret = self.ret_ty.clone();
+            self.ret(&text, &ret);
+            return true;
+        }
         if name == "join" {
             let joined = self.runtime("ptr", "kr_string_join", "ptr %a0, ptr %a1");
             release_args(self);
@@ -533,6 +543,19 @@ impl FnCx<'_, '_, '_> {
                 self.runtime("i32", "kr_string_length", &format!("ptr {this}")),
                 Ty::INT,
             ),
+            "bytes" => {
+                let array_ty = Ty::Array(Box::new(Ty::Primitive(PrimitiveTy::Byte)));
+                let descriptor = self.cx.rt_global(RtKey::Array(array_ty.clone()));
+                self.cx.drop_array_fn(&array_ty);
+                (
+                    self.runtime(
+                        "ptr",
+                        "kr_string_bytes",
+                        &format!("ptr {this}, ptr {descriptor}"),
+                    ),
+                    array_ty,
+                )
+            }
             "chars" => {
                 let array_ty = Ty::Array(Box::new(Ty::CHAR));
                 let descriptor = self.cx.rt_global(RtKey::Array(array_ty.clone()));
@@ -989,6 +1012,77 @@ impl FnCx<'_, '_, '_> {
                 self.ret(&text, &ret);
             }
             _ => return false,
+        }
+        true
+    }
+
+    /// The private `...Raw` intrinsics of `TcpListener`, `TcpStream` and
+    /// `UdpSocket`. Each runtime function takes the address of the socket's
+    /// native slot, then the remaining arguments; a socket argument is passed
+    /// as its handle and a borrowed array as the array itself.
+    fn net_builtin(&mut self, class: NetClass, name: &str, builtin: &Builtin) -> bool {
+        let function = match (class, name) {
+            (_, "localAddrRaw") => "kr_net_local_addr",
+            (_, "setTimeoutRaw") => "kr_net_set_timeout",
+            (NetClass::Listener, "bindRaw") => "kr_tcp_listener_bind",
+            (NetClass::Stream, "connectRaw") => "kr_tcp_stream_connect",
+            (NetClass::Stream, "acceptRaw") => "kr_tcp_stream_accept",
+            (NetClass::Stream, "peerAddrRaw") => "kr_tcp_stream_peer_addr",
+            (NetClass::Stream, "readLineRaw") => "kr_tcp_stream_read_line",
+            (NetClass::Stream, "readAllRaw") => "kr_tcp_stream_read_all",
+            (NetClass::Stream, "readRaw") => "kr_tcp_stream_read",
+            (NetClass::Stream, "writeRaw") => "kr_tcp_stream_write",
+            (NetClass::Stream, "writeBytesRaw") => "kr_tcp_stream_write_bytes",
+            (NetClass::Stream, "shutdownWriteRaw") => "kr_tcp_stream_shutdown_write",
+            (NetClass::Stream, "setNoDelayRaw") => "kr_tcp_stream_set_no_delay",
+            (NetClass::Udp, "bindRaw") => "kr_udp_bind",
+            (NetClass::Udp, "sendRaw") => "kr_udp_send_to",
+            (NetClass::Udp, "receiveRaw") => "kr_udp_receive",
+            (NetClass::Udp, "lastSenderRaw") => "kr_udp_last_sender",
+            _ => return false,
+        };
+        let ty = builtin.self_ty.clone();
+        let object = self.assign("load ptr, ptr %a0");
+        let slot = self.native_addr(&object, &ty, 0);
+        let mut args = vec![format!("ptr {slot}")];
+        let params = builtin.params.clone();
+        for (index, param) in params.iter().enumerate().skip(1) {
+            let value = format!("%a{index}");
+            match param {
+                Ty::Ref { ty: inner, .. } if self.cx.net_class_of(inner).is_some() => {
+                    let other = self.assign(format!("load ptr, ptr {value}"));
+                    let other_slot = self.native_addr(&other, inner, 0);
+                    let handle = self.assign(format!("load ptr, ptr {other_slot}"));
+                    args.push(format!("ptr {handle}"));
+                }
+                Ty::Ref { ty: inner, .. } if self.cx.is_ptr(inner) => {
+                    let pointer = self.assign(format!("load ptr, ptr {value}"));
+                    args.push(format!("ptr {pointer}"));
+                }
+                _ => {
+                    let ll = self.ll(param);
+                    args.push(format!("{ll} {value}"));
+                }
+            }
+        }
+        let ret = self.ret_ty.clone();
+        if let Ty::Array(_) = ret.non_null() {
+            let array = ret.non_null().clone();
+            let descriptor = self.cx.rt_global(RtKey::Array(array.clone()));
+            self.cx.drop_array_fn(&array);
+            args.push(format!("ptr {descriptor}"));
+        }
+        let ret_ll = self.ll(&ret);
+        let result = self.runtime(&ret_ll, function, &args.join(", "));
+        for (index, param) in params.iter().enumerate().skip(1) {
+            if self.cx.needs_drop(param) {
+                self.drop_value(&format!("%a{index}"), param);
+            }
+        }
+        if ret_ll == "void" {
+            self.line("ret void");
+        } else {
+            self.ret(&result, &ret);
         }
         true
     }

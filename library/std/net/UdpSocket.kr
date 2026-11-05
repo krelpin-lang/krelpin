@@ -1,0 +1,126 @@
+package std.net;
+
+import std.io.Files;
+import std.io.IOException;
+
+/**
+ * A UDP socket, which sends and receives separate messages without a
+ * connection.
+ *
+ * A message is delivered whole or not at all: UDP doesn't retry, and
+ * messages can arrive out of order.
+ *
+ * ```
+ * UdpSocket socket = UdpSocket.bind("127.0.0.1:0");
+ * socket.sendText("ping", "127.0.0.1:9000");
+ * Datagram reply = socket.receive(1500);
+ * Console.println("${reply.sender} answered ${reply.text()}");
+ * ```
+ *
+ * The socket is closed when it is dropped.
+ */
+final class UdpSocket {
+    private UdpSocket() {}
+
+    /**
+     * Opens a socket on `address`, written as `host:port`. Port 0 asks the
+     * system for any free port.
+     *
+     * # Throws
+     *
+     * `IOException` if the address is malformed or can't be resolved, or
+     * the port is taken.
+     */
+    static UdpSocket bind(String address) throws IOException {
+        UdpSocket socket = new UdpSocket();
+        if (!socket.bindRaw(address)) {
+            throw new IOException("couldn't bind to `$address`: ${Files.lastError()}");
+        }
+        return socket;
+    }
+
+    /**
+     * Sends `data` as one message to `address`, written as `host:port`.
+     *
+     * # Throws
+     *
+     * `IOException` if the address can't be resolved, the message is too
+     * large, or sending fails.
+     */
+    mut void send(&byte[] data, String address) throws IOException {
+        if (!this.sendRaw(data, address)) {
+            throw new IOException("couldn't send to `$address`: ${Files.lastError()}");
+        }
+    }
+
+    /** Sends `text` as one UTF-8 message to `address`, like `send`. */
+    mut void sendText(String text, String address) throws IOException {
+        byte[] data = text.bytes();
+        this.send(&data, address);
+    }
+
+    /**
+     * Waits for the next message and returns it. A message longer than `max`
+     * bytes is cut short, and the rest of it is lost.
+     *
+     * # Throws
+     *
+     * `IllegalArgumentException` unless `max` is from 1 to 65536.
+     * `IOException` if receiving fails or times out.
+     */
+    mut Datagram receive(int max) throws IOException {
+        if (max <= 0 || max > 65536) {
+            throw new IllegalArgumentException("receive: `max` must be from 1 to 65536, not $max");
+        }
+        byte[]? data = this.receiveRaw(max);
+        if (data == null) {
+            throw new IOException("couldn't receive: ${Files.lastError()}");
+        }
+        String? sender = this.lastSenderRaw();
+        if (sender == null) {
+            throw new IOException("couldn't read the sender: ${Files.lastError()}");
+        }
+        return new Datagram(data, SocketAddr.parse(sender));
+    }
+
+    /** Returns the address the socket is bound to. */
+    SocketAddr localAddr() throws IOException {
+        String? address = this.localAddrRaw();
+        if (address == null) {
+            throw new IOException("couldn't get the local address: ${Files.lastError()}");
+        }
+        return SocketAddr.parse(address);
+    }
+
+    /**
+     * Makes `receive` give up after `millis` milliseconds without a message.
+     * `0` waits forever, which is the default.
+     *
+     * # Throws
+     *
+     * `IOException` if `millis` is negative or the system refuses.
+     */
+    mut void setReadTimeout(long millis) throws IOException {
+        if (!this.setTimeoutRaw(millis, false)) {
+            throw new IOException("couldn't set the timeout: ${Files.lastError()}");
+        }
+    }
+
+    @Intrinsic
+    private mut boolean bindRaw(String address);
+
+    @Intrinsic
+    private mut boolean sendRaw(&byte[] data, String address);
+
+    @Intrinsic
+    private mut byte[]? receiveRaw(int max);
+
+    @Intrinsic
+    private mut String? lastSenderRaw();
+
+    @Intrinsic
+    private String? localAddrRaw();
+
+    @Intrinsic
+    private mut boolean setTimeoutRaw(long millis, boolean writing);
+}

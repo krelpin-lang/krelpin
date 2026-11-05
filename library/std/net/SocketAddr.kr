@@ -1,0 +1,67 @@
+package std.net;
+
+import std.primitive.Int;
+
+/**
+ * An IP address and a port, like `127.0.0.1:8080` or `[::1]:443`.
+ *
+ * Sockets report their own address and their peer's as a `SocketAddr`:
+ *
+ * ```
+ * TcpListener listener = TcpListener.bind("127.0.0.1:0");
+ * int port = listener.localAddr().port; // the port the system picked
+ * ```
+ *
+ * Methods that open a socket take the address as a string instead, so they
+ * can also accept a host name like `example.com:80`.
+ */
+record SocketAddr(String ip, int port) {
+    /**
+     * Parses a numeric address such as `10.0.0.1:80` or `[fe80::1]:8080`.
+     * Host names aren't resolved; pass them to `TcpStream.connect` instead.
+     *
+     * # Throws
+     *
+     * `IllegalArgumentException` if `text` isn't an IP address followed by
+     * `:` and a port from 0 to 65535.
+     */
+    static SocketAddr parse(String text) {
+        int colon = text.lastIndexOf(":");
+        if (colon <= 0) {
+            throw new IllegalArgumentException("`$text` is not a socket address");
+        }
+        String ip = text.substring(0, colon);
+        if (ip.startsWith("[") && ip.endsWith("]")) {
+            ip = ip.substring(1, ip.length() - 1);
+        } else if (ip.contains(":")) {
+            throw new IllegalArgumentException("`$text` needs brackets around its IPv6 address");
+        }
+        String digits = text.substring(colon + 1);
+        if (ip.isEmpty() || digits.isEmpty() || digits.length() > 5) {
+            throw new IllegalArgumentException("`$text` is not a socket address");
+        }
+        for (char c : digits.chars()) {
+            if (c < '0' || c > '9') {
+                throw new IllegalArgumentException("`$text` has no valid port");
+            }
+        }
+        int port = Int.parse(digits);
+        if (port > 65535) {
+            throw new IllegalArgumentException("the port of `$text` is above 65535");
+        }
+        return new SocketAddr(ip, port);
+    }
+
+    /** Returns whether the address is an IPv6 address. */
+    boolean isIpv6() {
+        return this.ip.contains(":");
+    }
+
+    /**
+     * Returns the address the way `parse` and the socket methods read it,
+     * with brackets around an IPv6 address: `[::1]:8080`.
+     */
+    String toString() {
+        return this.isIpv6() ? "[${this.ip}]:${this.port}" : "${this.ip}:${this.port}";
+    }
+}

@@ -1,0 +1,98 @@
+package std.net;
+
+import std.io.Files;
+import std.io.IOException;
+
+/**
+ * A TCP socket that waits for connections.
+ *
+ * Each call to `accept` blocks until a client connects and returns the
+ * connection as a `TcpStream`. To serve several clients at once, handle
+ * each connection on its own `Thread`.
+ *
+ * ```
+ * TcpListener listener = TcpListener.bind("127.0.0.1:8080");
+ * while (true) {
+ *     TcpStream client = listener.accept();
+ *     String? line = client.readLine();
+ *     if (line != null) {
+ *         client.write("you said: $line\n");
+ *     }
+ * }
+ * ```
+ *
+ * The socket is closed when the listener is dropped.
+ */
+final class TcpListener {
+    private TcpListener() {}
+
+    /**
+     * Opens a listener on `address`, written as `host:port`.
+     *
+     * Port 0 asks the system for any free port; `localAddr` tells which one
+     * it picked. `0.0.0.0` listens on every IPv4 interface and `[::]` on
+     * every IPv6 one. Like Rust, the listener sets `SO_REUSEADDR`, so a
+     * restarted server can take its port back right away.
+     *
+     * ```
+     * TcpListener listener = TcpListener.bind("0.0.0.0:0");
+     * Console.println("listening on ${listener.localAddr()}");
+     * ```
+     *
+     * # Throws
+     *
+     * `IOException` if the address is malformed or can't be resolved, or
+     * the port is taken or needs privileges.
+     */
+    static TcpListener bind(String address) throws IOException {
+        TcpListener listener = new TcpListener();
+        if (!listener.bindRaw(address)) {
+            throw new IOException("couldn't bind to `$address`: ${Files.lastError()}");
+        }
+        return listener;
+    }
+
+    /**
+     * Waits for the next client and returns the connection to it.
+     *
+     * # Throws
+     *
+     * `IOException` if accepting fails, or the timeout set with
+     * `setAcceptTimeout` passes first.
+     */
+    mut TcpStream accept() throws IOException {
+        return TcpStream.accept(this);
+    }
+
+    /** Returns the address the listener is bound to. */
+    SocketAddr localAddr() throws IOException {
+        String? address = this.localAddrRaw();
+        if (address == null) {
+            throw new IOException("couldn't get the local address: ${Files.lastError()}");
+        }
+        return SocketAddr.parse(address);
+    }
+
+    /**
+     * Makes `accept` give up after `millis` milliseconds without a client.
+     * `0` waits forever, which is the default.
+     *
+     * # Throws
+     *
+     * `IOException` if `millis` is negative or the system refuses.
+     */
+    mut void setAcceptTimeout(long millis) throws IOException {
+        if (!this.setTimeoutRaw(millis, false)) {
+            throw new IOException("couldn't set the timeout: ${Files.lastError()}");
+        }
+    }
+
+    @Intrinsic
+    private mut boolean bindRaw(String address);
+
+    @Intrinsic
+    private String? localAddrRaw();
+
+    @Intrinsic
+    private mut boolean setTimeoutRaw(long millis, boolean writing);
+}
