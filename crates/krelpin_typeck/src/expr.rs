@@ -166,6 +166,15 @@ impl FnCtxt<'_, '_> {
             }
             ExprKind::With { base, fields } => self.check_with(base, fields),
             ExprKind::Lambda { .. } | ExprKind::MethodRef { .. } => {
+                // Reached only where nothing says which interface the closure
+                // implements; everywhere else goes through `check_closure`.
+                self.emit(
+                    Diagnostic::error("cannot tell what type this closure has")
+                        .with_span(expr.span)
+                        .with_help(
+                            "store it in a variable of a functional interface type first, like `Supplier<int> f = ...`",
+                        ),
+                );
                 self.check_closure(expr, &Ty::Unknown)
             }
             ExprKind::Switch { scrutinee, arms } => {
@@ -631,7 +640,7 @@ impl FnCtxt<'_, '_> {
                 }
                 self.call(instance, args, arg_tys, name, "method")
             }
-            Ty::Void => {
+            Ty::Void | Ty::Array(_) | Ty::Null => {
                 self.no_method(ty, name);
                 Ty::Unknown
             }
@@ -793,7 +802,14 @@ impl FnCtxt<'_, '_> {
                 );
             }
             ty if is_unknown_code(ty) => self.calls_unknown_code(),
-            _ => {}
+            other => {
+                self.emit(
+                    Diagnostic::error(format!("cannot create an object of type `{other}`"))
+                        .with_span(span)
+                        .with_help("`new` takes the name of a class or record"),
+                );
+                return Ty::Unknown;
+            }
         }
         ty
     }
@@ -1102,6 +1118,18 @@ impl FnCtxt<'_, '_> {
                 self.results.expr_types.insert(expr.span, ty.clone());
                 if let Some(field) = field {
                     self.check_field_assignable(&field, *name);
+                } else if name.name.as_str() == "length"
+                    && matches!(
+                        self.results.expr_types.get(&base.span).map(Ty::strip_refs),
+                        Some(Ty::Array(_))
+                    )
+                {
+                    self.emit(
+                        Diagnostic::error("cannot assign to the length of an array")
+                            .with_span(name.span)
+                            .with_note("an array keeps the length it was created with")
+                            .with_help("create a new array, or use an `ArrayList`"),
+                    );
                 }
                 ty
             }

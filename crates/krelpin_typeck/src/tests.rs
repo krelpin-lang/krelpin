@@ -2064,3 +2064,23 @@ fn type_parameters_have_no_static_members() {
         ["cannot reach `make` through type parameter `T`"]
     );
 }
+
+#[test]
+fn values_that_cannot_be_built_or_called() {
+    assert_eq!(
+        errors("record P(int x) {} class A { void f() { Object o = new &P(1); } }"),
+        ["cannot create an object of type `&P`"]
+    );
+    assert_eq!(
+        errors("class A { void f() { String[] words = {}; words.println(1); } }"),
+        ["no method named `println` found for `String[]`"]
+    );
+    assert_eq!(
+        errors("class A { void f() { int[] a = {1}; a.length = 3; } }"),
+        ["cannot assign to the length of an array"]
+    );
+    assert_eq!(
+        errors("class A { void f() { Object o = (() -> 1).run(); } }"),
+        ["cannot tell what type this closure has"]
+    );
+}
