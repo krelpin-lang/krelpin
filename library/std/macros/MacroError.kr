@@ -1,18 +1,39 @@
 package std.macros;
 
+/**
+ * An error a macro reports to the user of the macro.
+ *
+ * When a macro throws a `MacroError`, the compiler stops expanding it and
+ * prints the message as a compile error, pointing at the token given to the
+ * constructor or else at the macro call. Any other exception is reported as
+ * a crash of the macro.
+ *
+ * ```
+ * macro Getters(TokenStream args, TokenStream input) {
+ *     Item item = Item.parse(&input);
+ *     if (item.kind() == ItemKind.INTERFACE) {
+ *         throw new MacroError("`@Getters` can't go on an interface", &item.name());
+ *     }
+ *     ...
+ * }
+ * ```
+ */
 class MacroError extends RuntimeException {
     private Span span;
 
+    /** Creates an error reported at the macro call. */
     MacroError(String message) {
         super(message);
         this.span = Span.callSite();
     }
 
+    /** Creates an error reported at the token `at`. */
     MacroError(String message, &Token at) {
         super(message);
         this.span = at.span;
     }
 
+    /** Returns where the compiler reports this error. */
     Span span() {
         return this.span;
     }

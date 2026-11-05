@@ -1,18 +1,38 @@
 package std.macros;
 
+/**
+ * One token of source code: a name, a literal, a piece of punctuation or a
+ * doc comment.
+ *
+ * `text` is exactly what the source says, so a string literal keeps its
+ * quotes and escapes: the literal `"a\n"` has the five characters `"a\n"`
+ * as its text. Tokens made by the static methods here have the span of the
+ * macro call; tokens read from the input keep their place in the source.
+ */
 record Token(TokenKind kind, String text, Span span) {
+    /** Returns a name or keyword token. `name` is not checked. */
     static Token ident(String name) {
         return new Token(TokenKind.IDENT, name, Span.callSite());
     }
 
+    /** Returns a punctuation token such as `;` or `->`. `text` is not checked. */
     static Token punct(String text) {
         return new Token(TokenKind.PUNCT, text, Span.callSite());
     }
 
+    /**
+     * Returns a literal token whose source text is `text`, such as `42`,
+     * `'x'` or `"done"`. Use `string` to turn a value into a string literal.
+     */
     static Token literal(String text) {
         return new Token(TokenKind.LITERAL, text, Span.callSite());
     }
 
+    /**
+     * Returns a string literal whose value is `value`, escaping quotes,
+     * backslashes and control characters. A value holding a tab gives a
+     * literal with `\t` written in it.
+     */
     static Token string(String value) {
         String text = "\"";
         for (char c : value.chars()) {
@@ -33,30 +53,40 @@ record Token(TokenKind kind, String text, Span span) {
         return literal(text + "\"");
     }
 
+    /** Returns whether this token is a name or keyword. */
     boolean isIdent() {
         return this.kind == TokenKind.IDENT;
     }
 
+    /** Returns whether this token is the name or keyword `name`. */
     boolean isIdent(String name) {
         return this.kind == TokenKind.IDENT && this.text.equals(&name);
     }
 
+    /** Returns whether this token is the punctuation `text`. */
     boolean isPunct(String text) {
         return this.kind == TokenKind.PUNCT && this.text.equals(&text);
     }
 
+    /** Returns whether this token is a literal. */
     boolean isLiteral() {
         return this.kind == TokenKind.LITERAL;
     }
 
+    /** Returns whether this token is a doc comment. */
     boolean isDoc() {
         return this.kind == TokenKind.DOC;
     }
 
+    /**
+     * Returns this token placed at `span`, so errors in code built from it
+     * point there instead.
+     */
     Token withSpan(Span span) {
         return new Token(this.kind, this.text, span);
     }
 
+    /** Returns the source text of this token. */
     String toString() {
         return this.text;
     }

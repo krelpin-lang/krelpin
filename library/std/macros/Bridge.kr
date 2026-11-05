@@ -4,6 +4,13 @@ import std.primitive.Int;
 import std.util.ArrayList;
 import std.util.List;
 
+/**
+ * Connects a macro crate to the compiler that runs it.
+ *
+ * The compiler generates the `main` of every macro crate around this class,
+ * so macros never use it themselves. Requests and replies are lines of
+ * tab-separated text.
+ */
 final class Bridge {
     private List<String> macros;
     private String current;
@@ -13,10 +20,12 @@ final class Bridge {
         this.current = "";
     }
 
+    /** Adds `name` to the macros this crate offers. */
     mut void declare(String name) {
         this.macros.add(name);
     }
 
+    /** Tells the compiler which macros the crate offers. */
     mut void ready(String crateName) {
         open();
         String line = "krelpin-macro-server\t1\t" + escape(crateName);
@@ -26,6 +35,14 @@ final class Bridge {
         send(line);
     }
 
+    /**
+     * Waits for the next request and returns `true`, or `false` once the
+     * compiler has no more.
+     *
+     * # Throws
+     *
+     * `IllegalStateException` if the request is malformed.
+     */
     mut boolean next() {
         String? line = receive();
         if (line == null) {
@@ -39,14 +56,17 @@ final class Bridge {
         return true;
     }
 
+    /** Returns whether the current request is for the macro `name`. */
     boolean calls(String name) {
         return this.current.equals(&name);
     }
 
+    /** Reads a token stream sent with the current request. */
     TokenStream read() {
         return readStream();
     }
 
+    /** Sends the tokens a macro returned. */
     void reply(TokenStream output) {
         send("ok\t" + output.size());
         for (int i = 0; i < output.size(); i++) {
@@ -55,15 +75,18 @@ final class Bridge {
         }
     }
 
+    /** Reports an error a macro threw. */
     void fail(&MacroError error) {
         String message = error.getMessage() ?: "the macro failed";
         send("error\t" + error.span().id + "\t" + escape(message));
     }
 
+    /** Reports that the requested macro doesn't exist in this crate. */
     void unknown() {
         send("error\t-1\t" + escape("this crate has no macro `" + this.current + "`"));
     }
 
+    /** Asks the compiler to split `source` into tokens. */
     static TokenStream lex(String source) {
         send("lex\t" + escape(source));
         return readStream();

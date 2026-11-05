@@ -1,6 +1,18 @@
 package std.macros;
 
+/**
+ * A place in the source code the compiler is reading.
+ *
+ * Spans are opaque: a macro can only copy them from one token to another.
+ * The compiler uses them to point errors and the code a macro produces at
+ * the right place.
+ */
 record Span(int id) {
+    /**
+     * Returns the span of the macro call itself, the one tokens built from
+     * strings get. An error reported there points at the `@Name` that invoked
+     * the macro.
+     */
     static Span callSite() {
         return new Span(-1);
     }

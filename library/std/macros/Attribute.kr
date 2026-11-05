@@ -1,5 +1,12 @@
 package std.macros;
 
+/**
+ * An annotation such as `@Default(10)` written on an item or a member.
+ *
+ * Macros use attributes as options for themselves: `@Builder` can read the
+ * `@Default` of each field and then remove it, so the compiler never sees
+ * an annotation it doesn't know.
+ */
 final class Attribute {
     private Token name;
     private TokenStream tokens;
@@ -11,22 +18,37 @@ final class Attribute {
         this.args = args;
     }
 
+    /** Returns the annotation's name. For `@a.b.Name` it is `Name`. */
     Token name() {
         return this.name;
     }
 
+    /** Returns whether the annotation is called `name`. */
     boolean is(String name) {
         return this.name.text.equals(&name);
     }
 
+    /**
+     * Returns the tokens between the parentheses, or no tokens when the
+     * annotation has no parentheses. For `@Default(1 + 2)` they are `1 + 2`.
+     */
     &TokenStream args() {
         return &this.args;
     }
 
+    /** Returns the annotation as it was written. */
     TokenStream toTokens() {
         return this.tokens.copy();
     }
 
+    /**
+     * Returns the index just past the annotation that starts at `at`, or `-1`
+     * when no annotation starts there. Used by `Item.parse` and `Member.parse`.
+     *
+     * # Throws
+     *
+     * `MacroError` if the annotation's `(` is never closed.
+     */
     static int end(&TokenStream tokens, int at) {
         if (at + 1 >= tokens.size() || !tokens.get(at).isPunct("@")
                 || !tokens.get(at + 1).isIdent() || tokens.get(at + 1).isIdent("interface")) {
@@ -47,6 +69,7 @@ final class Attribute {
         return end;
     }
 
+    /** Reads the annotation found by `end` between `start` and `end`. */
     static Attribute read(&TokenStream tokens, int start, int end) {
         int nameEnd = start + 2;
         while (nameEnd + 1 < end && tokens.get(nameEnd).isPunct(".")) {

@@ -3,6 +3,29 @@ package std.macros;
 import std.util.ArrayList;
 import std.util.List;
 
+/**
+ * A class, record, interface or enum, split into its parts.
+ *
+ * `Item.parse` reads the tokens a macro receives; `toTokens` writes the item
+ * back out, with any changes. An unchanged item gives back exactly the
+ * tokens it was parsed from.
+ *
+ * ```
+ * macro Describe(TokenStream args, TokenStream input) {
+ *     Item item = Item.parse(&input);
+ *     String names = "";
+ *     for (&Member member : item.members()) {
+ *         if (member.isField()) {
+ *             names = names + member.name().text + " ";
+ *         }
+ *     }
+ *     Quote describe = new Quote("static String fields() { return #names; }");
+ *     describe.string("names", names.trim());
+ *     item.addMember(&describe.render());
+ *     return item.toTokens();
+ * }
+ * ```
+ */
 final class Item {
     private TokenStream docs;
     private List<Attribute> attributes;
@@ -29,6 +52,15 @@ final class Item {
         this.close = close;
     }
 
+    /**
+     * Reads a type declaration: its doc comments, its annotations, then the
+     * declaration itself.
+     *
+     * # Throws
+     *
+     * `MacroError` if `tokens` holds no class, record, interface or enum, or
+     * if its body isn't closed or a member in it never ends.
+     */
     static Item parse(&TokenStream tokens) {
         int at = 0;
         TokenStream docs = new TokenStream();
@@ -63,30 +95,53 @@ final class Item {
         return item;
     }
 
+    /** Returns whether this is a class, record, interface or enum. */
     ItemKind kind() {
         return this.kind;
     }
 
+    /** Returns the name of the type. */
     Token name() {
         return this.name;
     }
 
+    /** Returns the annotations written on the type, in order. */
     &List<Attribute> attributes() {
         return &this.attributes;
     }
 
+    /**
+     * Returns the members in the body, in order. An enum's constants are not
+     * members.
+     */
     &List<Member> members() {
         return &this.members;
     }
 
+    /**
+     * Returns the components of a record, each as a field member, or nothing
+     * for other kinds of types. They are read-only: `toTokens` writes the
+     * record header as it was.
+     */
     &List<Member> components() {
         return &this.components;
     }
 
+    /**
+     * Parses `member` and adds it at the end of the body.
+     *
+     * # Throws
+     *
+     * `MacroError` if `member` is not a single member.
+     */
     mut void addMember(&TokenStream member) {
         this.members.add(Member.parse(member));
     }
 
+    /**
+     * Removes every annotation called `name` from the type and from all of
+     * its members, and returns how many were removed.
+     */
     mut int removeAttribute(String name) {
         int removed = 0;
         int i = 0;
@@ -108,6 +163,7 @@ final class Item {
         return removed;
     }
 
+    /** Returns the item as tokens, with any changes made to it. */
     TokenStream toTokens() {
         TokenStream out = this.docs.copy();
         for (&Attribute attribute : this.attributes) {

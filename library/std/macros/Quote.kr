@@ -3,31 +3,63 @@ package std.macros;
 import std.util.HashMap;
 import std.util.Map;
 
+/**
+ * Builds code from a template with `#name` placeholders, which is easier
+ * to read than adding tokens one by one.
+ *
+ * Each placeholder is replaced by the tokens set for it. A `#` inside a
+ * string or character literal in the template is left alone.
+ *
+ * ```
+ * Quote getter = new Quote("#type #getter() { return this.#name; }");
+ * getter.set("type", &field.type());
+ * getter.set("name", field.name());
+ * getter.ident("getter", "get" + capitalized);
+ * TokenStream code = getter.render();
+ * ```
+ *
+ * A placeholder always stands for whole tokens: `get#name` is the name
+ * `get` followed by the field's name, not one longer name. Build such names
+ * with `ident`, as above.
+ */
 final class Quote {
     private String template;
     private Map<String, TokenStream> values;
 
+    /** Creates a quote from `template`, with no placeholders set yet. */
     Quote(String template) {
         this.template = template;
         this.values = new HashMap<>();
     }
 
+    /** Makes `#name` stand for a copy of `tokens`. */
     mut void set(String name, &TokenStream tokens) {
         this.values.put(name, tokens.copy());
     }
 
+    /** Makes `#name` stand for `token`. */
     mut void set(String name, Token token) {
         this.values.put(name, TokenStream.of(token));
     }
 
+    /** Makes `#name` stand for the name `text`. */
     mut void ident(String name, String text) {
         this.set(name, Token.ident(text));
     }
 
+    /** Makes `#name` stand for a string literal with the value `value`. */
     mut void string(String name, String value) {
         this.set(name, Token.string(value));
     }
 
+    /**
+     * Returns the template's tokens with every placeholder replaced.
+     *
+     * # Throws
+     *
+     * `MacroError` if the template uses a placeholder that was never set.
+     * `IllegalStateException` when called outside a macro.
+     */
     TokenStream render() {
         char[] chars = this.template.chars();
         String source = "";
