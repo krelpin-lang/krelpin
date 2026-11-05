@@ -49,7 +49,6 @@ pub struct UnitScope {
     pub package: PackagePath,
     pub imports: HashMap<Symbol, Res>,
     pub globs: Vec<PackagePath>,
-    pub has_unknown_glob: bool,
 }
 
 impl ItemTable {
@@ -254,7 +253,7 @@ fn collect_imports(table: &ItemTable, unit: &CompilationUnit, dcx: &DiagCtxt) ->
             if table.packages.contains_key(&package) {
                 scope.globs.push(package);
             } else {
-                scope.has_unknown_glob = true;
+                report_unknown_package(dcx, &import.path.segments);
             }
             continue;
         }
@@ -275,11 +274,12 @@ fn collect_imports(table: &ItemTable, unit: &CompilationUnit, dcx: &DiagCtxt) ->
 }
 
 fn resolve_import(table: &ItemTable, import: &Import, dcx: &DiagCtxt) -> Option<Res> {
-    let (name, package) = import.path.segments.split_last()?;
-    let package = PackagePath::from_idents(package);
+    let (name, package_segments) = import.path.segments.split_last()?;
+    let package = PackagePath::from_idents(package_segments);
 
     let Some(types) = table.packages.get(&package) else {
-        return Some(Res::Import(name.span));
+        report_unknown_package(dcx, package_segments);
+        return None;
     };
     match types.get(&name.name) {
         Some(&def) => Some(Res::Item(def)),
@@ -295,6 +295,21 @@ fn resolve_import(table: &ItemTable, import: &Import, dcx: &DiagCtxt) -> Option<
             None
         }
     }
+}
+
+fn report_unknown_package(dcx: &DiagCtxt, segments: &[Ident]) {
+    let (Some(first), Some(last)) = (segments.first(), segments.last()) else {
+        return;
+    };
+    let package = PackagePath::from_idents(segments);
+    dcx.emit(
+        Diagnostic::error(format!(
+            "unresolved import: there is no package `{package}`"
+        ))
+        .with_span(first.span.to(last.span))
+        .with_label("no such package")
+        .with_note("a program is made of the standard library and its own source file"),
+    );
 }
 
 fn add_field(dcx: &DiagCtxt, def: &mut TypeDef, name: Ident, is_instance: bool) {

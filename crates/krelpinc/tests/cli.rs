@@ -155,7 +155,11 @@ fn builds_programs_tests_and_libraries() {
     let run = Command::new(dir.join("features"))
         .output()
         .expect("program runs");
-    let platform = if cfg!(target_os = "linux") { "linux" } else { "other" };
+    let platform = if cfg!(target_os = "linux") {
+        "linux"
+    } else {
+        "other"
+    };
     assert_eq!(stdout(&run), format!("{platform} LOUD 49\nthree\n"));
 
     let tests = krelpinc(
@@ -186,7 +190,11 @@ fn builds_programs_tests_and_libraries() {
     let library = krelpinc(&[&[SOURCE, "--crate-type", "staticlib,cdylib"][..], &base].concat());
     assert!(library.status.success(), "{}", stderr(&library));
     assert!(dir.join("libfeatures.a").exists());
-    let shared = if cfg!(target_vendor = "apple") { "dylib" } else { "so" };
+    let shared = if cfg!(target_vendor = "apple") {
+        "dylib"
+    } else {
+        "so"
+    };
     assert!(dir.join(format!("libfeatures.{shared}")).exists());
     let symbols = Command::new("nm")
         .arg(dir.join("libfeatures.a"))
@@ -392,7 +400,12 @@ fn symbols(path: &Path, dynamic: bool) -> Option<Vec<String>> {
             .lines()
             .filter_map(|line| line.split_whitespace().nth(2))
             // Mach-O prefixes C symbols with an underscore.
-            .map(|name| name.strip_prefix('_').filter(|_| cfg!(target_vendor = "apple")).unwrap_or(name).to_owned())
+            .map(|name| {
+                name.strip_prefix('_')
+                    .filter(|_| cfg!(target_vendor = "apple"))
+                    .unwrap_or(name)
+                    .to_owned()
+            })
             .collect()
     })
 }

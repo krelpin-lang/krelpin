@@ -130,7 +130,7 @@ impl FnCtxt<'_, '_> {
             _ => return None,
         };
         let fits = match expected.non_null() {
-            Ty::Unknown | Ty::External { .. } => true,
+            Ty::Unknown => true,
             target => self
                 .tcx
                 .fn_sig(target)
@@ -142,7 +142,7 @@ impl FnCtxt<'_, '_> {
     pub(crate) fn check_closure(&mut self, expr: &Expr, expected: &Ty) -> Ty {
         let target = expected.non_null();
         let sig = match target {
-            Ty::Unknown | Ty::External { .. } => None,
+            Ty::Unknown => None,
             target => {
                 let sig = self.tcx.fn_sig(target);
                 if sig.is_none() {
@@ -326,7 +326,7 @@ impl FnCtxt<'_, '_> {
             return;
         };
         let (RefReceiver::Type(ty) | RefReceiver::Value(ty)) = &receiver;
-        if matches!(ty.strip_refs(), Ty::Unknown | Ty::External { .. }) {
+        if matches!(ty.strip_refs(), Ty::Unknown) {
             return;
         }
 

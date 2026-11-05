@@ -309,7 +309,7 @@ impl PlaceTys<'_, '_> {
 
     fn may_hold_refs_inner(&self, ty: &Ty, visiting: &mut Vec<DefId>) -> bool {
         match ty {
-            Ty::Ref { .. } | Ty::Param(_) | Ty::External { .. } => true,
+            Ty::Ref { .. } | Ty::Param(_) => true,
             Ty::Primitive(_) | Ty::Null | Ty::Void | Ty::Unknown => false,
             Ty::Nullable(inner) | Ty::Array(inner) => self.may_hold_refs_inner(inner, visiting),
             Ty::Adt { def, args, .. } => {

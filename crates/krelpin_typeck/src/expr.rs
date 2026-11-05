@@ -217,7 +217,7 @@ impl FnCtxt<'_, '_> {
             Ty::Adt { def, args, .. } if self.tcx.sig(*def).kind == AdtKind::Record => {
                 Some((*def, args.clone()))
             }
-            Ty::Unknown | Ty::External { .. } => None,
+            Ty::Unknown => None,
             other => {
                 self.emit(
                     Diagnostic::error(format!("`with` cannot be used on `{other}`"))
@@ -277,10 +277,6 @@ impl FnCtxt<'_, '_> {
                 name: name.name,
                 args: Vec::new(),
             }),
-            Res::Import(_) => Some(Ty::External {
-                name: name.name,
-                args: Vec::new(),
-            }),
             Res::TypeParam(_) => Some(Ty::Param(name.name)),
             Res::PrimTy(primitive) => Some(Ty::Primitive(primitive)),
             Res::Local(_) | Res::BorrowSource(_) => None,
@@ -297,7 +293,7 @@ impl FnCtxt<'_, '_> {
                 );
                 Ty::Unknown
             }
-            Some(Res::Item(_) | Res::Import(_) | Res::TypeParam(_)) => {
+            Some(Res::Item(_) | Res::TypeParam(_)) => {
                 self.emit(
                     Diagnostic::error(format!("expected a value, found type `{}`", name.name))
                         .with_span(name.span)
@@ -740,7 +736,8 @@ impl FnCtxt<'_, '_> {
         span: Span,
         expected: Option<&Ty>,
     ) -> Ty {
-        let ty = self.lower_ty(ty);
+        self.tcx.check_wf_inferred(&self.param_env, ty);
+        let ty = self.tcx.lower_ty(ty);
         let arg_tys = self.check_closure_args(args);
         let ty = self.infer_diamond(ty, &arg_tys, span, expected);
 
@@ -784,7 +781,7 @@ impl FnCtxt<'_, '_> {
         self.check_expr_coerce(index, &Ty::INT);
         match base_ty.strip_refs() {
             Ty::Array(elem) => elem.as_ref().clone(),
-            Ty::Unknown | Ty::External { .. } | Ty::Param(_) => Ty::Unknown,
+            Ty::Unknown | Ty::Param(_) => Ty::Unknown,
             Ty::Nullable(_) => {
                 self.error(base.span, format!("value of type `{base_ty}` may be null"));
                 Ty::Unknown
@@ -979,7 +976,7 @@ impl FnCtxt<'_, '_> {
 
     fn is_equatable(&self, ty: &Ty) -> bool {
         match ty {
-            Ty::Primitive(_) | Ty::Unknown | Ty::External { .. } => true,
+            Ty::Primitive(_) | Ty::Unknown => true,
             ty => self.is_assignable(ty, &self.tcx.lang_ty(LangItem::Equatable)),
         }
     }
@@ -1187,8 +1184,5 @@ fn is_int_literal(expr: &Expr) -> bool {
 }
 
 fn is_unknown_code(ty: &Ty) -> bool {
-    matches!(
-        ty.strip_refs().non_null(),
-        Ty::Unknown | Ty::External { .. }
-    )
+    matches!(ty.strip_refs().non_null(), Ty::Unknown)
 }

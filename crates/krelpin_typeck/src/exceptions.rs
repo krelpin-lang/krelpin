@@ -45,14 +45,14 @@ impl ExceptionScope {
 impl Tcx<'_> {
     pub(crate) fn is_throwable(&self, env: &ParamEnv, ty: &Ty) -> bool {
         match ty {
-            Ty::Unknown | Ty::External { .. } => true,
+            Ty::Unknown => true,
             ty => self.is_assignable(env, ty, &self.lang_ty(LangItem::Throwable)),
         }
     }
 
     pub(crate) fn is_checked(&self, env: &ParamEnv, ty: &Ty) -> bool {
         let unchecked = |item| self.is_assignable(env, ty, &self.lang_ty(item));
-        !matches!(ty, Ty::Unknown | Ty::External { .. } | Ty::Null)
+        !matches!(ty, Ty::Unknown | Ty::Null)
             && self.is_throwable(env, ty)
             && !unchecked(LangItem::RuntimeException)
             && !unchecked(LangItem::Error)
@@ -161,7 +161,7 @@ impl FnCtxt<'_, '_> {
         let mut alternatives: Vec<Ty> = Vec::new();
         for ast_ty in &catch.tys {
             let ty = self.lower_ty(ast_ty);
-            if ty.references_unknown() || matches!(ty, Ty::External { .. }) {
+            if ty.references_unknown() {
                 continue;
             }
             if !self.tcx.is_throwable(&self.param_env, &ty) {

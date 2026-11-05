@@ -99,13 +99,23 @@ impl Tcx<'_> {
     }
 
     pub(crate) fn check_wf(&self, env: &ParamEnv, ty: &ast::Ty) {
+        self.check_wf_with(env, ty, false);
+    }
+
+    /// Like `check_wf`, but the outermost type may leave out its type
+    /// arguments because they are inferred, as in `new ArrayList<>()`.
+    pub(crate) fn check_wf_inferred(&self, env: &ParamEnv, ty: &ast::Ty) {
+        self.check_wf_with(env, ty, true);
+    }
+
+    fn check_wf_with(&self, env: &ParamEnv, ty: &ast::Ty, inferred: bool) {
         match &ty.kind {
             TyKind::Primitive(_) => {}
             TyKind::Path { path, args } => {
                 for arg in args {
                     self.check_wf(env, arg);
                 }
-                let [segment] = path.segments.as_slice() else {
+                let Some(segment) = path.segments.last() else {
                     return;
                 };
                 match self.resolutions.get(segment.span) {
@@ -117,6 +127,7 @@ impl Tcx<'_> {
                                     .with_help(format!("use `{}` instead", primitive.name())),
                             );
                         }
+                        None if inferred && args.is_empty() => {}
                         None => self.check_generic_args(env, def, args, ty.span),
                     },
                     Some(Res::TypeParam(_)) if !args.is_empty() => {
@@ -139,7 +150,21 @@ impl Tcx<'_> {
 
     fn check_generic_args(&self, env: &ParamEnv, def: DefId, args: &[ast::Ty], span: Span) {
         let generics = &self.sig(def).generics;
-        if args.is_empty() {
+        if args.is_empty() && !generics.is_empty() {
+            let name = self.sig(def).name.name;
+            let params: Vec<String> = generics
+                .iter()
+                .map(|param| param.name.to_string())
+                .collect();
+            self.dcx.emit(
+                Diagnostic::error(format!("missing type arguments for `{name}`"))
+                    .with_span(span)
+                    .with_label(format!(
+                        "expected {}",
+                        plural(generics.len(), "type argument")
+                    ))
+                    .with_help(format!("write `{name}<{}>`", params.join(", "))),
+            );
             return;
         }
         if args.len() != generics.len() {

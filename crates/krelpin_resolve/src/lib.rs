@@ -21,7 +21,6 @@ pub enum Res {
     BorrowSource(Span),
     Item(DefId),
     PrimTy(PrimitiveTy),
-    Import(Span),
 }
 
 #[derive(Debug, Default)]

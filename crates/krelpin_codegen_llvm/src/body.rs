@@ -1295,7 +1295,7 @@ impl Cx<'_, '_> {
 
 pub(crate) fn is_concrete(ty: &Ty) -> bool {
     match ty {
-        Ty::Param(_) | Ty::Unknown | Ty::External { .. } => false,
+        Ty::Param(_) | Ty::Unknown => false,
         Ty::Adt { args, .. } => args.iter().all(is_concrete),
         Ty::Ref { ty, .. } | Ty::Nullable(ty) | Ty::Array(ty) => is_concrete(ty),
         Ty::Primitive(_) | Ty::Void | Ty::Null => true,

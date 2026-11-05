@@ -444,7 +444,7 @@ impl LoweringCtxt<'_, '_> {
         };
         matches!(
             self.resolved.resolutions.get(name.span),
-            Some(Res::Item(_) | Res::Import(_) | Res::TypeParam(_) | Res::PrimTy(_))
+            Some(Res::Item(_) | Res::TypeParam(_) | Res::PrimTy(_))
         )
     }
 

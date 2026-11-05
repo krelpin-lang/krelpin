@@ -322,10 +322,32 @@ fn enum_constants_in_case_labels() {
 }
 
 #[test]
-fn glob_imports_suppress_unknown_names() {
-    ok(
-        "import java.util.*; class A { static Optional<String> find() { return \
-         Optional.empty(); } }",
+fn imports_from_unknown_packages_are_errors() {
+    assert_eq!(
+        errors("import java.util.*; class A { static Optional<String> find() { return null; } }"),
+        [
+            "unresolved import: there is no package `java.util`",
+            "cannot find type `Optional` in this scope",
+        ]
+    );
+    assert_eq!(
+        errors("import shop.money.Price; class A { Price price; }"),
+        [
+            "unresolved import: there is no package `shop.money`",
+            "cannot find type `Price` in this scope",
+        ]
+    );
+}
+
+#[test]
+fn qualified_paths_that_name_nothing_are_errors() {
+    assert_eq!(
+        errors("class A { std.util.Lst<String> names; }"),
+        ["cannot find type `Lst` in package `std.util`"]
+    );
+    assert_eq!(
+        errors("class A { shop.Price price; }"),
+        ["cannot find type `shop.Price`"]
     );
 }
 
@@ -436,7 +458,6 @@ fn imports_from_known_packages_are_checked() {
         errors("import std.io.*; class A { Strem s; }"),
         ["cannot find type `Strem` in this scope"]
     );
-    ok("import shop.money.Price; class A { Price price; }");
 }
 
 #[test]

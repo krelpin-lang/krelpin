@@ -17,10 +17,6 @@ pub enum Ty {
         name: Symbol,
         args: Vec<Ty>,
     },
-    External {
-        name: Symbol,
-        args: Vec<Ty>,
-    },
     Param(Symbol),
     Ref {
         mutable: bool,
@@ -46,9 +42,7 @@ impl Ty {
     pub fn references_unknown(&self) -> bool {
         match self {
             Ty::Unknown => true,
-            Ty::Adt { args, .. } | Ty::External { args, .. } => {
-                args.iter().any(Ty::references_unknown)
-            }
+            Ty::Adt { args, .. } => args.iter().any(Ty::references_unknown),
             Ty::Ref { ty, .. } | Ty::Nullable(ty) | Ty::Array(ty) => ty.references_unknown(),
             Ty::Primitive(_) | Ty::Void | Ty::Null | Ty::Param(_) => false,
         }
@@ -57,9 +51,7 @@ impl Ty {
     pub fn mentions_param(&self, name: Symbol) -> bool {
         match self {
             Ty::Param(param) => *param == name,
-            Ty::Adt { args, .. } | Ty::External { args, .. } => {
-                args.iter().any(|arg| arg.mentions_param(name))
-            }
+            Ty::Adt { args, .. } => args.iter().any(|arg| arg.mentions_param(name)),
             Ty::Ref { ty, .. } | Ty::Nullable(ty) | Ty::Array(ty) => ty.mentions_param(name),
             Ty::Primitive(_) | Ty::Void | Ty::Null | Ty::Unknown => false,
         }
@@ -114,10 +106,6 @@ impl Ty {
             Ty::Param(name) => subst.get(name).cloned().unwrap_or_else(|| self.clone()),
             Ty::Adt { def, name, args } => Ty::Adt {
                 def: *def,
-                name: *name,
-                args: all(args),
-            },
-            Ty::External { name, args } => Ty::External {
                 name: *name,
                 args: all(args),
             },
@@ -193,7 +181,7 @@ impl fmt::Display for Ty {
             Ty::Primitive(primitive) => f.write_str(primitive.name()),
             Ty::Void => f.write_str("void"),
             Ty::Null => f.write_str("null"),
-            Ty::Adt { name, args, .. } | Ty::External { name, args } => with_args(f, name, args),
+            Ty::Adt { name, args, .. } => with_args(f, name, args),
             Ty::Param(name) => write!(f, "{name}"),
             Ty::Ref { mutable, ty } => {
                 f.write_str(if *mutable { "&mut " } else { "&" })?;

@@ -1,9 +1,10 @@
 package shop;
 
-import shop.money.Price;
 import std.sync.AtomicInt;
 import std.util.ArrayList;
 import std.util.List;
+
+record Price(long cents) {}
 
 interface Priced {
     &Price price();

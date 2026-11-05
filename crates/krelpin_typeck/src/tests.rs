@@ -513,12 +513,6 @@ fn casts() {
 }
 
 #[test]
-fn types_from_unknown_packages_are_lenient() {
-    ok("import shop.money.Price;\n\
-        class A { static int f(Price price) { return price.cents() + price.anything; } }");
-}
-
-#[test]
 fn standard_library_has_no_errors() {
     ok("");
 }
@@ -1270,11 +1264,6 @@ fn catching_checked_exceptions_that_are_never_thrown() {
     ok(&files(
         "void run() { try { Files.write(\"a\"); } catch (IllegalStateException e) {} }",
     ));
-    ok("import std.io.IOException;\n\
-        import java.net.Socket;\n\
-        class Main {\n\
-        \x20   void run(Socket s) { try { s.connect(); } catch (IOException e) {} }\n\
-        }");
 }
 
 #[test]

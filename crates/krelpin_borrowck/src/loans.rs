@@ -484,7 +484,7 @@ fn contains_param(ty: &Ty) -> bool {
     match ty {
         Ty::Param(_) => true,
         Ty::Ref { ty, .. } | Ty::Nullable(ty) | Ty::Array(ty) => contains_param(ty),
-        Ty::Adt { args, .. } | Ty::External { args, .. } => args.iter().any(contains_param),
+        Ty::Adt { args, .. } => args.iter().any(contains_param),
         Ty::Primitive(_) | Ty::Void | Ty::Null | Ty::Unknown => false,
     }
 }
@@ -493,7 +493,7 @@ fn contains_ref(ty: &Ty) -> bool {
     match ty {
         Ty::Ref { .. } => true,
         Ty::Nullable(inner) | Ty::Array(inner) => contains_ref(inner),
-        Ty::Adt { args, .. } | Ty::External { args, .. } => args.iter().any(contains_ref),
+        Ty::Adt { args, .. } => args.iter().any(contains_ref),
         Ty::Primitive(_) | Ty::Void | Ty::Null | Ty::Param(_) | Ty::Unknown => false,
     }
 }

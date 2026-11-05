@@ -243,9 +243,7 @@ impl FnCtxt<'_, '_> {
             Ty::Adt { def: expected, .. } if *expected == def => {
                 DeconPat::new(Ctor::Variant(0), fields)
             }
-            ty if ty.references_unknown() || matches!(ty, Ty::External { .. }) => {
-                DeconPat::wildcard()
-            }
+            ty if ty.references_unknown() => DeconPat::wildcard(),
             ty if self.is_assignable(&record_ty, ty) || self.is_interface(ty) => {
                 DeconPat::new(Ctor::Opaque(None), Vec::new())
             }
@@ -325,7 +323,7 @@ impl FnCtxt<'_, '_> {
     ) -> Option<Ctor> {
         match expected.non_null() {
             Ty::Adt { def: expected, .. } if *expected == def => Some(Ctor::Variant(index)),
-            ty if ty.references_unknown() || matches!(ty, Ty::External { .. }) => None,
+            ty if ty.references_unknown() => None,
             ty => {
                 let enum_ty = self.tcx.self_ty(def);
                 if self.is_assignable(&enum_ty, ty) {
@@ -354,7 +352,7 @@ impl FnCtxt<'_, '_> {
 
     fn type_test(&self, tested: &Ty, expected: &Ty, span: Span) -> DeconPat {
         let tested = tested.strip_refs();
-        let unknown = |ty: &Ty| ty.references_unknown() || matches!(ty, Ty::External { .. });
+        let unknown = |ty: &Ty| ty.references_unknown();
         if unknown(tested) || unknown(expected) {
             return DeconPat::wildcard();
         }

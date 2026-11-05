@@ -286,25 +286,23 @@ impl<'a> Resolver<'a> {
             return;
         }
 
-        if !self.scope.has_unknown_glob {
-            let mut diagnostic =
-                Diagnostic::error(format!("cannot find type `{}` in this scope", name.name))
-                    .with_span(name.span)
-                    .with_label("not found in this scope");
-            let mut candidates: Vec<String> = self
-                .table
-                .packages
-                .iter()
-                .filter(|(_, types)| types.contains_key(&name.name))
-                .map(|(package, _)| format!("`import {package}.{};`", name.name))
-                .collect();
-            candidates.sort();
-            if !candidates.is_empty() {
-                diagnostic =
-                    diagnostic.with_help(format!("import it with {}", candidates.join(" or ")));
-            }
-            self.emit(diagnostic);
+        let mut diagnostic =
+            Diagnostic::error(format!("cannot find type `{}` in this scope", name.name))
+                .with_span(name.span)
+                .with_label("not found in this scope");
+        let mut candidates: Vec<String> = self
+            .table
+            .packages
+            .iter()
+            .filter(|(_, types)| types.contains_key(&name.name))
+            .map(|(package, _)| format!("`import {package}.{};`", name.name))
+            .collect();
+        candidates.sort();
+        if !candidates.is_empty() {
+            diagnostic =
+                diagnostic.with_help(format!("import it with {}", candidates.join(" or ")));
         }
+        self.emit(diagnostic);
     }
 
     fn resolve_kept(&mut self, params: &[Param], keeps: &[Ident]) {
@@ -622,15 +620,50 @@ impl<'a> Resolver<'a> {
     }
 
     fn resolve_qualified_type(&mut self, segments: &[Ident]) -> Option<DefId> {
-        let (package_len, def) = (1..segments.len()).find_map(|len| {
+        let found = (1..segments.len()).find_map(|len| {
             let package = PackagePath::from_idents(&segments[..len]);
             self.table
                 .lookup(&package, segments[len].name)
                 .map(|def| (len, def))
-        })?;
+        });
+        let Some((package_len, def)) = found else {
+            self.report_unresolved_path(segments);
+            return None;
+        };
         self.resolutions
             .record(segments[package_len].span, Res::Item(def));
         self.resolve_nested_types(def, &segments[package_len + 1..])
+    }
+
+    /// Reports a dotted path that names no type: either its package doesn't
+    /// exist or the package has no such type.
+    fn report_unresolved_path(&mut self, segments: &[Ident]) {
+        let (Some(first), Some(last)) = (segments.first(), segments.last()) else {
+            return;
+        };
+        let package_len = (1..segments.len()).rev().find(|&len| {
+            let package = PackagePath::from_idents(&segments[..len]);
+            self.table.packages.contains_key(&package)
+        });
+        let diagnostic = match package_len {
+            Some(len) => {
+                let package = PackagePath::from_idents(&segments[..len]);
+                let name = segments[len];
+                Diagnostic::error(format!(
+                    "cannot find type `{}` in package `{package}`",
+                    name.name
+                ))
+                .with_span(name.span)
+                .with_label("not found in this package")
+            }
+            None => {
+                let path: Vec<String> = segments.iter().map(|s| s.name.to_string()).collect();
+                Diagnostic::error(format!("cannot find type `{}`", path.join(".")))
+                    .with_span(first.span.to(last.span))
+                    .with_label("no package or type has this name")
+            }
+        };
+        self.emit(diagnostic);
     }
 
     fn resolve_nested_types(&mut self, mut def: DefId, rest: &[Ident]) -> Option<DefId> {
@@ -846,10 +879,6 @@ impl<'a> Resolver<'a> {
             self.resolutions.record(name.span, res);
             return;
         }
-        if self.scope.has_unknown_glob {
-            return;
-        }
-
         let mut diagnostic =
             Diagnostic::error(format!("cannot find value `{}` in this scope", name.name))
                 .with_span(name.span)
@@ -874,13 +903,11 @@ impl<'a> Resolver<'a> {
 
     fn resolve_unqualified_call(&mut self, name: Ident) {
         let Some(methods) = self.owner.methods.get(&name.name) else {
-            if !self.scope.has_unknown_glob {
-                self.emit(
-                    Diagnostic::error(format!("cannot find method `{}` in this scope", name.name))
-                        .with_span(name.span)
-                        .with_label("not found in this scope"),
-                );
-            }
+            self.emit(
+                Diagnostic::error(format!("cannot find method `{}` in this scope", name.name))
+                    .with_span(name.span)
+                    .with_label("not found in this scope"),
+            );
             return;
         };
 

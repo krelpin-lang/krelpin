@@ -57,7 +57,6 @@ impl Cx<'_, '_> {
                 _ => Shape::NullableValue(inner.clone()),
             },
             Ty::Param(name) => panic!("generic parameter `{name}` survived monomorphization"),
-            Ty::External { name, .. } => panic!("unresolved type `{name}` reached codegen"),
             Ty::Unknown => panic!("an unknown type reached codegen"),
         }
     }

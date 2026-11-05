@@ -60,7 +60,6 @@ impl Tcx<'_> {
             (Ty::Ref { .. }, _) | (_, Ty::Ref { .. }) => false,
             (Ty::Primitive(_) | Ty::Void, _) | (_, Ty::Primitive(_) | Ty::Void) => false,
             (_, Ty::Adt { def, .. }) if self.lang_items.is(*def, LangItem::Object) => true,
-            (Ty::External { .. }, _) | (_, Ty::External { .. }) => true,
             (Ty::Array(from), Ty::Array(to)) => from == to || from.is_unknown() || to.is_unknown(),
             (Ty::Param(name), to) => env.bounds(*name).iter().any(|bound| assignable(bound, to)),
             (Ty::Adt { def, args, .. }, to) => self.adt_assignable(env, *def, args, to),

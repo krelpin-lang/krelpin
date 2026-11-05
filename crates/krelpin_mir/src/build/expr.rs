@@ -609,7 +609,7 @@ impl<'h> Builder<'_, 'h, '_> {
         let checked = matches!(to.non_null(), Ty::Adt { .. } | Ty::Array(_));
         let reference = matches!(
             from.non_null(),
-            Ty::Adt { .. } | Ty::Array(_) | Ty::Param(_) | Ty::External { .. }
+            Ty::Adt { .. } | Ty::Array(_) | Ty::Param(_)
         );
         checked && reference && !self.statically_is(from, to)
     }

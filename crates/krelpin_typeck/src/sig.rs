@@ -183,15 +183,7 @@ impl<'a> Tcx<'a> {
                 };
                 match self.resolutions.get(segment.span) {
                     Some(Res::Item(def)) => self.def_ty(def, args),
-                    Some(Res::Import(_)) => Ty::External {
-                        name: segment.name,
-                        args,
-                    },
                     Some(Res::TypeParam(_)) => Ty::Param(segment.name),
-                    None if path.segments.len() > 1 => Ty::External {
-                        name: segment.name,
-                        args,
-                    },
                     _ => Ty::Unknown,
                 }
             }
@@ -240,7 +232,7 @@ impl<'a> Tcx<'a> {
             Ty::Primitive(_) | Ty::Null | Ty::Void | Ty::Unknown => true,
             Ty::Ref { mutable, .. } => !mutable,
             Ty::Nullable(inner) => self.is_copy_inner(inner, visiting),
-            Ty::Array(_) | Ty::Param(_) | Ty::External { .. } => false,
+            Ty::Array(_) | Ty::Param(_) => false,
             Ty::Adt { def, args, .. } => {
                 if self.lang_items.is(*def, LangItem::String) {
                     return true;
