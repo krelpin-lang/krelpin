@@ -208,6 +208,9 @@ KrString *kr_bridge_escape(const KrString *text);
 KrString *kr_bridge_unescape(const KrString *text);
 
 void kr_runtime_init(int argc, char **argv);
+void kr_stack_guard_install(void);
+void kr_stack_guard_thread_start(void);
+void kr_stack_guard_thread_end(void);
 void kr_runtime_exit(void);
 KrArray *kr_runtime_args(const KrType *array_type);
 

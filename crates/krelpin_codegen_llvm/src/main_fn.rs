@@ -129,6 +129,7 @@ impl Cx<'_, '_> {
         let mut fx = FnCx::new(self, Subst::new(), Ty::INT);
         fx.start("entry");
         fx.runtime("void", "kr_runtime_init", "i32 %argc, ptr %argv");
+        fx.runtime("void", "kr_stack_guard_install", "");
         fx.run_static_inits(&inits, "uncaught");
         match args_descriptor {
             Some(descriptor) => {
@@ -160,6 +161,7 @@ impl Cx<'_, '_> {
         let mut fx = FnCx::new(self, Subst::new(), Ty::INT);
         fx.start("entry");
         fx.runtime("void", "kr_runtime_init", "i32 %argc, ptr %argv");
+        fx.runtime("void", "kr_stack_guard_install", "");
         fx.run_static_inits(&inits, "uncaught");
         fx.runtime("void", "kr_test_begin", &format!("i64 {}", cases.len()));
         for (index, (function, name)) in cases.iter().enumerate() {

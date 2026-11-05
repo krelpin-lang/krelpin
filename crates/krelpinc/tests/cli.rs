@@ -471,3 +471,33 @@ fn binaries_keep_only_the_runtime_they_use() {
     }
     let _ = fs::remove_dir_all(&dir);
 }
+
+#[test]
+fn stack_overflows_are_reported() {
+    if !has_clang() {
+        return;
+    }
+    let dir = scratch("stack-overflow");
+    let source = dir.join("deep.kr");
+    fs::write(
+        &source,
+        "class Main {\n    static int depth(int n) {\n        return Main.depth(n + 1) + 1;\n    }\n\n    \
+         static void main() {\n        Main.depth(0);\n    }\n}\n",
+    )
+    .expect("the source is writable");
+    let program = dir.join("deep");
+    let built = krelpinc(&[
+        source.to_str().expect("utf-8 path"),
+        "-o",
+        program.to_str().expect("utf-8 path"),
+    ]);
+    assert!(built.status.success(), "{}", stderr(&built));
+    let run = Command::new(&program).output().expect("the program runs");
+    assert!(!run.status.success());
+    assert!(
+        stderr(&run).contains("thread 'main' has overflowed its stack"),
+        "{}",
+        stderr(&run)
+    );
+    let _ = fs::remove_dir_all(dir);
+}

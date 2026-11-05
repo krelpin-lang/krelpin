@@ -1130,6 +1130,7 @@ pub(crate) fn runtime_signature(name: &str) -> &'static str {
         "kr_table_slot_count" => "declare i64 @kr_table_slot_count(ptr)",
         "kr_table_slot" => "declare ptr @kr_table_slot(ptr, ptr, i64)",
         "kr_runtime_init" => "declare void @kr_runtime_init(i32, ptr)",
+        "kr_stack_guard_install" => "declare void @kr_stack_guard_install()",
         "kr_runtime_exit" => "declare void @kr_runtime_exit()",
         "kr_runtime_args" => "declare ptr @kr_runtime_args(ptr)",
         "kr_report_thread" => "declare void @kr_report_thread(ptr, ptr)",

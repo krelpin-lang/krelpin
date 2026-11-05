@@ -113,7 +113,9 @@ typedef struct {
 static void *run_thread(void *pointer) {
     ThreadStart start = *(ThreadStart *)pointer;
     kr_free(pointer);
+    kr_stack_guard_thread_start();
     start.entry(start.argument);
+    kr_stack_guard_thread_end();
     return NULL;
 }
 
