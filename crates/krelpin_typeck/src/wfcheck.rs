@@ -90,6 +90,17 @@ impl Tcx<'_> {
 
     fn check_bounds_wf(&self, env: &ParamEnv, generics: &ast::Generics) {
         for param in &generics.params {
+            if env.is_cyclic(param.name.name) {
+                self.dcx.emit(
+                    Diagnostic::error(format!(
+                        "the bounds of `{}` lead back to `{}`",
+                        param.name.name, param.name.name
+                    ))
+                    .with_span(param.name.span)
+                    .with_label("this parameter extends itself")
+                    .with_help("a type parameter can't be bounded by itself, directly or through other parameters"),
+                );
+            }
             if let ast::GenericParamKind::Type { bounds } = &param.kind {
                 for bound in bounds {
                     self.check_wf(env, bound);

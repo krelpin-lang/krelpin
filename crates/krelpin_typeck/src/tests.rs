@@ -1970,3 +1970,35 @@ fn references_to_nullables_need_a_check() {
         Vec::<String>::new()
     );
 }
+
+#[test]
+fn methods_with_the_same_parameters_are_duplicates() {
+    assert_eq!(
+        errors("class A { int f(int a) { return 1; } static int f(int b) { return 2; } }"),
+        ["duplicate definitions of `f` with the same parameter types"]
+    );
+    assert_eq!(
+        errors("class A { <T> void f(T a) {} <U> void f(U b) {} }"),
+        ["duplicate definitions of `f` with the same parameter types"]
+    );
+    assert_eq!(
+        errors("class A { A(int a) {} A(int b) {} }"),
+        ["duplicate definitions of `A` with the same parameter types"]
+    );
+    ok("class A { void f(int a) {} void f(long a) {} void f(int a, int b) {} }");
+}
+
+#[test]
+fn cyclic_bounds_are_reported_without_looping() {
+    assert_eq!(
+        errors("class A<T extends T> {}"),
+        ["the bounds of `T` lead back to `T`"]
+    );
+    assert_eq!(
+        errors("class A { static <T extends U, U extends T> void f(T a) { a.x(); } }"),
+        [
+            "the bounds of `T` lead back to `T`",
+            "no method named `x` found for `T`"
+        ]
+    );
+}

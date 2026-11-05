@@ -9,11 +9,39 @@ use crate::ty::{Subst, Ty};
 
 impl Tcx<'_> {
     pub(crate) fn check_inheritance(&self, def: DefId, item: &Item) {
+        self.check_duplicate_methods(def);
         if !self.check_parents(def, item) {
             return;
         }
         self.check_overrides(def);
         self.check_abstract_methods_implemented(def);
+    }
+
+    /// Two methods or constructors of one type with the same name and
+    /// parameter types can't be told apart by a call, whether or not one of
+    /// them is static.
+    fn check_duplicate_methods(&self, def: DefId) {
+        let sig = self.sig(def);
+        let mut groups: Vec<&[MethodSig]> = sig.methods.values().map(Vec::as_slice).collect();
+        groups.push(&sig.ctors);
+        for methods in groups {
+            let own: Vec<&MethodSig> = methods.iter().filter(|m| m.owner == def).collect();
+            for (index, later) in own.iter().enumerate() {
+                let Some(earlier) = own[..index].iter().find(|m| same_signature(m, later)) else {
+                    continue;
+                };
+                self.dcx.emit(
+                    Diagnostic::error(format!(
+                        "duplicate definitions of `{}` with the same parameter types",
+                        later.name.name
+                    ))
+                    .with_span(later.name.span)
+                    .with_label("redefined here")
+                    .with_secondary(earlier.name.span, "first defined here")
+                    .with_help("rename one of them or change its parameters"),
+                );
+            }
+        }
     }
 
     fn check_parents(&self, def: DefId, item: &Item) -> bool {
@@ -316,4 +344,22 @@ fn describe_visibility(vis: Visibility) -> &'static str {
         Visibility::Protected(_) => "protected",
         Visibility::Default | Visibility::Public(_) => "public",
     }
+}
+
+/// Whether two signatures take the same parameters, treating the generic
+/// parameters of the methods as the same when they are in the same position.
+fn same_signature(a: &MethodSig, b: &MethodSig) -> bool {
+    if a.params.len() != b.params.len() || a.variadic != b.variadic {
+        return false;
+    }
+    let rename: Subst = b
+        .generics
+        .iter()
+        .zip(&a.generics)
+        .map(|(from, to)| (from.name, Ty::Param(to.name)))
+        .collect();
+    a.params
+        .iter()
+        .zip(&b.params)
+        .all(|(x, y)| *x == y.subst(&rename))
 }
