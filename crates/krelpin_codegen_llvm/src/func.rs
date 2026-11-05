@@ -667,6 +667,11 @@ impl<'c, 'a, 'tcx> FnCx<'c, 'a, 'tcx> {
                 .unwrap_or_else(|| panic!("`{base}` implements `{}`", selector.name));
             let instance = self.cx.resolved_instance(&resolved, &base);
             let params = self.cx.instance_params(&instance);
+            if let Some(param) = params.first().cloned() {
+                let converted = self.convert(receiver, receiver_ty, &param);
+                let ll = self.ll(&param);
+                rendered[0] = format!("{ll} {converted}");
+            }
             for (index, arg) in args.iter().enumerate() {
                 let param = params.get(index + 1).cloned().unwrap_or(arg.ty.clone());
                 let converted = self.convert(&arg.v, &arg.ty, &param);
@@ -1059,6 +1064,9 @@ pub(crate) fn runtime_signature(name: &str) -> &'static str {
         "kr_console_newline" => "declare void @kr_console_newline()",
         "kr_console_read_line" => "declare ptr @kr_console_read_line()",
         "kr_bridge_open" => "declare void @kr_bridge_open()",
+        "kr_format_long" => "declare ptr @kr_format_long(i64, ptr)",
+        "kr_format_double" => "declare ptr @kr_format_double(double, ptr)",
+        "kr_format_text" => "declare ptr @kr_format_text(ptr, ptr)",
         "kr_bridge_receive" => "declare ptr @kr_bridge_receive()",
         "kr_bridge_send" => "declare void @kr_bridge_send(ptr)",
         "kr_bridge_escape" => "declare ptr @kr_bridge_escape(ptr)",

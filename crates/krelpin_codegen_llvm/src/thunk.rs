@@ -50,7 +50,10 @@ impl Cx<'_, '_> {
                     ReceiverKind::Owned => "%recv".to_owned(),
                     _ => fx.assign("load ptr, ptr %recv"),
                 };
-                let boxed = fx.cx.is_value_type(value);
+                let takes_object = target_params
+                    .first()
+                    .is_some_and(|ty| !fx.cx.is_value_type(ty.strip_refs()));
+                let boxed = fx.cx.is_value_type(value) && !takes_object;
                 let mut cleanup = None;
                 let receiver = if boxed {
                     let box_ty = fx.cx.box_type(value);

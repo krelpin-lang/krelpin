@@ -726,6 +726,23 @@ impl<'h> Builder<'_, 'h, '_> {
     }
 
     fn stage_receiver(&mut self, receiver: &'h Expr, kind: Option<ReceiverKind>) -> StagedReceiver {
+        if let Ty::Ref { ty: inner, .. } = &receiver.ty
+            && matches!(inner.as_ref(), Ty::Ref { .. })
+        {
+            let mut place = self.as_place(receiver);
+            let mut ty = receiver.ty.clone();
+            while let Ty::Ref { ty: inner, .. } = &ty
+                && matches!(inner.as_ref(), Ty::Ref { .. })
+            {
+                place = place.project(PlaceElem::Deref);
+                ty = inner.as_ref().clone();
+            }
+            return StagedReceiver::Place {
+                place,
+                ty,
+                borrow: None,
+            };
+        }
         let reborrow = match (kind, &receiver.ty) {
             (Some(ReceiverKind::RefMut), Ty::Ref { mutable: false, ty }) => Some((true, ty)),
             (Some(ReceiverKind::Ref), Ty::Ref { mutable: true, ty }) => Some((false, ty)),

@@ -336,6 +336,18 @@ impl FnCtxt<'_, '_> {
                 self.error(base.span, "`null` has no fields or methods");
                 (Receiver::Value(Ty::Unknown), false)
             }
+            Ty::Ref { .. } if matches!(ty.strip_refs(), Ty::Nullable(_)) => {
+                let span = match &base.kind {
+                    ExprKind::Borrow { expr, .. } => expr.span,
+                    _ => base.span,
+                };
+                self.emit(
+                    Diagnostic::error(format!("value of type `{}` may be null", ty.strip_refs()))
+                        .with_span(span)
+                        .with_help("check `!= null` first, or give a default with `?:`"),
+                );
+                (Receiver::Value(Ty::Unknown), false)
+            }
             ty => {
                 if safe && !ty.is_unknown() {
                     self.emit(

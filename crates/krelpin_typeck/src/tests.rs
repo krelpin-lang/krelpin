@@ -1965,3 +1965,18 @@ fn generic_results_follow_the_expected_type() {
         ["cannot infer the type argument `T` of `empty`"]
     );
 }
+
+#[test]
+fn references_to_nullables_need_a_check() {
+    assert_eq!(
+        errors("class A { static void f() { String? m = null; int n = (&m).length(); } }"),
+        ["value of type `String?` may be null"]
+    );
+    assert_eq!(
+        errors(
+            "class A { static void f() { String? m = null; \
+             if (m != null) { int n = (&m).length(); } } }"
+        ),
+        Vec::<String>::new()
+    );
+}
