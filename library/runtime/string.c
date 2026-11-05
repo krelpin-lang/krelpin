@@ -167,18 +167,22 @@ bool kr_string_ends_with(const KrString *string, const KrString *suffix) {
                   (size_t)suffix->len) == 0;
 }
 
-static KrString *map_chars(const KrString *string, int32_t (*map)(int32_t)) {
-    char *buffer = kr_alloc(string->len * 2 + 4);
+static KrString *map_chars(const KrString *string, int32_t (*map)(int32_t, int32_t[3])) {
+    /* One character maps to at most three, each at most four bytes long. */
+    int64_t cap = string->len + 16;
+    char *buffer = kr_alloc(cap);
     int64_t len = 0;
     int64_t at = 0;
-    int64_t cap = string->len * 2 + 4;
     while (at < string->len) {
-        int32_t c = map(decode((const unsigned char *)string->data, string->len, &at));
-        if (len + 4 > cap) {
+        int32_t mapped[3];
+        int32_t count = map(decode((const unsigned char *)string->data, string->len, &at), mapped);
+        if (len + 12 > cap) {
             cap *= 2;
             buffer = kr_realloc(buffer, cap);
         }
-        len += encode(c, buffer + len);
+        for (int32_t i = 0; i < count; i++) {
+            len += encode(mapped[i], buffer + len);
+        }
     }
     KrString *result = kr_string_new(buffer, len);
     kr_free(buffer);
@@ -186,11 +190,11 @@ static KrString *map_chars(const KrString *string, int32_t (*map)(int32_t)) {
 }
 
 KrString *kr_string_to_upper(const KrString *string) {
-    return map_chars(string, kr_char_to_upper);
+    return map_chars(string, kr_char_to_upper_full);
 }
 
 KrString *kr_string_to_lower(const KrString *string) {
-    return map_chars(string, kr_char_to_lower);
+    return map_chars(string, kr_char_to_lower_full);
 }
 
 KrString *kr_string_trim(const KrString *string) {

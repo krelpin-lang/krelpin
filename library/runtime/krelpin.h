@@ -147,6 +147,8 @@ bool kr_char_is_upper(int32_t c);
 bool kr_char_is_lower(int32_t c);
 int32_t kr_char_to_upper(int32_t c);
 int32_t kr_char_to_lower(int32_t c);
+int32_t kr_char_to_upper_full(int32_t c, int32_t out[3]);
+int32_t kr_char_to_lower_full(int32_t c, int32_t out[3]);
 
 double kr_random(void);
 

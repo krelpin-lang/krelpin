@@ -1,13 +1,11 @@
 #define _GNU_SOURCE
 
-#include <locale.h>
 #include <pthread.h>
 #include <sched.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 #include <time.h>
-#include <wctype.h>
 
 #include "krelpin.h"
 
@@ -18,9 +16,6 @@ static pthread_mutex_t console_lock = PTHREAD_MUTEX_INITIALIZER;
 void kr_runtime_init(int argc, char **argv) {
     saved_argc = argc;
     saved_argv = argv;
-    if (setlocale(LC_CTYPE, "C.UTF-8") == NULL) {
-        setlocale(LC_CTYPE, "");
-    }
 }
 
 void kr_runtime_exit(void) {
@@ -91,41 +86,6 @@ void kr_report_thread(const KrType *type, const KrString *message) {
         fprintf(stderr, "Exception in a spawned thread: %s: %.*s\n", type->name, (int)message->len,
                 message->data);
     }
-}
-
-bool kr_char_is_digit(int32_t c) {
-    return c < 128 ? c >= '0' && c <= '9' : iswdigit((wint_t)c) != 0;
-}
-
-bool kr_char_is_letter(int32_t c) {
-    return c < 128 ? (c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z')
-                   : iswalpha((wint_t)c) != 0;
-}
-
-bool kr_char_is_whitespace(int32_t c) {
-    return c < 128 ? c == ' ' || (c >= 9 && c <= 13) : iswspace((wint_t)c) != 0;
-}
-
-bool kr_char_is_upper(int32_t c) {
-    return c < 128 ? c >= 'A' && c <= 'Z' : iswupper((wint_t)c) != 0;
-}
-
-bool kr_char_is_lower(int32_t c) {
-    return c < 128 ? c >= 'a' && c <= 'z' : iswlower((wint_t)c) != 0;
-}
-
-int32_t kr_char_to_upper(int32_t c) {
-    if (c < 128) {
-        return c >= 'a' && c <= 'z' ? c - 32 : c;
-    }
-    return (int32_t)towupper((wint_t)c);
-}
-
-int32_t kr_char_to_lower(int32_t c) {
-    if (c < 128) {
-        return c >= 'A' && c <= 'Z' ? c + 32 : c;
-    }
-    return (int32_t)towlower((wint_t)c);
 }
 
 static _Thread_local uint64_t random_state;

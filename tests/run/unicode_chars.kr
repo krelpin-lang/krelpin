@@ -1,0 +1,11 @@
+class Main {
+    static void main() {
+        Console.println("çğış".toUpperCase());
+        Console.println("ÇĞIŞ ΣΩ Ж".toLowerCase());
+        Console.println("straße".toUpperCase());
+        Console.println('ж'.isLetter() + " " + '٣'.isDigit() + " " + '٣'.isLetter());
+        Console.println('Ω'.isUpperCase() + " " + 'ω'.isLowerCase() + " " + '7'.isUpperCase());
+        Console.println('\u{A0}'.isWhitespace() + " " + '\u{3000}'.isWhitespace() + " " + 'x'.isWhitespace());
+        Console.println('漢'.isLetter() + " " + '😀'.isLetter() + " " + '_'.isLetterOrDigit());
+    }
+}
