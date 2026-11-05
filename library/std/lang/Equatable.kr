@@ -1,5 +1,13 @@
 package std.lang;
 
+/**
+ * A type whose values can be compared for equality with `equals`.
+ *
+ * `equals` must be an equivalence relation: every value equals itself, `a`
+ * equals `b` exactly when `b` equals `a`, and two values equal to a third
+ * equal each other. Records get an `equals` that compares their components.
+ */
 interface Equatable<T> {
+    /** Returns whether this value is equal to `other`. */
     boolean equals(&T other);
 }

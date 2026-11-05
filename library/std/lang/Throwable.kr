@@ -1,16 +1,37 @@
 package std.lang;
 
+/**
+ * The superclass of everything that can be thrown with `throw` and caught
+ * with `catch`.
+ *
+ * An exception that nothing catches ends the program: its type and message
+ * are printed to standard error and the program exits with status 1.
+ *
+ * ```
+ * try {
+ *     int count = int.parse(text);
+ * } catch (NumberFormatException e) {
+ *     Console.eprintln("not a number: ${e.getMessage()}");
+ * }
+ * ```
+ *
+ * Extend `Exception` for failures a caller should handle, `RuntimeException`
+ * for mistakes in the program, and `Error` for failures nobody should catch.
+ */
 class Throwable {
     private String? message;
 
+    /** Creates a throwable without a message. */
     Throwable() {
         this.message = null;
     }
 
+    /** Creates a throwable with a message that says what went wrong. */
     Throwable(String message) {
         this.message = message;
     }
 
+    /** Returns the message given when this was created, or `null` if there was none. */
     String? getMessage() {
         return this.message;
     }

@@ -1,9 +1,36 @@
 package std.lang;
 
+/**
+ * The root of the class hierarchy: every class extends `Object`, directly or
+ * through its superclass.
+ */
 class Object {
+    /**
+     * Returns this object as text. `+` and `Console.println` call it to show
+     * an object.
+     *
+     * The default shows the class name and the object's address, like
+     * `Money@6000014e8020`. Records show their components, like
+     * `Point[x=1, y=2]`, and enums their variant. Override it to show
+     * something more useful:
+     *
+     * ```
+     * class Money {
+     *     long cents;
+     *
+     *     String toString() {
+     *         return "${this.cents / 100}.${(this.cents % 100).format("02")}";
+     *     }
+     * }
+     * ```
+     */
     @Intrinsic
     String toString();
 
+    /**
+     * Formats `toString()` with a text format spec, the same as
+     * `"${value:spec}"` in an interpolated string.
+     */
     String format(String spec) {
         return Format.text(this.toString(), spec);
     }

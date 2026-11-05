@@ -1,17 +1,33 @@
 package std.util;
 
+/**
+ * A collection without duplicates, like `HashSet`.
+ *
+ * ```
+ * Set<String> seen = new HashSet<>();
+ * if (!seen.add(name)) {
+ *     Console.println("$name appears twice");
+ * }
+ * ```
+ */
 interface Set<T> extends Iterable<T> {
+    /** Returns the number of elements. */
     int size();
 
+    /** Returns whether the set has no elements. */
     boolean isEmpty() {
         return this.size() == 0;
     }
 
+    /** Adds `value` and returns `true`, or returns `false` when an equal element is already there. */
     mut boolean add(T value);
 
+    /** Removes the element equal to `value` and returns whether there was one. */
     mut boolean remove(&T value);
 
+    /** Returns whether an element equal to `value` is in the set. */
     boolean contains(&T value);
 
+    /** Removes every element. */
     mut void clear();
 }

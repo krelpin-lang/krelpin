@@ -1,8 +1,24 @@
 package std.io;
 
+/**
+ * Functions on paths written as strings with `/` between the parts.
+ *
+ * They only look at the text and never touch the file system.
+ *
+ * ```
+ * String file = Path.join("src", "main.kr"); // "src/main.kr"
+ * Path.fileName(file);                       // "main.kr"
+ * Path.parent(file);                         // "src"
+ * Path.extension(file);                      // "kr"
+ * ```
+ */
 final class Path {
     private Path() {}
 
+    /**
+     * Joins `child` to `base` with a `/`. An absolute `child` replaces `base`,
+     * and an empty `base` gives `child`.
+     */
     static String join(String base, String child) {
         if (base.isEmpty() || child.startsWith("/")) {
             return child;
@@ -13,11 +29,16 @@ final class Path {
         return "$base/$child";
     }
 
+    /** Returns the part of `path` after the last `/`, or all of it when there is none. */
     static String fileName(String path) {
         int slash = path.lastIndexOf("/");
         return slash < 0 ? path : path.substring(slash + 1);
     }
 
+    /**
+     * Returns the part of `path` before the last `/`: `""` when there is none
+     * and `"/"` for a file at the root.
+     */
     static String parent(String path) {
         int slash = path.lastIndexOf("/");
         if (slash < 0) {
@@ -26,6 +47,10 @@ final class Path {
         return slash == 0 ? "/" : path.substring(0, slash);
     }
 
+    /**
+     * Returns the part of the file name after its last `.`, or `""` when there
+     * is none. A leading dot doesn't count, so `.profile` has no extension.
+     */
     static String extension(String path) {
         String name = fileName(path);
         int dot = name.lastIndexOf(".");

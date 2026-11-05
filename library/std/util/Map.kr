@@ -1,23 +1,51 @@
 package std.util;
 
+/**
+ * A collection of key-value pairs where each key appears at most once, like
+ * `HashMap`.
+ *
+ * The map owns its keys and values: `put` moves them in, `remove` moves the
+ * value back out, and `get` lends a reference to it.
+ *
+ * ```
+ * Map<String, int> ages = new HashMap<>();
+ * ages.put("Ada", 36);
+ * (&int)? age = ages.get(&"Ada");
+ * if (age != null) {
+ *     Console.println("Ada is $age");
+ * }
+ * ```
+ */
 interface Map<K, V> {
+    /** Returns the number of entries. */
     int size();
 
+    /** Returns whether the map has no entries. */
     boolean isEmpty() {
         return this.size() == 0;
     }
 
+    /** Returns a reference to the value for `key`, or `null` when there is none. */
     (&V)? get(&K key);
 
+    /**
+     * Sets the value for `key` and returns the value it replaces, or `null`
+     * when the key is new.
+     */
     mut V? put(K key, V value);
 
+    /** Removes the entry for `key` and returns its value, or `null` when there was none. */
     mut V? remove(&K key);
 
+    /** Returns whether there is an entry for `key`. */
     boolean containsKey(&K key);
 
+    /** Removes every entry. */
     mut void clear();
 
+    /** Returns references to the keys. */
     Set<&K> keySet();
 
+    /** Returns references to the values, in the same order as `keySet`. */
     List<&V> values();
 }

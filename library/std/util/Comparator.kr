@@ -1,0 +1,19 @@
+package std.util;
+
+/**
+ * Orders two values, for sorting by something other than their natural
+ * order. Usually written as a lambda:
+ *
+ * ```
+ * people.sort((a, b) -> a.age.compareTo(&b.age));
+ * words.sort((a, b) -> b.length() - a.length());   // longest first
+ * ```
+ */
+interface Comparator<T> {
+    /**
+     * Returns a negative number, zero or a positive number when `a` sorts
+     * before, together with or after `b`. Must be a total order, like
+     * `Comparable.compareTo`.
+     */
+    mut int compare(&T a, &T b);
+}

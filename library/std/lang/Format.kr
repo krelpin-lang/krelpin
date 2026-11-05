@@ -1,8 +1,42 @@
 package std.lang;
 
+/**
+ * Formats values with a format spec, the text after the `:` in
+ * `"${value:spec}"`.
+ *
+ * A spec is `[[fill]align][+][#][0][width][.precision][type]`:
+ *
+ * - `align` is `<` (left), `>` (right) or `^` (center), and `fill` the
+ *   character that pads to `width`, a space by default;
+ * - `+` shows a sign on positive numbers too;
+ * - `#` adds the prefix of the type, like `0x`;
+ * - `0` pads numbers with zeros after the sign;
+ * - `precision` is the number of digits after the decimal point, or the
+ *   maximum number of characters of text;
+ * - `type` is `x` or `X` for hexadecimal, `o` for octal, `b` for binary, or
+ *   `e` or `E` for scientific notation.
+ *
+ * ```
+ * "${42:>6}"      // "    42"
+ * "${3.14159:.2}" // "3.14"
+ * "${255:#x}"     // "0xff"
+ * "${"hi":*^6}"   // "**hi**"
+ * ```
+ *
+ * The methods of the primitive types and `Object.format` call these, so
+ * `42.format(">6")` gives the same text.
+ */
 final class Format {
     private Format() {}
 
+    /**
+     * Formats an integer.
+     *
+     * # Throws
+     *
+     * `IllegalArgumentException` if the spec is malformed or can't be used
+     * on integers.
+     */
     static String integer(long value, String spec) {
         String? text = formatLong(value, spec);
         if (text == null) {
@@ -11,6 +45,14 @@ final class Format {
         return text;
     }
 
+    /**
+     * Formats a floating-point number.
+     *
+     * # Throws
+     *
+     * `IllegalArgumentException` if the spec is malformed or can't be used
+     * on numbers.
+     */
     static String decimal(double value, String spec) {
         String? text = formatDouble(value, spec);
         if (text == null) {
@@ -19,6 +61,14 @@ final class Format {
         return text;
     }
 
+    /**
+     * Formats text. Only fill, alignment, width and precision apply.
+     *
+     * # Throws
+     *
+     * `IllegalArgumentException` if the spec is malformed or can't be used
+     * on text.
+     */
     static String text(String value, String spec) {
         String? text = formatText(value, spec);
         if (text == null) {

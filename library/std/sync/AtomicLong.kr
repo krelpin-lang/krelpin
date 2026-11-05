@@ -1,27 +1,50 @@
 package std.sync;
 
+/**
+ * An `long` that several threads can read and change safely, for counters
+ * and ids shared between threads.
+ *
+ * ```
+ * static AtomicLong created = new AtomicLong(0);
+ *
+ * long id = Main.created.increment();
+ * ```
+ *
+ * Every operation is sequentially consistent: all threads see the
+ * operations in the same order. Arithmetic wraps around on overflow.
+ */
 final class AtomicLong {
     private long value;
 
+    /** Creates an atomic holding `value`. */
     AtomicLong(long value) {
         this.value = value;
     }
 
+    /** Returns the current value. */
     @Intrinsic
     long get();
 
+    /** Replaces the value. */
     @Intrinsic
     void set(long value);
 
+    /**
+     * Sets the value to `value` if it is currently `expected`, and returns
+     * whether it did.
+     */
     @Intrinsic
     boolean compareAndSet(long expected, long value);
 
+    /** Adds 1 and returns the new value. */
     @Intrinsic
     long increment();
 
+    /** Subtracts 1 and returns the new value. */
     @Intrinsic
     long decrement();
 
+    /** Adds `delta` and returns the new value. */
     @Intrinsic
     long addAndGet(long delta);
 }

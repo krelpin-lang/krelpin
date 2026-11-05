@@ -1,10 +1,28 @@
 package std.lang;
 
+/**
+ * Thrown when a cast names a type the value doesn't have.
+ *
+ * ```
+ * Object value = "text";
+ * StringBuilder builder = (StringBuilder) value; // throws
+ * ```
+ *
+ * Check with `instanceof` first to avoid it:
+ *
+ * ```
+ * if (value instanceof String text) {
+ *     Console.println(text.length());
+ * }
+ * ```
+ */
 class ClassCastException extends RuntimeException {
+    /** Creates an exception without a message. */
     ClassCastException() {
         super();
     }
 
+    /** Creates an exception with a message that says what went wrong. */
     ClassCastException(String message) {
         super(message);
     }

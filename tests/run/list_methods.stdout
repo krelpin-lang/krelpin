@@ -1,0 +1,8 @@
+[0, 7, 3, 10, 6, 2, 9, 5, 1, 8, 4, 0, 7, 3, 10, 6, 2, 9, 5, 1]
+[0, 0, 1, 1, 2, 2, 3, 3, 4, 5, 5, 6, 6, 7, 7, 8, 9, 9, 10, 10]
+[10, 10, 9, 9, 8, 7, 7, 6, 6, 5, 5, 4, 3, 3, 2, 2, 1, 1, 0, 0]
+10 [9, 9, 7, 7, 5, 5, 3, 3, 1, 1]
+[1, 1, 3, 3, 5, 5, 7, 7, 9, 9] first=1 last=9 lastIndexOf(5)=5
+[Person[name=Grace, age=30], Person[name=Linus, age=30], Person[name=Ada, age=36], Person[name=Alan, age=36]]
+null null
+[brown, dog, fox, jumps, lazy, over, quick, the, the]

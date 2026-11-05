@@ -1,11 +1,17 @@
 package std.sync;
 
+/**
+ * Access to the value of a locked `Mutex`. Dropping the guard releases the
+ * lock, and the references it lends can't outlive it.
+ */
 final class MutexGuard<T> borrows mutex {
     private MutexGuard() {}
 
+    /** Returns a reference to the protected value. */
     @Intrinsic
     &T get();
 
+    /** Returns a mutable reference to the protected value. */
     @Intrinsic
     mut &mut T getMut();
 }

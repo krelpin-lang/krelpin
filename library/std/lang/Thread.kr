@@ -1,18 +1,38 @@
 package std.lang;
 
+/**
+ * A thread of execution that runs a task next to the rest of the program.
+ *
+ * ```
+ * AtomicInt done = new AtomicInt(0);
+ * Thread worker = new Thread(() -> {
+ *     done.increment();
+ * });
+ * worker.start();
+ * worker.join();
+ * ```
+ *
+ * An exception that escapes the task is printed to standard error and ends
+ * only that thread. Share data between threads through the types in
+ * `std.sync`.
+ */
 final class Thread {
     private Runnable task;
 
+    /** Creates a thread that will run `task` once it is started. */
     Thread(Runnable task) {
         this.task = task;
     }
 
+    /** Starts running the task on a new thread. */
     @Intrinsic
     mut void start();
 
+    /** Waits until the task has finished. */
     @Intrinsic
     mut void join();
 
+    /** Pauses the current thread for at least `millis` milliseconds. */
     @Intrinsic
     static void sleep(long millis);
 }

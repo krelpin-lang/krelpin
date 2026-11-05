@@ -1,10 +1,16 @@
 package std.lang;
 
+/**
+ * Thrown when an argument is outside what a method accepts, like a negative
+ * count or a malformed format spec.
+ */
 class IllegalArgumentException extends RuntimeException {
+    /** Creates an exception without a message. */
     IllegalArgumentException() {
         super();
     }
 
+    /** Creates an exception with a message that says what went wrong. */
     IllegalArgumentException(String message) {
         super(message);
     }

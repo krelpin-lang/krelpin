@@ -1,9 +1,12 @@
 package std.lang;
 
+/** The superclass of every enum. */
 abstract class Enum {
+    /** Returns the name of this variant as written in the source, like `"RED"`. */
     @Intrinsic
     String name();
 
+    /** Returns the position of this variant in its declaration, counting from 0. */
     @Intrinsic
     int ordinal();
 }

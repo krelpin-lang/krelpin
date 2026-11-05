@@ -1,17 +1,48 @@
 package std.lang;
 
+/** Access to the process: exiting, environment variables and clocks. */
 final class System {
     private System() {}
 
+    /**
+     * Ends the program right away with the exit status `code`, after
+     * flushing standard output and error. By convention 0 means success.
+     *
+     * Nothing else runs on the way out: `finally` blocks are skipped and
+     * other threads are stopped wherever they are.
+     */
     @Intrinsic
     static void exit(int code);
 
+    /**
+     * Returns the value of the environment variable `name`, or `null` when it
+     * isn't set. Bytes that aren't valid UTF-8 become `U+FFFD`.
+     *
+     * ```
+     * String home = System.env("HOME") ?: "/";
+     * ```
+     */
     @Intrinsic
     static String? env(String name);
 
+    /**
+     * Returns the wall-clock time in milliseconds since 1970-01-01 00:00 UTC.
+     * The clock can jump, so use `nanoTime` to measure how long something
+     * takes.
+     */
     @Intrinsic
     static long currentTimeMillis();
 
+    /**
+     * Returns a monotonic time in nanoseconds, which only means something
+     * when compared with another call:
+     *
+     * ```
+     * long start = System.nanoTime();
+     * work();
+     * long elapsed = System.nanoTime() - start;
+     * ```
+     */
     @Intrinsic
     static long nanoTime();
 }

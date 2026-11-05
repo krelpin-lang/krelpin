@@ -1,6 +1,16 @@
 package std.util;
 
+/**
+ * A set backed by a hash table. Adding, removing and looking up an element
+ * take constant time on average.
+ *
+ * Elements must be `Hashable`. The order in which they are visited is
+ * unspecified and may change as elements are added or removed.
+ */
 class HashSet<T extends Hashable<T>> implements Set<T> {
+    /** Creates an empty set. */
+    HashSet() {}
+
     @Intrinsic
     int size();
 
@@ -16,26 +26,32 @@ class HashSet<T extends Hashable<T>> implements Set<T> {
     @Intrinsic
     mut void clear();
 
+    /** Returns an iterator over the elements. */
     Iterator<T> iterator() {
         return new HashSetIterator<>(this);
     }
 
+    /** Shows the elements in brackets, like `[a, b]`. */
     String toString() {
-        String text = "[";
+        StringBuilder text = new StringBuilder();
+        text.append("[");
         boolean first = true;
         for (&T value : this) {
             if (!first) {
-                text = text + ", ";
+                text.append(", ");
             }
             first = false;
-            text = text + value;
+            text.append("" + value);
         }
-        return text + "]";
+        text.append("]");
+        return text.toString();
     }
 
+    /** The number of slots in the table, for `HashSetIterator`. */
     @Intrinsic
     int slotCount();
 
+    /** The element in slot `index`, or `null` for an empty slot, for `HashSetIterator`. */
     @Intrinsic
     (&T)? slotAt(int index);
 }

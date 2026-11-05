@@ -1,5 +1,7 @@
 package std.function;
 
+/** A function that takes a value and returns nothing, like `x -> Console.println(x)`. */
 interface Consumer<T> {
+    /** Calls the function with `value`. */
     mut void accept(T value);
 }

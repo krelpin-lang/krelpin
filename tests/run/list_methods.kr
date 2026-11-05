@@ -1,0 +1,37 @@
+import std.util.ArrayList;
+import std.util.List;
+
+record Person(String name, int age) {}
+
+class Main {
+    static void main() {
+        List<int> numbers = new ArrayList<>();
+        for (int i = 0; i < 20; i++) {
+            numbers.add((i * 7) % 11);
+        }
+        Console.println(&numbers);
+        numbers.sort();
+        Console.println(&numbers);
+        numbers.sort((a, b) -> b - a);
+        Console.println(&numbers);
+        Console.println(numbers.removeIf(n -> n % 2 == 0) + " " + &numbers);
+        numbers.reverse();
+        Console.println(&numbers + " first=" + numbers.first() + " last=" + numbers.last() + " lastIndexOf(5)=" + numbers.lastIndexOf(&5));
+        List<Person> people = new ArrayList<>();
+        people.add(new Person("Ada", 36));
+        people.add(new Person("Grace", 30));
+        people.add(new Person("Alan", 36));
+        people.add(new Person("Linus", 30));
+        people.sort((a, b) -> a.age.compareTo(&b.age));
+        Console.println(&people);
+        List<String> empty = new ArrayList<>();
+        Console.println(empty.first() + " " + empty.last());
+        empty.sort();
+        List<String> words = new ArrayList<>();
+        for (String w : "the quick brown fox jumps over the lazy dog".split(" ")) {
+            words.add(w);
+        }
+        words.sort();
+        Console.println(&words);
+    }
+}

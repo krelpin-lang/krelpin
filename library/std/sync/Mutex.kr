@@ -1,12 +1,29 @@
 package std.sync;
 
+/**
+ * Protects a value so that only one thread at a time can use it.
+ *
+ * `lock` waits until no other thread holds the lock and returns a guard.
+ * The value is reached through the guard, and the lock is released when the
+ * guard is dropped, so it can't be forgotten:
+ *
+ * ```
+ * Mutex<List<String>> log = new Mutex<>(new ArrayList<>());
+ * MutexGuard<List<String>> guard = log.lock();
+ * guard.getMut().add("started");
+ * ```
+ *
+ * Locking the same mutex again on the thread that holds it deadlocks.
+ */
 final class Mutex<T> {
     private T value;
 
+    /** Creates a mutex that owns `value`. */
     Mutex(T value) {
         this.value = value;
     }
 
+    /** Waits for the lock and returns a guard that gives access to the value. */
     @Intrinsic
     MutexGuard<T> lock();
 }

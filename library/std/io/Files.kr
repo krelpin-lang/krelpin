@@ -1,8 +1,27 @@
 package std.io;
 
+/**
+ * Reads, writes and inspects files as a whole.
+ *
+ * Paths are strings, relative to the current directory unless they start
+ * with `/`. Text is UTF-8: reading a file that isn't valid UTF-8 throws.
+ *
+ * ```
+ * Files.writeString("notes.txt", "first line\n");
+ * Files.appendString("notes.txt", "second line\n");
+ * for (String line : Files.readLines("notes.txt")) {
+ *     Console.println(line);
+ * }
+ * ```
+ *
+ * Every method that can fail throws an `IOException` whose message names
+ * the path and the reason, like
+ * ``couldn't read `notes.txt`: No such file or directory``.
+ */
 final class Files {
     private Files() {}
 
+    /** Returns the whole content of the file at `path`. */
     static String readString(String path) throws IOException {
         String? text = readFile(path);
         if (text == null) {
@@ -11,31 +30,38 @@ final class Files {
         return text;
     }
 
+    /** Returns the lines of the file at `path`, split the way `String.lines` splits. */
     static String[] readLines(String path) throws IOException {
         return readString(path).lines();
     }
 
+    /** Writes `text` to the file at `path`, creating it or replacing what it held. */
     static void writeString(String path, String text) throws IOException {
         if (!writeFile(path, text, false)) {
             throw failure("write", path);
         }
     }
 
+    /** Adds `text` to the end of the file at `path`, creating it if needed. */
     static void appendString(String path, String text) throws IOException {
         if (!writeFile(path, text, true)) {
             throw failure("append to", path);
         }
     }
 
+    /** Returns whether something exists at `path`. Never throws. */
     @Intrinsic
     static boolean exists(String path);
 
+    /** Returns whether `path` names a regular file. Never throws. */
     @Intrinsic
     static boolean isFile(String path);
 
+    /** Returns whether `path` names a directory. Never throws. */
     @Intrinsic
     static boolean isDirectory(String path);
 
+    /** Returns the size of the file at `path` in bytes. */
     static long size(String path) throws IOException {
         long size = sizeOf(path);
         if (size < 0) {
@@ -44,18 +70,24 @@ final class Files {
         return size;
     }
 
+    /** Deletes the file or empty directory at `path`. */
     static void delete(String path) throws IOException {
         if (!remove(path)) {
             throw failure("delete", path);
         }
     }
 
+    /**
+     * Creates the directory at `path` and every missing parent. Succeeds when
+     * the directory already exists.
+     */
     static void createDirectories(String path) throws IOException {
         if (!makeDirectories(path)) {
             throw failure("create the directory", path);
         }
     }
 
+    /** Returns the names of the entries in `directory`, sorted, without `.` and `..`. */
     static String[] list(String directory) throws IOException {
         String[]? names = listDirectory(directory);
         if (names == null) {
@@ -64,13 +96,16 @@ final class Files {
         return names;
     }
 
+    /** Builds the exception for a failed `action` on `path`, with the reason from `lastError`. */
     static IOException failure(String action, String path) {
         return new IOException("couldn't $action `$path`: ${lastError()}");
     }
 
+    /** Describes why the last file operation on this thread failed. */
     @Intrinsic
     static String lastError();
 
+    /** Returns whether the last file operation on this thread failed. */
     @Intrinsic
     static boolean lastFailed();
 

@@ -1,10 +1,15 @@
 package std.lang;
 
+/**
+ * Thrown when integer arithmetic has no answer, like dividing by zero.
+ */
 class ArithmeticException extends RuntimeException {
+    /** Creates an exception without a message. */
     ArithmeticException() {
         super();
     }
 
+    /** Creates an exception with a message that says what went wrong. */
     ArithmeticException(String message) {
         super(message);
     }

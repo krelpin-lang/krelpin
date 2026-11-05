@@ -1,10 +1,16 @@
 package std.lang;
 
+/**
+ * Thrown when an object isn't in a state that allows the call, like
+ * reading from an iterator that has no elements left.
+ */
 class IllegalStateException extends RuntimeException {
+    /** Creates an exception without a message. */
     IllegalStateException() {
         super();
     }
 
+    /** Creates an exception with a message that says what went wrong. */
     IllegalStateException(String message) {
         super(message);
     }

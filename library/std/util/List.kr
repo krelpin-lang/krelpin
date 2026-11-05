@@ -1,27 +1,212 @@
 package std.util;
 
+import std.function.Predicate;
+
+/**
+ * An ordered collection that can be indexed, like `ArrayList`.
+ *
+ * Indices count from 0. Methods that take an index throw
+ * `IndexOutOfBoundsException` when it is out of range.
+ *
+ * Elements are owned by the list: `add` moves a value in, `remove` moves it
+ * back out, and `get` lends a reference that keeps the list borrowed while
+ * it is used.
+ *
+ * ```
+ * List<String> names = new ArrayList<>();
+ * names.add("Ada");
+ * names.add("Grace");
+ * names.sort();
+ * &String first = names.get(0);
+ * ```
+ */
 interface List<T> extends Iterable<T> {
+    /** Returns the number of elements. */
     int size();
 
+    /** Returns whether the list has no elements. */
     boolean isEmpty() {
         return this.size() == 0;
     }
 
+    /** Returns a reference to the element at `index`. */
     &T get(int index);
 
+    /** Returns a reference to the first element, or `null` when the list is empty. */
+    (&T)? first() {
+        if (this.isEmpty()) {
+            return null;
+        }
+        return this.get(0);
+    }
+
+    /** Returns a reference to the last element, or `null` when the list is empty. */
+    (&T)? last() {
+        if (this.isEmpty()) {
+            return null;
+        }
+        return this.get(this.size() - 1);
+    }
+
+    /** Replaces the element at `index` with `value` and returns the old element. */
     mut T set(int index, T value);
 
+    /** Adds `value` at the end. */
     mut void add(T value);
 
+    /**
+     * Inserts `value` at `index`, moving the elements from there on one
+     * place up. An `index` equal to `size()` adds at the end.
+     */
     mut void add(int index, T value);
 
+    /**
+     * Removes the element at `index` and returns it, moving the elements
+     * after it one place down.
+     */
     mut T remove(int index);
 
+    /**
+     * Removes every element for which `filter` returns `true` and returns how
+     * many were removed. The others keep their order.
+     *
+     * ```
+     * numbers.removeIf(n -> n % 2 == 0); // keeps the odd numbers
+     * ```
+     */
+    mut int removeIf(Predicate<&T> filter) {
+        int count = this.size();
+        boolean[] doomed = new boolean[count];
+        for (int index = 0; index < count; index++) {
+            doomed[index] = filter.test(this.get(index));
+        }
+        // Move the survivors to the front in order, then drop the tail.
+        int kept = 0;
+        for (int index = 0; index < count; index++) {
+            if (!doomed[index]) {
+                if (kept != index) {
+                    this.swap(kept, index);
+                }
+                kept++;
+            }
+        }
+        for (int index = count - 1; index >= kept; index--) {
+            this.remove(index);
+        }
+        return count - kept;
+    }
+
+    /** Exchanges the elements at indices `a` and `b`. */
+    mut void swap(int a, int b);
+
+    /** Reverses the order of the elements. */
+    mut void reverse() {
+        int low = 0;
+        int high = this.size() - 1;
+        while (low < high) {
+            this.swap(low, high);
+            low++;
+            high--;
+        }
+    }
+
+    /** Returns whether an element equal to `value` is in the list. */
     boolean contains(&T value) where T extends Equatable<T> {
         return this.indexOf(value) >= 0;
     }
 
+    /** Returns the index of the first element equal to `value`, or `-1`. */
     int indexOf(&T value) where T extends Equatable<T>;
 
+    /** Returns the index of the last element equal to `value`, or `-1`. */
+    int lastIndexOf(&T value) where T extends Equatable<T> {
+        for (int index = this.size() - 1; index >= 0; index--) {
+            if (this.get(index).equals(value)) {
+                return index;
+            }
+        }
+        return -1;
+    }
+
+    /** Sorts the elements in their natural order. Equal elements keep their order. */
+    mut void sort() where T extends Comparable<T> {
+        this.sort((a, b) -> a.compareTo(b));
+    }
+
+    /**
+     * Sorts the elements in the order `comparator` defines. The sort is
+     * stable, so elements it considers equal keep their order, and takes
+     * O(n log n) comparisons.
+     *
+     * ```
+     * words.sort((a, b) -> a.length() - b.length());
+     * ```
+     */
+    mut void sort(Comparator<T> comparator) {
+        int count = this.size();
+        if (count < 2) {
+            return;
+        }
+        // Merge-sort the indices, then move each element to its place.
+        int[] order = new int[count];
+        int[] merged = new int[count];
+        for (int i = 0; i < count; i++) {
+            order[i] = i;
+        }
+        for (int width = 1; width < count; width = width * 2) {
+            for (int low = 0; low < count; low = low + 2 * width) {
+                int middle = Math.min(low + width, count);
+                int high = Math.min(low + 2 * width, count);
+                int left = low;
+                int right = middle;
+                int out = low;
+                while (left < middle && right < high) {
+                    if (comparator.compare(this.get(order[right]), this.get(order[left])) < 0) {
+                        merged[out] = order[right];
+                        right++;
+                    } else {
+                        merged[out] = order[left];
+                        left++;
+                    }
+                    out++;
+                }
+                while (left < middle) {
+                    merged[out] = order[left];
+                    left++;
+                    out++;
+                }
+                while (right < high) {
+                    merged[out] = order[right];
+                    right++;
+                    out++;
+                }
+            }
+            for (int i = 0; i < count; i++) {
+                order[i] = merged[i];
+            }
+        }
+        // `origin[p]` is the original index of the element now at `p`, and
+        // `place[i]` is where the element that started at `i` is now.
+        int[] origin = new int[count];
+        int[] place = new int[count];
+        for (int i = 0; i < count; i++) {
+            origin[i] = i;
+            place[i] = i;
+        }
+        for (int target = 0; target < count; target++) {
+            int wanted = order[target];
+            int from = place[wanted];
+            if (from != target) {
+                this.swap(target, from);
+                int displaced = origin[target];
+                origin[from] = displaced;
+                place[displaced] = from;
+                origin[target] = wanted;
+                place[wanted] = target;
+            }
+        }
+    }
+
+    /** Removes every element. */
     mut void clear();
 }

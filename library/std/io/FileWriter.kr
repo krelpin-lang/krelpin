@@ -1,27 +1,45 @@
 package std.io;
 
+/**
+ * Writes a file piece by piece.
+ *
+ * ```
+ * FileWriter out = FileWriter.create("report.txt");
+ * out.writeLine("total: $total");
+ * out.flush();
+ * ```
+ *
+ * Writes are buffered; `flush` pushes them to the file. The file is flushed
+ * and closed when the writer is dropped, but errors at that point are lost,
+ * so call `flush` when they matter.
+ */
 final class FileWriter {
     private FileWriter() {}
 
+    /** Opens the file at `path` for writing, creating it or emptying what it held. */
     static FileWriter create(String path) throws IOException {
         return open(path, false);
     }
 
+    /** Opens the file at `path` for adding to its end, creating it if needed. */
     static FileWriter append(String path) throws IOException {
         return open(path, true);
     }
 
+    /** Writes `text`. */
     mut void write(String text) throws IOException {
         if (!this.writeRaw(text)) {
             throw new IOException("couldn't write: ${Files.lastError()}");
         }
     }
 
+    /** Writes `text` and a `\n`. */
     mut void writeLine(String text) throws IOException {
         this.write(text);
         this.write("\n");
     }
 
+    /** Pushes everything written so far to the file. */
     mut void flush() throws IOException {
         if (!this.flushRaw()) {
             throw new IOException("couldn't flush: ${Files.lastError()}");

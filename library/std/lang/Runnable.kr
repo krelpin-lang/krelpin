@@ -1,5 +1,7 @@
 package std.lang;
 
+/** A task with no arguments and no result, like the body of a `Thread`. */
 interface Runnable {
+    /** Runs the task. */
     mut void run();
 }

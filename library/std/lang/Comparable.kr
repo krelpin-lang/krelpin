@@ -1,5 +1,27 @@
 package std.lang;
 
+/**
+ * A type whose values have a natural order, like numbers or strings.
+ *
+ * `compareTo` must define a total order: it must be consistent with itself
+ * (`a < b` and `b < c` mean `a < c`), with its reverse (`a.compareTo(&b)` has
+ * the opposite sign of `b.compareTo(&a)`), and with `equals` when the type is
+ * also `Equatable`.
+ *
+ * ```
+ * record Version(int major, int minor) implements Comparable<Version> {
+ *     int compareTo(&Version other) {
+ *         int major = this.major.compareTo(&other.major);
+ *         return major != 0 ? major : this.minor.compareTo(&other.minor);
+ *     }
+ * }
+ * ```
+ */
 interface Comparable<T> {
+    /**
+     * Returns a negative number, zero or a positive number when this value
+     * is smaller than, equal to or larger than `other`. Only the sign
+     * matters.
+     */
     int compareTo(&T other);
 }

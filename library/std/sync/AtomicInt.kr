@@ -1,27 +1,50 @@
 package std.sync;
 
+/**
+ * An `int` that several threads can read and change safely, for counters
+ * and ids shared between threads.
+ *
+ * ```
+ * static AtomicInt created = new AtomicInt(0);
+ *
+ * int id = Main.created.increment();
+ * ```
+ *
+ * Every operation is sequentially consistent: all threads see the
+ * operations in the same order. Arithmetic wraps around on overflow.
+ */
 final class AtomicInt {
     private int value;
 
+    /** Creates an atomic holding `value`. */
     AtomicInt(int value) {
         this.value = value;
     }
 
+    /** Returns the current value. */
     @Intrinsic
     int get();
 
+    /** Replaces the value. */
     @Intrinsic
     void set(int value);
 
+    /**
+     * Sets the value to `value` if it is currently `expected`, and returns
+     * whether it did.
+     */
     @Intrinsic
     boolean compareAndSet(int expected, int value);
 
+    /** Adds 1 and returns the new value. */
     @Intrinsic
     int increment();
 
+    /** Subtracts 1 and returns the new value. */
     @Intrinsic
     int decrement();
 
+    /** Adds `delta` and returns the new value. */
     @Intrinsic
     int addAndGet(int delta);
 }

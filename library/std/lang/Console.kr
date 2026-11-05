@@ -1,38 +1,80 @@
 package std.lang;
 
+/**
+ * Standard input, output and error.
+ *
+ * `print` and `println` write to standard output, `eprint` and `eprintln` to
+ * standard error. Any value can be printed; it is shown the same way `+`
+ * shows it, and `null` prints as `null`.
+ *
+ * ```
+ * Console.println("Hello, world!");
+ * Console.eprintln("warning: ${count} files skipped");
+ * String? line = Console.readLine();
+ * ```
+ *
+ * Writing is safe from several threads: each call writes its text in one
+ * piece. Standard output is flushed before anything is written to standard
+ * error and before a line is read, so prompts and messages appear in order.
+ */
 final class Console {
     private Console() {}
 
+    /** Writes `value` to standard output. */
     @Intrinsic
     static void print(Object? value);
 
+    /** Writes the value behind `value` to standard output. */
     @Intrinsic
     static void print(&Object? value);
 
+    /** Writes a line break to standard output. */
     @Intrinsic
     static void println();
 
+    /** Writes `value` and a line break to standard output. */
     @Intrinsic
     static void println(Object? value);
 
+    /** Writes the value behind `value` and a line break to standard output. */
     @Intrinsic
     static void println(&Object? value);
 
+    /** Writes `value` to standard error. */
     @Intrinsic
     static void eprint(Object? value);
 
+    /** Writes the value behind `value` to standard error. */
     @Intrinsic
     static void eprint(&Object? value);
 
+    /** Writes a line break to standard error. */
     @Intrinsic
     static void eprintln();
 
+    /** Writes `value` and a line break to standard error. */
     @Intrinsic
     static void eprintln(Object? value);
 
+    /** Writes the value behind `value` and a line break to standard error. */
     @Intrinsic
     static void eprintln(&Object? value);
 
+    /**
+     * Reads a line from standard input, without its line ending, or returns
+     * `null` at the end of the input. Bytes that aren't valid UTF-8 become
+     * `U+FFFD`.
+     *
+     * ```
+     * while (true) {
+     *     String? line = Console.readLine();
+     *     if (line == null) {
+     *         break;
+     *     }
+     *     Console.println(line.toUpperCase());
+     * }
+     * ```
+     */
     @Intrinsic
     static String? readLine();
 }

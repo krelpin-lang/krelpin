@@ -1,10 +1,19 @@
 package std.io;
 
+/**
+ * Thrown when an input or output operation fails, like opening a file that
+ * doesn't exist. The message says which operation failed and why.
+ *
+ * `IOException` is checked: a method that can throw it says so with
+ * `throws IOException`.
+ */
 class IOException extends Exception {
+    /** Creates an exception without a message. */
     IOException() {
         super();
     }
 
+    /** Creates an exception with a message that says what went wrong. */
     IOException(String message) {
         super(message);
     }

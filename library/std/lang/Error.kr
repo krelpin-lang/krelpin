@@ -1,10 +1,18 @@
 package std.lang;
 
+/**
+ * The superclass of failures a program isn't expected to recover from.
+ *
+ * Errors are unchecked. Don't catch them except at the very top of a
+ * program, to report them.
+ */
 class Error extends Throwable {
+    /** Creates an exception without a message. */
     Error() {
         super();
     }
 
+    /** Creates an exception with a message that says what went wrong. */
     Error(String message) {
         super(message);
     }

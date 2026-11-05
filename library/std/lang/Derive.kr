@@ -1,4 +1,19 @@
 package std.lang;
 
+/**
+ * Generates implementations of `Equatable`, `Hashable` and `Comparable` for
+ * a class.
+ *
+ * ```
+ * @Derive(Equatable, Hashable)
+ * class Point {
+ *     int x;
+ *     int y;
+ * }
+ * ```
+ *
+ * The generated methods compare and hash every field in declaration order;
+ * `Comparable` orders by the first field that differs.
+ */
 @Intrinsic
 macro Derive;

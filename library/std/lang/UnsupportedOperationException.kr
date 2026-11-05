@@ -1,10 +1,16 @@
 package std.lang;
 
+/**
+ * Thrown by a method that the object doesn't support, like changing a
+ * collection that can only be read.
+ */
 class UnsupportedOperationException extends RuntimeException {
+    /** Creates an exception without a message. */
     UnsupportedOperationException() {
         super();
     }
 
+    /** Creates an exception with a message that says what went wrong. */
     UnsupportedOperationException(String message) {
         super(message);
     }

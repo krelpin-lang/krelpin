@@ -1,6 +1,21 @@
 package std.util;
 
+/**
+ * A list backed by a growable array: indexing and adding at the end are
+ * fast, inserting and removing elsewhere move the elements after.
+ *
+ * ```
+ * List<int> squares = new ArrayList<>();
+ * for (int i = 1; i <= 4; i++) {
+ *     squares.add(i * i);
+ * }
+ * Console.println(squares); // [1, 4, 9, 16]
+ * ```
+ */
 class ArrayList<T> implements List<T> {
+    /** Creates an empty list. */
+    ArrayList() {}
+
     @Intrinsic
     int size();
 
@@ -20,23 +35,30 @@ class ArrayList<T> implements List<T> {
     mut T remove(int index);
 
     @Intrinsic
+    mut void swap(int a, int b);
+
+    @Intrinsic
     int indexOf(&T value) where T extends Equatable<T>;
 
     @Intrinsic
     mut void clear();
 
+    /** Returns an iterator over the elements, in order. */
     Iterator<T> iterator() {
         return new ArrayListIterator<>(this);
     }
 
+    /** Shows the elements in brackets, like `[1, 2, 3]`. */
     String toString() {
-        String text = "[";
+        StringBuilder text = new StringBuilder();
+        text.append("[");
         for (int i = 0; i < this.size(); i++) {
             if (i > 0) {
-                text = text + ", ";
+                text.append(", ");
             }
-            text = text + this.get(i);
+            text.append("" + this.get(i));
         }
-        return text + "]";
+        text.append("]");
+        return text.toString();
     }
 }

@@ -1,8 +1,25 @@
 package std.io;
 
+/**
+ * Reads a file line by line, without loading all of it at once.
+ *
+ * ```
+ * FileReader reader = FileReader.open("data.csv");
+ * while (true) {
+ *     String? line = reader.readLine();
+ *     if (line == null) {
+ *         break;
+ *     }
+ *     Console.println(line.split(",")[0]);
+ * }
+ * ```
+ *
+ * The file is closed when the reader is dropped.
+ */
 final class FileReader {
     private FileReader() {}
 
+    /** Opens the file at `path` for reading. */
     static FileReader open(String path) throws IOException {
         FileReader reader = new FileReader();
         if (!reader.openRaw(path)) {
@@ -11,6 +28,14 @@ final class FileReader {
         return reader;
     }
 
+    /**
+     * Returns the next line without its `\n` or `\r\n`, or `null` at the end of
+     * the file.
+     *
+     * # Throws
+     *
+     * `IOException` if reading fails or the line isn't valid UTF-8.
+     */
     mut String? readLine() throws IOException {
         String? line = this.readLineRaw();
         if (line == null && Files.lastFailed()) {
@@ -19,6 +44,7 @@ final class FileReader {
         return line;
     }
 
+    /** Returns everything from the current position to the end of the file. */
     mut String readAll() throws IOException {
         String? text = this.readAllRaw();
         if (text == null) {

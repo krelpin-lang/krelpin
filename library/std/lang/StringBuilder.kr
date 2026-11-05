@@ -1,39 +1,79 @@
 package std.lang;
 
+/**
+ * A growable string, for building text piece by piece without creating a
+ * new `String` at every step.
+ *
+ * ```
+ * StringBuilder out = new StringBuilder();
+ * for (int i = 0; i < 3; i++) {
+ *     out.append("line $i");
+ *     out.append('\n');
+ * }
+ * String text = out.toString();
+ * ```
+ *
+ * Like `String`, lengths and indices count characters, not bytes.
+ */
 final class StringBuilder {
+    /** Creates an empty builder. */
     StringBuilder() {}
 
+    /** Adds `text` to the end. */
     @Intrinsic
     mut void append(String text);
 
+    /** Adds the character `c` to the end. */
     mut void append(char c) {
         this.append("" + c);
     }
 
+    /** Adds `text` and then a line break, `\n`, to the end. */
     mut void appendLine(String text) {
         this.append(text);
         this.append("\n");
     }
 
+    /** Returns the number of characters built so far. */
     @Intrinsic
     int length();
 
+    /** Returns whether nothing has been built yet. */
     boolean isEmpty() {
         return this.length() == 0;
     }
 
+    /**
+     * Inserts `text` before the character at `index`. An `index` equal to
+     * `length()` appends.
+     *
+     * # Throws
+     *
+     * `IndexOutOfBoundsException` if `index` is negative or above `length()`.
+     */
     @Intrinsic
     mut void insert(int index, String text);
 
+    /**
+     * Keeps the first `length` characters and drops the rest.
+     *
+     * # Throws
+     *
+     * `IndexOutOfBoundsException` if `length` is negative or above
+     * `length()`.
+     */
     @Intrinsic
     mut void truncate(int length);
 
+    /** Reverses the order of the characters. */
     @Intrinsic
     mut void reverse();
 
+    /** Removes every character, keeping the memory for reuse. */
     @Intrinsic
     mut void clear();
 
+    /** Returns the characters built so far as a new `String`. */
     @Intrinsic
     String toString();
 }

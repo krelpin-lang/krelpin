@@ -3,9 +3,27 @@ package std.lang;
 import std.function.Consumer;
 import std.util.Iterator;
 
+/**
+ * A collection that can be visited element by element, for example with a
+ * `for` loop:
+ *
+ * ```
+ * for (&String name : names) {
+ *     Console.println(name);
+ * }
+ * ```
+ */
 interface Iterable<T> {
+    /** Returns an iterator over the elements, which borrows the collection. */
     Iterator<T> iterator();
 
+    /**
+     * Calls `action` with a reference to each element in turn.
+     *
+     * ```
+     * names.forEach(name -> Console.println(name));
+     * ```
+     */
     void forEach(Consumer<&T> action) {
         Iterator<T> values = this.iterator();
         while (values.hasNext()) {

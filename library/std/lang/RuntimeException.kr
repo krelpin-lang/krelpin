@@ -1,10 +1,20 @@
 package std.lang;
 
+/**
+ * The superclass of the exceptions that report mistakes in the program
+ * rather than conditions it should expect.
+ *
+ * Runtime exceptions are unchecked: a method doesn't have to declare them
+ * with `throws`, and a caller doesn't have to catch them. Extend `Exception`
+ * instead for failures a caller is expected to handle, like `IOException`.
+ */
 class RuntimeException extends Exception {
+    /** Creates an exception without a message. */
     RuntimeException() {
         super();
     }
 
+    /** Creates an exception with a message that says what went wrong. */
     RuntimeException(String message) {
         super(message);
     }

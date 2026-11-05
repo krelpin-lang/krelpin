@@ -1,67 +1,199 @@
 package std.lang;
 
+/**
+ * An immutable sequence of Unicode characters, stored as UTF-8.
+ *
+ * Lengths and indices count characters (Unicode scalar values), not bytes,
+ * so `"héllo".length()` is 5 and `"héllo".charAt(1)` is `'é'`. Strings are
+ * shared, not copied, so passing one around is cheap.
+ *
+ * Strings are built with `+`, which turns any value into text, or with
+ * interpolation:
+ *
+ * ```
+ * String name = "Krelpin";
+ * int version = 2;
+ * String title = "$name v$version";          // "Krelpin v2"
+ * String padded = "[${name:>10}]";           // "[   Krelpin]"
+ * ```
+ *
+ * Use a `StringBuilder` to build a long string piece by piece.
+ */
 final class String implements Comparable<String>, Hashable<String> {
+    /** Returns the number of characters in this string. */
     @Intrinsic
     int length();
 
+    /** Returns whether this string has no characters. */
     boolean isEmpty() {
         return this.length() == 0;
     }
 
+    /**
+     * Returns whether this string is empty or made only of whitespace, as
+     * defined by `Char.isWhitespace`.
+     */
     boolean isBlank() {
         return this.trim().isEmpty();
     }
 
+    /** Returns the characters of this string as a new array. */
     @Intrinsic
     char[] chars();
 
+    /**
+     * Returns the character at `index`, counting from 0.
+     *
+     * Each call walks the string from the start when it contains non-ASCII
+     * characters, so use `chars()` to visit every character of a long string.
+     *
+     * # Throws
+     *
+     * `IndexOutOfBoundsException` if `index` is negative or not below
+     * `length()`.
+     */
     @Intrinsic
     char charAt(int index);
 
+    /**
+     * Returns the characters from `begin` to the end.
+     *
+     * # Throws
+     *
+     * `IndexOutOfBoundsException` if `begin` is negative or above `length()`.
+     */
     @Intrinsic
     String substring(int begin);
 
+    /**
+     * Returns the characters from `begin` (included) to `end` (excluded).
+     *
+     * ```
+     * "Krelpin".substring(1, 4) // "rel"
+     * ```
+     *
+     * # Throws
+     *
+     * `IndexOutOfBoundsException` unless `0 <= begin <= end <= length()`.
+     */
     @Intrinsic
     String substring(int begin, int end);
 
+    /**
+     * Returns the index of the first occurrence of `text`, or `-1` when there
+     * is none. An empty `text` is found at index 0.
+     */
     @Intrinsic
     int indexOf(String text);
 
+    /**
+     * Returns the index of the first occurrence of `text` at or after `from`,
+     * or `-1` when there is none. A negative `from` counts as 0.
+     */
     @Intrinsic
     int indexOf(String text, int from);
 
+    /**
+     * Returns the index of the last occurrence of `text`, or `-1` when there
+     * is none. An empty `text` is found at `length()`.
+     */
     @Intrinsic
     int lastIndexOf(String text);
 
+    /** Returns whether `text` occurs in this string. */
     boolean contains(String text) {
         return this.indexOf(text) >= 0;
     }
 
+    /** Returns whether this string starts with `prefix`. */
     @Intrinsic
     boolean startsWith(String prefix);
 
+    /** Returns whether this string ends with `suffix`. */
     @Intrinsic
     boolean endsWith(String suffix);
 
+    /**
+     * Returns this string with `prefix` removed from the start, or `null`
+     * when it doesn't start with `prefix`.
+     *
+     * ```
+     * "v1.2".stripPrefix("v")  // "1.2"
+     * "1.2".stripPrefix("v")   // null
+     * ```
+     */
+    String? stripPrefix(String prefix) {
+        if (!this.startsWith(prefix)) {
+            return null;
+        }
+        return this.substring(prefix.length());
+    }
+
+    /**
+     * Returns this string with `suffix` removed from the end, or `null` when
+     * it doesn't end with `suffix`.
+     */
+    String? stripSuffix(String suffix) {
+        if (!this.endsWith(suffix)) {
+            return null;
+        }
+        return this.substring(0, this.length() - suffix.length());
+    }
+
+    /**
+     * Returns this string in uppercase.
+     *
+     * Uses the full Unicode case mappings, which may change the length:
+     * `"straße".toUpperCase()` is `"STRASSE"`. The mapping is the same in
+     * every language and locale.
+     */
     @Intrinsic
     String toUpperCase();
 
+    /**
+     * Returns this string in lowercase, using the full Unicode case mappings
+     * the same way `toUpperCase` does.
+     */
     @Intrinsic
     String toLowerCase();
 
+    /**
+     * Returns this string without whitespace at either end. Whitespace is
+     * every character with the Unicode `White_Space` property.
+     *
+     * ```
+     * "  hello\n".trim() // "hello"
+     * ```
+     */
     @Intrinsic
     String trim();
 
+    /** Returns this string without whitespace at the start. */
     @Intrinsic
     String trimStart();
 
+    /** Returns this string without whitespace at the end. */
     @Intrinsic
     String trimEnd();
 
+    /**
+     * Returns whether this string equals `other` when both are converted to
+     * lowercase.
+     */
     boolean equalsIgnoreCase(&String other) {
         return this.toLowerCase().equals(&other.toLowerCase());
     }
 
+    /**
+     * Splits this string into lines.
+     *
+     * Lines end with `\n` or `\r\n`, which aren't part of the result. A final
+     * line ending doesn't start another, empty line.
+     *
+     * ```
+     * "one\ntwo\r\n".lines() // ["one", "two"]
+     * ```
+     */
     String[] lines() {
         String[] parts = this.replace("\r\n", "\n").split("\n");
         int count = parts.length;
@@ -75,27 +207,65 @@ final class String implements Comparable<String>, Hashable<String> {
         return lines;
     }
 
+    /**
+     * Returns this string with every occurrence of `target` replaced by
+     * `replacement`, from left to right. An empty `target` changes nothing.
+     */
     @Intrinsic
     String replace(String target, String replacement);
 
+    /**
+     * Returns this string repeated `count` times.
+     *
+     * # Throws
+     *
+     * `IllegalArgumentException` if `count` is negative.
+     */
     @Intrinsic
     String repeat(int count);
 
+    /**
+     * Splits this string around every occurrence of `separator`.
+     *
+     * Empty pieces are kept, so the result always has one more element than
+     * there are separators. An empty `separator` splits the string into its
+     * characters.
+     *
+     * ```
+     * "a,b,,c".split(",") // ["a", "b", "", "c"]
+     * "abc".split("")     // ["a", "b", "c"]
+     * ```
+     */
     @Intrinsic
     String[] split(String separator);
 
+    /**
+     * Compares this string and `other` character by character, by code
+     * point. Returns a negative number, zero or a positive number when this
+     * string sorts before, the same as or after `other`.
+     */
     @Intrinsic
     int compareTo(&String other);
 
+    /** Returns whether this string has the same characters as `other`. */
     @Intrinsic
     boolean equals(&String other);
 
+    /** Returns a hash of the characters, consistent with `equals`. */
     @Intrinsic
     int hashCode();
 
+    /**
+     * Joins `parts` into one string with `separator` between them.
+     *
+     * ```
+     * String.join(", ", "a", "b", "c") // "a, b, c"
+     * ```
+     */
     @Intrinsic
     static String join(String separator, String... parts);
 
+    /** Returns `value` as text, the way `+` and `Console.println` show it. */
     @Intrinsic
     static String valueOf(Object? value);
 }

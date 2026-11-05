@@ -1,6 +1,24 @@
 package std.util;
 
+/**
+ * A map backed by a hash table. Looking up, adding and removing an entry
+ * take constant time on average.
+ *
+ * Keys must be `Hashable`. The order of the entries is unspecified and may
+ * change as entries are added or removed.
+ *
+ * ```
+ * Map<String, int> counts = new HashMap<>();
+ * for (String word : text.split(" ")) {
+ *     (&int)? seen = counts.get(&word);
+ *     counts.put(word, seen == null ? 1 : seen + 1);
+ * }
+ * ```
+ */
 class HashMap<K extends Hashable<K>, V> implements Map<K, V> {
+    /** Creates an empty map. */
+    HashMap() {}
+
     @Intrinsic
     int size();
 
@@ -25,16 +43,19 @@ class HashMap<K extends Hashable<K>, V> implements Map<K, V> {
     @Intrinsic
     List<&V> values();
 
+    /** Shows the entries in braces, like `{a=1, b=2}`. */
     String toString() {
-        String text = "{";
+        StringBuilder text = new StringBuilder();
+        text.append("{");
         boolean first = true;
         for (&K key : this.keySet()) {
             if (!first) {
-                text = text + ", ";
+                text.append(", ");
             }
             first = false;
-            text = text + key + "=" + this.get(key);
+            text.append(key + "=" + this.get(key));
         }
-        return text + "}";
+        text.append("}");
+        return text.toString();
     }
 }

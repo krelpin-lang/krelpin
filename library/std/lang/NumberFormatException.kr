@@ -1,10 +1,16 @@
 package std.lang;
 
+/**
+ * Thrown when text that should be a number isn't one, or the number doesn't
+ * fit in the type it is parsed into.
+ */
 class NumberFormatException extends IllegalArgumentException {
+    /** Creates an exception without a message. */
     NumberFormatException() {
         super();
     }
 
+    /** Creates an exception with a message that says what went wrong. */
     NumberFormatException(String message) {
         super(message);
     }

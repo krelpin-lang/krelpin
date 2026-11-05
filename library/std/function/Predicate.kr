@@ -1,5 +1,7 @@
 package std.function;
 
+/** A test on a value, like `n -> n > 0`. */
 interface Predicate<T> {
+    /** Returns whether `value` passes the test. */
     mut boolean test(T value);
 }
