@@ -1,0 +1,32 @@
+package broken;
+
+import std.macros.MacroError;
+import std.macros.Token;
+import std.macros.TokenStream;
+
+macro Reject(TokenStream args, TokenStream item) {
+    throw new MacroError("fields are not allowed here", &item.get(item.indexOf("{") + 2));
+}
+
+macro Crash(TokenStream args, TokenStream item) {
+    Console.println("about to crash");
+    int[] numbers = new int[1];
+    numbers[3] = 1;
+    return item;
+}
+
+macro Junk(TokenStream args, TokenStream item) {
+    TokenStream out = new TokenStream();
+    out.add(Token.punct("a b"));
+    return out;
+}
+
+macro Again(TokenStream args, TokenStream item) {
+    TokenStream out = TokenStream.parse("@Again");
+    out.addAll(&item);
+    return out;
+}
+
+macro Keep(TokenStream args, TokenStream item) {
+    return item;
+}

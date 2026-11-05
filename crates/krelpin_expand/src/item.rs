@@ -86,7 +86,7 @@ impl ExpandCtxt<'_> {
                     self.emit(
                         Diagnostic::error(format!(
                             "`@{}` cannot be used on types with borrow sources",
-                            invocation.builtin.name()
+                            invocation.kind.name()
                         ))
                         .with_span(invocation.annotation.span)
                         .with_note("macros do not support borrowed data yet"),
@@ -108,19 +108,19 @@ impl ExpandCtxt<'_> {
         self.emit(
             Diagnostic::error(format!(
                 "`@{}` cannot be used on {target}",
-                invocation.builtin.name()
+                invocation.kind.name()
             ))
             .with_span(invocation.annotation.span)
-            .with_help(invocation.builtin.usage()),
+            .with_help(invocation.usage()),
         );
     }
 
     pub(crate) fn splice(&self, item: &mut Item, invocation: &Invocation, generated: Generated) {
         let expansion = Expansion {
             call_site: invocation.annotation.span,
-            macro_name: invocation.builtin.name().to_owned(),
+            macro_name: invocation.kind.name().as_str().to_owned(),
         };
-        let file_name = format!("<@{} on {}>", invocation.builtin.name(), item.name.name);
+        let file_name = format!("<@{} on {}>", invocation.kind.name(), item.name.name);
         let interfaces = if generated.interfaces.is_empty() {
             Vec::new()
         } else {

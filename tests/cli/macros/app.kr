@@ -1,0 +1,38 @@
+import accessors.Getters;
+import accessors.Trace;
+import accessors.*;
+
+/** A point that knows its coordinates. */
+@Getters
+@Companion("hello")
+class Point {
+    private int x;
+    private int y = 2;
+    @Cfg(feature = "z")
+    private int z;
+    private static int count = 0;
+
+    Point(int x) {
+        this.x = x;
+    }
+
+    @Trace("sum")
+    int sum() {
+        return this.x + this.y;
+    }
+
+    @Getters
+    record Pair(int left, int right) {
+        static String tag = "pair";
+    }
+}
+
+class Main {
+    @Trace
+    static void main() {
+        Point p = new Point(40);
+        Console.println(p.getX() + p.getY());
+        Console.println(p.sum());
+        Console.println(PointCompanion.greet());
+    }
+}

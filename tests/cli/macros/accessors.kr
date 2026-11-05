@@ -1,0 +1,74 @@
+package accessors;
+
+import std.macros.MacroError;
+import std.macros.Token;
+import std.macros.TokenStream;
+
+macro Getters(TokenStream args, TokenStream item) {
+    int open = item.indexOf("{");
+    if (open < 0) {
+        throw new MacroError("`@Getters` needs a type with a body");
+    }
+    int close = item.matching(open);
+    TokenStream getters = new TokenStream();
+    int depth = 0;
+    int start = open + 1;
+    for (int i = open + 1; i < close; i++) {
+        Token token = item.get(i);
+        if (token.isPunct("{") || token.isPunct("(")) {
+            depth++;
+        } else if (token.isPunct("}") || token.isPunct(")")) {
+            depth--;
+            if (depth == 0 && token.isPunct("}")) {
+                start = i + 1;
+            }
+        } else if (depth == 0 && token.isPunct(";")) {
+            int nameAt = i - 1;
+            int eq = item.indexOf("=", start);
+            if (eq >= 0 && eq < i) {
+                nameAt = eq - 1;
+            }
+            Token name = item.get(nameAt);
+            TokenStream type = item.slice(start, nameAt);
+            while (!type.isEmpty() && type.get(0).isIdent("private")) {
+                type.remove(0);
+            }
+            if (!type.isEmpty() && !type.get(0).isIdent("static")) {
+                String upper = name.text.substring(0, 1).toUpperCase() + name.text.substring(1);
+                getters.addAll(&type);
+                getters.add(Token.ident("get" + upper));
+                getters.append("() { return this.");
+                getters.add(name);
+                getters.append("; }");
+            }
+            start = i + 1;
+        }
+    }
+    item.insertAll(close, &getters);
+    return item;
+}
+
+macro Trace(TokenStream args, TokenStream item) {
+    int paren = item.indexOf("(");
+    int body = item.indexOf("{");
+    if (paren < 1 || body < 0) {
+        throw new MacroError("`@Trace` goes on methods");
+    }
+    Token name = item.get(paren - 1);
+    String label = args.isEmpty() ? Token.string(name.text).text : args.get(0).text;
+    item.insertAll(body + 1, &TokenStream.parse("Console.println(\"-> \" + " + label + ");"));
+    return item;
+}
+
+macro Companion(TokenStream args, TokenStream item) {
+    int kw = item.indexOf("class");
+    Token name = item.get(kw + 1);
+    if (args.size() != 1 || !args.get(0).isLiteral()) {
+        throw new MacroError("`@Companion` takes a greeting string", &name);
+    }
+    TokenStream out = new TokenStream();
+    out.addAll(&item);
+    out.append("final class " + name.text + "Companion { static String greet() { return "
+        + args.get(0).text + " + \" from " + name.text + "\"; } }");
+    return out;
+}

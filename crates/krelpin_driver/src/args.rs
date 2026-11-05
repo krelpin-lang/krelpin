@@ -77,6 +77,14 @@ pub struct Args {
     pub crate_type: Vec<CrateType>,
 
     #[arg(
+        long = "extern",
+        value_name = "NAME[=PATH]",
+        help = "Use the macros of the `proc-macro` crate NAME, built at PATH \
+                (default: lib<NAME>.krmacro in the -L directories)"
+    )]
+    pub externs: Vec<String>,
+
+    #[arg(
         long,
         value_name = "NAME",
         help = "Specify the name of the crate being built"
@@ -204,6 +212,7 @@ pub enum CrateType {
     Dylib,
     Cdylib,
     Staticlib,
+    ProcMacro,
 }
 
 #[derive(ValueEnum, Clone, Copy, Debug, PartialEq, Eq)]

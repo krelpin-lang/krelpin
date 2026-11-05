@@ -25,7 +25,12 @@ fn expand_with(src: &str, cfg: &crate::CfgSet) -> Expanded {
         .load_std(&source_map, &dcx);
     let file = source_map.new_source_file("test.kr", src.to_owned());
     units.push(parser::parse(lexer::lex(&file, &dcx), &dcx));
-    crate::expand_with_cfg(&mut units, &source_map, &dcx, cfg);
+    let options = crate::ExpandOptions {
+        cfg,
+        proc_macro: None,
+        externs: &[],
+    };
+    crate::expand_crate(&mut units, &source_map, &dcx, &options);
     Expanded {
         unit: units.pop().expect("the test unit"),
         errors: buffer.messages(),
@@ -137,12 +142,140 @@ fn macros_are_resolved_by_name() {
     assert!(expanded.unit.imports.is_empty());
 }
 
+fn expand_proc_macro(src: &str) -> Expanded {
+    let source_map = SourceMap::new();
+    let buffer = DiagnosticBuffer::default();
+    let dcx = DiagCtxt::new(buffer.clone());
+    let root = Path::new(env!("CARGO_MANIFEST_DIR")).join("../..");
+    let mut units = Sysroot::new(root)
+        .expect("the workspace is a sysroot")
+        .load_std(&source_map, &dcx);
+    let file = source_map.new_source_file("test.kr", src.to_owned());
+    units.push(parser::parse(lexer::lex(&file, &dcx), &dcx));
+    let options = crate::ExpandOptions {
+        cfg: &crate::CfgSet::default(),
+        proc_macro: Some("demo"),
+        externs: &[],
+    };
+    crate::expand_crate(&mut units, &source_map, &dcx, &options);
+    Expanded {
+        unit: units.pop().expect("the test unit"),
+        errors: buffer.messages(),
+    }
+}
+
+const PROC_MACRO_IMPORTS: &str = "package demo;\nimport std.macros.TokenStream;\n";
+
 #[test]
-fn only_the_standard_library_declares_macros() {
+fn macros_are_defined_in_proc_macro_crates() {
     assert_eq!(
         errors("macro Builder;"),
-        ["only the standard library can declare macros for now"]
+        ["only the standard library can declare macros without a body"]
     );
+    assert_eq!(
+        errors("macro Builder(TokenStream args, TokenStream item) { return item; }"),
+        ["macros can only be defined in a `proc-macro` crate"]
+    );
+}
+
+#[test]
+fn proc_macro_crates_get_a_macro_server() {
+    let src = format!(
+        "{PROC_MACRO_IMPORTS}macro Builder(TokenStream args, TokenStream item) {{ return item; }}\n\
+         class Helper {{}}"
+    );
+    let expanded = expand_proc_macro(&src);
+    assert_eq!(expanded.errors, Vec::<String>::new());
+    assert!(expanded.unit.macros.is_empty());
+    let names: Vec<&str> = expanded
+        .unit
+        .items
+        .iter()
+        .map(|item| item.name.name.as_str())
+        .collect();
+    assert_eq!(names, ["Helper", "macros#"]);
+    let ItemKind::Class(server) = &expanded.unit.items[1].kind else {
+        panic!("the macro server is a class");
+    };
+    let members: Vec<&str> = server
+        .members
+        .iter()
+        .filter_map(|member| match &member.kind {
+            MemberKind::Method(method) => Some(method.name.name.as_str()),
+            _ => None,
+        })
+        .collect();
+    assert_eq!(members, ["main", "Builder"]);
+    let MemberKind::Method(builder) = &server.members[1].kind else {
+        panic!("the macro is a method");
+    };
+    assert!(builder.receiver.is_none());
+    assert_eq!(builder.params[1].name.name.as_str(), "item");
+}
+
+#[test]
+fn macro_definitions_are_checked() {
+    let src = format!(
+        "{PROC_MACRO_IMPORTS}macro One(TokenStream args) {{ return args; }}\n\
+         macro Two(TokenStream args, String item) {{ return args; }}\n\
+         macro Three;\n\
+         macro main(TokenStream args, TokenStream item) {{ return item; }}\n\
+         class App {{ static void main() {{}} }}"
+    );
+    assert_eq!(
+        expand_proc_macro(&src).errors,
+        [
+            "a `proc-macro` crate cannot have a `main` method",
+            "the macro `One` takes 1 parameter, but macros take two",
+            "macro parameters are `TokenStream`s",
+            "the macro `Three` has no body",
+            "a macro cannot be named `main`",
+        ]
+    );
+}
+
+#[test]
+fn macros_cannot_be_used_where_they_are_defined() {
+    let src = format!(
+        "{PROC_MACRO_IMPORTS}macro Builder(TokenStream args, TokenStream item) {{ return item; }}\n\
+         @Builder class A {{}}"
+    );
+    assert_eq!(
+        expand_proc_macro(&src).errors,
+        ["the macro `Builder` cannot be used in the crate that defines it"]
+    );
+}
+
+#[test]
+fn wire_tokens_round_trip() {
+    use crate::proc_macro::{escape, unescape};
+    use crate::{WireKind, WireToken};
+
+    for text in [
+        "plain",
+        "tab\there",
+        "line\nbreak",
+        "back\\slash",
+        "\\n",
+        "\r\n\t",
+    ] {
+        assert_eq!(unescape(&escape(text)), text);
+        assert!(!escape(text).contains(['\n', '\t', '\r']));
+    }
+    let token = WireToken {
+        kind: WireKind::Doc,
+        span: Some(7),
+        text: "/** two\n lines */".to_owned(),
+    };
+    assert_eq!(WireToken::decode(&token.encode()), Some(token));
+    let fresh = WireToken {
+        kind: WireKind::Punct,
+        span: None,
+        text: "->".to_owned(),
+    };
+    assert_eq!(fresh.encode(), "punct\t-1\t->");
+    assert_eq!(WireToken::decode(&fresh.encode()), Some(fresh));
+    assert_eq!(WireToken::decode("bogus\t1\tx"), None);
 }
 
 #[test]

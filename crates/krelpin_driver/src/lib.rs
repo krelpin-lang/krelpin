@@ -123,9 +123,20 @@ pub fn run(args: &Args, sess: &Session) {
         return;
     }
     units.push(unit);
+    let externs = timer.time("loading macro crates", || load_externs(&config, sess));
+    if sess.dcx.has_errors() {
+        return;
+    }
+    let crate_name = args.crate_name();
     timer.time("expansion", || {
-        krelpin_expand::expand_with_cfg(&mut units, &sess.source_map, &sess.dcx, &config.cfg)
+        let options = krelpin_expand::ExpandOptions {
+            cfg: &config.cfg,
+            proc_macro: config.proc_macro().then_some(crate_name.as_str()),
+            externs: &externs,
+        };
+        krelpin_expand::expand_crate(&mut units, &sess.source_map, &sess.dcx, &options)
     });
+    drop(externs);
     if sess.dcx.has_errors() {
         return;
     }
@@ -174,7 +185,8 @@ pub fn run(args: &Args, sess: &Session) {
 
     for emit in emits.iter().filter(|emit| emit.kind == Emit::DepInfo) {
         let path = output_path(args, &config, emit, None);
-        let sources = sysroot.std_sources().unwrap_or_default();
+        let mut sources = sysroot.std_sources().unwrap_or_default();
+        sources.extend(config.externs.iter().map(|(_, path)| path.clone()));
         let outputs: Vec<PathBuf> = emits
             .iter()
             .filter(|other| !matches!(other.kind, Emit::DepInfo | Emit::Metadata))
@@ -221,7 +233,7 @@ pub fn run(args: &Args, sess: &Session) {
         builds.push((None, krelpin_codegen_llvm::Entry::Tests(tests)));
     } else {
         for &crate_type in &config.crate_types {
-            let entry = if crate_type == CrateType::Bin {
+            let entry = if matches!(crate_type, CrateType::Bin | CrateType::ProcMacro) {
                 match krelpin_codegen_llvm::find_entry(&mir, &typeck.tcx, is_user) {
                     Ok(entry) => krelpin_codegen_llvm::Entry::Main(entry),
                     Err(diagnostic) => {
@@ -265,7 +277,9 @@ pub fn run(args: &Args, sess: &Session) {
             let kind = match (emit.kind, crate_type) {
                 (Emit::Asm, _) => krelpin_codegen_llvm::OutputKind::Asm,
                 (Emit::Obj, _) => krelpin_codegen_llvm::OutputKind::Object,
-                (_, None | Some(CrateType::Bin)) => krelpin_codegen_llvm::OutputKind::Executable,
+                (_, None | Some(CrateType::Bin | CrateType::ProcMacro)) => {
+                    krelpin_codegen_llvm::OutputKind::Executable
+                }
                 (_, Some(CrateType::Dylib | CrateType::Cdylib)) => {
                     krelpin_codegen_llvm::OutputKind::SharedLib
                 }
@@ -293,6 +307,26 @@ pub fn run(args: &Args, sess: &Session) {
             }
         }
     }
+}
+
+fn load_externs(config: &Config, sess: &Session) -> Vec<krelpin_expand::ProcMacroCrate> {
+    let mut loaded = Vec::new();
+    for (name, path) in &config.externs {
+        if loaded
+            .iter()
+            .any(|other: &krelpin_expand::ProcMacroCrate| other.name() == name)
+        {
+            sess.dcx.emit(Diagnostic::error(format!(
+                "the macro crate `{name}` is passed to `--extern` more than once"
+            )));
+            continue;
+        }
+        match krelpin_expand::ProcMacroCrate::load(name, path) {
+            Ok(krate) => loaded.push(krate),
+            Err(message) => sess.dcx.emit(Diagnostic::error(message)),
+        }
+    }
+    loaded
 }
 
 fn members(item: &krelpin_ast::ast::Item) -> &[krelpin_ast::ast::Member] {
@@ -340,6 +374,7 @@ fn artifact_name(
             None | Some(CrateType::Bin) => name,
             Some(CrateType::Lib | CrateType::Rlib) => library("rlib"),
             Some(CrateType::Staticlib) => library("a"),
+            Some(CrateType::ProcMacro) => library("krmacro"),
             Some(CrateType::Dylib | CrateType::Cdylib) => library(if config.target.os == "macos" {
                 "dylib"
             } else {

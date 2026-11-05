@@ -1,0 +1,23 @@
+import broken.*;
+
+@Reject
+class A {
+    int x;
+}
+
+@Crash
+class B {}
+
+@Keep
+class C {}
+
+@Junk
+class D {}
+
+@Again
+class E {}
+
+enum F {
+    @Keep
+    ONE
+}

@@ -118,9 +118,14 @@ impl<W: Write> HumanEmitter<W> {
             .children
             .iter()
             .map(|child| (child.level.as_str(), child.message.clone()))
-            .chain(origins.into_iter().map(|name| {
+            .chain(collapse(origins).into_iter().map(|(name, count)| {
                 let level = Level::Note.as_str();
-                (level, format!("this comes from the expansion of `@{name}`"))
+                let message = if count == 1 {
+                    format!("this comes from the expansion of `@{name}`")
+                } else {
+                    format!("this comes from {count} nested expansions of `@{name}`")
+                };
+                (level, message)
             }))
             .collect::<Vec<_>>();
         if !children.is_empty() {
@@ -255,4 +260,15 @@ fn display_width(text: &str) -> usize {
 
 fn expand_tabs(text: &str) -> String {
     text.replace('\t', &" ".repeat(TAB_WIDTH))
+}
+
+fn collapse(origins: Vec<String>) -> Vec<(String, usize)> {
+    let mut runs: Vec<(String, usize)> = Vec::new();
+    for name in origins {
+        match runs.last_mut() {
+            Some((last, count)) if *last == name => *count += 1,
+            _ => runs.push((name, 1)),
+        }
+    }
+    runs
 }

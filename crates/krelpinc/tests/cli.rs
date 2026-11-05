@@ -62,7 +62,18 @@ fn prints_compiler_information() {
     let targets = stdout(&krelpinc(&["--print", "target-list"]));
     assert!(targets.contains("x86_64-unknown-linux-gnu"), "{targets}");
     let types = stdout(&krelpinc(&["--print", "supported-crate-types"]));
-    assert_eq!(types, "bin\nlib\nrlib\ndylib\ncdylib\nstaticlib\n");
+    assert_eq!(
+        types,
+        "bin\nlib\nrlib\ndylib\ncdylib\nstaticlib\nproc-macro\n"
+    );
+    let macro_files = stdout(&krelpinc(&[
+        "tests/cli/macros/accessors.kr",
+        "--crate-type",
+        "proc-macro",
+        "--print",
+        "file-names",
+    ]));
+    assert_eq!(macro_files, "libaccessors.krmacro\n");
 }
 
 #[test]
@@ -185,4 +196,126 @@ fn builds_programs_tests_and_libraries() {
         assert!(symbols.contains("features_init"), "{symbols}");
     }
     let _ = fs::remove_dir_all(dir);
+}
+
+fn build_macro_crate(name: &str, dir: &Path) {
+    let source = format!("tests/cli/macros/{name}.kr");
+    let built = krelpinc(&[
+        &source,
+        "--crate-type",
+        "proc-macro",
+        "--out-dir",
+        dir.to_str().expect("utf-8 path"),
+    ]);
+    assert!(built.status.success(), "{}", stderr(&built));
+    assert!(dir.join(format!("lib{name}.krmacro")).is_file());
+}
+
+#[test]
+fn runs_macros_from_proc_macro_crates() {
+    if !has_clang() {
+        return;
+    }
+    let dir = scratch("macros");
+    build_macro_crate("accessors", &dir);
+    let dir_arg = dir.to_str().expect("utf-8 path");
+    let program = dir.join("app");
+    let built = krelpinc(&[
+        "tests/cli/macros/app.kr",
+        "--extern",
+        "accessors",
+        "-L",
+        dir_arg,
+        "-o",
+        program.to_str().expect("utf-8 path"),
+    ]);
+    assert!(built.status.success(), "{}", stderr(&built));
+    let run = Command::new(&program).output().expect("the program runs");
+    assert_eq!(stdout(&run), "-> main\n42\n-> sum\n42\nhello from Point\n");
+
+    let library = dir.join("libaccessors.krmacro");
+    let explicit = format!("accessors={}", library.display());
+    let checked = krelpinc(&[
+        "tests/cli/macros/app.kr",
+        "--extern",
+        &explicit,
+        "--emit=metadata",
+    ]);
+    assert!(checked.status.success(), "{}", stderr(&checked));
+
+    let renamed = format!("other={}", library.display());
+    let wrong_name = krelpinc(&["tests/cli/macros/app.kr", "--extern", &renamed]);
+    assert!(stderr(&wrong_name).contains("is the macro crate `accessors`, not `other`"));
+    let not_macros = format!("accessors={}", program.display());
+    let wrong_file = krelpinc(&["tests/cli/macros/app.kr", "--extern", &not_macros]);
+    assert!(stderr(&wrong_file).contains("is not a macro crate"));
+    let missing = krelpinc(&["tests/cli/macros/app.kr", "--extern", "accessors"]);
+    assert!(stderr(&missing).contains("couldn't find the macro crate `accessors`"));
+    let without = krelpinc(&["tests/cli/macros/app.kr", "--emit=metadata"]);
+    assert!(stderr(&without).contains("cannot find macro `Getters` in this scope"));
+    let _ = fs::remove_dir_all(&dir);
+}
+
+#[test]
+fn reports_macro_failures() {
+    if !has_clang() {
+        return;
+    }
+    let dir = scratch("macro-failures");
+    build_macro_crate("broken", &dir);
+    let output = krelpinc(&[
+        "tests/cli/macros/misuse.kr",
+        "--extern",
+        "broken",
+        "-L",
+        dir.to_str().expect("utf-8 path"),
+        "--emit=metadata",
+    ]);
+    assert!(!output.status.success());
+    let errors = stderr(&output);
+    for expected in [
+        "error: fields are not allowed here\n --> tests/cli/macros/misuse.kr:5:9",
+        "about to crash",
+        "error: the macro `@Crash` panicked",
+        "it threw IndexOutOfBoundsException: Index 3 out of bounds for length 1",
+        "error: the macro `@Junk` produced an invalid token",
+        "`a b` is not a single token",
+        "error: recursion limit reached while expanding `@Again`",
+        "this comes from 64 nested expansions of `@Again`",
+        "error: `@Keep` cannot be used on enum variants",
+        "aborting due to 5 previous errors",
+    ] {
+        assert!(
+            errors.contains(expected),
+            "missing `{expected}` in:\n{errors}"
+        );
+    }
+    let _ = fs::remove_dir_all(&dir);
+}
+
+#[test]
+fn checks_proc_macro_options() {
+    let combined = krelpinc(&[
+        "tests/cli/macros/accessors.kr",
+        "--crate-type",
+        "proc-macro,bin",
+    ]);
+    assert!(stderr(&combined).contains("`proc-macro` cannot be combined with other crate types"));
+    let foreign = if cfg!(target_arch = "x86_64") {
+        "aarch64-unknown-linux-gnu"
+    } else {
+        "x86_64-unknown-linux-gnu"
+    };
+    let cross = krelpinc(&[
+        "tests/cli/macros/accessors.kr",
+        "--crate-type",
+        "proc-macro",
+        "--target",
+        foreign,
+    ]);
+    assert!(stderr(&cross).contains("`proc-macro` crates are built for the host"));
+    let invalid = krelpinc(&[SOURCE, "--extern", "not-a-name=x"]);
+    assert!(stderr(&invalid).contains("invalid `--extern` argument `not-a-name=x`"));
+    let outside = krelpinc(&["tests/cli/macros/accessors.kr", "--emit=metadata"]);
+    assert!(stderr(&outside).contains("macros can only be defined in a `proc-macro` crate"));
 }

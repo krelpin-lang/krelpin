@@ -6,6 +6,8 @@ use krelpin_ast::package::PackagePath;
 use krelpin_errors::{DiagCtxt, Diagnostic};
 use krelpin_span::{Span, Symbol};
 
+use crate::proc_macro::ProcMacroCrate;
+
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum BuiltinMacro {
     Derive,
@@ -39,80 +41,137 @@ impl BuiltinMacro {
     }
 }
 
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub(crate) enum MacroKind {
+    Builtin(BuiltinMacro),
+    Extern {
+        krate: usize,
+        index: usize,
+        name: Symbol,
+    },
+    Local {
+        name: Symbol,
+    },
+}
+
+impl MacroKind {
+    pub(crate) fn name(self) -> Symbol {
+        match self {
+            MacroKind::Builtin(builtin) => Symbol::intern(builtin.name()),
+            MacroKind::Extern { name, .. } | MacroKind::Local { name } => name,
+        }
+    }
+}
+
 #[derive(Debug, Default)]
 pub(crate) struct MacroTable {
-    macros: HashMap<PackagePath, HashMap<Symbol, BuiltinMacro>>,
+    macros: HashMap<PackagePath, HashMap<Symbol, MacroKind>>,
     types: HashSet<(PackagePath, Symbol)>,
+    packages: HashSet<PackagePath>,
 }
 
 impl MacroTable {
-    pub(crate) fn collect(units: &[CompilationUnit], dcx: &DiagCtxt) -> MacroTable {
+    pub(crate) fn collect(
+        units: &[CompilationUnit],
+        externs: &[ProcMacroCrate],
+        proc_macro: bool,
+        dcx: &DiagCtxt,
+    ) -> MacroTable {
         let mut table = MacroTable::default();
         for unit in units {
             let package = PackagePath::of_unit(unit);
+            table.packages.insert(package.clone());
             for item in &unit.items {
                 table.types.insert((package.clone(), item.name.name));
             }
             for def in &unit.macros {
-                table.add(&package, def, dcx);
+                table.add(&package, def, proc_macro, dcx);
+            }
+        }
+        for (krate, extern_crate) in externs.iter().enumerate() {
+            for (index, path) in extern_crate.macros().iter().enumerate() {
+                let (package, name) = match path.rsplit_once('.') {
+                    Some((package, name)) => (PackagePath::parse(package), name),
+                    None => (PackagePath::default(), path.as_str()),
+                };
+                let name = Symbol::intern(name);
+                let kind = MacroKind::Extern { krate, index, name };
+                if table.insert(&package, name, kind).is_err() {
+                    dcx.emit(
+                        Diagnostic::error(format!(
+                            "the macro `{path}` of `{}` is already defined",
+                            extern_crate.name()
+                        ))
+                        .with_note("two crates cannot define a macro with the same path"),
+                    );
+                }
             }
         }
         table
     }
 
-    fn add(&mut self, package: &PackagePath, def: &MacroDef, dcx: &DiagCtxt) {
+    fn add(&mut self, package: &PackagePath, def: &MacroDef, proc_macro: bool, dcx: &DiagCtxt) {
         let name = def.name;
-        if !package.is_std() {
-            dcx.emit(
-                Diagnostic::error("only the standard library can declare macros for now")
-                    .with_span(name.span)
-                    .with_note("macros written in Krelpin are not supported yet"),
-            );
-            return;
-        }
-        let builtin = match BuiltinMacro::lookup(package, name.name) {
-            Some(builtin) if is_intrinsic(&def.annotations) => builtin,
-            _ => {
-                dcx.emit(
-                    Diagnostic::error(format!("unknown intrinsic macro `{package}.{}`", name.name))
+        let kind = if package.is_std() {
+            match BuiltinMacro::lookup(package, name.name) {
+                Some(builtin) if is_intrinsic(&def.annotations) && def.body.is_none() => {
+                    MacroKind::Builtin(builtin)
+                }
+                _ => {
+                    dcx.emit(
+                        Diagnostic::error(format!(
+                            "unknown intrinsic macro `{package}.{}`",
+                            name.name
+                        ))
                         .with_span(name.span)
                         .with_note("the compiler provides the macros of the standard library"),
-                );
-                return;
+                    );
+                    return;
+                }
             }
+        } else if !proc_macro || def.body.is_none() {
+            return;
+        } else {
+            MacroKind::Local { name: name.name }
         };
-        match self
-            .macros
-            .entry(package.clone())
-            .or_default()
-            .entry(name.name)
-        {
-            Entry::Occupied(_) => dcx.emit(
+        if self.insert(package, name.name, kind).is_err() {
+            dcx.emit(
                 Diagnostic::error(format!(
                     "the macro `{}` is defined multiple times",
                     name.name
                 ))
                 .with_span(name.span),
-            ),
+            );
+        }
+    }
+
+    fn insert(&mut self, package: &PackagePath, name: Symbol, kind: MacroKind) -> Result<(), ()> {
+        match self.macros.entry(package.clone()).or_default().entry(name) {
+            Entry::Occupied(_) => Err(()),
             Entry::Vacant(entry) => {
-                entry.insert(builtin);
+                entry.insert(kind);
+                Ok(())
             }
         }
     }
 
-    pub(crate) fn lookup(&self, package: &PackagePath, name: Symbol) -> Option<BuiltinMacro> {
+    pub(crate) fn lookup(&self, package: &PackagePath, name: Symbol) -> Option<MacroKind> {
         self.macros.get(package)?.get(&name).copied()
     }
 
     fn has_type(&self, package: &PackagePath, name: Symbol) -> bool {
         self.types.contains(&(package.clone(), name))
     }
+
+    fn only_macros(&self, package: &PackagePath) -> bool {
+        self.macros.contains_key(package) && !self.packages.contains(package)
+    }
 }
 
 pub(crate) struct MacroScope<'a> {
     table: &'a MacroTable,
     package: PackagePath,
-    imports: HashMap<Symbol, BuiltinMacro>,
+    imports: HashMap<Symbol, MacroKind>,
     globs: Vec<PackagePath>,
     prelude: Vec<PackagePath>,
     macro_only_imports: Vec<Span>,
@@ -136,18 +195,21 @@ impl<'a> MacroScope<'a> {
 
     fn add_import(&mut self, import: &Import) {
         if import.glob {
-            self.globs
-                .push(PackagePath::from_idents(&import.path.segments));
+            let package = PackagePath::from_idents(&import.path.segments);
+            if self.table.only_macros(&package) {
+                self.macro_only_imports.push(import.span);
+            }
+            self.globs.push(package);
             return;
         }
         let Some((name, package)) = import.path.segments.split_last() else {
             return;
         };
         let package = PackagePath::from_idents(package);
-        let Some(builtin) = self.table.lookup(&package, name.name) else {
+        let Some(kind) = self.table.lookup(&package, name.name) else {
             return;
         };
-        self.imports.insert(name.name, builtin);
+        self.imports.insert(name.name, kind);
         if !self.table.has_type(&package, name.name) {
             self.macro_only_imports.push(import.span);
         }
@@ -157,15 +219,15 @@ impl<'a> MacroScope<'a> {
         self.macro_only_imports.contains(&import.span)
     }
 
-    pub(crate) fn resolve(&self, path: &Path) -> Option<BuiltinMacro> {
+    pub(crate) fn resolve(&self, path: &Path) -> Option<MacroKind> {
         let (name, package) = path.segments.split_last()?;
         if !package.is_empty() {
             return self
                 .table
                 .lookup(&PackagePath::from_idents(package), name.name);
         }
-        if let Some(&builtin) = self.imports.get(&name.name) {
-            return Some(builtin);
+        if let Some(&kind) = self.imports.get(&name.name) {
+            return Some(kind);
         }
         std::iter::once(&self.package)
             .chain(&self.globs)

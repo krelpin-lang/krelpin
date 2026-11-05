@@ -19,6 +19,7 @@ pub struct Config {
     pub target_cpu: Option<String>,
     pub libraries: Vec<String>,
     pub crate_types: Vec<CrateType>,
+    pub externs: Vec<(String, PathBuf)>,
     pub time_passes: bool,
     pub keep_temps: Option<PathBuf>,
 }
@@ -29,6 +30,7 @@ const UNSTABLE_OPTIONS: &str = "time-passes, keep-temps";
 impl Config {
     pub fn from_args(args: &Args) -> Result<Config, Vec<Diagnostic>> {
         let mut errors = Vec::new();
+        let proc_macro = args.crate_type.contains(&CrateType::ProcMacro);
         let target = match &args.target {
             Some(triple) => Target::parse(triple).unwrap_or_else(|message| {
                 errors.push(Diagnostic::error(message));
@@ -48,6 +50,7 @@ impl Config {
             target_cpu: None,
             libraries: Vec::new(),
             crate_types: dedup(&args.crate_type),
+            externs: Vec::new(),
             time_passes: false,
             keep_temps: None,
         };
@@ -74,11 +77,37 @@ impl Config {
                 errors.push(Diagnostic::error(message));
             }
         }
+        let mut search_dirs = Vec::new();
         for path in &args.lib_search_paths {
             match search_path(path) {
                 Ok(flag) => config.libraries.extend(flag),
                 Err(message) => errors.push(Diagnostic::error(message)),
             }
+            if let Some(dir) = crate_search_dir(path) {
+                search_dirs.push(dir);
+            }
+        }
+        for spec in &args.externs {
+            match extern_crate(spec, &search_dirs) {
+                Ok(found) => config.externs.push(found),
+                Err(message) => errors.push(Diagnostic::error(message)),
+            }
+        }
+        if proc_macro && config.crate_types.len() > 1 {
+            errors.push(
+                Diagnostic::error("`proc-macro` cannot be combined with other crate types")
+                    .with_help("build the macros and the code that uses them as separate crates"),
+            );
+        }
+        if proc_macro && config.target != Target::host() {
+            errors.push(
+                Diagnostic::error("`proc-macro` crates are built for the host")
+                    .with_note(format!(
+                        "the compiler runs macros on `{}` while it compiles",
+                        Target::host().triple
+                    ))
+                    .with_help("remove `--target`"),
+            );
         }
         for library in &args.link_libs {
             match link_library(library, &config.target) {
@@ -96,7 +125,13 @@ impl Config {
     }
 
     pub fn builds_executable(&self, args: &Args) -> bool {
-        args.test || self.crate_types.contains(&CrateType::Bin)
+        args.test
+            || self.crate_types.contains(&CrateType::Bin)
+            || self.crate_types.contains(&CrateType::ProcMacro)
+    }
+
+    pub fn proc_macro(&self) -> bool {
+        self.crate_types.contains(&CrateType::ProcMacro)
     }
 
     fn codegen_option(&mut self, option: &str) -> Result<(), String> {
@@ -254,6 +289,46 @@ fn search_path(spec: &str) -> Result<Vec<String>, String> {
              framework or all"
         )),
     }
+}
+
+fn crate_search_dir(spec: &str) -> Option<PathBuf> {
+    match spec.split_once('=') {
+        Some(("dependency" | "crate" | "all", path)) => Some(PathBuf::from(path)),
+        Some(_) => None,
+        None => Some(PathBuf::from(spec)),
+    }
+}
+
+fn extern_crate(spec: &str, search_dirs: &[PathBuf]) -> Result<(String, PathBuf), String> {
+    let (name, path) = match spec.split_once('=') {
+        Some((name, path)) => (name, Some(PathBuf::from(path))),
+        None => (spec, None),
+    };
+    let valid = name
+        .chars()
+        .next()
+        .is_some_and(|c| c.is_alphabetic() || c == '_')
+        && name.chars().all(|c| c.is_alphanumeric() || c == '_');
+    if !valid {
+        return Err(format!(
+            "invalid `--extern` argument `{spec}`; expected `NAME` or `NAME=PATH`"
+        ));
+    }
+    if let Some(path) = path {
+        return Ok((name.to_owned(), path));
+    }
+    let file = format!("lib{name}.krmacro");
+    search_dirs
+        .iter()
+        .map(|dir| dir.join(&file))
+        .find(|path| path.is_file())
+        .map(|path| (name.to_owned(), path))
+        .ok_or_else(|| {
+            format!(
+                "couldn't find the macro crate `{name}`; looked for `{file}` in the `-L` \
+                 directories"
+            )
+        })
 }
 
 fn link_library(spec: &str, target: &Target) -> Result<Vec<String>, String> {

@@ -1,11 +1,3 @@
-error: only the standard library can declare macros for now
- --> tests/ui/expand/macro_errors.kr:3:7
-  |
-3 | macro Builder;
-  |       ^^^^^^^
-  |
-  = note: macros written in Krelpin are not supported yet
-
 error: cannot find macro `Builder` in this scope
  --> tests/ui/expand/macro_errors.kr:5:2
   |
@@ -51,6 +43,14 @@ error: `Comparable` cannot be derived because `text` may be null
    | ^^^^^^^^^^^^^^^^^^^
    |
    = help: implement `compareTo` yourself to decide where null values go
+
+error: only the standard library can declare macros without a body
+ --> tests/ui/expand/macro_errors.kr:3:7
+  |
+3 | macro Builder;
+  |       ^^^^^^^
+  |
+  = help: write `macro Name(TokenStream args, TokenStream item) { ... }`
 
 error: aborting due to 7 previous errors
 
