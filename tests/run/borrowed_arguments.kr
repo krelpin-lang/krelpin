@@ -1,0 +1,19 @@
+class Main {
+    static void show(&long? value) {
+        Console.println(value);
+    }
+
+    static int twice(&&int value) {
+        return value + value;
+    }
+
+    static void main() {
+        // A value passed where a nullable reference is expected is lent.
+        show(255);
+        show(null);
+        // Arithmetic reads through every level of reference.
+        int x = 4;
+        &int r = &x;
+        Console.println(twice(&r));
+    }
+}

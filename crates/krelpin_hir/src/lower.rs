@@ -881,6 +881,23 @@ impl LoweringCtxt<'_, '_> {
 }
 
 fn coerce(expr: Expr, target: &Ty) -> Expr {
+    // A value passed as `(&T)?` is lent the same way as one passed as `&T`.
+    if let Ty::Nullable(reference) = target
+        && matches!(reference.as_ref(), Ty::Ref { mutable: false, .. })
+        && !matches!(
+            expr.ty,
+            Ty::Ref { .. } | Ty::Nullable(_) | Ty::Null | Ty::Unknown
+        )
+    {
+        let lent = coerce(expr, reference);
+        return Expr {
+            ty: target.clone(),
+            span: lent.span,
+            kind: ExprKind::Cast {
+                expr: Box::new(lent),
+            },
+        };
+    }
     if let Ty::Ref {
         mutable: false,
         ty: inner,
@@ -936,8 +953,9 @@ fn deref_all(mut expr: Expr) -> Expr {
 fn copy_through_ref(expr: Expr, target: &Ty) -> Expr {
     let is_ref = |ty: &Ty| matches!(ty, Ty::Ref { .. });
     let (inner, safe) = match (&expr.ty, target) {
-        (Ty::Ref { ty, .. }, target) if !is_ref(target.non_null()) && !target.is_unknown() => {
-            (ty.as_ref().clone(), false)
+        // A value is wanted, so read through every level: `&&int` to `int`.
+        (Ty::Ref { .. }, target) if !is_ref(target.non_null()) && !target.is_unknown() => {
+            return deref_all(expr);
         }
         (Ty::Nullable(nullable), Ty::Nullable(target)) if !is_ref(target) => {
             match nullable.as_ref() {
