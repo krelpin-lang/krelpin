@@ -711,15 +711,15 @@ fn atomics_can_change_through_static_fields() {
 #[test]
 fn generic_arguments_are_counted() {
     assert_eq!(
-        errors("class A { List<String, int> xs; }"),
+        errors("class A { List<String, int>? xs; }"),
         ["`List` takes 1 type argument but 2 were supplied"]
     );
     assert_eq!(
-        errors("class A { String<int> s; }"),
+        errors("class A { String<int>? s; }"),
         ["`String` takes 0 type arguments but 1 was supplied"]
     );
     assert_eq!(
-        errors("class A<T> { T<String> x; }"),
+        errors("class A<T> { T<String>? x; }"),
         ["type parameter `T` does not take type arguments"]
     );
     assert_eq!(
@@ -1324,7 +1324,7 @@ fn where_clauses_are_checked_at_the_call() {
     );
     assert_eq!(
         errors(
-            "class Bag<T> { T first; boolean bad(T other) { \
+            "class Bag<T> { T first; Bag(T first) { this.first = first; } boolean bad(T other) { \
              return this.first.compareTo(&other) < 0; } }"
         ),
         ["no method named `compareTo` found for `T`"]
@@ -1674,7 +1674,7 @@ fn derived_equality_and_hashing() {
     assert_eq!(
         errors(
             "class Handle {}\n\
-             @Derive(Equatable) class Account { Handle handle; }"
+             @Derive(Equatable) class Account { Handle handle = new Handle(); }"
         ),
         ["values of type `Handle` cannot be compared with `==`"]
     );
@@ -1752,7 +1752,7 @@ fn with_copies_a_struct_with_some_fields_changed() {
     let src = |code: &str| {
         format!(
             "record User(String name, String email, long visits);\n\
-             class Account {{ String owner; }}\n\
+             class Account {{ String owner = \"\"; }}\n\
              class Main {{ static void run(User user, Account account) {{ {code} }} }}"
         )
     };
@@ -2009,5 +2009,35 @@ fn cyclic_bounds_are_reported_without_looping() {
             "the bounds of `T` lead back to `T`",
             "no method named `x` found for `T`"
         ]
+    );
+}
+
+#[test]
+fn fields_that_cannot_be_null_need_a_value() {
+    assert_eq!(
+        errors("class A { String name; }"),
+        ["field `name` is never given a value"]
+    );
+    assert_eq!(
+        errors("class A { static String name; }"),
+        ["static field `name` is never given a value"]
+    );
+    assert_eq!(
+        errors(
+            "class A { String name; A(boolean early) { if (early) { return; } this.name = \"\"; } }"
+        ),
+        ["this constructor doesn't always give field `name` a value"]
+    );
+    assert_eq!(
+        errors("class A { String name; A(boolean b) { if (b) { this.name = \"x\"; } } }"),
+        ["this constructor doesn't always give field `name` a value"]
+    );
+    ok("class A { String? name; int count; static int total; }");
+    ok(
+        "class A { String name; A(boolean b) { if (b) { this.name = \"x\"; } else { this.name = \"y\"; } } }",
+    );
+    ok("class A { String name; A() { this(\"x\"); } A(String name) { this.name = name; } }");
+    ok(
+        "class A { String name; A(int n) { if (n < 0) { throw new IllegalArgumentException(); } this.name = \"\"; } }",
     );
 }

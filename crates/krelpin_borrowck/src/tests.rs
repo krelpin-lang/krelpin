@@ -104,8 +104,8 @@ fn copyable_values_are_copied() {
 fn borrowed_values_cannot_be_moved_out() {
     assert_eq!(
         errors(
-            "import std.util.List;\n\
-             class Bag { List<String> items; List<String> items() { return this.items; } }"
+            "import std.util.ArrayList;\nimport std.util.List;\n\
+             class Bag { List<String> items = new ArrayList<>(); List<String> items() { return this.items; } }"
         ),
         ["cannot move out of `this.items`, which is borrowed"]
     );

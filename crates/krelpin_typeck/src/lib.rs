@@ -5,6 +5,7 @@ mod coerce;
 mod exceptions;
 mod expr;
 mod inherit;
+mod init;
 mod lang_items;
 mod param_env;
 mod pat;

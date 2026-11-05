@@ -1,3 +1,5 @@
+field Account.owner(this_0: &mut Account) -> String = "";
+
 fn Main.rename(user_0: User) -> User {
     let renamed_1: User = user_0 with { email = "another@example.com", visits = (1 as long) };
     return renamed_1;

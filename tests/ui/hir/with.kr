@@ -3,7 +3,7 @@ package demo;
 record User(String name, String email, long visits) {}
 
 class Account {
-    String owner;
+    String owner = "";
 }
 
 class Main {

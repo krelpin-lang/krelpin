@@ -4,8 +4,8 @@ class Handle {}
 
 @Derive(Equatable, Hashable)
 class Account {
-    String owner;
-    Handle handle;
+    String owner = "";
+    Handle handle = new Handle();
 }
 
 @Derive(Equatable)
