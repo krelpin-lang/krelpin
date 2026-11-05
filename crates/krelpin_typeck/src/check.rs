@@ -1,7 +1,7 @@
 use std::collections::{HashMap, HashSet};
 
 use krelpin_ast::ast::{
-    CompilationUnit, ExprKind, FieldStorage, FnRetTy, ItemKind, Member, MemberKind, Param,
+    CompilationUnit, ExprKind, FieldStorage, FnRetTy, Ident, ItemKind, Member, MemberKind, Param,
     ReceiverKind, StmtKind,
 };
 use krelpin_errors::Diagnostic;
@@ -94,6 +94,17 @@ pub(crate) fn check_units(tcx: &Tcx<'_>, units: &[CompilationUnit]) -> TypeckRes
             results.extend(fcx.results);
             results.local_types.extend(fcx.locals);
         }
+        if let ItemKind::Class(_) = &item.kind
+            && !members
+                .iter()
+                .any(|member| matches!(member.kind, MemberKind::Constructor(_)))
+        {
+            // A class without constructors still runs its superclass's.
+            let mut fcx = FnCtxt::new(tcx, owner, Ty::Void);
+            fcx.self_ty = receiver_ty(tcx, owner, ReceiverKind::RefMut);
+            fcx.check_implicit_super(item.name, true);
+            results.extend(fcx.results);
+        }
     }
 
     results
@@ -134,6 +145,9 @@ fn check_member<'a, 'tcx>(tcx: &'a Tcx<'tcx>, owner: DefId, member: &Member) -> 
                 }
                 _ => None,
             });
+            if fcx.delegation.is_none() {
+                fcx.check_implicit_super(ctor.name, false);
+            }
             fcx.check_block(&ctor.body);
             fcx
         }
@@ -175,7 +189,64 @@ fn receiver_ty(tcx: &Tcx<'_>, owner: DefId, receiver: ReceiverKind) -> Ty {
     }
 }
 
+impl Tcx<'_> {
+    /// The nearest superclass of `owner` that declares constructors, at the
+    /// type arguments `owner` inherits it with.
+    pub(crate) fn constructing_ancestor(&self, owner: DefId) -> Option<Ty> {
+        let mut current = self.sig(owner).superclass.clone()?;
+        loop {
+            let Ty::Adt { def, args, .. } = &current else {
+                return None;
+            };
+            // Extending anything but a class is reported on its own.
+            if self.sig(*def).kind != crate::sig::AdtKind::Class {
+                return None;
+            }
+            if !self.sig(*def).ctors.is_empty() {
+                return Some(current);
+            }
+            let next = self.sig(*def).superclass.clone()?;
+            current = next.subst(&self.subst_for(*def, args));
+        }
+    }
+}
+
 impl<'a, 'tcx> FnCtxt<'a, 'tcx> {
+    /// Resolves the `super()` that runs before a constructor which doesn't
+    /// start with `this(...)` or `super(...)`, or for a class that has no
+    /// constructor at all. The call is recorded at `at`.
+    pub(crate) fn check_implicit_super(&mut self, at: Ident, no_constructor: bool) {
+        let Some(Ty::Adt { def, args, .. }) = self.tcx.constructing_ancestor(self.owner) else {
+            return;
+        };
+        let takes_nothing = self
+            .tcx
+            .sig(def)
+            .ctors
+            .iter()
+            .any(|ctor| ctor.params.is_empty() || (ctor.variadic && ctor.params.len() == 1));
+        if !takes_nothing {
+            let parent = self.type_name(def);
+            let class = self.type_name(self.owner);
+            let help = if no_constructor {
+                format!("add a constructor to `{class}` that starts with `super(...)`")
+            } else {
+                "start the constructor with `super(...)`".to_owned()
+            };
+            self.emit(
+                Diagnostic::error(format!(
+                    "`{class}` must call a constructor of `{parent}` first"
+                ))
+                .with_span(at.span)
+                .with_note(format!("every constructor of `{parent}` takes arguments"))
+                .with_help(help),
+            );
+            return;
+        }
+        let name = Ident::new(self.type_name(def), at.span);
+        self.check_ctor_call(def, &args, &[], &[], name);
+    }
+
     pub(crate) fn new(tcx: &'a Tcx<'tcx>, owner: DefId, ret: Ty) -> Self {
         FnCtxt {
             tcx,

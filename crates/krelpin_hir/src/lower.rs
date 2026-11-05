@@ -151,6 +151,9 @@ impl LoweringCtxt<'_, '_> {
             }
             MemberKind::Constructor(ctor) => {
                 let mut block = self.lower_block(&ctor.body);
+                if let Some(call) = self.implicit_super(ctor.name.span) {
+                    block.stmts.insert(0, call);
+                }
                 if ctor.compact {
                     block
                         .stmts
@@ -174,6 +177,25 @@ impl LoweringCtxt<'_, '_> {
             param_storage,
             value,
             span: member.span,
+        })
+    }
+
+    /// The `super()` the type checker resolved at `span` for a constructor
+    /// that doesn't call one itself.
+    fn implicit_super(&self, span: Span) -> Option<Stmt> {
+        let callee = self.callee(span)?;
+        let this = self.this?;
+        Some(Stmt {
+            kind: StmtKind::Expr(Expr {
+                kind: ExprKind::CtorCall {
+                    callee,
+                    this: Box::new(self.local_expr(this, span)),
+                    args: Vec::new(),
+                },
+                ty: Ty::Void,
+                span,
+            }),
+            span,
         })
     }
 
@@ -520,8 +542,14 @@ impl LoweringCtxt<'_, '_> {
                     args: self.lower_args(&found, args),
                     callee: Some(found),
                 },
+                // A class without constructors runs its superclass's.
                 None => ExprKind::New {
-                    callee: None,
+                    callee: match &ty {
+                        Ty::Adt { def, .. } if args.is_empty() => {
+                            self.callee(self.tcx.sig(*def).name.span)
+                        }
+                        _ => None,
+                    },
                     args: self.lower_exprs(args),
                 },
             },

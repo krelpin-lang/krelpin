@@ -1,0 +1,45 @@
+class Base {
+    String tag;
+
+    Base() {
+        this.tag = "base";
+        Console.println("Base()");
+    }
+
+    Base(String tag) {
+        this.tag = tag;
+    }
+
+    String tag() {
+        return this.tag;
+    }
+}
+
+// A constructor that doesn't call `super(...)` runs `super()` first.
+class Implicit extends Base {
+    Implicit() {
+        Console.println("Implicit()");
+    }
+}
+
+// So does a class without constructors, and every class below it.
+class Bare extends Base {}
+
+class Deeper extends Bare {
+    int depth = 2;
+}
+
+class Explicit extends Base {
+    Explicit() {
+        super("explicit");
+    }
+}
+
+class Main {
+    static void main() {
+        Console.println(new Implicit().tag());
+        Console.println(new Bare().tag());
+        Console.println(new Deeper().tag());
+        Console.println(new Explicit().tag());
+    }
+}

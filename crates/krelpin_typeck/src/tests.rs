@@ -2101,3 +2101,22 @@ fn constructor_calls_only_start_constructors() {
     );
     ok("class A { A() { this(1); } A(int x) { super(); } }");
 }
+
+#[test]
+fn constructors_run_the_superclass_constructor() {
+    assert_eq!(
+        errors("class B { B(int x) {} } class A extends B { A() {} }"),
+        ["`A` must call a constructor of `B` first"]
+    );
+    assert_eq!(
+        errors("class B { B(int x) {} } class A extends B {}"),
+        ["`A` must call a constructor of `B` first"]
+    );
+    assert_eq!(
+        errors(
+            "class B { B(int x) {} } class M extends B { M() { super(1); } } class A extends M {}"
+        ),
+        Vec::<String>::new()
+    );
+    ok("class B { B() {} B(int x) {} } class A extends B { A(int y) {} }");
+}
