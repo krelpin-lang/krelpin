@@ -44,7 +44,9 @@ impl FnCtxt<'_, '_> {
                     Some(els) => self.with_narrowing(&when_false, |fcx| fcx.check_stmt(els)),
                     None => false,
                 };
-                if then_diverges && els.is_none() {
+                // `if (x == null) { return; }` and `{ break; }` both mean
+                // that `x` isn't null after the `if`.
+                if (then_diverges || jumps_away(then)) && els.is_none() {
                     self.narrow_here(&when_false);
                 }
                 then_diverges && else_diverges
@@ -301,6 +303,21 @@ impl FnCtxt<'_, '_> {
 
 fn is_true(expr: &Expr) -> bool {
     matches!(expr.kind, ExprKind::Bool(true))
+}
+
+/// Whether `stmt` always leaves the enclosing loop iteration with `break` or
+/// `continue`, so the statements after it in the same block don't run.
+fn jumps_away(stmt: &Stmt) -> bool {
+    match &stmt.kind {
+        StmtKind::Break | StmtKind::Continue => true,
+        StmtKind::Block(block) => block.stmts.iter().any(jumps_away),
+        StmtKind::If {
+            then,
+            els: Some(els),
+            ..
+        } => jumps_away(then) && jumps_away(els),
+        _ => false,
+    }
 }
 
 fn contains_break(stmt: &Stmt) -> bool {

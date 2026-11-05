@@ -133,6 +133,8 @@ fn null_checks_narrow_types() {
     body_ok("Point? p = null; boolean empty = p == null || p.sum() == 0;");
     body_ok("Point? p = null; int a = p != null ? p.sum() : 0;");
     body_ok("Point? p = null; if (p == null) { return; } else { int a = p.sum(); }");
+    body_ok("while (true) { Point? p = null; if (p == null) { break; } int a = p.sum(); }");
+    body_ok("while (true) { Point? p = null; if (p == null) { continue; } int a = p.sum(); }");
 
     assert_eq!(
         in_body("Point? p = null; if (p != null) { p = null; int a = p.sum(); }"),
@@ -140,6 +142,13 @@ fn null_checks_narrow_types() {
     );
     assert_eq!(
         in_body("Point? p = null; if (p != null) {} int a = p.sum();"),
+        ["value of type `Point?` may be null"]
+    );
+    assert_eq!(
+        in_body(
+            "while (true) { Point? p = null; if (p == null) { while (true) { break; } } \
+             int a = p.sum(); }"
+        ),
         ["value of type `Point?` may be null"]
     );
 }
