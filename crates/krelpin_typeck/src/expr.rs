@@ -1,6 +1,6 @@
 use krelpin_ast::ast::{
-    BinOp, Expr, ExprKind, FieldInit, FieldStorage, Ident, PrimitiveTy, SwitchExprBody, UnOp,
-    Visibility,
+    BinOp, Expr, ExprKind, FieldInit, FieldStorage, Ident, PrimitiveTy, SwitchExprBody, TyKind,
+    UnOp, Visibility,
 };
 use krelpin_ast::token::{Lit, LitKind};
 use krelpin_errors::Diagnostic;
@@ -380,7 +380,7 @@ impl FnCtxt<'_, '_> {
     }
 
     fn static_field(&mut self, ty: &Ty, name: Ident) -> (Ty, Option<FieldSig>) {
-        let Some(def) = self.static_def(ty) else {
+        let Some(def) = self.static_def(ty, name) else {
             return (Ty::Unknown, None);
         };
         let Some((field, field_ty)) = self.find_field(def, &[], name.name) else {
@@ -565,7 +565,7 @@ impl FnCtxt<'_, '_> {
     }
 
     fn static_call(&mut self, ty: &Ty, name: Ident, args: &[Expr], arg_tys: &[Ty]) -> Ty {
-        let Some(def) = self.static_def(ty) else {
+        let Some(def) = self.static_def(ty, name) else {
             return Ty::Unknown;
         };
 
@@ -639,11 +639,29 @@ impl FnCtxt<'_, '_> {
         }
     }
 
-    fn static_def(&self, ty: &Ty) -> Option<DefId> {
+    /// The class whose static `member` is named through the type `ty`.
+    fn static_def(&self, ty: &Ty, member: Ident) -> Option<DefId> {
         match ty {
             Ty::Adt { def, .. } => Some(*def),
             Ty::Primitive(primitive) => self.tcx.lang_items.primitive_impl(*primitive),
-            _ => None,
+            Ty::Unknown => None,
+            Ty::Param(param) => {
+                self.emit(
+                    Diagnostic::error(format!(
+                        "cannot reach `{}` through type parameter `{param}`",
+                        member.name
+                    ))
+                    .with_span(member.span)
+                    .with_help(format!(
+                        "`{param}` stands for whatever type the caller picks, so it has no static members; use a value of type `{param}` instead"
+                    )),
+                );
+                None
+            }
+            _ => {
+                self.error(member.span, format!("type `{ty}` has no static members"));
+                None
+            }
         }
     }
 
@@ -737,9 +755,13 @@ impl FnCtxt<'_, '_> {
         expected: Option<&Ty>,
     ) -> Ty {
         self.tcx.check_wf_inferred(&self.param_env, ty);
+        let written_args = matches!(&ty.kind, TyKind::Path { args, .. } if !args.is_empty());
         let ty = self.tcx.lower_ty(ty);
         let arg_tys = self.check_closure_args(args);
         let ty = self.infer_diamond(ty, &arg_tys, span, expected);
+        if !written_args {
+            self.check_inferred_bounds(&ty, span);
+        }
 
         match &ty {
             Ty::Adt {
@@ -774,6 +796,23 @@ impl FnCtxt<'_, '_> {
             _ => {}
         }
         ty
+    }
+
+    /// Type arguments inferred for `new HashSet()` must meet the bounds just
+    /// like written ones, which `check_wf` has already checked.
+    fn check_inferred_bounds(&self, ty: &Ty, span: Span) {
+        let Ty::Adt { def, args, .. } = ty else {
+            return;
+        };
+        let generics = &self.tcx.sig(*def).generics;
+        if args.len() != generics.len() || args.iter().any(Ty::is_unknown) {
+            return;
+        }
+        let subst = self.tcx.subst_for(*def, args);
+        for (param, arg) in generics.iter().zip(args) {
+            self.tcx
+                .check_bound(&self.param_env, param, arg, &subst, span);
+        }
     }
 
     fn check_index(&mut self, base: &Expr, index: &Expr) -> Ty {

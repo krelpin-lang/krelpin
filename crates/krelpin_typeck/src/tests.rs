@@ -2041,3 +2041,26 @@ fn fields_that_cannot_be_null_need_a_value() {
         "class A { String name; A(int n) { if (n < 0) { throw new IllegalArgumentException(); } this.name = \"\"; } }",
     );
 }
+
+#[test]
+fn inferred_type_arguments_meet_their_bounds() {
+    assert_eq!(
+        errors("import std.util.*; class A { void f() { Set<String?> tags = new HashSet(); } }"),
+        ["type `String?` does not satisfy the bound of `T`"]
+    );
+    ok("import std.util.*; class A { void f() { Set<String> tags = new HashSet(); } }");
+}
+
+#[test]
+fn type_parameters_have_no_static_members() {
+    assert_eq!(
+        errors(
+            "class A<T> { T value; A(T value) { this.value = value; } Object f() { return T.value; } }"
+        ),
+        ["cannot reach `value` through type parameter `T`"]
+    );
+    assert_eq!(
+        errors("class A<T> { void f() { T.make(); } }"),
+        ["cannot reach `make` through type parameter `T`"]
+    );
+}
