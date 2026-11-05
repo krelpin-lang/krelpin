@@ -424,6 +424,18 @@ pub(crate) fn prim_llty(primitive: PrimitiveTy) -> &'static str {
     }
 }
 
+/// The extension attribute `ty` needs in a C signature. C widens integers
+/// narrower than 32 bits to a full register, but the targets disagree on
+/// whether the caller or the callee does it, so the attribute is spelled out
+/// the way clang does.
+pub(crate) fn c_abi_ext(ty: &Ty) -> Option<&'static str> {
+    match ty {
+        Ty::Primitive(PrimitiveTy::Boolean) => Some("zeroext"),
+        Ty::Primitive(PrimitiveTy::Byte | PrimitiveTy::Short) => Some("signext"),
+        _ => None,
+    }
+}
+
 fn prim_size(primitive: PrimitiveTy) -> u64 {
     match primitive {
         PrimitiveTy::Boolean | PrimitiveTy::Byte => 1,

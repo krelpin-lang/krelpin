@@ -224,7 +224,6 @@ impl Cx<'_, '_> {
             let instance = self.instances[*id].clone();
             let params = self.instance_params(&instance);
             let ret = self.instance_ret(&instance);
-            let function = self.fn_name(*id);
             let mut fx = FnCx::new(self, Subst::new(), ret.clone());
             fx.start("entry");
             fx.line(format!("call void {init_name}()"));
@@ -232,7 +231,9 @@ impl Cx<'_, '_> {
             let mut args = Vec::new();
             for (index, param) in params.iter().enumerate() {
                 let ll = fx.ll(param);
-                rendered.push(format!("{ll} %a{index}"));
+                let ext =
+                    crate::layout::c_abi_ext(param).map_or(String::new(), |ext| format!(" {ext}"));
+                rendered.push(format!("{ll}{ext} %a{index}"));
                 args.push((ll, format!("%a{index}")));
             }
             let result = fx.call_instance(*id, &args, &ret);
@@ -246,9 +247,10 @@ impl Cx<'_, '_> {
             fx.start("failed");
             fx.report_pending(&message, "kr_export_failed", &[]);
             fx.ret_zero(&ret);
-            let _ = function;
             out.push_str(&format!(
-                "define {llret} @{symbol}({}) {{\nallocas:\n{}  br label %entry\n{}}}\n",
+                "define {} @{symbol}({}) {{\nallocas:\n{}  br label %entry\n{}}}\n",
+                crate::layout::c_abi_ext(&ret)
+                    .map_or(llret.clone(), |ext| format!("{ext} {llret}")),
                 rendered.join(", "),
                 fx.allocas,
                 fx.out
