@@ -653,6 +653,52 @@ impl<'a> Resolver<'a> {
         Some(def)
     }
 
+    fn resolve_qualified_expr(&mut self, expr: &Expr) -> bool {
+        let mut segments = Vec::new();
+        let mut current = expr;
+        loop {
+            match &current.kind {
+                ExprKind::Field { expr, name, .. } => {
+                    segments.push(*name);
+                    current = expr;
+                }
+                ExprKind::Name(name) => {
+                    segments.push(*name);
+                    break;
+                }
+                _ => return false,
+            }
+        }
+        segments.reverse();
+        let root = segments[0].name;
+        if self.lookup_local(root).is_some()
+            || self.lookup_type(root).is_some()
+            || self.owner.fields.contains_key(&root)
+        {
+            return false;
+        }
+        let Some((package_len, mut def)) = (1..segments.len()).find_map(|len| {
+            let package = PackagePath::from_idents(&segments[..len]);
+            self.table
+                .lookup(&package, segments[len].name)
+                .map(|def| (len, def))
+        }) else {
+            return false;
+        };
+        let mut resolved = vec![(segments[package_len].span, def)];
+        for segment in &segments[package_len + 1..] {
+            let Some(nested) = self.table.nested(def, segment.name) else {
+                return false;
+            };
+            resolved.push((segment.span, nested));
+            def = nested;
+        }
+        for (span, def) in resolved {
+            self.resolutions.record(span, Res::Item(def));
+        }
+        true
+    }
+
     fn type_def_of_expr(&self, expr: &Expr) -> Option<DefId> {
         let span = match &expr.kind {
             ExprKind::Name(name) => name.span,
@@ -670,7 +716,13 @@ impl<'a> Resolver<'a> {
             ExprKind::Lit(_) | ExprKind::Bool(_) | ExprKind::Null => {}
             ExprKind::This | ExprKind::Super => self.check_this(expr),
             ExprKind::Name(name) => self.resolve_value_name(*name),
-            ExprKind::Field { expr, name, .. } => {
+            ExprKind::Field {
+                expr: inner, name, ..
+            } => {
+                if self.resolve_qualified_expr(expr) {
+                    return;
+                }
+                let expr = inner;
                 self.resolve_expr(expr);
                 let nested = self
                     .type_def_of_expr(expr)

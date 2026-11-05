@@ -383,6 +383,22 @@ fn only_std_lang_is_in_the_prelude() {
 }
 
 #[test]
+fn qualified_expressions_resolve_without_imports() {
+    let resolved = resolve_str(
+        "class A { static double f() { return std.lang.Math.sqrt(std.lang.Math.PI); } }",
+    );
+    assert_eq!(resolved.errors, Vec::<String>::new());
+    assert_eq!(
+        resolved.res_at("Math", 0),
+        resolved.std_type("std.lang.Math")
+    );
+    assert_eq!(
+        errors("class A { static void f() { nope.thing.X.y(); } }"),
+        ["cannot find value `nope` in this scope"]
+    );
+}
+
+#[test]
 fn qualified_type_names_resolve_without_imports() {
     let resolved = resolve_str("class A { std.util.List<String> names; }");
     assert_eq!(resolved.errors, Vec::<String>::new());
