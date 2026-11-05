@@ -201,3 +201,9 @@ fn interpolation_errors() {
         Some(&"this `${` is never closed".to_owned())
     );
 }
+
+#[test]
+fn array_lengths_after_new_are_not_borrow_sources() {
+    assert_eq!(expr("new String[count]"), "new String[count]");
+    assert_eq!(expr("new List<String>[n]"), "new List<String>[n]");
+}

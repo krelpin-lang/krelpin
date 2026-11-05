@@ -168,7 +168,8 @@ impl Parser<'_> {
     }
 
     fn bracket_sources_ahead(&self) -> bool {
-        self.token.kind == TokenKind::OpenBracket
+        !self.array_lengths
+            && self.token.kind == TokenKind::OpenBracket
             && matches!(self.look_ahead(1), TokenKind::Ident(_))
             && matches!(
                 self.look_ahead(2),

@@ -246,7 +246,10 @@ impl Parser<'_> {
     fn parse_new(&mut self) -> PResult<Expr> {
         let lo = self.token.span;
         self.bump();
-        let ty = self.parse_ty()?;
+        let array_lengths = std::mem::replace(&mut self.array_lengths, true);
+        let ty = self.parse_ty();
+        self.array_lengths = array_lengths;
+        let ty = ty?;
 
         let kind = match self.token.kind {
             TokenKind::OpenParen => ExprKind::New {

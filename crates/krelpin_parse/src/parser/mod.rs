@@ -67,6 +67,7 @@ pub(crate) struct Parser<'a> {
     token: Token,
     prev_token: Token,
     expected: Vec<Expected>,
+    array_lengths: bool,
     dcx: &'a DiagCtxt,
 }
 
@@ -86,6 +87,7 @@ impl<'a> Parser<'a> {
             token,
             prev_token: Token::new(TokenKind::Eof, token.span.shrink_to_lo()),
             expected: Vec::new(),
+            array_lengths: false,
             dcx,
         }
     }
