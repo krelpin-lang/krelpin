@@ -1,28 +1,113 @@
 package std.primitive;
 
+/**
+ * Methods and constants for `double`, a 64-bit IEEE 754 floating-point number.
+ *
+ * Arithmetic follows IEEE 754, so `double` has NaN ("not a number") and
+ * infinite values. `==` and `<` treat NaN the way the standard says: it is
+ * not equal to anything, itself included. `equals` and `compareTo` instead
+ * order every value, so floating-point numbers can be keys in a `HashMap`
+ * and can be sorted:
+ *
+ * - every NaN equals every other NaN and sorts after all other values,
+ * - `-0.0` sorts before `0.0`, and the two are not `equals`.
+ *
+ * ```
+ * double nan = 0.0 / 0.0;
+ * nan == nan        // false
+ * nan.equals(&nan)  // true
+ * nan.isNaN()       // true
+ * ```
+ */
 final class Double implements Comparable<double>, Hashable<double> {
+    /** The smallest positive `double`. */
     public const double MIN_VALUE = 4.9e-324;
+
+    /** The largest finite `double`. */
     public const double MAX_VALUE = 1.7976931348623157e308;
 
     private Double() {}
 
+    /** Returns whether this value is NaN. */
+    boolean isNaN() {
+        return this != this;
+    }
+
+    /** Returns whether this value is positive or negative infinity. */
+    boolean isInfinite() {
+        return this == 1.0 / 0.0 || this == -1.0 / 0.0;
+    }
+
+    /** Returns whether this value is neither infinite nor NaN. */
+    boolean isFinite() {
+        return !this.isNaN() && !this.isInfinite();
+    }
+
+    /**
+     * Orders this value and `other` totally: NaN after everything else, and
+     * `-0.0` before `0.0`. Otherwise the same as `<` and `>`.
+     */
     int compareTo(&double other) {
         if (this < other) {
             return -1;
         }
-        return this > other ? 1 : 0;
+        if (this > other) {
+            return 1;
+        }
+        boolean thisNaN = this != this;
+        boolean otherNaN = other != other;
+        if (thisNaN || otherNaN) {
+            return thisNaN == otherNaN ? 0 : thisNaN ? 1 : -1;
+        }
+        if (this == 0.0) {
+            // Both are zeros, possibly with different signs.
+            double a = 1.0 / this;
+            double b = 1.0 / other;
+            return a < b ? -1 : a > b ? 1 : 0;
+        }
+        return 0;
     }
 
+    /**
+     * Parses a decimal number like `"3.25"`, `"-1e-9"` or `"inf"`.
+     *
+     * Accepts an optional sign followed by digits with an optional fraction
+     * and exponent, or `inf`, `infinity` or `nan` in any case. Spaces and
+     * hexadecimal numbers aren't accepted.
+     *
+     * # Throws
+     *
+     * `NumberFormatException` if the text isn't a number.
+     */
     @Intrinsic
     static double parse(String text);
 
+    /**
+     * Returns whether this value is the same number as `other`. Unlike `==`,
+     * NaN equals NaN and `0.0` doesn't equal `-0.0`, which keeps `equals`
+     * consistent with `hashCode` and `compareTo`.
+     */
     boolean equals(&double other) {
-        return this == other;
+        return this.compareTo(other) == 0;
     }
 
+    /** Returns a hash of this value, consistent with `equals`. */
     @Intrinsic
     int hashCode();
 
+    /**
+     * Formats this value with a format spec, the same as `"${value:spec}"`
+     * in an interpolated string.
+     *
+     * ```
+     * 3.14159.format(".2")   // "3.14"
+     * 2.5.format(">8.1")     // "     2.5"
+     * ```
+     *
+     * # Throws
+     *
+     * `IllegalArgumentException` if the spec can't be used on numbers.
+     */
     String format(String spec) {
         return Format.decimal(this, spec);
     }

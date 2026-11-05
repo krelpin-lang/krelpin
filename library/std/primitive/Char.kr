@@ -1,11 +1,29 @@
 package std.primitive;
 
+/**
+ * Methods and constants for `char`, a Unicode scalar value: any code point
+ * from `U+0000` to `U+10FFFF` except the surrogates `U+D800` to `U+DFFF`.
+ *
+ * The classification and case methods use the Unicode Character Database
+ * built into the runtime, so they give the same answers on every platform
+ * and in every locale.
+ *
+ * ```
+ * 'ж'.isLetter()      // true
+ * '٣'.isDigit()       // true, ARABIC-INDIC DIGIT THREE
+ * 'ç'.toUpperCase()   // 'Ç'
+ * ```
+ */
 final class Char implements Comparable<char>, Hashable<char> {
+    /** The smallest `char`, `U+0000`. */
     public const char MIN_VALUE = '\u{0}';
+
+    /** The largest `char`, `U+10FFFF`. */
     public const char MAX_VALUE = '\u{10FFFF}';
 
     private Char() {}
 
+    /** Compares the code points of this character and `other`. */
     int compareTo(&char other) {
         if (this < other) {
             return -1;
@@ -13,37 +31,63 @@ final class Char implements Comparable<char>, Hashable<char> {
         return this > other ? 1 : 0;
     }
 
+    /** Returns whether this is a decimal digit (general category `Nd`), in any script. */
     @Intrinsic
     boolean isDigit();
 
+    /** Returns whether this is a letter (a general category starting with `L`). */
     @Intrinsic
     boolean isLetter();
 
+    /** Returns whether this is a letter or a decimal digit. */
     @Intrinsic
     boolean isLetterOrDigit();
 
+    /**
+     * Returns whether this has the Unicode `White_Space` property. That
+     * includes the ASCII spaces, tabs and line breaks, and also characters
+     * like the no-break space `U+00A0`.
+     */
     @Intrinsic
     boolean isWhitespace();
 
+    /** Returns whether this is an uppercase letter (general category `Lu`). */
     @Intrinsic
     boolean isUpperCase();
 
+    /** Returns whether this is a lowercase letter (general category `Ll`). */
     @Intrinsic
     boolean isLowerCase();
 
+    /**
+     * Returns the uppercase form of this character, or the character itself
+     * when it has none.
+     *
+     * A `char` can only map to one `char`, so characters whose uppercase
+     * form is longer stay as they are: `'ß'.toUpperCase()` is `'ß'`. Use
+     * `String.toUpperCase` to get `"SS"`.
+     */
     @Intrinsic
     char toUpperCase();
 
+    /**
+     * Returns the lowercase form of this character, or the character itself
+     * when it has none. The mapping doesn't depend on the language, so `'I'`
+     * becomes `'i'` (not the dotless `'ı'` of Turkish).
+     */
     @Intrinsic
     char toLowerCase();
 
+    /** Returns whether this character is equal to `other`. */
     boolean equals(&char other) {
         return this == other;
     }
 
+    /** Returns the code point, which is also the hash. */
     @Intrinsic
     int hashCode();
 
+    /** Formats this character as text with a format spec, like `"^3"`. */
     String format(String spec) {
         return Format.text("" + this, spec);
     }

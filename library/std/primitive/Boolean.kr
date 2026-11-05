@@ -1,8 +1,10 @@
 package std.primitive;
 
+/** Methods for `boolean`. `false` sorts before `true`. */
 final class Boolean implements Comparable<boolean>, Hashable<boolean> {
     private Boolean() {}
 
+    /** Returns `0` when the values are equal, `-1` when this one is `false` and `1` when it is `true`. */
     int compareTo(&boolean other) {
         if (this == other) {
             return 0;
@@ -10,17 +12,34 @@ final class Boolean implements Comparable<boolean>, Hashable<boolean> {
         return this ? 1 : -1;
     }
 
+    /**
+     * Parses `"true"` or `"false"`. Nothing else is accepted, not even other
+     * capitalizations.
+     *
+     * # Throws
+     *
+     * `IllegalArgumentException` for any other text.
+     */
     static boolean parse(String text) {
-        return text == "true";
+        if (text == "true") {
+            return true;
+        }
+        if (text == "false") {
+            return false;
+        }
+        throw new IllegalArgumentException("`$text` is not a boolean; expected `true` or `false`");
     }
 
+    /** Returns whether this value is equal to `other`. */
     boolean equals(&boolean other) {
         return this == other;
     }
 
+    /** Returns a hash of this value, consistent with `equals`. */
     @Intrinsic
     int hashCode();
 
+    /** Formats `"true"` or `"false"` with a text format spec, like `">6"`. */
     String format(String spec) {
         return Format.text("" + this, spec);
     }

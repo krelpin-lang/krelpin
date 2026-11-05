@@ -1,11 +1,28 @@
 package std.primitive;
 
+/**
+ * Methods and constants for `byte`, an 8-bit signed integer.
+ *
+ * The methods are called on the values themselves:
+ *
+ * ```
+ * byte value = byte.parse("-12");
+ * String padded = value.format(">8");
+ * ```
+ *
+ * Arithmetic on `byte` wraps around on overflow: `byte.MAX_VALUE + 1` is
+ * `byte.MIN_VALUE`.
+ */
 final class Byte implements Comparable<byte>, Hashable<byte> {
+    /** The smallest `byte`, -2<sup>7</sup>. */
     public const byte MIN_VALUE = -128;
+
+    /** The largest `byte`, 2<sup>7</sup> - 1, which is 127. */
     public const byte MAX_VALUE = 127;
 
     private Byte() {}
 
+    /** Returns a negative number, zero or a positive number when this value is smaller than, equal to or larger than `other`. */
     int compareTo(&byte other) {
         if (this < other) {
             return -1;
@@ -13,16 +30,43 @@ final class Byte implements Comparable<byte>, Hashable<byte> {
         return this > other ? 1 : 0;
     }
 
+    /**
+     * Parses a decimal number, like `"-12"` or `"+7"`.
+     *
+     * The text may start with `+` or `-` and must otherwise be made of the
+     * digits `0` to `9` only: no spaces, underscores or prefixes like `0x`.
+     *
+     * # Throws
+     *
+     * `NumberFormatException` if the text isn't a number or the number
+     * doesn't fit in a `byte`.
+     */
     @Intrinsic
     static byte parse(String text);
 
+    /** Returns whether this value is equal to `other`. */
     boolean equals(&byte other) {
         return this == other;
     }
 
+    /** Returns a hash of this value, consistent with `equals`. */
     @Intrinsic
     int hashCode();
 
+    /**
+     * Formats this value with a format spec, the same as `"${value:spec}"`
+     * in an interpolated string.
+     *
+     * ```
+     * 42.format(">6")  // "    42"
+     * 42.format("06")  // "000042"
+     * 255.format("x")  // "ff"
+     * ```
+     *
+     * # Throws
+     *
+     * `IllegalArgumentException` if the spec can't be used on integers.
+     */
     String format(String spec) {
         return Format.integer(this, spec);
     }

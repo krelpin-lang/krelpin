@@ -1,62 +1,297 @@
 package std.lang;
 
+/**
+ * Basic numeric functions: absolute values, minimums and maximums, rounding,
+ * roots, powers, logarithms and trigonometry.
+ *
+ * Integer functions follow the language's arithmetic and wrap around on
+ * overflow. Floating-point functions follow IEEE 754: a NaN argument gives a
+ * NaN result unless the function says otherwise.
+ *
+ * ```
+ * double side = Math.hypot(3.0, 4.0);       // 5.0
+ * int percent = Math.clamp(130, 0, 100);    // 100
+ * long rounded = Math.round(-2.5);          // -3
+ * ```
+ */
 final class Math {
+    /** The ratio of a circle's circumference to its diameter. */
     public const double PI = 3.141592653589793;
+
+    /** The base of the natural logarithm. */
     public const double E = 2.718281828459045;
 
     private Math() {}
 
+    /**
+     * Returns the absolute value of `value`.
+     *
+     * `Math.abs(Int.MIN_VALUE)` is `Int.MIN_VALUE`, because the positive value
+     * doesn't fit in an `int`.
+     */
     static int abs(int value) {
         return value < 0 ? -value : value;
     }
 
+    /**
+     * Returns the absolute value of `value`.
+     *
+     * `Math.abs(Long.MIN_VALUE)` is `Long.MIN_VALUE`, because the positive
+     * value doesn't fit in a `long`.
+     */
     static long abs(long value) {
         return value < 0 ? -value : value;
     }
 
+    /** Returns the absolute value of `value`, turning `-0.0` into `0.0`. */
     static double abs(double value) {
-        return value < 0 ? -value : value;
+        return value <= 0.0 ? 0.0 - value : value;
     }
 
+    /** Returns the smaller of `a` and `b`. */
     static int min(int a, int b) {
         return a < b ? a : b;
     }
 
+    /** Returns the smaller of `a` and `b`. */
     static long min(long a, long b) {
         return a < b ? a : b;
     }
 
+    /**
+     * Returns the smaller of `a` and `b`.
+     *
+     * A NaN is ignored: if one argument is NaN the other one is returned, so
+     * the result is NaN only when both are.
+     *
+     * ```
+     * Math.min(1.5, 0.0 / 0.0) // 1.5
+     * ```
+     */
     static double min(double a, double b) {
+        if (a != a) {
+            return b;
+        }
+        if (b != b) {
+            return a;
+        }
         return a < b ? a : b;
     }
 
+    /** Returns the larger of `a` and `b`. */
     static int max(int a, int b) {
         return a > b ? a : b;
     }
 
+    /** Returns the larger of `a` and `b`. */
     static long max(long a, long b) {
         return a > b ? a : b;
     }
 
+    /**
+     * Returns the larger of `a` and `b`.
+     *
+     * A NaN is ignored: if one argument is NaN the other one is returned, so
+     * the result is NaN only when both are.
+     */
     static double max(double a, double b) {
+        if (a != a) {
+            return b;
+        }
+        if (b != b) {
+            return a;
+        }
         return a > b ? a : b;
     }
 
+    /**
+     * Restricts `value` to the range from `low` to `high`, both included.
+     *
+     * ```
+     * Math.clamp(-4, 0, 10) // 0
+     * Math.clamp(7, 0, 10)  // 7
+     * ```
+     *
+     * # Throws
+     *
+     * `IllegalArgumentException` if `low` is greater than `high`.
+     */
+    static int clamp(int value, int low, int high) {
+        if (low > high) {
+            throw new IllegalArgumentException("clamp: the low bound $low is above the high bound $high");
+        }
+        return value < low ? low : value > high ? high : value;
+    }
+
+    /**
+     * Restricts `value` to the range from `low` to `high`, both included.
+     *
+     * # Throws
+     *
+     * `IllegalArgumentException` if `low` is greater than `high`.
+     */
+    static long clamp(long value, long low, long high) {
+        if (low > high) {
+            throw new IllegalArgumentException("clamp: the low bound $low is above the high bound $high");
+        }
+        return value < low ? low : value > high ? high : value;
+    }
+
+    /**
+     * Restricts `value` to the range from `low` to `high`, both included. A
+     * NaN `value` stays NaN.
+     *
+     * # Throws
+     *
+     * `IllegalArgumentException` if `low` is greater than `high` or either
+     * bound is NaN.
+     */
+    static double clamp(double value, double low, double high) {
+        if (!(low <= high)) {
+            throw new IllegalArgumentException("clamp: the bounds $low and $high don't form a range");
+        }
+        return value < low ? low : value > high ? high : value;
+    }
+
+    /** Returns `-1`, `0` or `1` when `value` is negative, zero or positive. */
+    static int signum(int value) {
+        return value < 0 ? -1 : value > 0 ? 1 : 0;
+    }
+
+    /** Returns `-1`, `0` or `1` when `value` is negative, zero or positive. */
+    static int signum(long value) {
+        return value < 0 ? -1 : value > 0 ? 1 : 0;
+    }
+
+    /**
+     * Returns `-1.0`, `1.0` or `value` itself when `value` is negative,
+     * positive, or zero or NaN.
+     */
+    static double signum(double value) {
+        return value < 0.0 ? -1.0 : value > 0.0 ? 1.0 : value;
+    }
+
+    /**
+     * Returns the square root of `value`, or NaN when `value` is negative.
+     *
+     * ```
+     * Math.sqrt(2.0) // 1.4142135623730951
+     * ```
+     */
     @Intrinsic
     static double sqrt(double value);
 
+    /** Returns the cube root of `value`. Unlike `sqrt`, negative values work. */
+    @Intrinsic
+    static double cbrt(double value);
+
+    /** Returns `base` raised to the power `exponent`. */
     @Intrinsic
     static double pow(double base, double exponent);
 
+    /**
+     * Returns `sqrt(x * x + y * y)` without overflowing or underflowing in
+     * between.
+     */
+    @Intrinsic
+    static double hypot(double x, double y);
+
+    /** Returns `e` raised to the power `value`. */
+    @Intrinsic
+    static double exp(double value);
+
+    /** Returns the natural logarithm of `value`, or NaN when it is negative. */
+    @Intrinsic
+    static double ln(double value);
+
+    /** Returns the base 10 logarithm of `value`, or NaN when it is negative. */
+    @Intrinsic
+    static double log10(double value);
+
+    /** Returns the base 2 logarithm of `value`, or NaN when it is negative. */
+    @Intrinsic
+    static double log2(double value);
+
+    /** Returns the largest whole number that is not above `value`. */
     @Intrinsic
     static double floor(double value);
 
+    /** Returns the smallest whole number that is not below `value`. */
     @Intrinsic
     static double ceil(double value);
 
+    /** Returns `value` without its fractional part, rounding towards zero. */
+    @Intrinsic
+    static double trunc(double value);
+
+    /**
+     * Returns the nearest whole number to `value` as a `long`. Halfway cases
+     * round away from zero.
+     *
+     * NaN gives `0`, and values beyond the range of `long` give
+     * `Long.MIN_VALUE` or `Long.MAX_VALUE`.
+     *
+     * ```
+     * Math.round(2.5)  // 3
+     * Math.round(-2.5) // -3
+     * Math.round(0.49999999999999994) // 0
+     * ```
+     */
     @Intrinsic
     static long round(double value);
 
+    /** Returns the sine of `radians`. */
+    @Intrinsic
+    static double sin(double radians);
+
+    /** Returns the cosine of `radians`. */
+    @Intrinsic
+    static double cos(double radians);
+
+    /** Returns the tangent of `radians`. */
+    @Intrinsic
+    static double tan(double radians);
+
+    /** Returns the arcsine of `value` in radians, from `-PI / 2` to `PI / 2`. */
+    @Intrinsic
+    static double asin(double value);
+
+    /** Returns the arccosine of `value` in radians, from `0` to `PI`. */
+    @Intrinsic
+    static double acos(double value);
+
+    /** Returns the arctangent of `value` in radians, from `-PI / 2` to `PI / 2`. */
+    @Intrinsic
+    static double atan(double value);
+
+    /**
+     * Returns the angle in radians, from `-PI` to `PI`, between the positive
+     * x axis and the point `(x, y)`.
+     *
+     * ```
+     * Math.atan2(1.0, 1.0) // 0.7853981633974483, which is PI / 4
+     * ```
+     */
+    @Intrinsic
+    static double atan2(double y, double x);
+
+    /** Converts an angle from degrees to radians. */
+    static double toRadians(double degrees) {
+        return degrees * (Math.PI / 180.0);
+    }
+
+    /** Converts an angle from radians to degrees. */
+    static double toDegrees(double radians) {
+        return radians * (180.0 / Math.PI);
+    }
+
+    /**
+     * Returns a pseudo-random number from `0.0` (included) to `1.0`
+     * (excluded).
+     *
+     * Each thread has its own generator, seeded from the clock. It is fast
+     * but predictable, so don't use it for anything secret.
+     */
     @Intrinsic
     static double random();
 }

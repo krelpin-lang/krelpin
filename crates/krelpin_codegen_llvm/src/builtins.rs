@@ -5,7 +5,7 @@ use krelpin_span::def_id::DefId;
 use krelpin_typeck::{AdtKind, LangItem, Ty};
 
 use crate::cx::Cx;
-use crate::func::{FnCx, Val, array_ll, float_const};
+use crate::func::{FnCx, array_ll};
 use crate::instance::{Instance, Thunk};
 use crate::layout::{PtrKind, Shape};
 use crate::rtti::RtKey;
@@ -125,7 +125,7 @@ impl FnCx<'_, '_, '_> {
             return self.console_builtin(name, builtin);
         }
         if items.is(owner, LangItem::Math) {
-            return self.math_builtin(name, builtin);
+            return self.math_builtin(name);
         }
         if let Some(primitive) = items.primitive_of(owner) {
             return self.primitive_builtin(primitive, name, builtin);
@@ -464,9 +464,18 @@ impl FnCx<'_, '_, '_> {
                 let mixed = self.assign(format!("xor i64 {value}, {shifted}"));
                 self.assign(format!("trunc i64 {mixed} to i32"))
             }
-            PrimitiveTy::Float => self.assign(format!("bitcast float {value} to i32")),
+            // Every NaN is equal to every other, so they all hash alike.
+            PrimitiveTy::Float => {
+                let nan = self.assign(format!("fcmp uno float {value}, {value}"));
+                let bits = self.assign(format!("bitcast float {value} to i32"));
+                self.assign(format!("select i1 {nan}, i32 2143289344, i32 {bits}"))
+            }
             PrimitiveTy::Double => {
-                let bits = self.assign(format!("bitcast double {value} to i64"));
+                let nan = self.assign(format!("fcmp uno double {value}, {value}"));
+                let raw = self.assign(format!("bitcast double {value} to i64"));
+                let bits = self.assign(format!(
+                    "select i1 {nan}, i64 9221120237041090560, i64 {raw}"
+                ));
                 let shifted = self.assign(format!("lshr i64 {bits}, 32"));
                 let mixed = self.assign(format!("xor i64 {bits}, {shifted}"));
                 self.assign(format!("trunc i64 {mixed} to i32"))
@@ -734,36 +743,42 @@ impl FnCx<'_, '_, '_> {
         }
     }
 
-    fn math_builtin(&mut self, name: &str, builtin: &Builtin) -> bool {
-        let unary = |fx: &mut Self, intrinsic: &str| -> String {
+    fn math_builtin(&mut self, name: &str) -> bool {
+        let unary = |fx: &mut Self, function: &str| -> String {
             fx.cx
-                .declare_dynamic(intrinsic, &format!("declare double @{intrinsic}(double)"));
-            fx.assign(format!("call double @{intrinsic}(double %a0)"))
+                .declare_dynamic(function, &format!("declare double @{function}(double)"));
+            fx.assign(format!("call double @{function}(double %a0)"))
+        };
+        let binary = |fx: &mut Self, function: &str| -> String {
+            fx.cx.declare_dynamic(
+                function,
+                &format!("declare double @{function}(double, double)"),
+            );
+            fx.assign(format!("call double @{function}(double %a0, double %a1)"))
         };
         let value = match name {
             "sqrt" => unary(self, "llvm.sqrt.f64"),
             "floor" => unary(self, "llvm.floor.f64"),
             "ceil" => unary(self, "llvm.ceil.f64"),
-            "pow" => {
-                self.cx.declare_dynamic(
-                    "llvm.pow.f64",
-                    "declare double @llvm.pow.f64(double, double)",
-                );
-                self.assign("call double @llvm.pow.f64(double %a0, double %a1)")
-            }
+            "trunc" => unary(self, "llvm.trunc.f64"),
+            "pow" => binary(self, "llvm.pow.f64"),
+            // The C library's versions: LLVM has no intrinsics for all of
+            // these on every target.
+            "sin" | "cos" | "tan" | "asin" | "acos" | "atan" | "exp" | "log10" | "log2"
+            | "cbrt" => unary(self, name),
+            "ln" => unary(self, "log"),
+            "atan2" | "hypot" => binary(self, name),
             "round" => {
-                let shifted = self.assign(format!("fadd double %a0, {}", float_const(0.5)));
-                self.cx
-                    .declare_dynamic("llvm.floor.f64", "declare double @llvm.floor.f64(double)");
-                let floored = self.assign(format!("call double @llvm.floor.f64(double {shifted})"));
-                let value = self.numeric(&floored, PrimitiveTy::Double, PrimitiveTy::Long);
+                // Halfway cases round away from zero, and the conversion
+                // saturates, so NaN gives 0 and infinities the extremes.
+                let rounded = unary(self, "llvm.round.f64");
+                let value = self.numeric(&rounded, PrimitiveTy::Double, PrimitiveTy::Long);
                 self.ret(&value, &Ty::LONG);
                 return true;
             }
             "random" => self.runtime("double", "kr_random", ""),
             _ => return false,
         };
-        let _ = builtin;
         self.ret(&value, &Ty::DOUBLE);
         true
     }
@@ -1357,6 +1372,17 @@ impl FnCx<'_, '_, '_> {
                 self.line(format!("store i64 {last}, ptr {len_addr}"));
                 self.ret(&old, &elem);
             }
+            "swap" => {
+                let first = check_index(self, &builtin.arg(0), false);
+                let second = check_index(self, &builtin.arg(1), false);
+                let first_addr = slot(self, &first);
+                let second_addr = slot(self, &second);
+                let first_value = self.load(&elem, &first_addr);
+                let second_value = self.load(&elem, &second_addr);
+                self.store(&elem, &second_value, &first_addr);
+                self.store(&elem, &first_value, &second_addr);
+                self.line("ret void");
+            }
             "clear" => {
                 self.drop_list_elements(&object, &ty, &elem);
                 self.line("ret void");
@@ -1390,10 +1416,6 @@ impl FnCx<'_, '_, '_> {
             }
             _ => return false,
         }
-        let _ = Val {
-            ty: Ty::Void,
-            v: String::new(),
-        };
         true
     }
 
