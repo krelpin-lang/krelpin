@@ -1,0 +1,34 @@
+import std.util.ArrayList;
+import std.util.List;
+
+class Box {
+    public String name = "box";
+}
+
+record Point(int x) {}
+
+class Main {
+    static String volume() {
+        return "quiet";
+    }
+
+    static void main() {
+        List<String> names = new ArrayList<>();
+        names.add("a");
+        Console.println(1 + names.get(0));
+        Console.println(names.get(0) + 'x');
+        Console.println(true + names.get(0) + 2.5);
+        Console.println("x" + &&Main.volume());
+
+        Box box = new Box();
+        &Box boxRef = &box;
+        &&Box boxRefRef = &boxRef;
+        Point point = new Point(3);
+        &&Point pointRef = &&point;
+        int count = 5;
+        &&int countRef = &&count;
+        String? missing = null;
+        &(String?) missingRef = &missing;
+        Console.println(boxRefRef.name + " " + pointRef + " " + countRef + " " + missingRef);
+    }
+}

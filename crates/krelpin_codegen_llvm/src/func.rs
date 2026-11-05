@@ -801,7 +801,7 @@ impl<'c, 'a, 'tcx> FnCx<'c, 'a, 'tcx> {
                 let inner = inner.as_ref().clone();
                 if self.cx.is_ptr(&inner) {
                     let loaded = self.load(&inner, value);
-                    self.stringify_nullable(&loaded, &inner)
+                    self.stringify(&loaded, &inner)
                 } else {
                     self.value_to_string(value, &inner)
                 }

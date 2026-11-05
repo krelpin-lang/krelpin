@@ -677,7 +677,10 @@ impl<'f, 'c, 'a, 'tcx> BodyCx<'f, 'c, 'a, 'tcx> {
         let (a, a_owned) = self.operand_read(lhs);
         let (b, b_owned) = self.operand_read(rhs);
         let string = self.fx.cx.tcx.string_ty();
-        let is_string = |cx: &Cx<'_, '_>, ty: &Ty| cx.tcx.is_string(ty.non_null());
+        // The same test as the type checker's, which looks through references.
+        let is_string = |cx: &Cx<'_, '_>, ty: &Ty| {
+            cx.tcx.is_string(ty.strip_refs()) || cx.tcx.is_string(ty.non_null())
+        };
         if op == BinOp::Add && (is_string(self.fx.cx, &a.ty) || is_string(self.fx.cx, &b.ty)) {
             let left = self.fx.stringify(&a.v, &a.ty);
             let right = self.fx.stringify(&b.v, &b.ty);
