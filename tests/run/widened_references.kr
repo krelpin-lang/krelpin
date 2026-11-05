@@ -11,5 +11,11 @@ class Main {
         Console.println(max(&3, &-0.0));
         Console.println(max(&-7, &2.5));
         show(&9);
+
+        // A reference to a reference is passed as the reference it holds.
+        Console.println(max(&&"apple", &"banana"));
+        String word = "word";
+        &String borrowed = &word;
+        Console.println(max(&borrowed, &"able"));
     }
 }

@@ -417,6 +417,12 @@ impl<'c, 'a, 'tcx> FnCx<'c, 'a, 'tcx> {
         if from == to {
             return pointer.to_owned();
         }
+        // `&&T` used as `&T` points one level too far out.
+        if let (Ty::Ref { ty: inner, .. }, false) = (from, matches!(to, Ty::Ref { .. })) {
+            let inner = inner.as_ref().clone();
+            let loaded = self.assign(format!("load ptr, ptr {pointer}"));
+            return self.convert_reference(&loaded, &inner, to);
+        }
         let from_shape = self.cx.shape(from);
         let to_shape = self.cx.shape(to);
         match (&from_shape, &to_shape) {
