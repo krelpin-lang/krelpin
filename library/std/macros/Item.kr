@@ -1,0 +1,226 @@
+package std.macros;
+
+import std.util.ArrayList;
+import std.util.List;
+
+final class Item {
+    private TokenStream docs;
+    private List<Attribute> attributes;
+    private TokenStream head;
+    private ItemKind kind;
+    private Token name;
+    private Token open;
+    private TokenStream constants;
+    private List<Member> members;
+    private List<Member> components;
+    private Token close;
+
+    private Item(TokenStream docs, List<Attribute> attributes, TokenStream head, ItemKind kind,
+            Token name, Token open, Token close) {
+        this.docs = docs;
+        this.attributes = attributes;
+        this.head = head;
+        this.kind = kind;
+        this.name = name;
+        this.open = open;
+        this.constants = new TokenStream();
+        this.members = new ArrayList<>();
+        this.components = new ArrayList<>();
+        this.close = close;
+    }
+
+    static Item parse(&TokenStream tokens) {
+        int at = 0;
+        TokenStream docs = new TokenStream();
+        while (at < tokens.size() && tokens.get(at).isDoc()) {
+            docs.add(tokens.get(at));
+            at++;
+        }
+        List<Attribute> attributes = new ArrayList<>();
+        int end = Attribute.end(tokens, at);
+        while (end >= 0) {
+            attributes.add(Attribute.read(tokens, at, end));
+            at = end;
+            end = Attribute.end(tokens, at);
+        }
+        int keyword = at;
+        while (keyword < tokens.size() && !isKeyword(tokens.get(keyword))) {
+            keyword++;
+        }
+        if (keyword + 1 >= tokens.size()) {
+            throw new MacroError("expected a class, record, interface or enum");
+        }
+        int open = tokens.indexOf("{", keyword);
+        int close = open < 0 ? -1 : tokens.matching(open);
+        if (close < 0) {
+            throw new MacroError("expected the body of the type", &tokens.get(keyword));
+        }
+        Item item = new Item(docs, attributes, tokens.slice(at, open),
+            kindOf(tokens.get(keyword)), tokens.get(keyword + 1), tokens.get(open),
+            tokens.get(close));
+        item.readComponents(tokens, keyword + 2, open);
+        item.readBody(tokens, open + 1, close);
+        return item;
+    }
+
+    ItemKind kind() {
+        return this.kind;
+    }
+
+    Token name() {
+        return this.name;
+    }
+
+    &List<Attribute> attributes() {
+        return &this.attributes;
+    }
+
+    &List<Member> members() {
+        return &this.members;
+    }
+
+    &List<Member> components() {
+        return &this.components;
+    }
+
+    mut void addMember(&TokenStream member) {
+        this.members.add(Member.parse(member));
+    }
+
+    mut int removeAttribute(String name) {
+        int removed = 0;
+        int i = 0;
+        while (i < this.attributes.size()) {
+            if (this.attributes.get(i).is(name)) {
+                this.attributes.remove(i);
+                removed++;
+            } else {
+                i++;
+            }
+        }
+        List<Member> members = new ArrayList<>();
+        while (this.members.size() > 0) {
+            Member member = this.members.remove(0);
+            removed = removed + member.removeAttribute(name);
+            members.add(member);
+        }
+        this.members = members;
+        return removed;
+    }
+
+    TokenStream toTokens() {
+        TokenStream out = this.docs.copy();
+        for (&Attribute attribute : this.attributes) {
+            out.addAll(&attribute.toTokens());
+        }
+        out.addAll(&this.head);
+        out.add(this.open);
+        out.addAll(&this.constants);
+        for (&Member member : this.members) {
+            out.addAll(&member.toTokens());
+        }
+        out.add(this.close);
+        return out;
+    }
+
+    private mut void readComponents(&TokenStream tokens, int from, int open) {
+        if (this.kind != ItemKind.RECORD) {
+            return;
+        }
+        int at = from;
+        if (at < open && tokens.get(at).isPunct("<")) {
+            at = tokens.matching(at) + 1;
+        }
+        if (at >= open || !tokens.get(at).isPunct("(")) {
+            return;
+        }
+        int end = tokens.matching(at);
+        int start = at + 1;
+        int depth = 0;
+        for (int i = at + 1; i <= end; i++) {
+            Token token = tokens.get(i);
+            if (token.isPunct("(") || token.isPunct("<") || token.isPunct("[")) {
+                depth++;
+            } else if (token.isPunct(")") || token.isPunct(">") || token.isPunct("]")) {
+                depth--;
+            } else if (token.isPunct(">>")) {
+                depth = depth - 2;
+            }
+            if ((depth == 0 && token.isPunct(",")) || i == end) {
+                if (i > start) {
+                    TokenStream component = tokens.slice(start, i);
+                    component.add(Token.punct(";"));
+                    this.components.add(Member.parse(&component));
+                }
+                start = i + 1;
+            }
+        }
+    }
+
+    private mut void readBody(&TokenStream tokens, int from, int close) {
+        int at = from;
+        if (this.kind == ItemKind.ENUM) {
+            int depth = 0;
+            int end = close;
+            for (int i = from; i < close; i++) {
+                Token token = tokens.get(i);
+                if (token.isPunct("(") || token.isPunct("{") || token.isPunct("[")) {
+                    depth++;
+                } else if (token.isPunct(")") || token.isPunct("}") || token.isPunct("]")) {
+                    depth--;
+                } else if (depth == 0 && token.isPunct(";")) {
+                    end = i + 1;
+                    break;
+                }
+            }
+            this.constants = tokens.slice(from, end);
+            at = end;
+        }
+        int start = at;
+        int depth = 0;
+        boolean assigned = false;
+        for (int i = at; i < close; i++) {
+            Token token = tokens.get(i);
+            boolean ends = false;
+            if (token.isPunct("(") || token.isPunct("{") || token.isPunct("[")) {
+                depth++;
+            } else if (token.isPunct(")") || token.isPunct("]")) {
+                depth--;
+            } else if (token.isPunct("}")) {
+                depth--;
+                ends = depth == 0 && !assigned;
+            } else if (depth == 0 && token.isPunct("=")) {
+                assigned = true;
+            } else if (depth == 0 && token.isPunct(";")) {
+                ends = true;
+            }
+            if (ends) {
+                TokenStream member = tokens.slice(start, i + 1);
+                this.members.add(Member.parse(&member));
+                start = i + 1;
+                assigned = false;
+            }
+        }
+        if (start < close) {
+            throw new MacroError("this member never ends", &tokens.get(start));
+        }
+    }
+
+    private static boolean isKeyword(Token token) {
+        return token.isIdent("class") || token.isIdent("record") || token.isIdent("interface")
+            || token.isIdent("enum");
+    }
+
+    private static ItemKind kindOf(Token token) {
+        if (token.isIdent("record")) {
+            return ItemKind.RECORD;
+        }
+        if (token.isIdent("interface")) {
+            return ItemKind.INTERFACE;
+        }
+        if (token.isIdent("enum")) {
+            return ItemKind.ENUM;
+        }
+        return ItemKind.CLASS;
+    }
+}

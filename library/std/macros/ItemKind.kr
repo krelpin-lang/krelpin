@@ -1,0 +1,8 @@
+package std.macros;
+
+enum ItemKind {
+    CLASS,
+    RECORD,
+    INTERFACE,
+    ENUM
+}

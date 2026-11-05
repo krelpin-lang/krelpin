@@ -15,6 +15,12 @@ final class TokenStream implements Iterable<Token> {
         return Bridge.lex(source);
     }
 
+    static TokenStream of(Token token) {
+        TokenStream stream = new TokenStream();
+        stream.add(token);
+        return stream;
+    }
+
     int size() {
         return this.tokens.size();
     }
@@ -103,12 +109,22 @@ final class TokenStream implements Iterable<Token> {
                 depth++;
             } else if (token.text.equals(&closing)) {
                 depth--;
-                if (depth == 0) {
-                    return i;
-                }
+            } else if (opening.equals(&"<") && token.text.equals(&">>")) {
+                depth = depth - 2;
+            } else if (opening.equals(&"<") && token.text.equals(&">>>")) {
+                depth = depth - 3;
+            } else {
+                continue;
+            }
+            if (depth <= 0) {
+                return i;
             }
         }
         return -1;
+    }
+
+    TokenStream copy() {
+        return this.slice(0, this.size());
     }
 
     Iterator<Token> iterator() {

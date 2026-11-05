@@ -1,0 +1,9 @@
+package std.macros;
+
+enum MemberKind {
+    FIELD,
+    METHOD,
+    CONSTRUCTOR,
+    TYPE,
+    INITIALIZER
+}

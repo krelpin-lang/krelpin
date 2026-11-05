@@ -1,0 +1,138 @@
+package builders;
+
+import std.macros.Item;
+import std.macros.MacroError;
+import std.macros.Member;
+import std.macros.Quote;
+import std.macros.TokenStream;
+import std.util.ArrayList;
+import std.util.List;
+
+macro Builder(TokenStream args, TokenStream input) {
+    Item item = Item.parse(&input);
+    List<String> required = Options.required(&args);
+    String owner = item.name().text;
+
+    TokenStream params = new TokenStream();
+    TokenStream assigns = new TokenStream();
+    TokenStream setters = new TokenStream();
+    TokenStream defaults = new TokenStream();
+    TokenStream checks = new TokenStream();
+    TokenStream values = new TokenStream();
+
+    for (&Member field : item.members()) {
+        if (!field.isField()) {
+            continue;
+        }
+        String name = field.name().text;
+        boolean mandatory = required.contains(&name);
+        if (!mandatory && !field.hasAttribute("Default")) {
+            throw new MacroError("`" + name + "` needs `@Default(...)` or must be required",
+                &field.name());
+        }
+        if (!params.isEmpty()) {
+            params.append(",");
+            values.append(",");
+        }
+        Quote param = new Quote("#type #name");
+        param.set("type", &field.type());
+        param.set("name", field.name());
+        params.addAll(&param.render());
+
+        Quote assign = new Quote("this.#name = #name;");
+        assign.set("name", field.name());
+        assigns.addAll(&assign.render());
+
+        Quote setter = new Quote(mandatory
+            ? "private #type? #name; mut void #name(#type value) { this.#name = value; }"
+            : "private #type #name; mut void #name(#type value) { this.#name = value; }");
+        setter.set("type", &field.type());
+        setter.set("name", field.name());
+        setters.addAll(&setter.render());
+
+        Quote init = new Quote("this.#name = #value;");
+        init.set("name", field.name());
+        if (mandatory) {
+            init.set("value", &TokenStream.parse("null"));
+        } else {
+            init.set("value", &field.attribute("Default"));
+        }
+        defaults.addAll(&init.render());
+
+        if (mandatory) {
+            Quote check = new Quote("""
+                #type? #name = this.#name;
+                if (#name == null) {
+                    throw new IllegalStateException(#message);
+                }
+                """);
+            check.set("type", &field.type());
+            check.set("name", field.name());
+            check.string("message", "`" + owner + "." + name + "` is required");
+            checks.addAll(&check.render());
+            values.add(field.name());
+        } else {
+            Quote value = new Quote("this.#name");
+            value.set("name", field.name());
+            values.addAll(&value.render());
+        }
+    }
+    item.removeAttribute("Default");
+
+    Quote constructor = new Quote("#owner(#params) { #assigns }");
+    constructor.set("owner", item.name());
+    constructor.set("params", &params);
+    constructor.set("assigns", &assigns);
+    item.addMember(&constructor.render());
+
+    Quote builder = new Quote("""
+        final class #builder {
+            #setters
+            #builder() { #defaults }
+            #owner build() { #checks return new #owner(#values); }
+        }
+        """);
+    builder.ident("builder", owner + "Builder");
+    builder.set("owner", item.name());
+    builder.set("setters", &setters);
+    builder.set("defaults", &defaults);
+    builder.set("checks", &checks);
+    builder.set("values", &values);
+
+    TokenStream output = item.toTokens();
+    output.addAll(&builder.render());
+    return output;
+}
+
+macro Trace(TokenStream args, TokenStream input) {
+    Member method = Member.parse(&input);
+    if (!method.hasBody()) {
+        throw new MacroError("`@Trace` needs a method with a body");
+    }
+    Quote body = new Quote("Console.println(#label); #body");
+    body.string("label", "-> " + method.name().text);
+    body.set("body", &method.body());
+    method.setBody(&body.render());
+    return method.toTokens();
+}
+
+class Options {
+    static List<String> required(&TokenStream args) {
+        List<String> names = new ArrayList<>();
+        if (args.isEmpty()) {
+            return names;
+        }
+        if (args.size() != 3 || !args.get(0).isIdent("required") || !args.get(1).isPunct("=")
+                || !args.get(2).isLiteral()) {
+            throw new MacroError("write `@Builder(required = \"a, b\")`", &args.get(0));
+        }
+        String list = args.get(2).text;
+        for (String part : list.substring(1, list.length() - 1).split(",")) {
+            String name = part.trim();
+            if (!name.isEmpty()) {
+                names.add(name);
+            }
+        }
+        return names;
+    }
+}

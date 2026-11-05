@@ -1,0 +1,61 @@
+package std.macros;
+
+final class Attribute {
+    private Token name;
+    private TokenStream tokens;
+    private TokenStream args;
+
+    private Attribute(Token name, TokenStream tokens, TokenStream args) {
+        this.name = name;
+        this.tokens = tokens;
+        this.args = args;
+    }
+
+    Token name() {
+        return this.name;
+    }
+
+    boolean is(String name) {
+        return this.name.text.equals(&name);
+    }
+
+    &TokenStream args() {
+        return &this.args;
+    }
+
+    TokenStream toTokens() {
+        return this.tokens.copy();
+    }
+
+    static int end(&TokenStream tokens, int at) {
+        if (at + 1 >= tokens.size() || !tokens.get(at).isPunct("@")
+                || !tokens.get(at + 1).isIdent() || tokens.get(at + 1).isIdent("interface")) {
+            return -1;
+        }
+        int end = at + 2;
+        while (end + 1 < tokens.size() && tokens.get(end).isPunct(".")
+                && tokens.get(end + 1).isIdent()) {
+            end = end + 2;
+        }
+        if (end < tokens.size() && tokens.get(end).isPunct("(")) {
+            int close = tokens.matching(end);
+            if (close < 0) {
+                throw new MacroError("this `(` is never closed", &tokens.get(end));
+            }
+            end = close + 1;
+        }
+        return end;
+    }
+
+    static Attribute read(&TokenStream tokens, int start, int end) {
+        int nameEnd = start + 2;
+        while (nameEnd + 1 < end && tokens.get(nameEnd).isPunct(".")) {
+            nameEnd = nameEnd + 2;
+        }
+        TokenStream args = new TokenStream();
+        if (nameEnd < end) {
+            args = tokens.slice(nameEnd + 1, end - 1);
+        }
+        return new Attribute(tokens.get(nameEnd - 1), tokens.slice(start, end), args);
+    }
+}

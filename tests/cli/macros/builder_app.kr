@@ -1,0 +1,39 @@
+import builders.Builder;
+import builders.Trace;
+
+/** A user of the system. */
+@Builder(required = "name, email")
+class User {
+    private String name;
+    private String email;
+    @Default(18)
+    private int age;
+    @Default(false)
+    private boolean admin;
+    private static int created = 0;
+
+    @Trace
+    String describe() {
+        return this.name + " <" + this.email + ">, " + this.age + (this.admin ? ", admin" : "");
+    }
+}
+
+class Main {
+    static void main() {
+        UserBuilder builder = new UserBuilder();
+        builder.name("Ada");
+        builder.email("ada@example.com");
+        builder.admin(true);
+        User ada = builder.build();
+        Console.println(ada.describe());
+
+        UserBuilder incomplete = new UserBuilder();
+        incomplete.name("Grace");
+        try {
+            User grace = incomplete.build();
+            Console.println(grace.describe());
+        } catch (IllegalStateException error) {
+            Console.println(error.getMessage());
+        }
+    }
+}

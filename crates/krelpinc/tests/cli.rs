@@ -319,3 +319,62 @@ fn checks_proc_macro_options() {
     let outside = krelpinc(&["tests/cli/macros/accessors.kr", "--emit=metadata"]);
     assert!(stderr(&outside).contains("macros can only be defined in a `proc-macro` crate"));
 }
+
+#[test]
+fn macros_work_on_parsed_items_and_quotes() {
+    if !has_clang() {
+        return;
+    }
+    let dir = scratch("structured-macros");
+    build_macro_crate("builders", &dir);
+    build_macro_crate("echo", &dir);
+    let dir_arg = dir.to_str().expect("utf-8 path");
+
+    let program = dir.join("builder_app");
+    let built = krelpinc(&[
+        "tests/cli/macros/builder_app.kr",
+        "--extern",
+        "builders",
+        "-L",
+        dir_arg,
+        "-o",
+        program.to_str().expect("utf-8 path"),
+    ]);
+    assert!(built.status.success(), "{}", stderr(&built));
+    let run = Command::new(&program).output().expect("the program runs");
+    assert_eq!(
+        stdout(&run),
+        "-> describe\nAda <ada@example.com>, 18, admin\n`User.email` is required\n"
+    );
+
+    let echo = dir.join("echo_app");
+    let built = krelpinc(&[
+        "tests/cli/macros/echo_app.kr",
+        "--extern",
+        "echo",
+        "-L",
+        dir_arg,
+        "-o",
+        echo.to_str().expect("utf-8 path"),
+    ]);
+    assert!(built.status.success(), "{}", stderr(&built));
+    let printed = stderr(&built);
+    for expected in [
+        "CLASS Shape: FIELD(cache) FIELD(hook) FIELD(numbers) METHOD(max) \
+         CONSTRUCTOR(Shape) METHOD(area) TYPE(Inner)",
+        "METHOD max type=[U] params=[U a , U b] init=[]",
+        "CONSTRUCTOR Shape type=[] params=[] init=[]",
+        "RECORD Pair: METHOD(show) component(A first) \
+         component(Map < String , List < B >> second)",
+        "ENUM Level: METHOD(code)",
+        "INTERFACE Named: METHOD(name) METHOD(greet)",
+    ] {
+        assert!(
+            printed.contains(expected),
+            "missing `{expected}` in:\n{printed}"
+        );
+    }
+    let run = Command::new(&echo).output().expect("the program runs");
+    assert_eq!(stdout(&run), "HIGH\n");
+    let _ = fs::remove_dir_all(&dir);
+}

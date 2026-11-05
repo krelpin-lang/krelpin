@@ -1,0 +1,43 @@
+import echo.*;
+import std.util.ArrayList;
+import std.util.List;
+import std.util.Map;
+
+@Echo
+abstract class Shape<T extends Comparable<T>> implements Cloneable {
+    /** cached */
+    protected List<Map<String, List<T>>>? cache = null;
+    private Runnable hook = () -> {
+        Console.println("hook");
+    };
+    private int[] numbers = {1, 2, 3};
+    @Inspect
+    static <U extends Comparable<U>> U max(U a, U b) throws IllegalStateException {
+        return a.compareTo(&b) > 0 ? a : b;
+    }
+    @Inspect
+    Shape() {}
+    abstract double area();
+    @Inspect
+    static final class Inner {}
+}
+
+@Echo
+record Pair<A, B>(A first, Map<String, List<B>> second) {
+    String show() { return "pair"; }
+}
+
+@Echo
+enum Level {
+    LOW,
+    HIGH;
+    String code() { return this == Level.LOW ? "l" : "h"; }
+}
+
+@Echo
+interface Named {
+    String name();
+    String greet() { return "hi " + this.name(); }
+}
+
+class Main { static void main() { Console.println(Level.HIGH); } }

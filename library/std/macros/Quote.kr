@@ -1,0 +1,93 @@
+package std.macros;
+
+import std.util.HashMap;
+import std.util.Map;
+
+final class Quote {
+    private String template;
+    private Map<String, TokenStream> values;
+
+    Quote(String template) {
+        this.template = template;
+        this.values = new HashMap<>();
+    }
+
+    mut void set(String name, &TokenStream tokens) {
+        this.values.put(name, tokens.copy());
+    }
+
+    mut void set(String name, Token token) {
+        this.values.put(name, TokenStream.of(token));
+    }
+
+    mut void ident(String name, String text) {
+        this.set(name, Token.ident(text));
+    }
+
+    mut void string(String name, String value) {
+        this.set(name, Token.string(value));
+    }
+
+    TokenStream render() {
+        char[] chars = this.template.chars();
+        String source = "";
+        char quote = ' ';
+        boolean quoted = false;
+        int i = 0;
+        while (i < chars.length) {
+            char c = chars[i];
+            if (quoted) {
+                source = source + c;
+                if (c == '\\' && i + 1 < chars.length) {
+                    source = source + chars[i + 1];
+                    i = i + 2;
+                    continue;
+                }
+                quoted = c != quote;
+                i++;
+                continue;
+            }
+            if (c == '"' || c == '\'') {
+                quoted = true;
+                quote = c;
+                source = source + c;
+                i++;
+                continue;
+            }
+            if (c == '#' && i + 1 < chars.length
+                    && (chars[i + 1].isLetter() || chars[i + 1] == '_')) {
+                int j = i + 1;
+                String name = "";
+                while (j < chars.length && (chars[j].isLetterOrDigit() || chars[j] == '_')) {
+                    name = name + chars[j];
+                    j++;
+                }
+                if (!this.values.containsKey(&name)) {
+                    throw new MacroError("`#" + name + "` is used in a quote but never set");
+                }
+                source = source + " " + Quote.MARKER + name + " ";
+                i = j;
+                continue;
+            }
+            source = source + c;
+            i++;
+        }
+        TokenStream parsed = TokenStream.parse(source);
+        TokenStream out = new TokenStream();
+        for (int k = 0; k < parsed.size(); k++) {
+            Token token = parsed.get(k);
+            if (token.isIdent() && token.text.startsWith(Quote.MARKER)) {
+                String name = token.text.substring(Quote.MARKER.length());
+                (&TokenStream)? value = this.values.get(&name);
+                if (value != null) {
+                    out.addAll(value);
+                }
+            } else {
+                out.add(token);
+            }
+        }
+        return out;
+    }
+
+    private const String MARKER = "__krelpin_quote_";
+}

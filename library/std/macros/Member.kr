@@ -1,0 +1,261 @@
+package std.macros;
+
+import std.util.ArrayList;
+import std.util.List;
+
+final class Member {
+    private TokenStream docs;
+    private List<Attribute> attributes;
+    private TokenStream rest;
+    private MemberKind kind;
+    private int modifiersEnd;
+    private int typeStart;
+    private int nameAt;
+    private int open;
+    private int close;
+    private int bodyOpen;
+    private int bodyClose;
+    private int initAt;
+
+    private Member(TokenStream docs, List<Attribute> attributes, TokenStream rest) {
+        this.docs = docs;
+        this.attributes = attributes;
+        this.rest = rest;
+        this.kind = MemberKind.FIELD;
+        this.modifiersEnd = 0;
+        this.typeStart = 0;
+        this.nameAt = -1;
+        this.open = -1;
+        this.close = -1;
+        this.bodyOpen = -1;
+        this.bodyClose = -1;
+        this.initAt = -1;
+        this.analyze();
+    }
+
+    static Member parse(&TokenStream tokens) {
+        int at = 0;
+        TokenStream docs = new TokenStream();
+        while (at < tokens.size() && tokens.get(at).isDoc()) {
+            docs.add(tokens.get(at));
+            at++;
+        }
+        List<Attribute> attributes = new ArrayList<>();
+        int end = Attribute.end(tokens, at);
+        while (end >= 0) {
+            attributes.add(Attribute.read(tokens, at, end));
+            at = end;
+            end = Attribute.end(tokens, at);
+        }
+        if (at >= tokens.size()) {
+            throw new MacroError("expected a member");
+        }
+        return new Member(docs, attributes, tokens.slice(at, tokens.size()));
+    }
+
+    MemberKind kind() {
+        return this.kind;
+    }
+
+    boolean isField() {
+        return this.kind == MemberKind.FIELD && !this.isStatic();
+    }
+
+    boolean isMethod() {
+        return this.kind == MemberKind.METHOD;
+    }
+
+    Token name() {
+        if (this.nameAt < 0) {
+            throw new MacroError("this member has no name", &this.rest.get(0));
+        }
+        return this.rest.get(this.nameAt);
+    }
+
+    boolean hasModifier(String modifier) {
+        for (int i = 0; i < this.modifiersEnd; i++) {
+            if (this.rest.get(i).isIdent(modifier)) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    boolean isStatic() {
+        return this.hasModifier("static") || this.hasModifier("const");
+    }
+
+    TokenStream type() {
+        if (this.kind != MemberKind.FIELD && this.kind != MemberKind.METHOD) {
+            return new TokenStream();
+        }
+        return this.rest.slice(this.typeStart, this.nameAt);
+    }
+
+    TokenStream params() {
+        if (this.open < 0) {
+            return new TokenStream();
+        }
+        return this.rest.slice(this.open + 1, this.close);
+    }
+
+    boolean hasBody() {
+        return this.bodyOpen >= 0;
+    }
+
+    TokenStream body() {
+        if (this.bodyOpen < 0) {
+            return new TokenStream();
+        }
+        return this.rest.slice(this.bodyOpen + 1, this.bodyClose);
+    }
+
+    TokenStream initializer() {
+        if (this.initAt < 0) {
+            return new TokenStream();
+        }
+        return this.rest.slice(this.initAt, this.rest.size() - 1);
+    }
+
+    mut void setBody(&TokenStream body) {
+        if (this.bodyOpen < 0 || this.kind == MemberKind.TYPE) {
+            throw new MacroError("only methods, constructors and initializers have a body",
+                &this.rest.get(0));
+        }
+        TokenStream rest = this.rest.slice(0, this.bodyOpen + 1);
+        rest.addAll(body);
+        rest.addAll(&this.rest.slice(this.bodyClose, this.rest.size()));
+        this.rest = rest;
+        this.analyze();
+    }
+
+    &List<Attribute> attributes() {
+        return &this.attributes;
+    }
+
+    boolean hasAttribute(String name) {
+        for (&Attribute attribute : this.attributes) {
+            if (attribute.is(name)) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    TokenStream attribute(String name) {
+        for (&Attribute attribute : this.attributes) {
+            if (attribute.is(name)) {
+                return attribute.args().copy();
+            }
+        }
+        return new TokenStream();
+    }
+
+    mut int removeAttribute(String name) {
+        int removed = 0;
+        int i = 0;
+        while (i < this.attributes.size()) {
+            if (this.attributes.get(i).is(name)) {
+                this.attributes.remove(i);
+                removed++;
+            } else {
+                i++;
+            }
+        }
+        return removed;
+    }
+
+    TokenStream toTokens() {
+        TokenStream out = this.docs.copy();
+        for (&Attribute attribute : this.attributes) {
+            out.addAll(&attribute.toTokens());
+        }
+        out.addAll(&this.rest);
+        return out;
+    }
+
+    private mut void analyze() {
+        TokenStream rest = this.rest.copy();
+        int at = 0;
+        while (at < rest.size() && isModifier(rest.get(at))) {
+            at++;
+        }
+        this.modifiersEnd = at;
+        this.typeStart = at;
+        this.nameAt = -1;
+        this.open = -1;
+        this.close = -1;
+        this.bodyOpen = -1;
+        this.bodyClose = -1;
+        this.initAt = -1;
+        if (at >= rest.size()) {
+            throw new MacroError("expected a member after its modifiers", &rest.get(0));
+        }
+        Token first = rest.get(at);
+        if (first.isIdent("class") || first.isIdent("record") || first.isIdent("interface")
+                || first.isIdent("enum")) {
+            this.kind = MemberKind.TYPE;
+            this.nameAt = at + 1;
+            this.bodyOpen = rest.indexOf("{", at);
+            this.bodyClose = this.bodyOpen < 0 ? -1 : rest.matching(this.bodyOpen);
+            return;
+        }
+        if (first.isPunct("{")) {
+            this.kind = MemberKind.INITIALIZER;
+            this.bodyOpen = at;
+            this.bodyClose = rest.matching(at);
+            return;
+        }
+        if (first.isPunct("<")) {
+            int closing = rest.matching(at);
+            if (closing < 0) {
+                throw new MacroError("this `<` is never closed", &first);
+            }
+            this.typeStart = closing + 1;
+        }
+        for (int i = this.typeStart; i < rest.size(); i++) {
+            Token token = rest.get(i);
+            if (token.isPunct("(")) {
+                this.nameAt = i - 1;
+                this.open = i;
+                this.close = rest.matching(i);
+                if (this.close < 0) {
+                    throw new MacroError("this `(` is never closed", &token);
+                }
+                this.kind = this.nameAt == this.typeStart
+                    ? MemberKind.CONSTRUCTOR
+                    : MemberKind.METHOD;
+                for (int j = this.close + 1; j < rest.size(); j++) {
+                    if (rest.get(j).isPunct("{")) {
+                        this.bodyOpen = j;
+                        this.bodyClose = rest.matching(j);
+                        return;
+                    }
+                    if (rest.get(j).isPunct(";")) {
+                        return;
+                    }
+                }
+                return;
+            }
+            if (token.isPunct("=")) {
+                this.kind = MemberKind.FIELD;
+                this.nameAt = i - 1;
+                this.initAt = i + 1;
+                return;
+            }
+            if (token.isPunct(";")) {
+                this.kind = MemberKind.FIELD;
+                this.nameAt = i - 1;
+                return;
+            }
+        }
+        throw new MacroError("expected a field, method, constructor or type", &first);
+    }
+
+    private static boolean isModifier(Token token) {
+        return token.isIdent("public") || token.isIdent("protected")
+            || token.isIdent("private") || token.isIdent("static") || token.isIdent("const")
+            || token.isIdent("final") || token.isIdent("abstract") || token.isIdent("mut")
+            || token.isIdent("move");
+    }
+}
