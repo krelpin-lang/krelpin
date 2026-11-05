@@ -164,13 +164,13 @@ static KrString *format_double(double value, const Spec *spec) {
     bool negative = signbit(value) && !isnan(value);
     if (spec->kind == 'e' || spec->kind == 'E') {
         if (spec->precision >= 0) {
-            snprintf(body, sizeof(body), spec->kind == 'e' ? "%.*e" : "%.*E",
+            kr_c_snprintf(body, sizeof(body), spec->kind == 'e' ? "%.*e" : "%.*E",
                      (int)spec->precision, magnitude);
         } else {
-            snprintf(body, sizeof(body), spec->kind == 'e' ? "%e" : "%E", magnitude);
+            kr_c_snprintf(body, sizeof(body), spec->kind == 'e' ? "%e" : "%E", magnitude);
         }
     } else if (spec->precision >= 0) {
-        snprintf(body, sizeof(body), "%.*f", (int)spec->precision, magnitude);
+        kr_c_snprintf(body, sizeof(body), "%.*f", (int)spec->precision, magnitude);
     } else {
         KrString *plain = kr_string_from_double(magnitude);
         int64_t limit = (int64_t)sizeof(body) - 1;

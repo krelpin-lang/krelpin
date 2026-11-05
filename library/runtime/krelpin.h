@@ -88,6 +88,11 @@ _Noreturn void kr_panic(const char *message);
 KrString *kr_string_new(const char *bytes, int64_t len);
 KrString *kr_string_from_lossy(const char *bytes, int64_t len);
 bool kr_utf8_valid(const char *bytes, int64_t len);
+
+/* `strtod` and `snprintf` in the "C" locale, whatever the host has set. */
+double kr_c_strtod(const char *text, char **end);
+int kr_c_snprintf(char *buffer, size_t size, const char *format, ...)
+    __attribute__((format(printf, 3, 4)));
 void kr_string_retain(KrString *string);
 void kr_string_release(void *string);
 KrString *kr_string_concat(const KrString *a, const KrString *b);

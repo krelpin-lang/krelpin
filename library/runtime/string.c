@@ -486,8 +486,8 @@ static KrString *format_floating(double value, int max_digits) {
     char digits[64];
     int precision = 0;
     for (; precision < max_digits; precision++) {
-        snprintf(digits, sizeof digits, "%.*e", precision, value);
-        double parsed = strtod(digits, NULL);
+        kr_c_snprintf(digits, sizeof digits, "%.*e", precision, value);
+        double parsed = kr_c_strtod(digits, NULL);
         if (max_digits <= 9 ? (float)parsed == (float)value : parsed == value) {
             break;
         }
@@ -663,7 +663,7 @@ bool kr_parse_double(const KrString *text, double *out) {
     }
     char *buffer = terminated(text);
     char *end = NULL;
-    double value = strtod(buffer, &end);
+    double value = kr_c_strtod(buffer, &end);
     bool ok = end == buffer + text->len;
     kr_free(buffer);
     if (ok) {
