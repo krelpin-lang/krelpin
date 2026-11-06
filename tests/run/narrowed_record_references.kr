@@ -1,0 +1,35 @@
+import std.util.ArrayList;
+import std.util.List;
+
+record Package(String name, int version, List<String> deps) {
+    String label() {
+        return "${this.name} v${this.version}";
+    }
+}
+
+class Main {
+    static (&Package)? find(&List<Package> packages, &String name) {
+        for (&Package p : packages) {
+            if (p.name() == name) {
+                return p;
+            }
+        }
+        return null;
+    }
+
+    static void main() {
+        List<Package> packages = new ArrayList<>();
+        packages.add(new Package("json", 3, new ArrayList<>()));
+        (&Package)? found = find(&packages, &"json");
+        if (found != null) {
+            Console.println(found.name());
+            Console.println(found.version());
+            Console.println(found.label());
+            Console.println(found.deps().size());
+        }
+        Console.println(found != null && found.version() == 3);
+        Console.println(found != null ? found.label() : "none");
+        (&Package)? missing = find(&packages, &"tide");
+        Console.println(missing != null && missing.version() == 3);
+    }
+}

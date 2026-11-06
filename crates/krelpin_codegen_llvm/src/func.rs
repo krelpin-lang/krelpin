@@ -659,7 +659,7 @@ impl<'c, 'a, 'tcx> FnCx<'c, 'a, 'tcx> {
         receiver: &str,
         args: &[Val],
     ) -> String {
-        let base = receiver_ty.strip_refs().non_null().clone();
+        let base = receiver_ty.non_null().strip_refs().non_null().clone();
         let id = self.cx.selector(selector.clone());
         let statically = self.statically_dispatched(&base);
         let mut rendered = Vec::new();
