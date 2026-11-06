@@ -85,6 +85,7 @@ pub fn check<'a>(
     let mut tcx = Tcx::new(units, resolved, dcx);
     tcx.break_inheritance_cycles();
     tcx.derive_record_equality();
+    tcx.add_record_accessors();
     let results = check::check_units(&tcx, units);
     TypeckOutput { tcx, results }
 }

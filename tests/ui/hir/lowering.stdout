@@ -6,7 +6,7 @@ ctor Register.Register(this_0: &mut Register, count_1: int) -> void {
 
 fn Register.track(this_0: &mut Register, payment_1: Payment) -> void {
     switch payment_1 {
-        Payment::Card(number_2: String, amount_3: Money) if (amount_3.cents > (0 as long)) => {
+        Payment::Card(number_2: String, amount_3: Money) if (Money::cents(&amount_3) > (0 as long)) => {
             ArrayList::add(&mut this_0.history, amount_3);
         }
         Payment::Card(_, _) => {
@@ -23,7 +23,7 @@ fn Register.track(this_0: &mut Register, payment_1: Payment) -> void {
 fn Register.total(this_0: &Register) -> long {
     let sum_1: long = (0 as long);
     for money_2 in this_0.history {
-        sum_1 += money_2.cents;
+        sum_1 += Money::cents(&money_2);
     }
     {
         let i_3: int = 0;
@@ -38,7 +38,7 @@ fn Register.total(this_0: &Register) -> long {
 
 fn Register.describe(this_0: &Register, payment_1: Payment) -> String {
     return switch payment_1 {
-        Payment::Card(_, amount_2: Money) => ("card " + String::length(&amount_2.currency))
+        Payment::Card(_, amount_2: Money) => ("card " + String::length(&Money::currency(&amount_2)))
         Payment::Cash(_) => "cash"
         Payment::Free => Register::label(this_0, ["free", "no", "charge"])
     };

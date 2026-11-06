@@ -25,7 +25,7 @@ final class Attribute {
 
     /** Returns whether the annotation is called `name`. */
     boolean is(String name) {
-        return this.name.text.equals(&name);
+        return this.name.text().equals(&name);
     }
 
     /**

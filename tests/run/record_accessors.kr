@@ -1,0 +1,66 @@
+import std.util.ArrayList;
+import std.util.List;
+
+record Point(int x, int y) {}
+
+record Named<T>(String name, T value) {}
+
+// A component that can't be copied is returned as a reference.
+record Batch(String label, List<String> items, byte[] data) {}
+
+record Temperature(double celsius) {
+    // A declared accessor replaces the generated one.
+    double celsius() {
+        return (double) Math.round(this.celsius * 10.0) / 10.0;
+    }
+
+    double fahrenheit() {
+        return this.celsius * 9.0 / 5.0 + 32.0;
+    }
+}
+
+record Segment(Point from, Point to) {
+    int length() {
+        return Math.abs(this.to.x() - this.from.x()) + Math.abs(this.to.y() - this.from.y());
+    }
+}
+
+class Main {
+    static int total(&Batch batch) {
+        int sum = 0;
+        for (String item : batch.items()) {
+            sum += item.length();
+        }
+        return sum + batch.data().length;
+    }
+
+    static void main() {
+        Point p = new Point(3, 4);
+        Console.println("${p.x()} ${p.y()}");
+
+        Named<int> answer = new Named<>("answer", 42);
+        Named<Point> origin = new Named<>("origin", new Point(0, 0));
+        Console.println("${answer.name()} = ${answer.value()}, ${origin.name()} = ${origin.value()}");
+        Console.println(origin.value().x());
+
+        List<String> items = new ArrayList<>();
+        items.add("ab");
+        items.add("cde");
+        Batch batch = new Batch("first", items, new byte[4]);
+        &List<String> view = batch.items();
+        Console.println("${batch.label()} has ${view.size()} items, total ${Main.total(&batch)}");
+
+        Temperature t = new Temperature(21.456);
+        Console.println("${t.celsius()} C is ${t.fahrenheit()} F");
+
+        Segment s = new Segment(new Point(1, 1), new Point(4, 5));
+        Console.println("from ${s.from()} to ${s.to().x()},${s.to().y()}: ${s.length()}");
+
+        // `with` and patterns still reach the components directly.
+        Point moved = p with { x = 10 };
+        Console.println(moved);
+        if (s instanceof Segment(Point(int x1, _), Point(int x2, _))) {
+            Console.println("x from $x1 to $x2");
+        }
+    }
+}

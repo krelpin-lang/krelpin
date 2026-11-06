@@ -5,7 +5,7 @@ package std.net;
  *
  * ```
  * Datagram message = socket.receive(1500);
- * socket.send(message.data, message.sender.toString()); // echo it back
+ * socket.send(message.data(), message.sender().toString()); // echo it back
  * ```
  */
 record Datagram(byte[] data, SocketAddr sender) {

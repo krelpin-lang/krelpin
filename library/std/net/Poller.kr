@@ -23,7 +23,7 @@ import std.util.List;
  * int next = 1;
  * while (true) {
  *     for (Event event : poller.poll(-1)) {
- *         if (event.token == 0) {
+ *         if (event.token() == 0) {
  *             TcpStream? client = listener.tryAccept();
  *             if (client != null) {
  *                 client.register(&mut poller, next, Interest.READABLE);
@@ -32,7 +32,7 @@ import std.util.List;
  *             }
  *             continue;
  *         }
- *         TcpStream? client = clients.remove(&event.token);
+ *         TcpStream? client = clients.remove(&event.token());
  *         if (client == null) {
  *             continue;
  *         }
@@ -43,7 +43,7 @@ import std.util.List;
  *         }
  *         client.flush();
  *         if (!client.atEnd()) {
- *             clients.put(event.token, client); // dropping it closes it
+ *             clients.put(event.token(), client); // dropping it closes it
  *         }
  *     }
  * }

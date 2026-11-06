@@ -488,10 +488,12 @@ impl<'a> Tcx<'a> {
         for component in &record.components {
             let name = component.name;
             sig.components.push(name.name);
+            // Components are read through their accessors outside the
+            // record, like any other encapsulated state.
             sig.fields.entry(name.name).or_insert(FieldSig {
                 name,
                 ty: self.lower_ty(&component.ty),
-                vis: Visibility::Public(name.span),
+                vis: Visibility::Private(name.span),
                 storage: FieldStorage::Instance,
                 owner: def,
             });
@@ -549,6 +551,54 @@ impl<'a> Tcx<'a> {
 
         if sig.variants.iter().all(|variant| variant.fields.is_empty()) {
             self.synthesize_unit_enum_members(sig, def, self_ty);
+        }
+    }
+
+    /// Gives every component of a record an accessor of the same name,
+    /// unless the record declares one: `point.x()`. A component that can
+    /// be copied is returned as a copy, and any other as a reference into
+    /// the record.
+    pub(crate) fn add_record_accessors(&mut self) {
+        for def in (0..self.types.len()).map(DefId::from_index) {
+            let sig = self.sig(def);
+            if sig.kind != AdtKind::Record {
+                continue;
+            }
+            let mut accessors = Vec::new();
+            for name in &sig.components {
+                let declared = sig
+                    .methods
+                    .get(name)
+                    .is_some_and(|methods| methods.iter().any(|method| method.params.is_empty()));
+                if declared {
+                    continue;
+                }
+                let field = &sig.fields[name];
+                let ret = if self.is_copy(&field.ty) {
+                    field.ty.clone()
+                } else {
+                    Ty::Ref {
+                        mutable: false,
+                        ty: Box::new(field.ty.clone()),
+                    }
+                };
+                // What the accessor returns may borrow from the record.
+                let borrows = RetBorrows {
+                    sources: Vec::new(),
+                    elided: true,
+                };
+                accessors.push(MethodSig {
+                    borrows,
+                    ..synthesized_method(field.name, def, Some(ReceiverKind::Ref), ret)
+                });
+            }
+            let sig = &mut self.types[def.index()];
+            for accessor in accessors {
+                sig.methods
+                    .entry(accessor.name.name)
+                    .or_default()
+                    .push(accessor);
+            }
         }
     }
 

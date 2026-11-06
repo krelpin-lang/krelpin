@@ -9,13 +9,31 @@ import std.primitive.Int;
  *
  * ```
  * TcpListener listener = TcpListener.bind("127.0.0.1:0");
- * int port = listener.localAddr().port; // the port the system picked
+ * int port = listener.localAddr().port(); // the port the system picked
  * ```
  *
  * Methods that open a socket take the address as a string instead, so they
  * can also accept a host name like `example.com:80`.
  */
 record SocketAddr(String ip, int port) {
+    /**
+     * Creates the address of port `port` on `ip`, an IPv4 address like
+     * `10.0.0.1` or an IPv6 address like `fe80::1`, without brackets.
+     *
+     * # Throws
+     *
+     * `IllegalArgumentException` if `ip` isn't a numeric IP address or
+     * `port` isn't from 0 to 65535.
+     */
+    SocketAddr {
+        if (port < 0 || port > 65535) {
+            throw new IllegalArgumentException("port $port is outside 0 to 65535");
+        }
+        if (!SocketAddr.isIpv4(ip) && !SocketAddr.isIpv6(ip)) {
+            throw new IllegalArgumentException("`$ip` is not an IP address");
+        }
+    }
+
     /**
      * Parses a numeric address such as `10.0.0.1:80` or `[fe80::1]:8080`.
      * Host names aren't resolved; pass them to `TcpStream.connect` instead.
@@ -55,6 +73,89 @@ record SocketAddr(String ip, int port) {
     /** Returns whether the address is an IPv6 address. */
     boolean isIpv6() {
         return this.ip.contains(":");
+    }
+
+    // Four numbers from 0 to 255, separated by dots.
+    private static boolean isIpv4(&String text) {
+        int parts = 0;
+        int digits = 0;
+        int value = 0;
+        for (char c : text.chars()) {
+            if (c == '.') {
+                if (digits == 0) {
+                    return false;
+                }
+                parts++;
+                digits = 0;
+                value = 0;
+            } else if (c >= '0' && c <= '9') {
+                digits++;
+                value = value * 10 + (c - '0');
+                if (digits > 3 || value > 255) {
+                    return false;
+                }
+            } else {
+                return false;
+            }
+        }
+        return parts == 3 && digits > 0;
+    }
+
+    // Groups of up to four hex digits separated by `:`, with at most one
+    // `::`, possibly an IPv4 address at the end, like `::ffff:1.2.3.4`, and
+    // possibly a zone, like `fe80::1%en0`.
+    private static boolean isIpv6(&String address) {
+        String text = address;
+        int zone = text.indexOf("%");
+        if (zone >= 0) {
+            if (zone == text.length() - 1) {
+                return false;
+            }
+            text = text.substring(0, zone);
+        }
+        if (!text.contains(":") || text.length() > 45) {
+            return false;
+        }
+        int last = text.lastIndexOf(":");
+        String tail = text.substring(last + 1);
+        String head = text.substring(0, last + 1);
+        int groups = 0;
+        if (tail.contains(".")) {
+            if (!SocketAddr.isIpv4(&tail)) {
+                return false;
+            }
+            groups = 2;
+            tail = "";
+        }
+        String rest = head + tail;
+        int compressed = 0;
+        int digits = 0;
+        char previous = ' ';
+        for (char c : rest.chars()) {
+            if (c == ':') {
+                if (previous == ':') {
+                    compressed++;
+                } else if (digits > 0) {
+                    groups++;
+                }
+                digits = 0;
+            } else if ((c >= '0' && c <= '9') || (c >= 'a' && c <= 'f') || (c >= 'A' && c <= 'F')) {
+                digits++;
+                if (digits > 4) {
+                    return false;
+                }
+            } else {
+                return false;
+            }
+            previous = c;
+        }
+        if (digits > 0) {
+            groups++;
+        }
+        if (compressed > 1) {
+            return false;
+        }
+        return compressed == 1 ? groups < 8 : groups == 8;
     }
 
     /**

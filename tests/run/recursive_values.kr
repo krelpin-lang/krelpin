@@ -12,10 +12,10 @@ class Main {
     }
     static int sum(&Node node) {
         int rest = 0;
-        if (node.next instanceof Node next) {
+        if (node.next() instanceof Node next) {
             rest = sum(&next);
         }
-        return node.value + rest;
+        return node.value() + rest;
     }
 
     static void main() {

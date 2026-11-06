@@ -10,6 +10,7 @@ import std.sync.AtomicBool;
 import std.sync.AtomicInt;
 import std.sync.AtomicLong;
 import std.util.HashMap;
+import std.util.List;
 import std.util.Map;
 
 class Main {
@@ -17,6 +18,16 @@ class Main {
     static AtomicInt CORRECT = new AtomicInt(0);
     static AtomicBool START_READING = new AtomicBool(false);
     static AtomicLong RECEIVED = new AtomicLong(0);
+
+    // Waits for events, and fails instead of waiting forever when none
+    // come, so a socket that is never reported ready fails the test.
+    static List<Event> ready(&mut Poller poller) throws IOException {
+        List<Event> events = poller.poll(5000);
+        if (events.isEmpty()) {
+            throw new IOException("nothing was ready after 5 seconds");
+        }
+        return events;
+    }
 
     // Two connections from one thread, used in an interleaved order, so the
     // server has to serve both at once.
@@ -54,7 +65,7 @@ class Main {
             Console.println(e.getMessage());
         }
 
-        int port = listener.localAddr().port;
+        int port = listener.localAddr().port();
         Thread thread = new Thread(() -> Main.clients(port));
         thread.start();
 
@@ -64,8 +75,8 @@ class Main {
         int lines = 0;
         int closed = 0;
         while (closed < 2) {
-            for (Event event : poller.poll(5000)) {
-                if (event.token == Main.LISTENER) {
+            for (Event event : Main.ready(&mut poller)) {
+                if (event.token() == Main.LISTENER) {
                     TcpStream? stream = listener.tryAccept();
                     while (stream != null) {
                         stream.register(&mut poller, next, Interest.READABLE);
@@ -76,7 +87,7 @@ class Main {
                     }
                     continue;
                 }
-                TcpStream? stream = streams.remove(&event.token);
+                TcpStream? stream = streams.remove(&event.token());
                 if (stream == null) {
                     continue;
                 }
@@ -97,7 +108,7 @@ class Main {
                 if (!stream.flush()) {
                     Console.println("a short reply didn't fit");
                 }
-                streams.put(event.token, stream);
+                streams.put(event.token(), stream);
             }
         }
         thread.join();
@@ -107,17 +118,17 @@ class Main {
     static void connectWithoutWaiting() throws IOException {
         Poller poller = Poller.create();
         TcpListener listener = TcpListener.bind("127.0.0.1:0");
-        int port = listener.localAddr().port;
+        int port = listener.localAddr().port();
         TcpStream stream = TcpStream.startConnect("127.0.0.1:$port");
         stream.register(&mut poller, 1, Interest.WRITABLE);
         boolean connected = stream.finishConnect();
         while (!connected) {
-            for (Event event : poller.poll(5000)) {
+            for (Event event : Main.ready(&mut poller)) {
                 connected = stream.finishConnect();
             }
         }
         TcpStream server = listener.accept();
-        boolean same = server.peerAddr().port == stream.localAddr().port;
+        boolean same = server.peerAddr().port() == stream.localAddr().port();
         Console.println("connected without waiting, peer port matches: $same");
 
         // Nothing has been sent, so a read isn't ready; then data arrives.
@@ -127,7 +138,7 @@ class Main {
         server.write("hi");
         int got = -1;
         while (got < 0) {
-            for (Event event : poller.poll(5000)) {
+            for (Event event : Main.ready(&mut poller)) {
                 byte[]? bytes = stream.tryRead(16);
                 if (bytes != null) {
                     got = bytes.length;
@@ -138,7 +149,7 @@ class Main {
         {
             TcpStream gone = server;
         }
-        poller.poll(5000);
+        Main.ready(&mut poller);
         byte[]? end = stream.tryRead(16);
         Console.println("read after close is empty: ${end != null && end.length == 0}, at end: ${stream.atEnd()}");
         stream.deregister(&mut poller);
@@ -153,14 +164,14 @@ class Main {
         int closedPort = 0;
         {
             TcpListener temporary = TcpListener.bind("127.0.0.1:0");
-            closedPort = temporary.localAddr().port;
+            closedPort = temporary.localAddr().port();
         }
         try {
             TcpStream refused = TcpStream.startConnect("127.0.0.1:$closedPort");
             refused.register(&mut poller, 2, Interest.WRITABLE);
             boolean done = false;
             while (!done) {
-                for (Event event : poller.poll(5000)) {
+                for (Event event : Main.ready(&mut poller)) {
                     done = refused.finishConnect();
                 }
             }
@@ -191,7 +202,7 @@ class Main {
     static void queueAndFlush() throws IOException {
         Poller poller = Poller.create();
         TcpListener listener = TcpListener.bind("127.0.0.1:0");
-        int port = listener.localAddr().port;
+        int port = listener.localAddr().port();
         Thread thread = new Thread(() -> Main.drain(port));
         thread.start();
         TcpStream writer = listener.accept();
@@ -204,12 +215,13 @@ class Main {
             writer.queueBytes(&block);
         }
         Console.println("queued ${writer.queued() == size}");
+        // The reader isn't reading yet, so the first flush can only send
+        // what fits in the socket buffers; the rest goes as they drain.
         boolean done = writer.flush();
-        Console.println("first flush sent everything: $done");
         Main.START_READING.set(true);
         writer.register(&mut poller, 1, Interest.WRITABLE);
         while (!done) {
-            for (Event event : poller.poll(5000)) {
+            for (Event event : Main.ready(&mut poller)) {
                 done = writer.flush();
             }
         }
@@ -240,11 +252,11 @@ class Main {
         Console.println("sent at once: ${sender.trySend(&data, receiver.localAddr().toString())}");
         boolean received = false;
         while (!received) {
-            for (Event event : poller.poll(5000)) {
-                Console.println("token ${event.token} readable: ${event.readable}");
+            for (Event event : Main.ready(&mut poller)) {
+                Console.println("token ${event.token()} readable: ${event.readable()}");
                 Datagram? message = receiver.tryReceive(100);
                 if (message != null) {
-                    boolean fromSender = message.sender.port == sender.localAddr().port;
+                    boolean fromSender = message.sender().port() == sender.localAddr().port();
                     Console.println("got ${message.text()} from the sender: $fromSender");
                     received = true;
                 }

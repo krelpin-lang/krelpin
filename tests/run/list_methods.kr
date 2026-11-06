@@ -22,7 +22,7 @@ class Main {
         people.add(new Person("Grace", 30));
         people.add(new Person("Alan", 36));
         people.add(new Person("Linus", 30));
-        people.sort((a, b) -> a.age.compareTo(&b.age));
+        people.sort((a, b) -> a.age().compareTo(&b.age()));
         Console.println(&people);
         List<String> empty = new ArrayList<>();
         Console.println(empty.first() + " " + empty.last());

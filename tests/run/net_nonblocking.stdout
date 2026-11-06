@@ -11,7 +11,6 @@ deregistered: true
 deregistering twice throws
 refused connection throws: true
 queued true
-first flush sent everything: false
 reader got all of it: true, left: 0
 tryWrite at the end sends 0
 tryWrite: offset 1048577 is outside 0..1048576

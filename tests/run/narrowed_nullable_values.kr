@@ -37,8 +37,8 @@ class Main {
         // Fields, nested fields and methods of a record narrowed from `R?`.
         Message? message = Main.message(true);
         if (message != null) {
-            Console.println("${message.data.length} bytes from ${message.from.ip}");
-            Console.println("text ${message.text()}, sender ${message.from.show()}");
+            Console.println("${message.data().length} bytes from ${message.from().ip()}");
+            Console.println("text ${message.text()}, sender ${message.from().show()}");
         }
         Console.println("none: ${Main.message(false) == null}");
 

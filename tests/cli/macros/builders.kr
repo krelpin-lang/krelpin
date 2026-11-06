@@ -11,7 +11,7 @@ import std.util.List;
 macro Builder(TokenStream args, TokenStream input) {
     Item item = Item.parse(&input);
     List<String> required = Options.required(&args);
-    String owner = item.name().text;
+    String owner = item.name().text();
 
     TokenStream params = new TokenStream();
     TokenStream assigns = new TokenStream();
@@ -24,7 +24,7 @@ macro Builder(TokenStream args, TokenStream input) {
         if (!field.isField()) {
             continue;
         }
-        String name = field.name().text;
+        String name = field.name().text();
         boolean mandatory = required.contains(&name);
         if (!mandatory && !field.hasAttribute("Default")) {
             throw new MacroError("`" + name + "` needs `@Default(...)` or must be required",
@@ -110,7 +110,7 @@ macro Trace(TokenStream args, TokenStream input) {
         throw new MacroError("`@Trace` needs a method with a body");
     }
     Quote body = new Quote("Console.println(#label); #body");
-    body.string("label", "-> " + method.name().text);
+    body.string("label", "-> " + method.name().text());
     body.set("body", &method.body());
     method.setBody(&body.render());
     return method.toTokens();
@@ -126,7 +126,7 @@ class Options {
                 || !args.get(2).isLiteral()) {
             throw new MacroError("write `@Builder(required = \"a, b\")`", &args.get(0));
         }
-        String list = args.get(2).text;
+        String list = args.get(2).text();
         for (String part : list.substring(1, list.length() - 1).split(",")) {
             String name = part.trim();
             if (!name.isEmpty()) {

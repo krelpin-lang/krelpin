@@ -14,7 +14,7 @@ import std.io.IOException;
  * UdpSocket socket = UdpSocket.bind("127.0.0.1:0");
  * socket.sendText("ping", "127.0.0.1:9000");
  * Datagram reply = socket.receive(1500);
- * Console.println("${reply.sender} answered ${reply.text()}");
+ * Console.println("${reply.sender()} answered ${reply.text()}");
  * ```
  *
  * The socket is closed when it is dropped.

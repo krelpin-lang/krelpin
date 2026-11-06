@@ -1,0 +1,26 @@
+import std.util.ArrayList;
+import std.util.List;
+
+record Batch(List<String> items) {}
+
+class Main {
+    // An accessor of a component that can't be copied lends it out, so the
+    // record stays borrowed while the reference is used.
+    static void replacedWhileLent() {
+        Batch batch = new Batch(new ArrayList<>());
+        &List<String> items = batch.items();
+        batch = new Batch(new ArrayList<>());
+        Console.println(items.size());
+    }
+
+    static &List<String> escapes() {
+        Batch batch = new Batch(new ArrayList<>());
+        return batch.items();
+    }
+
+    static &List<String> fromArgument(&Batch batch) {
+        return batch.items();
+    }
+
+    static void main() {}
+}

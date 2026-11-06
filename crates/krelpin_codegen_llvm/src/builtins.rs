@@ -115,6 +115,14 @@ impl FnCx<'_, '_, '_> {
             || (kind == AdtKind::Enum && builtin.receiver.is_some())
             || (kind == AdtKind::Enum && name == "values")
             || (kind == AdtKind::Record && matches!(name, "equals" | "hashCode"))
+            || (kind == AdtKind::Record
+                && builtin.receiver.is_some()
+                && self
+                    .cx
+                    .tcx
+                    .sig(owner)
+                    .components
+                    .contains(&Symbol::intern(name)))
         {
             return self.adt_builtin(name, builtin);
         }
@@ -170,6 +178,34 @@ impl FnCx<'_, '_, '_> {
             return self.table_builtin(owner, name, builtin);
         }
         false
+    }
+
+    /// The accessor of a record component: a copy of the component, or a
+    /// reference to it when it can't be copied.
+    fn record_accessor(
+        &mut self,
+        def: DefId,
+        args: &[Ty],
+        index: usize,
+        builtin: &Builtin,
+    ) -> bool {
+        let ty = builtin.self_ty.clone();
+        let fields = self.cx.record_fields(def, args);
+        let field_ty = fields[index].1.clone();
+        let record_ll = self.ll(&ty);
+        let address = self.assign(format!(
+            "getelementptr inbounds {record_ll}, ptr %a0, i32 0, i32 {index}"
+        ));
+        let address = self.indirect_slot(&ty, &field_ty, address);
+        let ret = self.ret_ty.clone();
+        if let Ty::Ref { .. } = ret {
+            self.ret(&address, &ret);
+        } else {
+            let value = self.load(&field_ty, &address);
+            let copy = self.copy_value(&value, &field_ty);
+            self.ret(&copy, &field_ty);
+        }
+        true
     }
 
     fn default_to_string(&mut self, builtin: &Builtin) -> String {
@@ -299,6 +335,17 @@ impl FnCx<'_, '_, '_> {
 
     fn adt_builtin(&mut self, name: &str, builtin: &Builtin) -> bool {
         let ty = builtin.self_ty.clone();
+        if let Shape::Record(def, args) = self.cx.shape(&ty)
+            && let Some(index) = self
+                .cx
+                .tcx
+                .sig(def)
+                .components
+                .iter()
+                .position(|c| c.as_str() == name)
+        {
+            return self.record_accessor(def, &args, index, builtin);
+        }
         match (self.cx.shape(&ty), name) {
             (Shape::Enum(..), "ordinal") => {
                 let enum_ll = self.ll(&ty);

@@ -108,8 +108,8 @@ final class Quote {
         TokenStream out = new TokenStream();
         for (int k = 0; k < parsed.size(); k++) {
             Token token = parsed.get(k);
-            if (token.isIdent() && token.text.startsWith(Quote.MARKER)) {
-                String name = token.text.substring(Quote.MARKER.length());
+            if (token.isIdent() && token.text().startsWith(Quote.MARKER)) {
+                String name = token.text().substring(Quote.MARKER.length());
                 (&TokenStream)? value = this.values.get(&name);
                 if (value != null) {
                     out.addAll(value);

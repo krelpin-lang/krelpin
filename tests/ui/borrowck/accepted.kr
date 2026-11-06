@@ -60,7 +60,7 @@ class Main {
         counter.bump();
         User user = new User("ada", "a@x", 1L);
         User renamed = user with { email = "b@x" };
-        String name = user.name + renamed.name;
+        String name = user.name() + renamed.name();
         List<String> names = new ArrayList<>();
         names.add(name);
         names.add(name);

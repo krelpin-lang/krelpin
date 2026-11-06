@@ -33,6 +33,9 @@ pub(crate) struct FnCtxt<'a, 'tcx> {
     /// Whether this is the body of an `async` method, where `await` is
     /// allowed. Lambdas inside it aren't.
     pub(crate) in_async: bool,
+    /// The field an assignment is checking as its target, which reports a
+    /// record component as unassignable rather than as private.
+    pub(crate) assigning: Option<krelpin_span::Span>,
 }
 
 impl Tcx<'_> {
@@ -270,6 +273,7 @@ impl<'a, 'tcx> FnCtxt<'a, 'tcx> {
             results: TypeckResults::default(),
             delegation: None,
             in_async: false,
+            assigning: None,
         }
     }
 

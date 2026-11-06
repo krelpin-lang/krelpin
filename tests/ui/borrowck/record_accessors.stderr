@@ -1,0 +1,21 @@
+error: cannot assign to `batch` because it is borrowed
+  --> tests/ui/borrowck/record_accessors.kr:12:9
+   |
+11 |         &List<String> items = batch.items();
+   |                               ------------- shared borrow of `batch` happens here
+12 |         batch = new Batch(new ArrayList<>());
+   |         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ `batch` is assigned here while it is borrowed
+13 |         Console.println(items.size());
+   |                         ------------ the borrow is used later here
+
+error: cannot let a reference to `batch` escape the method
+  --> tests/ui/borrowck/record_accessors.kr:18:16
+   |
+18 |         return batch.items();
+   |         --------------------- the reference is returned here
+   |                ^^^^^^^^^^^^^ `batch` is borrowed here
+   |
+   = note: `batch` stops existing when the method ends
+
+error: aborting due to 2 previous errors
+

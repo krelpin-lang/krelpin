@@ -559,15 +559,24 @@ impl FnCtxt<'_, '_> {
         if self.owner == owner {
             return;
         }
-        self.emit(
-            Diagnostic::error(format!(
-                "{what} `{}` of `{}` is {level}",
-                name.name,
-                self.type_name(owner)
-            ))
-            .with_span(name.span)
-            .with_label(format!("{level} {what}")),
-        );
+        let mut diagnostic = Diagnostic::error(format!(
+            "{what} `{}` of `{}` is {level}",
+            name.name,
+            self.type_name(owner)
+        ))
+        .with_span(name.span)
+        .with_label(format!("{level} {what}"));
+        let component = what == "field" && self.tcx.sig(owner).components.contains(&name.name);
+        if component && self.assigning == Some(name.span) {
+            return;
+        }
+        if component {
+            diagnostic = diagnostic.with_help(format!(
+                "read the component with its accessor: `{}()`",
+                name.name
+            ));
+        }
+        self.emit(diagnostic);
     }
 
     fn check_method_call(
@@ -1165,7 +1174,9 @@ impl FnCtxt<'_, '_> {
                 if *safe {
                     self.error(expr.span, "cannot assign through `?.`");
                 }
+                self.assigning = Some(name.span);
                 let (ty, field) = self.field_access(base, *name, *safe);
+                self.assigning = None;
                 self.results.expr_types.insert(expr.span, ty.clone());
                 if let Some(field) = field {
                     self.check_field_assignable(&field, *name);

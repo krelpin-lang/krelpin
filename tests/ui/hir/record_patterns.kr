@@ -13,7 +13,7 @@ class Main {
     }
 
     static boolean sameStart(Line a, Line b) {
-        return a.from == b.from;
+        return a.from() == b.from();
     }
 
     static double originX(Object any) {

@@ -30,7 +30,7 @@ class MacroError extends RuntimeException {
     /** Creates an error reported at the token `at`. */
     MacroError(String message, &Token at) {
         super(message);
-        this.span = at.span;
+        this.span = at.span();
     }
 
     /** Returns where the compiler reports this error. */

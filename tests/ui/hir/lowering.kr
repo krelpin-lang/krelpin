@@ -20,7 +20,7 @@ class Register {
 
     mut void track(Payment payment) {
         switch (payment) {
-            case Card(String number, Money amount) when amount.cents > 0 -> {
+            case Card(String number, Money amount) when amount.cents() > 0 -> {
                 this.history.add(amount);
             }
             case Card(_, _) -> {}
@@ -33,7 +33,7 @@ class Register {
     long total() {
         long sum = 0;
         for (Money money : this.history) {
-            sum += money.cents;
+            sum += money.cents();
         }
         for (int i = 0; i < this.count; i++) {
             if (i > 10) {
@@ -45,7 +45,7 @@ class Register {
 
     String describe(Payment payment) {
         return switch (payment) {
-            case Card(_, Money amount) -> "card " + amount.currency.length();
+            case Card(_, Money amount) -> "card " + amount.currency().length();
             case Cash(_) -> "cash";
             case Free -> this.label("free", "no", "charge");
         };

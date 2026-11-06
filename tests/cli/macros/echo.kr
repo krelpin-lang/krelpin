@@ -7,12 +7,12 @@ import std.macros.TokenStream;
 
 macro Echo(TokenStream args, TokenStream input) {
     Item item = Item.parse(&input);
-    String summary = item.kind() + " " + item.name().text + ":";
+    String summary = item.kind() + " " + item.name().text() + ":";
     for (&Member member : item.members()) {
-        summary = summary + " " + member.kind() + "(" + member.name().text + ")";
+        summary = summary + " " + member.kind() + "(" + member.name().text() + ")";
     }
     for (&Member component : item.components()) {
-        summary = summary + " component(" + component.type() + " " + component.name().text + ")";
+        summary = summary + " component(" + component.type() + " " + component.name().text() + ")";
     }
     Console.println(summary);
     TokenStream output = item.toTokens();
@@ -24,7 +24,7 @@ macro Echo(TokenStream args, TokenStream input) {
 
 macro Inspect(TokenStream args, TokenStream input) {
     Member member = Member.parse(&input);
-    Console.println(member.kind() + " " + member.name().text + " type=[" + member.type()
+    Console.println(member.kind() + " " + member.name().text() + " type=[" + member.type()
         + "] params=[" + member.params() + "] init=[" + member.initializer() + "]");
     return member.toTokens();
 }

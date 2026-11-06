@@ -34,7 +34,7 @@ macro Getters(TokenStream args, TokenStream item) {
                 type.remove(0);
             }
             if (!type.isEmpty() && !type.get(0).isIdent("static")) {
-                String upper = name.text.substring(0, 1).toUpperCase() + name.text.substring(1);
+                String upper = name.text().substring(0, 1).toUpperCase() + name.text().substring(1);
                 getters.addAll(&type);
                 getters.add(Token.ident("get" + upper));
                 getters.append("() { return this.");
@@ -55,7 +55,7 @@ macro Trace(TokenStream args, TokenStream item) {
         throw new MacroError("`@Trace` goes on methods");
     }
     Token name = item.get(paren - 1);
-    String label = args.isEmpty() ? Token.string(name.text).text : args.get(0).text;
+    String label = args.isEmpty() ? Token.string(name.text()).text() : args.get(0).text();
     item.insertAll(body + 1, &TokenStream.parse("Console.println(\"-> \" + " + label + ");"));
     return item;
 }
@@ -68,7 +68,7 @@ macro Companion(TokenStream args, TokenStream item) {
     }
     TokenStream out = new TokenStream();
     out.addAll(&item);
-    out.append("final class " + name.text + "Companion { static String greet() { return "
-        + args.get(0).text + " + \" from " + name.text + "\"; } }");
+    out.append("final class " + name.text() + "Companion { static String greet() { return "
+        + args.get(0).text() + " + \" from " + name.text() + "\"; } }");
     return out;
 }

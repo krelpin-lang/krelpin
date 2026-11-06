@@ -1711,12 +1711,11 @@ fn records_are_built_from_their_components() {
 
 #[test]
 fn results_record_callees_and_fields() {
-    let src = "record Money(long cents, String currency);\n\
-               class Main { long run(Money m, String... tags) {\n\
-               \x20   this.log(\"a\", \"b\");\n\
-               \x20   return m.cents + m.currency.length();\n\
-               }\n\
-               void log(String... tags) {} }";
+    let src = "record Money(long cents, String currency) { long run(String... tags) {\n\
+               \x20   Main.log(\"a\", \"b\");\n\
+               \x20   return this.cents + this.currency.length();\n\
+               } }\n\
+               class Main { static void log(String... tags) {} }";
     let (results, diagnostics, source_map) = check_str(src);
     assert!(diagnostics.is_empty(), "{diagnostics:?}");
     let named = |name: &str| {
@@ -1794,8 +1793,12 @@ fn record_components_never_change() {
     };
     ok(&src(
         "User user2 = new User(\"Ali\", 0); boolean fresh = user2.isNew(); \
-         String name = user.name;",
+         String name = user.name(); long visits = user.visits();",
     ));
+    assert_eq!(
+        errors(&src("String name = user.name;")),
+        ["field `name` of `User` is private"]
+    );
     assert_eq!(
         errors(&src("user.visits = 3;")),
         ["cannot assign to `visits`, a component of the record `User`"]

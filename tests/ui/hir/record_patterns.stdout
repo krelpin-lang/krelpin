@@ -6,7 +6,7 @@ fn Main.width(line_0: Line) -> double {
 }
 
 fn Main.sameStart(a_0: Line, b_1: Line) -> boolean {
-    return Equatable::equals(&a_0.from, &b_1.from);
+    return Equatable::equals(&Line::from(&a_0), &Line::from(&b_1));
 }
 
 fn Main.originX(any_0: Object) -> double {

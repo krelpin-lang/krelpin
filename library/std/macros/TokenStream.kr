@@ -167,7 +167,7 @@ final class TokenStream implements Iterable<Token> {
      */
     int indexOf(String text, int from) {
         for (int i = from; i < this.size(); i++) {
-            if (this.get(i).text.equals(&text)) {
+            if (this.get(i).text().equals(&text)) {
                 return i;
             }
         }
@@ -177,7 +177,7 @@ final class TokenStream implements Iterable<Token> {
     /** Returns the index of the last token whose text is `text`, or `-1`. */
     int lastIndexOf(String text) {
         for (int i = this.size() - 1; i >= 0; i--) {
-            if (this.get(i).text.equals(&text)) {
+            if (this.get(i).text().equals(&text)) {
                 return i;
             }
         }
@@ -197,21 +197,21 @@ final class TokenStream implements Iterable<Token> {
      * brackets.
      */
     int matching(int open) {
-        String opening = this.get(open).text;
+        String opening = this.get(open).text();
         String closing = closer(opening);
         int depth = 0;
         for (int i = open; i < this.size(); i++) {
             Token token = this.get(i);
-            if (token.kind != TokenKind.PUNCT) {
+            if (token.kind() != TokenKind.PUNCT) {
                 continue;
             }
-            if (token.text.equals(&opening)) {
+            if (token.text().equals(&opening)) {
                 depth++;
-            } else if (token.text.equals(&closing)) {
+            } else if (token.text().equals(&closing)) {
                 depth--;
-            } else if (opening.equals(&"<") && token.text.equals(&">>")) {
+            } else if (opening.equals(&"<") && token.text().equals(&">>")) {
                 depth = depth - 2;
-            } else if (opening.equals(&"<") && token.text.equals(&">>>")) {
+            } else if (opening.equals(&"<") && token.text().equals(&">>>")) {
                 depth = depth - 3;
             } else {
                 continue;
@@ -240,7 +240,7 @@ final class TokenStream implements Iterable<Token> {
             if (i > 0) {
                 text = text + " ";
             }
-            text = text + this.get(i).text;
+            text = text + this.get(i).text();
         }
         return text;
     }

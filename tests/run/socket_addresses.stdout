@@ -1,0 +1,17 @@
+ok 127.0.0.1:80
+rejected: `nonsense` is not an IP address
+rejected: port 99999 is outside 0 to 65535
+rejected: `256.1.1.1` is not an IP address
+rejected: `1.2.3` is not an IP address
+ok [::1]:443
+ok [fe80::1:2]:8080
+ok [2001:db8:0:0:0:0:2:1]:1
+ok [::ffff:192.168.0.1]:1
+rejected: `1::2::3` is not an IP address
+rejected: `[::1]` is not an IP address
+rejected: `12345::` is not an IP address
+ok [fe80::1%en0]:1
+rejected: `fe80::1%` is not an IP address
+parsed [::1]:8080 port 8080
+parsed 10.0.0.1:65535 port 65535
+rejected: `host.example` is not an IP address

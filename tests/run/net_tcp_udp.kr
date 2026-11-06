@@ -26,14 +26,14 @@ class Main {
     static void main() throws IOException {
         TcpListener listener = TcpListener.bind("127.0.0.1:0");
         SocketAddr address = listener.localAddr();
-        int port = address.port;
-        Console.println("ip ${address.ip}, port is positive: ${port > 0}");
+        int port = address.port();
+        Console.println("ip ${address.ip()}, port is positive: ${port > 0}");
 
         Thread thread = new Thread(() -> Main.client(port));
         thread.start();
 
         TcpStream connection = listener.accept();
-        Console.println("peer ip: ${connection.peerAddr().ip}");
+        Console.println("peer ip: ${connection.peerAddr().ip()}");
         for (int i = 0; i < 2; i++) {
             String? line = connection.readLine();
             connection.write("echo: $line\n");
@@ -50,7 +50,7 @@ class Main {
         UdpSocket b = UdpSocket.bind("127.0.0.1:0");
         a.sendText("ping", b.localAddr().toString());
         Datagram message = b.receive(1500);
-        Console.println("udp: ${message.text()} from a: ${message.sender.port == a.localAddr().port}");
+        Console.println("udp: ${message.text()} from a: ${message.sender().port() == a.localAddr().port()}");
 
         try {
             TcpStream.connect("not an address");

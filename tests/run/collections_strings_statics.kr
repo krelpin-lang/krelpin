@@ -33,7 +33,7 @@ class Main {
             return "text of length " + text.length();
         }
         if (value instanceof Person person) {
-            return "person " + person.name;
+            return "person " + person.name();
         }
         return "something else: " + value;
     }
