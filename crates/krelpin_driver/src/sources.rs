@@ -1,12 +1,11 @@
 //! Finding, reading and checking the source files of the crate being built
 //! and of its source library dependencies.
 //!
-//! A crate is either a single file or a source directory. In a source
-//! directory a file's package follows from where the file is: `net/http/Client.kr`
-//! is in `net.http`, and the files at the root are in the default package.
-//! A library's packages are under its name, the way `std` is laid out:
-//! with `--dep tide=DIR`, `DIR/net/TcpStream.kr` is in `tide.net` and the
-//! files at the root of `DIR` are in `tide`.
+//! A crate is either a single file or a source directory. A source directory
+//! is the package named after its crate, the way `std` is laid out, and a
+//! file's package follows from where the file is: in the crate `tide`,
+//! `net/TcpStream.kr` is in `tide.net` and the files at the root are in
+//! `tide`. The same holds for a library passed with `--dep tide=DIR`.
 
 use std::path::{Path, PathBuf};
 
@@ -55,9 +54,9 @@ impl Dep {
 /// Where a crate's source comes from, and which package its root holds.
 pub(crate) struct Root<'a> {
     pub path: &'a Path,
-    /// The package of the files at the root of a source directory: the
-    /// library name for a library, nothing for a program.
-    pub package: Option<&'a str>,
+    /// The package of the files at the root of a source directory, which
+    /// is the name of the crate.
+    pub package: &'a str,
 }
 
 /// The files of a crate, lexed.
@@ -124,7 +123,7 @@ pub(crate) fn parse(lexed: Lexed, root: &Root<'_>, dcx: &DiagCtxt) -> Vec<Compil
 pub(crate) fn load_dep(dep: &Dep, sess: &Session) -> Vec<CompilationUnit> {
     let root = Root {
         path: &dep.dir,
-        package: Some(&dep.name),
+        package: &dep.name,
     };
     match lex(&root, sess) {
         Some(lexed) => parse(lexed, &root, &sess.dcx),
@@ -138,11 +137,11 @@ fn check_package(
     dir: &Path,
     path: &Path,
     unit: &CompilationUnit,
-    root_package: Option<&str>,
+    root_package: &str,
     dcx: &DiagCtxt,
 ) {
     let relative = path.strip_prefix(dir).unwrap_or(path);
-    let mut segments: Vec<String> = root_package.into_iter().map(str::to_string).collect();
+    let mut segments: Vec<String> = vec![root_package.to_string()];
     if let Some(parent) = relative.parent() {
         for component in parent.components() {
             let name = component.as_os_str().to_string_lossy().into_owned();
@@ -168,34 +167,27 @@ fn check_package(
         .package
         .as_ref()
         .map_or(unit.span.shrink_to_lo(), |package| package.span);
-    let diagnostic = if expected.is_empty() {
-        Diagnostic::error(format!(
-            "`{}` is at the root of the source directory, so it must not declare a package",
-            relative.display()
-        ))
-        .with_span(span)
-        .with_help(format!(
-            "remove the `package` line, or move the file into `{}`",
-            declared.replace('.', "/")
-        ))
+    let help = if declared.is_empty() {
+        format!("add `package {expected};` at the top of the file")
+    } else if let Some(rest) = declared.strip_prefix(&format!("{root_package}.")) {
+        format!(
+            "declare `package {expected};`, or move the file to `{}`",
+            dir.join(rest.replace('.', "/")).display()
+        )
+    } else if declared == root_package {
+        format!("declare `package {expected};`, or move the file to the root of the directory")
     } else {
-        Diagnostic::error(format!(
-            "`{}` must be in the package `{expected}`",
-            relative.display()
-        ))
-        .with_span(span)
-        .with_note(format!(
-            "the package of a file follows from its directory in `{}`",
-            dir.display()
-        ))
-        .with_help(if declared.is_empty() {
-            format!("add `package {expected};` at the top of the file")
-        } else {
-            format!(
-                "declare `package {expected};`, or move the file to the directory of `{declared}`"
-            )
-        })
+        format!("declare `package {expected};`")
     };
+    let diagnostic = Diagnostic::error(format!(
+        "`{}` must be in the package `{expected}`",
+        relative.display()
+    ))
+    .with_span(span)
+    .with_note(format!(
+        "a source directory holds the package `{root_package}`, and each subdirectory one of its subpackages"
+    ))
+    .with_help(help);
     dcx.emit(diagnostic);
 }
 

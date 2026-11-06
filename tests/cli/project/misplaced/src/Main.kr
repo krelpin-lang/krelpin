@@ -1,3 +1,5 @@
+package misplaced;
+
 class Main {
     static void main() {}
 }

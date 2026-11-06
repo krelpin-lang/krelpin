@@ -264,38 +264,50 @@ fn checks_the_packages_of_source_directories() {
     assert!(!misplaced.status.success());
     let text = stderr(&misplaced);
     assert!(
-        text.contains("error: `tools/Tool.kr` must be in the package `tools`"),
+        text.contains("error: `tools/Tool.kr` must be in the package `misplaced.tools`"),
         "{text}"
     );
     assert!(
         text.contains(
-            "help: declare `package tools;`, or move the file to the directory of `util`"
+            "help: declare `package misplaced.tools;`, or move the file to \
+             `tests/cli/project/misplaced/src/util`"
         ),
         "{text}"
     );
 
     let claims = krelpinc(&[
-        "tests/cli/project/claims/src",
+        "tests/cli/project/claims/Main.kr",
         "--dep",
         "greet=tests/cli/project/greet/src",
         "--emit=metadata",
     ]);
     let text = stderr(&claims);
     assert!(
-        text.contains("error: the package `greet` belongs to the library `greet`"),
+        text.contains("error: the package `greet.copy` belongs to the library `greet`"),
         "{text}"
     );
 
-    // A library's files are under its name, so its root can't be a program's.
-    let as_library = krelpinc(&[
+    // A source directory holds the package named after its crate.
+    let renamed = krelpinc(&[
         "tests/cli/project/app/src",
-        "--crate-type",
-        "lib",
+        "--crate-name",
+        "other",
         "--emit=metadata",
     ]);
-    let text = stderr(&as_library);
+    let text = stderr(&renamed);
     assert!(
-        text.contains("error: `Main.kr` must be in the package `app`"),
+        text.contains("error: `Main.kr` must be in the package `other`"),
+        "{text}"
+    );
+    let same_name = krelpinc(&[
+        "tests/cli/project/greet/src",
+        "--dep",
+        "greet=tests/cli/project/greet/src",
+        "--emit=metadata",
+    ]);
+    let text = stderr(&same_name);
+    assert!(
+        text.contains("error: the package `greet` belongs to the library `greet`"),
         "{text}"
     );
 

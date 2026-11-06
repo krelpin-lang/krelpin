@@ -1,4 +1,6 @@
-import util.Counter;
+package app;
+
+import app.util.Counter;
 import greet.Greeter;
 import greet.fmt.Shout;
 

@@ -1,3 +1,5 @@
+package greet.copy;
+
 class Main {
     static void main() {}
 }

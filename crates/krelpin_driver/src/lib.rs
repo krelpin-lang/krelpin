@@ -78,7 +78,7 @@ pub fn run(args: &Args, sess: &Session) {
     let crate_name = args.crate_name();
     let root = sources::Root {
         path: input,
-        package: config.builds_library().then_some(crate_name.as_str()),
+        package: crate_name.as_str(),
     };
     let timer = Timer::new(config.time_passes);
     let emits = args.emits();

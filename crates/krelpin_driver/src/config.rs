@@ -145,13 +145,6 @@ impl Config {
             || self.crate_types.contains(&CrateType::ProcMacro)
     }
 
-    /// Returns whether the crate is a library, whose packages are under its name.
-    pub fn builds_library(&self) -> bool {
-        self.crate_types
-            .iter()
-            .any(|crate_type| !matches!(crate_type, CrateType::Bin | CrateType::ProcMacro))
-    }
-
     pub fn proc_macro(&self) -> bool {
         self.crate_types.contains(&CrateType::ProcMacro)
     }
