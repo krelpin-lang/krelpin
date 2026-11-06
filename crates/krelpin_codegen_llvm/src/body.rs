@@ -260,6 +260,20 @@ impl<'f, 'c, 'a, 'tcx> BodyCx<'f, 'c, 'a, 'tcx> {
         }
     }
 
+    /// A local narrowed from `R?` to `R` keeps its `{ i1, R }` slot. This
+    /// returns the address and type of the `R` inside it, and leaves any
+    /// other place as it is.
+    fn narrowed(&mut self, address: String, ty: Ty) -> (String, Ty) {
+        if !matches!(self.fx.cx.shape(&ty), Shape::NullableValue(_)) {
+            return (address, ty);
+        }
+        let nullable_ll = self.fx.ll(&ty);
+        let payload = self.fx.assign(format!(
+            "getelementptr inbounds {nullable_ll}, ptr {address}, i32 0, i32 1"
+        ));
+        (payload, ty.non_null().clone())
+    }
+
     fn place_addr(&mut self, place: &Place) -> (String, Ty) {
         let (mut address, mut ty) = match place.base {
             PlaceBase::Local(local) => (
@@ -277,6 +291,9 @@ impl<'f, 'c, 'a, 'tcx> BodyCx<'f, 'c, 'a, 'tcx> {
         let mut variant: Option<usize> = None;
         for elem in &place.projection {
             let base = ty.non_null().clone();
+            if matches!(elem, PlaceElem::Field { .. } | PlaceElem::Variant { .. }) {
+                (address, ty) = self.narrowed(address, ty);
+            }
             match elem {
                 PlaceElem::Deref => {
                     address = self.fx.assign(format!("load ptr, ptr {address}"));
@@ -515,7 +532,13 @@ impl<'f, 'c, 'a, 'tcx> BodyCx<'f, 'c, 'a, 'tcx> {
         Some(match rvalue {
             Rvalue::Use(operand) => self.operand_owned(operand),
             Rvalue::Ref { place, mutable } => {
-                let (address, ty) = self.place_addr(place);
+                let (mut address, mut ty) = self.place_addr(place);
+                // `&value` where `value` was narrowed to non-null lends the `R`.
+                if let Ty::Ref { ty: pointee, .. } = dest
+                    && !matches!(self.fx.cx.shape(pointee), Shape::NullableValue(_))
+                {
+                    (address, ty) = self.narrowed(address, ty);
+                }
                 Val {
                     ty: Ty::Ref {
                         mutable: *mutable,
@@ -566,6 +589,7 @@ impl<'f, 'c, 'a, 'tcx> BodyCx<'f, 'c, 'a, 'tcx> {
             }
             Rvalue::Discriminant(place) => {
                 let (address, ty) = self.place_addr(place);
+                let (address, ty) = self.narrowed(address, ty);
                 let enum_ll = self.fx.ll(ty.non_null());
                 let tag = self.fx.assign(format!(
                     "getelementptr inbounds {enum_ll}, ptr {address}, i32 0, i32 0"

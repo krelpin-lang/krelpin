@@ -1,0 +1,7 @@
+2 bytes from 10.0.0.1
+text hi, sender 10.0.0.1:80
+none: true
+no shape
+circle 4, circle 4
+square 7, square 7
+empty, empty

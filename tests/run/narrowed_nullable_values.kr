@@ -1,0 +1,60 @@
+record Addr(String ip, int port) {
+    String show() {
+        return "${this.ip}:${this.port}";
+    }
+}
+
+record Message(byte[] data, Addr from) {
+    String? text() {
+        return String.fromUtf8(&this.data);
+    }
+}
+
+enum Shape { Circle(int r), Square(int side), Empty }
+
+class Main {
+    static Message? message(boolean some) {
+        if (!some) {
+            return null;
+        }
+        byte[] data = "hi".bytes();
+        return new Message(data, new Addr("10.0.0.1", 80));
+    }
+
+    static Shape? shape(int n) {
+        return n == 0 ? null : n == 1 ? Shape.Circle(4) : n == 2 ? Shape.Square(7) : Shape.Empty;
+    }
+
+    static String describe(&Shape shape) {
+        return switch (shape) {
+            case Circle(int r) -> "circle $r";
+            case Square(int side) -> "square $side";
+            case Empty -> "empty";
+        };
+    }
+
+    static void main() {
+        // Fields, nested fields and methods of a record narrowed from `R?`.
+        Message? message = Main.message(true);
+        if (message != null) {
+            Console.println("${message.data.length} bytes from ${message.from.ip}");
+            Console.println("text ${message.text()}, sender ${message.from.show()}");
+        }
+        Console.println("none: ${Main.message(false) == null}");
+
+        // Switching on and lending an enum narrowed from `E?`.
+        for (int i = 0; i < 4; i++) {
+            Shape? shape = Main.shape(i);
+            if (shape != null) {
+                String name = switch (shape) {
+                    case Circle(int r) -> "circle $r";
+                    case Square(int side) -> "square $side";
+                    case Empty -> "empty";
+                };
+                Console.println("$name, ${Main.describe(&shape)}");
+            } else {
+                Console.println("no shape");
+            }
+        }
+    }
+}
