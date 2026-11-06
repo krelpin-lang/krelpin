@@ -1,0 +1,22 @@
+class Main {
+    static int? maybe(int n) {
+        return n == 0 ? null : n;
+    }
+
+    static String? name(boolean present) {
+        return present ? "krelp" : null;
+    }
+
+    static void main() {
+        int? two = Main.maybe(2);
+        int? none = Main.maybe(0);
+        Console.println("${two == 2} ${two != 2} ${two == 3} ${none == 2} ${none != 2}");
+        Console.println("${2 == two} ${3 != two} ${2 == none}");
+        Console.println("${two == Main.maybe(2)} ${two == none} ${none == Main.maybe(0)} ${none != two}");
+
+        String? present = Main.name(true);
+        String? absent = Main.name(false);
+        Console.println("${present == "krelp"} ${absent == "krelp"} ${"krelp" == absent} ${absent != "x"}");
+        Console.println("${present == Main.name(true)} ${absent == Main.name(false)} ${present == absent}");
+    }
+}

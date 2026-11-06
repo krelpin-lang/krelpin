@@ -198,6 +198,21 @@ impl<'h> Builder<'_, 'h, '_> {
                 lhs,
                 rhs,
                 negated,
+            } if may_be_null(&lhs.ty) || may_be_null(&rhs.ty) => {
+                self.lower_nullable_equals(dest.clone(), callee, lhs, rhs, span);
+                if *negated {
+                    self.assign(
+                        dest.clone(),
+                        Rvalue::Unary(UnaryOp::Not, Operand::Copy(dest)),
+                        span,
+                    );
+                }
+            }
+            ExprKind::Equals {
+                callee,
+                lhs,
+                rhs,
+                negated,
             } => {
                 let args = vec![self.as_operand(lhs), self.as_operand(rhs)];
                 if *negated {
@@ -509,6 +524,16 @@ impl<'h> Builder<'_, 'h, '_> {
                     );
                 }
             }
+            BinOp::Eq | BinOp::Ne if self.compares_nullable(&lhs.ty, &rhs.ty) => {
+                self.lower_nullable_eq(dest.clone(), lhs, rhs, span);
+                if op == BinOp::Ne {
+                    self.assign(
+                        dest.clone(),
+                        Rvalue::Unary(UnaryOp::Not, Operand::Copy(dest)),
+                        span,
+                    );
+                }
+            }
             _ => {
                 let lhs_operand = self.as_operand(lhs);
                 let rhs_operand = self.as_operand(rhs);
@@ -516,6 +541,101 @@ impl<'h> Builder<'_, 'h, '_> {
                 self.assign(dest, Rvalue::Binary(op, lhs_operand, rhs_operand), span);
             }
         }
+    }
+
+    fn lower_nullable_equals(
+        &mut self,
+        dest: Place,
+        callee: &'h Callee,
+        lhs: &'h Expr,
+        rhs: &'h Expr,
+        span: Span,
+    ) {
+        let lhs_ref = self.temp(&lhs.ty, span);
+        let operand = self.as_operand(lhs);
+        self.assign(Place::local(lhs_ref), Rvalue::Use(operand), span);
+        let rhs_ref = self.temp(&rhs.ty, span);
+        let operand = self.as_operand(rhs);
+        self.assign(Place::local(rhs_ref), Rvalue::Use(operand), span);
+        let lhs_value = Place::local(lhs_ref).project(PlaceElem::Deref);
+        let rhs_value = Place::local(rhs_ref).project(PlaceElem::Deref);
+        let join = self.new_block();
+        if may_be_null(&lhs.ty) {
+            let (null, present) = self.null_branch(lhs_value, span);
+            self.current = null;
+            let both = if may_be_null(&rhs.ty) {
+                Rvalue::IsNull(rhs_value.clone())
+            } else {
+                Rvalue::Use(Constant::Bool(false).into())
+            };
+            self.assign(dest.clone(), both, span);
+            self.goto(join, span);
+            self.current = present;
+        }
+        if may_be_null(&rhs.ty) {
+            let (null, present) = self.null_branch(rhs_value, span);
+            self.current = null;
+            self.assign(
+                dest.clone(),
+                Rvalue::Use(Constant::Bool(false).into()),
+                span,
+            );
+            self.goto(join, span);
+            self.current = present;
+        }
+        let args = vec![
+            Operand::Copy(Place::local(lhs_ref)),
+            Operand::Copy(Place::local(rhs_ref)),
+        ];
+        self.call(callee, Dispatch::Virtual, args, Some(dest), span);
+        self.goto(join, span);
+        self.current = join;
+    }
+
+    fn compares_nullable(&self, lhs: &Ty, rhs: &Ty) -> bool {
+        let nullable = |ty: &Ty| matches!(ty, Ty::Nullable(inner) if self.is_copy(inner));
+        nullable(lhs) || nullable(rhs)
+    }
+
+    fn lower_nullable_eq(&mut self, dest: Place, lhs: &'h Expr, rhs: &'h Expr, span: Span) {
+        let lhs_place = self.as_place(lhs);
+        let rhs_place = self.as_place(rhs);
+        let join = self.new_block();
+        let untested = matches!(rhs.ty, Ty::Nullable(_)).then_some(&rhs_place);
+        let lhs_value =
+            self.unwrap_nullable(dest.clone(), lhs_place, &lhs.ty, untested, join, span);
+        let rhs_value = self.unwrap_nullable(dest.clone(), rhs_place, &rhs.ty, None, join, span);
+        self.assign(dest, Rvalue::Binary(BinOp::Eq, lhs_value, rhs_value), span);
+        self.goto(join, span);
+        self.current = join;
+    }
+
+    fn unwrap_nullable(
+        &mut self,
+        dest: Place,
+        place: Place,
+        ty: &Ty,
+        untested: Option<&Place>,
+        join: BasicBlock,
+        span: Span,
+    ) -> Operand {
+        if !matches!(ty, Ty::Nullable(_)) {
+            return self.operand_from_place(place, ty, span);
+        }
+        let (null, present) = self.null_branch(place.clone(), span);
+        self.current = null;
+        let both_null = match untested {
+            Some(other) => Rvalue::IsNull(other.clone()),
+            None => Rvalue::Use(Constant::Bool(false).into()),
+        };
+        self.assign(dest, both_null, span);
+        self.goto(join, span);
+        self.current = present;
+        let value_ty = ty.non_null().clone();
+        let value = self.temp(&value_ty, span);
+        let operand = self.operand_from_place(place, &value_ty, span);
+        self.assign(Place::local(value), Rvalue::Use(operand), span);
+        Operand::Copy(Place::local(value))
     }
 
     fn check_divisor(&mut self, op: BinOp, ty: &Ty, divisor: &Operand, span: Span) {
@@ -704,6 +824,7 @@ impl<'h> Builder<'_, 'h, '_> {
         }
         self.goto(join, span);
         self.current = present;
+        let borrow = borrow.filter(|_| !matches!(inner.ty.non_null(), Ty::Ref { .. }));
         let receiver = match borrow {
             Some(mutable) => {
                 let ty = Ty::Ref {
@@ -1095,6 +1216,10 @@ fn unary_op(op: UnOp) -> Option<UnaryOp> {
 
 fn is_null(expr: &Expr) -> bool {
     matches!(expr.kind, ExprKind::Null)
+}
+
+fn may_be_null(side: &Ty) -> bool {
+    matches!(side.strip_refs(), Ty::Nullable(_))
 }
 
 fn is_zero_literal(lit: &Lit) -> bool {

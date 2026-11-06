@@ -1,0 +1,26 @@
+import std.util.ArrayList;
+import std.util.HashMap;
+import std.util.List;
+import std.util.Map;
+
+class Main {
+    static (&List<int>)? pick(&List<int> items, boolean present) {
+        return present ? items : null;
+    }
+
+    static void main() {
+        List<int> items = new ArrayList<>();
+        items.add(1);
+        items.add(2);
+        (&List<int>)? some = Main.pick(&items, true);
+        (&List<int>)? none = Main.pick(&items, false);
+        Console.println("${some?.size()} ${none?.size()}");
+        Console.println("${some?.size() == 2} ${none?.size() == 2} ${Main.pick(&items, true)?.get(1)}");
+
+        Map<String, List<int>> groups = new HashMap<>();
+        groups.put("odd", new ArrayList<>());
+        groups.getMut(&"odd")?.add(7);
+        groups.getMut(&"even")?.add(8);
+        Console.println("${groups.get(&"odd")?.size()} ${groups.get(&"even")?.size()}");
+    }
+}
