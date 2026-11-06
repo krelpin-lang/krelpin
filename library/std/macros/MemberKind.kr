@@ -1,6 +1,6 @@
 package std.macros;
 
-/** The kind of declaration a `Member` holds. */
+/** The kind of declaration a {@link Member} holds. */
 enum MemberKind {
     /** A field, with or without an initializer, or a record component. */
     FIELD,
@@ -10,6 +10,6 @@ enum MemberKind {
     CONSTRUCTOR,
     /** A nested class, record, interface or enum. */
     TYPE,
-    /** A bare `{ ... }` block in a class body. */
+    /** An initializer block, {@code { ... }}, in a class body. */
     INITIALIZER
 }

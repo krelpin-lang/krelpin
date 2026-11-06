@@ -1,20 +1,31 @@
 package std.task;
 
 /**
- * What an executor passes to `Future.poll`: the waker of the task being
- * polled.
+ * The context of an asynchronous task, passed by an executor to
+ * {@link Future#poll}.
+ *
+ * <p>The context gives the future access to the {@link Waker} of the task
+ * being polled.
  */
 final class Context {
     private Waker waker;
 
-    /** Creates a context for polling a task that `waker` wakes. */
+    /**
+     * Constructs a context for polling a task.
+     *
+     * @param waker the waker that schedules the task to be polled again
+     */
     Context(Waker waker) {
         this.waker = waker;
     }
 
     /**
-     * Returns a waker for the task being polled. A future keeps it when it
-     * returns `Poll.Pending`, and wakes it once it can make progress.
+     * Returns a waker for the task being polled.
+     *
+     * <p>A future that returns {@code Poll.Pending} keeps this waker and calls
+     * {@link Waker#wake} once it can make progress.
+     *
+     * @return a waker for the current task
      */
     Waker waker() {
         return this.waker.copy();

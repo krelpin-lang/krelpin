@@ -1,28 +1,35 @@
 package std.util;
 
 /**
- * Visits the elements of a collection one at a time. The iterator borrows
- * the collection, so the collection can't change while it is in use.
+ * An iterator over a collection, which returns its elements one at a time.
  *
- * ```
+ * <p>An iterator borrows its collection, so the collection cannot be
+ * modified while the iterator is in use.
+ *
+ * <pre>{@code
  * Iterator<String> names = list.iterator();
  * while (names.hasNext()) {
  *     Console.println(names.next());
  * }
- * ```
+ * }</pre>
  *
- * A `for` loop over an `Iterable` does the same.
+ * <p>An enhanced {@code for} loop over an {@link Iterable} does the same.
+ *
+ * @param <T> the type of the elements
  */
 interface Iterator<T> borrows src {
-    /** Returns whether `next` has another element to return. */
+    /**
+     * Returns whether the iteration has more elements.
+     *
+     * @return {@code true} if {@link #next} would return an element
+     */
     boolean hasNext();
 
     /**
-     * Returns a reference to the next element and moves past it.
+     * Returns the next element in the iteration and advances past it.
      *
-     * # Throws
-     *
-     * `IllegalStateException` if there are no elements left.
+     * @return a reference to the next element
+     * @throws IllegalStateException if the iteration has no more elements
      */
     mut &T next() borrows src;
 }

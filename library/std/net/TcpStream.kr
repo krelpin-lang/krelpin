@@ -4,42 +4,46 @@ import std.io.Files;
 import std.io.IOException;
 
 /**
- * A TCP connection, made with `connect` or returned by
- * `TcpListener.accept`.
+ * A TCP connection between a local and a remote socket, created with
+ * {@link #connect} or returned by {@link TcpListener#accept}.
  *
- * Reads block until data arrives and writes until the data is handed to
- * the system. Text is UTF-8; use `read` and `writeBytes` for binary data.
+ * <p>Reads block until data arrives, and writes block until the data has
+ * been handed to the system. Text is encoded as UTF-8; use {@link #read}
+ * and {@link #writeBytes} for binary data.
  *
- * ```
+ * <pre>{@code
  * TcpStream stream = TcpStream.connect("example.com:80");
  * stream.write("GET / HTTP/1.0\r\nHost: example.com\r\n\r\n");
  * String? status = stream.readLine(); // "HTTP/1.0 200 OK"
- * ```
+ * }</pre>
  *
- * The connection is closed when the stream is dropped. Writing to a
- * connection the peer has closed throws an `IOException`; it never kills
- * the program with `SIGPIPE`.
+ * <p>The connection is closed when the stream is dropped. Writing to a
+ * connection that the peer has closed throws an {@link IOException}; it
+ * never terminates the program with {@code SIGPIPE}.
  *
- * # Non-blocking use
+ * <h2>Non-blocking use</h2>
  *
- * A stream made with `startConnect` or `TcpListener.tryAccept`, or one
- * given `setNonBlocking(true)`, never waits. Register it with a `Poller`
- * and use the `try` methods when the poller reports it ready: `tryRead`,
- * `tryReadLine` and `tryWrite` return at once and say when the stream
- * isn't ready instead of throwing. Text to send can also be queued with
- * `queue` and sent with `flush` as the stream becomes writable.
+ * <p>A stream created with {@link #startConnect} or
+ * {@link TcpListener#tryAccept}, or put in non-blocking mode with
+ * {@link #setNonBlocking}, never waits. Register it with a {@link Poller}
+ * and call the {@code try} methods when the poller reports it ready:
+ * {@link #tryRead}, {@link #tryReadLine} and {@link #tryWrite} return
+ * immediately and indicate that the stream is not ready instead of
+ * throwing. Outgoing data can also be queued with {@link #queue} and sent
+ * with {@link #flush} as the stream becomes writable.
  */
 final class TcpStream {
     private TcpStream() {}
 
     /**
-     * Connects to `address`, written as `host:port`. A host name is resolved
-     * and each of its addresses is tried in turn.
+     * Opens a connection to a remote address.
      *
-     * # Throws
+     * <p>A host name is resolved, and each of its addresses is tried in turn.
      *
-     * `IOException` if the address is malformed or can't be resolved, or
-     * no address accepts the connection.
+     * @param address the address to connect to, in the form {@code host:port}
+     * @return the connected stream
+     * @throws IOException if the address is malformed or cannot be resolved,
+     *         or no address accepts the connection
      */
     static TcpStream connect(String address) throws IOException {
         TcpStream stream = new TcpStream();
@@ -50,12 +54,12 @@ final class TcpStream {
     }
 
     /**
-     * Waits for the next client of `listener` and returns the connection.
-     * The same as `listener.accept()`.
+     * Waits for a client of a listener and accepts the connection. This is
+     * equivalent to {@code listener.accept()}.
      *
-     * # Throws
-     *
-     * `IOException` if accepting fails or times out.
+     * @param listener the listener to accept from
+     * @return the connection to the client
+     * @throws IOException if accepting fails or times out
      */
     static TcpStream accept(&mut TcpListener listener) throws IOException {
         TcpStream stream = new TcpStream();
@@ -66,28 +70,30 @@ final class TcpStream {
     }
 
     /**
-     * Starts connecting to `address` without waiting and returns a
-     * non-blocking stream. Register it with a `Poller` for
-     * `Interest.WRITABLE`, and call `finishConnect` once the poller reports
-     * it.
+     * Starts connecting to a remote address without waiting for the connection
+     * to be established.
      *
-     * Only the first address a host name resolves to is tried, and the
-     * name is resolved before this returns, which can block. Use an IP
+     * <p>The returned stream is in non-blocking mode. Register it with a
+     * {@link Poller} for {@code Interest.WRITABLE}, and call
+     * {@link #finishConnect} once the poller reports it.
+     *
+     * <p>Only the first address that a host name resolves to is tried, and the
+     * name is resolved before this method returns, which can block. Pass an IP
      * address to avoid that.
      *
-     * ```
+     * <pre>{@code
      * TcpStream stream = TcpStream.startConnect("127.0.0.1:8080");
      * stream.register(&mut poller, 1, Interest.WRITABLE);
      * // ... once the poller reports token 1:
      * if (stream.finishConnect()) {
      *     stream.reregister(&mut poller, 1, Interest.READABLE);
      * }
-     * ```
+     * }</pre>
      *
-     * # Throws
-     *
-     * `IOException` if the address is malformed or can't be resolved, or
-     * the connection fails before it could start.
+     * @param address the address to connect to, in the form {@code host:port}
+     * @return a non-blocking stream whose connection is in progress
+     * @throws IOException if the address is malformed or cannot be resolved,
+     *         or the connection fails immediately
      */
     static TcpStream startConnect(String address) throws IOException {
         TcpStream stream = new TcpStream();
@@ -98,13 +104,12 @@ final class TcpStream {
     }
 
     /**
-     * Returns whether a connection begun with `startConnect` is
-     * established: `true` once it is, `false` while it is still on its way.
+     * Completes a connection started with {@link #startConnect}.
      *
-     * # Throws
-     *
-     * `IOException` if the connection failed, for example because it was
-     * refused.
+     * @return {@code true} if the connection is established, {@code false} if
+     *         it is still in progress
+     * @throws IOException if the connection failed, for example because it was
+     *         refused
      */
     mut boolean finishConnect() throws IOException {
         int status = this.finishConnectRaw();
@@ -115,8 +120,13 @@ final class TcpStream {
     }
 
     /**
-     * Returns the next client of `listener` if one is waiting, or `null`.
-     * The same as `listener.tryAccept()`.
+     * Accepts a connection from a listener if a client is waiting. This is
+     * equivalent to {@code listener.tryAccept()}.
+     *
+     * @param listener the listener to accept from
+     * @return the connection to the client, or {@code null} if no client is
+     *         waiting
+     * @throws IOException if accepting fails
      */
     static TcpStream? tryAccept(&mut TcpListener listener) throws IOException {
         TcpStream stream = new TcpStream();
@@ -128,17 +138,16 @@ final class TcpStream {
     }
 
     /**
-     * Returns the next line without its `\n` or `\r\n`, or `null` once the
-     * peer has closed the connection. A last line without a line ending is
-     * still returned.
+     * Reads the next line, blocking until it has arrived.
      *
-     * Bytes read past the line are kept for the next call to `readLine`,
-     * `read` or `readAll`.
+     * <p>A final line without a line terminator is still returned. Bytes
+     * received after the line are kept for the next call to {@code readLine},
+     * {@link #read} or {@link #readAll}.
      *
-     * # Throws
-     *
-     * `IOException` if reading fails or times out, or the line isn't valid
-     * UTF-8.
+     * @return the line without its {@code \n} or {@code \r\n} terminator, or
+     *         {@code null} if the peer has closed the connection
+     * @throws IOException if reading fails or times out, or the line is not
+     *         valid UTF-8
      */
     mut String? readLine() throws IOException {
         String? line = this.readLineRaw();
@@ -149,13 +158,11 @@ final class TcpStream {
     }
 
     /**
-     * Reads until the peer closes the connection and returns everything
-     * that arrived.
+     * Reads until the peer closes the connection.
      *
-     * # Throws
-     *
-     * `IOException` if reading fails or times out, or the text isn't valid
-     * UTF-8.
+     * @return all text received
+     * @throws IOException if reading fails or times out, or the text is not
+     *         valid UTF-8
      */
     mut String readAll() throws IOException {
         String? text = this.readAllRaw();
@@ -166,13 +173,13 @@ final class TcpStream {
     }
 
     /**
-     * Waits for data and returns up to `max` bytes of it. An empty array
-     * means the peer has closed the connection.
+     * Reads bytes, blocking until data is available.
      *
-     * # Throws
-     *
-     * `IllegalArgumentException` if `max` isn't positive.
-     * `IOException` if reading fails or times out.
+     * @param max the maximum number of bytes to read
+     * @return the bytes read, or an empty array if the peer has closed the
+     *         connection
+     * @throws IllegalArgumentException if {@code max} is not positive
+     * @throws IOException if reading fails or times out
      */
     mut byte[] read(int max) throws IOException {
         if (max <= 0) {
@@ -186,14 +193,14 @@ final class TcpStream {
     }
 
     /**
-     * Returns the next line without its line ending if a whole line has
-     * arrived, or `null` at once if it hasn't. Bytes of an unfinished line
-     * are kept, so call it again when the stream is readable.
+     * Reads the next line if a complete line has arrived, without blocking.
      *
-     * Once the peer has closed the connection, a last line without a line
-     * ending is returned, and after that `null` with `atEnd()` true.
+     * <p>The bytes of an incomplete line are kept, so call this method again
+     * when the stream becomes readable. After the peer has closed the
+     * connection, a final line without a terminator is returned, and then
+     * {@code null} with {@link #atEnd} returning {@code true}.
      *
-     * ```
+     * <pre>{@code
      * String? line = stream.tryReadLine();
      * while (line != null) {
      *     handle(line);
@@ -202,11 +209,11 @@ final class TcpStream {
      * if (stream.atEnd()) {
      *     // the client has gone
      * }
-     * ```
+     * }</pre>
      *
-     * # Throws
-     *
-     * `IOException` if reading fails, or the line isn't valid UTF-8.
+     * @return the line without its terminator, or {@code null} if no complete
+     *         line is available
+     * @throws IOException if reading fails, or the line is not valid UTF-8
      */
     mut String? tryReadLine() throws IOException {
         String? line = this.tryReadLineRaw();
@@ -217,22 +224,23 @@ final class TcpStream {
     }
 
     /**
-     * Returns whether the peer has closed the connection and every byte it
-     * sent has been read.
+     * Returns whether the end of the stream has been reached.
+     *
+     * @return {@code true} if the peer has closed the connection and every byte
+     *         it sent has been read
      */
     boolean atEnd() {
         return this.atEndRaw();
     }
 
     /**
-     * Returns up to `max` bytes that have arrived, an empty array once the
-     * peer has closed the connection, or `null` at once if no data is
-     * there yet.
+     * Reads the bytes that have arrived, without blocking.
      *
-     * # Throws
-     *
-     * `IllegalArgumentException` if `max` isn't positive.
-     * `IOException` if reading fails.
+     * @param max the maximum number of bytes to read
+     * @return the bytes read; an empty array if the peer has closed the
+     *         connection, or {@code null} if no data is available yet
+     * @throws IllegalArgumentException if {@code max} is not positive
+     * @throws IOException if reading fails
      */
     mut byte[]? tryRead(int max) throws IOException {
         if (max <= 0) {
@@ -246,23 +254,24 @@ final class TcpStream {
     }
 
     /**
-     * Sends as much of `bytes` from index `offset` on as the stream takes
-     * without waiting, and returns how many bytes it sent: `0` when the
-     * stream has no room.
+     * Writes as much of an array as the stream accepts without blocking.
      *
-     * ```
+     * <pre>{@code
      * int sent = 0;
      * // each time the poller reports the stream writable:
      * sent += stream.tryWrite(&data, sent);
      * if (sent == data.length) {
      *     // done
      * }
-     * ```
+     * }</pre>
      *
-     * # Throws
-     *
-     * `IndexOutOfBoundsException` unless `offset` is from 0 to the length.
-     * `IOException` if sending fails or the peer has closed the connection.
+     * @param bytes the bytes to write
+     * @param offset the index of the first byte to write
+     * @return the number of bytes written, or 0 if the send buffer is full
+     * @throws IndexOutOfBoundsException if {@code offset} is negative or
+     *         greater than {@code bytes.length}
+     * @throws IOException if writing fails or the peer has closed the
+     *         connection
      */
     mut int tryWrite(&byte[] bytes, int offset) throws IOException {
         if (offset < 0 || offset > bytes.length) {
@@ -278,33 +287,40 @@ final class TcpStream {
     }
 
     /**
-     * Adds `text` as UTF-8 to the bytes waiting to be sent, without sending
-     * anything. `flush` sends them.
+     * Appends text, encoded as UTF-8, to the bytes waiting to be sent,
+     * without sending anything. {@link #flush} sends the queued bytes.
+     *
+     * @param text the text to queue
      */
     mut void queue(String text) {
         this.queueRaw(text);
     }
 
-    /** Adds `bytes` to the bytes waiting to be sent, like `queue`. */
+    /**
+     * Appends bytes to the bytes waiting to be sent, as {@link #queue} does.
+     *
+     * @param bytes the bytes to queue
+     */
     mut void queueBytes(&byte[] bytes) {
         this.queueBytesRaw(bytes);
     }
 
     /**
-     * Sends as many queued bytes as the stream takes without waiting, and
-     * returns whether all of them are sent. When it returns `false`, wait
-     * for the stream to be writable and call it again.
+     * Sends as many queued bytes as the stream accepts without blocking.
      *
-     * ```
+     * <p>If this method returns {@code false}, wait for the stream to become
+     * writable and call it again.
+     *
+     * <pre>{@code
      * stream.queue("hello\n");
      * if (!stream.flush()) {
      *     stream.reregister(&mut poller, token, Interest.READABLE | Interest.WRITABLE);
      * }
-     * ```
+     * }</pre>
      *
-     * # Throws
-     *
-     * `IOException` if sending fails or the peer has closed the connection.
+     * @return {@code true} if every queued byte has been sent
+     * @throws IOException if writing fails or the peer has closed the
+     *         connection
      */
     mut boolean flush() throws IOException {
         int status = this.flushRaw();
@@ -314,18 +330,21 @@ final class TcpStream {
         return status == 1;
     }
 
-    /** Returns how many queued bytes `flush` hasn't sent yet. */
+    /**
+     * Returns the number of queued bytes that have not been sent yet.
+     *
+     * @return the number of bytes waiting for {@link #flush}
+     */
     long queued() {
         return this.queuedRaw();
     }
 
     /**
-     * Sends `text` as UTF-8, all of it.
+     * Writes text, encoded as UTF-8, blocking until all of it has been sent.
      *
-     * # Throws
-     *
-     * `IOException` if sending fails or times out, or the peer has closed
-     * the connection.
+     * @param text the text to write
+     * @throws IOException if writing fails or times out, or the peer has
+     *         closed the connection
      */
     mut void write(String text) throws IOException {
         if (!this.writeRaw(text)) {
@@ -334,12 +353,11 @@ final class TcpStream {
     }
 
     /**
-     * Sends all of `bytes`.
+     * Writes bytes, blocking until all of them have been sent.
      *
-     * # Throws
-     *
-     * `IOException` if sending fails or times out, or the peer has closed
-     * the connection.
+     * @param bytes the bytes to write
+     * @throws IOException if writing fails or times out, or the peer has
+     *         closed the connection
      */
     mut void writeBytes(&byte[] bytes) throws IOException {
         if (!this.writeBytesRaw(bytes)) {
@@ -348,15 +366,19 @@ final class TcpStream {
     }
 
     /**
-     * Tells the peer that nothing more will be sent, while still allowing
-     * reads. The peer's reads then see the end of the stream, which is how
-     * a client says it has sent its whole request.
+     * Shuts down the writing side of the connection, while still allowing
+     * reads.
      *
-     * ```
+     * <p>The peer's reads then reach the end of the stream, which is how a
+     * client signals that it has sent its complete request.
+     *
+     * <pre>{@code
      * stream.write(request);
      * stream.shutdownWrite();
      * String response = stream.readAll();
-     * ```
+     * }</pre>
+     *
+     * @throws IOException if the connection cannot be shut down
      */
     mut void shutdownWrite() throws IOException {
         if (!this.shutdownWriteRaw()) {
@@ -364,7 +386,12 @@ final class TcpStream {
         }
     }
 
-    /** Returns the address of the other end of the connection. */
+    /**
+     * Returns the address of the remote end of this connection.
+     *
+     * @return the peer address
+     * @throws IOException if the address cannot be obtained
+     */
     SocketAddr peerAddr() throws IOException {
         String? address = this.peerAddrRaw();
         if (address == null) {
@@ -373,7 +400,12 @@ final class TcpStream {
         return SocketAddr.parse(address);
     }
 
-    /** Returns the address of this end of the connection. */
+    /**
+     * Returns the address of the local end of this connection.
+     *
+     * @return the local address
+     * @throws IOException if the address cannot be obtained
+     */
     SocketAddr localAddr() throws IOException {
         String? address = this.localAddrRaw();
         if (address == null) {
@@ -383,12 +415,12 @@ final class TcpStream {
     }
 
     /**
-     * Makes reads give up after `millis` milliseconds without data. `0`
-     * waits forever, which is the default.
+     * Sets the time a read waits for data before it fails.
      *
-     * # Throws
-     *
-     * `IOException` if `millis` is negative or the system refuses.
+     * @param millis the timeout in milliseconds, or 0 to wait indefinitely,
+     *        which is the default
+     * @throws IOException if {@code millis} is negative or the timeout cannot
+     *         be set
      */
     mut void setReadTimeout(long millis) throws IOException {
         if (!this.setTimeoutRaw(millis, false)) {
@@ -397,12 +429,12 @@ final class TcpStream {
     }
 
     /**
-     * Makes writes give up after `millis` milliseconds without progress.
-     * `0` waits forever, which is the default.
+     * Sets the time a write waits for progress before it fails.
      *
-     * # Throws
-     *
-     * `IOException` if `millis` is negative or the system refuses.
+     * @param millis the timeout in milliseconds, or 0 to wait indefinitely,
+     *        which is the default
+     * @throws IOException if {@code millis} is negative or the timeout cannot
+     *         be set
      */
     mut void setWriteTimeout(long millis) throws IOException {
         if (!this.setTimeoutRaw(millis, true)) {
@@ -411,9 +443,14 @@ final class TcpStream {
     }
 
     /**
-     * Turns Nagle's algorithm off (`true`) or on. With it off, small writes
-     * are sent at once instead of being collected, which lowers latency for
-     * request-response protocols.
+     * Enables or disables {@code TCP_NODELAY}, which turns off Nagle's
+     * algorithm.
+     *
+     * <p>With the option enabled, small writes are sent immediately instead of
+     * being coalesced, which lowers the latency of request-response protocols.
+     *
+     * @param noDelay {@code true} to send small writes immediately
+     * @throws IOException if the option cannot be set
      */
     mut void setNoDelay(boolean noDelay) throws IOException {
         if (!this.setNoDelayRaw(noDelay)) {
@@ -423,9 +460,15 @@ final class TcpStream {
 
 
     /**
-     * Makes the stream non-blocking (`true`) or blocking again. A
-     * non-blocking stream is meant to be driven by a `Poller`; its blocking
-     * methods throw an `IOException` instead of waiting when it isn't ready.
+     * Sets whether this stream is in non-blocking mode.
+     *
+     * <p>A non-blocking stream is meant to be driven by a {@link Poller}. Its
+     * blocking methods throw an {@link IOException} instead of waiting when the
+     * stream is not ready.
+     *
+     * @param nonBlocking {@code true} to enable non-blocking mode, or
+     *        {@code false} to restore blocking mode
+     * @throws IOException if the mode cannot be changed
      */
     mut void setNonBlocking(boolean nonBlocking) throws IOException {
         if (!this.setNonBlockingRaw(nonBlocking)) {
@@ -434,14 +477,18 @@ final class TcpStream {
     }
 
     /**
-     * Asks `poller` to report this stream under `token` when it is ready for
-     * `interest`, a combination of the `Interest` constants.
+     * Registers this stream with a poller.
      *
-     * # Throws
-     *
-     * `IllegalArgumentException` if `interest` asks for nothing.
-     * `IOException` if the system refuses. On Linux that includes a stream
-     * already registered with `poller`; use `reregister` to change it.
+     * @param poller the poller that reports the stream
+     * @param token the token that identifies the stream in the poller's
+     *        {@link Event}s
+     * @param interest the readiness to report, a combination of the
+     *        {@link Interest} constants
+     * @throws IllegalArgumentException if {@code interest} is not a non-empty
+     *         combination of {@code Interest} constants
+     * @throws IOException if the registration fails; on Linux this includes a
+     *         stream that is already registered with {@code poller}, which
+     *         {@link #reregister} must be used for
      */
     void register(&mut Poller poller, int token, int interest) throws IOException {
         Poller.checkInterest(interest);
@@ -451,13 +498,17 @@ final class TcpStream {
     }
 
     /**
-     * Changes the token and interest of a stream registered with `poller`.
+     * Changes the token and interest of this stream in a poller it is
+     * registered with.
      *
-     * # Throws
-     *
-     * `IllegalArgumentException` if `interest` asks for nothing.
-     * `IOException` if the system refuses. On Linux that includes a stream
-     * that isn't registered with `poller`.
+     * @param poller the poller the stream is registered with
+     * @param token the new token
+     * @param interest the new interest, a combination of the {@link Interest}
+     *        constants
+     * @throws IllegalArgumentException if {@code interest} is not a non-empty
+     *         combination of {@code Interest} constants
+     * @throws IOException if the registration fails; on Linux this includes a
+     *         stream that is not registered with {@code poller}
      */
     void reregister(&mut Poller poller, int token, int interest) throws IOException {
         Poller.checkInterest(interest);
@@ -467,12 +518,11 @@ final class TcpStream {
     }
 
     /**
-     * Stops `poller` from reporting this stream. Dropping the stream does the
-     * same.
+     * Removes this stream from a poller. Dropping the stream has the same
+     * effect.
      *
-     * # Throws
-     *
-     * `IOException` if the stream isn't registered with `poller`.
+     * @param poller the poller the stream is registered with
+     * @throws IOException if the stream is not registered with {@code poller}
      */
     void deregister(&mut Poller poller) throws IOException {
         if (!this.deregisterRaw(poller)) {

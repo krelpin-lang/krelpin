@@ -1,47 +1,63 @@
 package std.lang;
 
-/** Access to the process: exiting, environment variables and clocks. */
+/**
+ * Provides access to the running process: termination, environment
+ * variables and clocks.
+ */
 final class System {
     private System() {}
 
     /**
-     * Ends the program right away with the exit status `code`, after
-     * flushing standard output and error. By convention 0 means success.
+     * Terminates the program immediately with the specified exit status.
      *
-     * Nothing else runs on the way out: `finally` blocks are skipped and
-     * other threads are stopped wherever they are.
+     * <p>Standard output and standard error are flushed first. No other code
+     * runs: {@code finally} blocks are skipped, and other threads stop
+     * wherever they are.
+     *
+     * @param code the exit status; by convention, 0 indicates success
      */
     @Intrinsic
     static void exit(int code);
 
     /**
-     * Returns the value of the environment variable `name`, or `null` when it
-     * isn't set. Bytes that aren't valid UTF-8 become `U+FFFD`.
+     * Returns the value of an environment variable.
      *
-     * ```
+     * <p>Bytes that are not valid UTF-8 are replaced with {@code U+FFFD}.
+     *
+     * <pre>{@code
      * String home = System.env("HOME") ?: "/";
-     * ```
+     * }</pre>
+     *
+     * @param name the name of the variable
+     * @return the value of the variable, or {@code null} if it is not set
      */
     @Intrinsic
     static String? env(String name);
 
     /**
-     * Returns the wall-clock time in milliseconds since 1970-01-01 00:00 UTC.
-     * The clock can jump, so use `nanoTime` to measure how long something
-     * takes.
+     * Returns the current wall-clock time.
+     *
+     * <p>The wall clock can be adjusted while the program runs, so use
+     * {@link #nanoTime} to measure elapsed time.
+     *
+     * @return the number of milliseconds since 1970-01-01T00:00:00Z
      */
     @Intrinsic
     static long currentTimeMillis();
 
     /**
-     * Returns a monotonic time in nanoseconds, which only means something
-     * when compared with another call:
+     * Returns the current value of a monotonic clock.
      *
-     * ```
+     * <p>The value is only meaningful relative to another value returned by
+     * this method:
+     *
+     * <pre>{@code
      * long start = System.nanoTime();
      * work();
      * long elapsed = System.nanoTime() - start;
-     * ```
+     * }</pre>
+     *
+     * @return the current value of the monotonic clock, in nanoseconds
      */
     @Intrinsic
     static long nanoTime();

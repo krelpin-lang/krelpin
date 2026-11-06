@@ -1,79 +1,103 @@
 package std.lang;
 
 /**
- * A growable string, for building text piece by piece without creating a
- * new `String` at every step.
+ * A mutable sequence of characters, for building a string from many pieces
+ * without creating an intermediate {@link String} for each one.
  *
- * ```
+ * <pre>{@code
  * StringBuilder out = new StringBuilder();
  * for (int i = 0; i < 3; i++) {
  *     out.append("line $i");
  *     out.append('\n');
  * }
  * String text = out.toString();
- * ```
+ * }</pre>
  *
- * Like `String`, lengths and indices count characters, not bytes.
+ * <p>As with {@code String}, lengths and indices count characters, not
+ * bytes.
  */
 final class StringBuilder {
-    /** Creates an empty builder. */
+    /** Constructs an empty string builder. */
     StringBuilder() {}
 
-    /** Adds `text` to the end. */
+    /**
+     * Appends a string.
+     *
+     * @param text the string to append
+     */
     @Intrinsic
     mut void append(String text);
 
-    /** Adds the character `c` to the end. */
+    /**
+     * Appends a character.
+     *
+     * @param c the character to append
+     */
     mut void append(char c) {
         this.append("" + c);
     }
 
-    /** Adds `text` and then a line break, `\n`, to the end. */
+    /**
+     * Appends a string followed by a line separator ({@code \n}).
+     *
+     * @param text the string to append
+     */
     mut void appendLine(String text) {
         this.append(text);
         this.append("\n");
     }
 
-    /** Returns the number of characters built so far. */
+    /**
+     * Returns the number of characters in this builder.
+     *
+     * @return the current length
+     */
     @Intrinsic
     int length();
 
-    /** Returns whether nothing has been built yet. */
+    /**
+     * Returns whether this builder is empty.
+     *
+     * @return {@code true} if {@link #length} is 0
+     */
     boolean isEmpty() {
         return this.length() == 0;
     }
 
     /**
-     * Inserts `text` before the character at `index`. An `index` equal to
-     * `length()` appends.
+     * Inserts a string at the specified index.
      *
-     * # Throws
-     *
-     * `IndexOutOfBoundsException` if `index` is negative or above `length()`.
+     * @param index the index to insert at; {@link #length} appends
+     * @param text the string to insert
+     * @throws IndexOutOfBoundsException if {@code index} is negative or
+     *         greater than {@link #length}
      */
     @Intrinsic
     mut void insert(int index, String text);
 
     /**
-     * Keeps the first `length` characters and drops the rest.
+     * Shortens this builder to the specified length.
      *
-     * # Throws
-     *
-     * `IndexOutOfBoundsException` if `length` is negative or above
-     * `length()`.
+     * @param length the number of characters to keep
+     * @throws IndexOutOfBoundsException if {@code length} is negative or
+     *         greater than the current length
      */
     @Intrinsic
     mut void truncate(int length);
 
-    /** Reverses the order of the characters. */
+    /** Reverses the order of the characters in this builder. */
     @Intrinsic
     mut void reverse();
 
-    /** Removes every character, keeping the memory for reuse. */
+    /** Removes all characters, keeping the allocated memory for reuse. */
     @Intrinsic
     mut void clear();
 
-    /** Returns the characters built so far as a new `String`. */
+    /**
+     * Returns the characters of this builder as a string.
+     *
+     * @return a new string containing the current contents
+     */
     @Intrinsic
     String toString();
 }

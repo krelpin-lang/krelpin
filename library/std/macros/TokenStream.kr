@@ -5,100 +5,123 @@ import std.util.Iterator;
 import std.util.List;
 
 /**
- * A list of tokens: the code a macro receives and the code it returns.
+ * A sequence of tokens: the code a macro receives and the code it returns.
  *
- * A macro gets the tokens of the item it is attached to and returns the
- * tokens that replace it. They can be changed in place, but `Item` and
- * `Member` are easier to use for anything that depends on the structure of
- * a declaration.
+ * <p>A macro receives the tokens of the item it is applied to and returns
+ * the tokens that replace it. The tokens can be modified in place, but
+ * {@link Item} and {@link Member} are easier to use for anything that
+ * depends on the structure of a declaration.
  *
- * ```
+ * <pre>{@code
  * macro Hello(TokenStream args, TokenStream item) {
  *     int close = item.lastIndexOf("}");
  *     item.insertAll(close, &TokenStream.parse("static String hello() { return \"hi\"; }"));
  *     return item;
  * }
- * ```
+ * }</pre>
  */
 final class TokenStream implements Iterable<Token> {
     private List<Token> tokens;
 
-    /** Creates an empty token stream. */
+    /** Constructs an empty token stream. */
     TokenStream() {
         this.tokens = new ArrayList<>();
     }
 
     /**
-     * Splits `source` into tokens, the way the compiler would.
+     * Splits source code into tokens, as the compiler does.
      *
-     * The compiler does the splitting, so this works only inside a running
-     * macro.
+     * <p>The compiler performs the tokenization, so this method works only
+     * inside a running macro.
      *
-     * # Throws
-     *
-     * `IllegalStateException` when called outside a macro.
+     * @param source the source code
+     * @return the tokens of {@code source}
+     * @throws IllegalStateException if called outside a running macro
      */
     static TokenStream parse(String source) {
         return Bridge.lex(source);
     }
 
-    /** Returns a stream holding just `token`. */
+    /**
+     * Returns a stream that contains a single token.
+     *
+     * @param token the token
+     * @return a new stream containing {@code token}
+     */
     static TokenStream of(Token token) {
         TokenStream stream = new TokenStream();
         stream.add(token);
         return stream;
     }
 
-    /** Returns the number of tokens. */
+    /**
+     * Returns the number of tokens in this stream.
+     *
+     * @return the number of tokens
+     */
     int size() {
         return this.tokens.size();
     }
 
-    /** Returns whether there are no tokens. */
+    /**
+     * Returns whether this stream contains no tokens.
+     *
+     * @return {@code true} if {@link #size} is 0
+     */
     boolean isEmpty() {
         return this.tokens.size() == 0;
     }
 
     /**
-     * Returns the token at `index`.
+     * Returns the token at the specified position.
      *
-     * # Throws
-     *
-     * `IndexOutOfBoundsException` if `index` is negative or not below `size()`.
+     * @param index the index of the token
+     * @return the token
+     * @throws IndexOutOfBoundsException if {@code index} is negative or not
+     *         less than {@link #size}
      */
     Token get(int index) {
         return this.tokens.get(index);
     }
 
-    /** Adds `token` at the end. */
+    /**
+     * Appends a token to the end of this stream.
+     *
+     * @param token the token to append
+     */
     mut void add(Token token) {
         this.tokens.add(token);
     }
 
     /**
-     * Inserts `token` before the token at `index`, or at the end when `index`
-     * is `size()`.
+     * Inserts a token at the specified position.
      *
-     * # Throws
-     *
-     * `IndexOutOfBoundsException` if `index` is negative or above `size()`.
+     * @param index the index to insert at; {@link #size} appends
+     * @param token the token to insert
+     * @throws IndexOutOfBoundsException if {@code index} is negative or
+     *         greater than {@link #size}
      */
     mut void insert(int index, Token token) {
         this.tokens.add(index, token);
     }
 
     /**
-     * Removes and returns the token at `index`.
+     * Removes the token at the specified position.
      *
-     * # Throws
-     *
-     * `IndexOutOfBoundsException` if `index` is negative or not below `size()`.
+     * @param index the index of the token
+     * @return the removed token
+     * @throws IndexOutOfBoundsException if {@code index} is negative or not
+     *         less than {@link #size}
      */
     mut Token remove(int index) {
         return this.tokens.remove(index);
     }
 
-    /** Adds the tokens of `other` at the end. */
+    /**
+     * Appends the tokens of another stream to the end of this stream.
+     *
+     * @param other the tokens to append
+     */
     mut void addAll(&TokenStream other) {
         for (int i = 0; i < other.size(); i++) {
             this.tokens.add(other.get(i));
@@ -106,17 +129,16 @@ final class TokenStream implements Iterable<Token> {
     }
 
     /**
-     * Parses `source` and adds its tokens at the end.
+     * Parses source code and appends its tokens to the end of this stream.
      *
-     * ```
+     * <pre>{@code
      * out.append("return this.");
      * out.add(name);
      * out.append(";");
-     * ```
+     * }</pre>
      *
-     * # Throws
-     *
-     * `IllegalStateException` when called outside a macro.
+     * @param source the source code to append
+     * @throws IllegalStateException if called outside a running macro
      */
     mut void append(String source) {
         TokenStream parsed = TokenStream.parse(source);
@@ -124,11 +146,12 @@ final class TokenStream implements Iterable<Token> {
     }
 
     /**
-     * Inserts the tokens of `other` before the token at `index`.
+     * Inserts the tokens of another stream at the specified position.
      *
-     * # Throws
-     *
-     * `IndexOutOfBoundsException` if `index` is negative or above `size()`.
+     * @param index the index to insert at; {@link #size} appends
+     * @param other the tokens to insert
+     * @throws IndexOutOfBoundsException if {@code index} is negative or
+     *         greater than {@link #size}
      */
     mut void insertAll(int index, &TokenStream other) {
         for (int i = 0; i < other.size(); i++) {
@@ -137,12 +160,13 @@ final class TokenStream implements Iterable<Token> {
     }
 
     /**
-     * Returns a copy of the tokens from `begin` (included) to `end`
-     * (excluded).
+     * Returns a copy of a range of tokens.
      *
-     * # Throws
-     *
-     * `IndexOutOfBoundsException` unless `0 <= begin <= end <= size()`.
+     * @param begin the index of the first token, inclusive
+     * @param end the index after the last token, exclusive
+     * @return a new stream containing the tokens in the range
+     * @throws IndexOutOfBoundsException unless
+     *         {@code 0 <= begin <= end <= size()}
      */
     TokenStream slice(int begin, int end) {
         if (begin < 0 || end > this.size() || begin > end) {
@@ -156,14 +180,24 @@ final class TokenStream implements Iterable<Token> {
         return part;
     }
 
-    /** Returns the index of the first token whose text is `text`, or `-1`. */
+    /**
+     * Returns the index of the first token with the specified text.
+     *
+     * @param text the text to search for
+     * @return the index of the first matching token, or -1 if there is none
+     */
     int indexOf(String text) {
         return this.indexOf(text, 0);
     }
 
     /**
-     * Returns the index of the first token at or after `from` whose text is
-     * `text`, or `-1`.
+     * Returns the index of the first token with the specified text, starting
+     * the search at the specified index.
+     *
+     * @param text the text to search for
+     * @param from the index to start the search at
+     * @return the index of the first matching token at or after {@code from},
+     *         or -1 if there is none
      */
     int indexOf(String text, int from) {
         for (int i = from; i < this.size(); i++) {
@@ -174,7 +208,12 @@ final class TokenStream implements Iterable<Token> {
         return -1;
     }
 
-    /** Returns the index of the last token whose text is `text`, or `-1`. */
+    /**
+     * Returns the index of the last token with the specified text.
+     *
+     * @param text the text to search for
+     * @return the index of the last matching token, or -1 if there is none
+     */
     int lastIndexOf(String text) {
         for (int i = this.size() - 1; i >= 0; i--) {
             if (this.get(i).text().equals(&text)) {
@@ -185,16 +224,17 @@ final class TokenStream implements Iterable<Token> {
     }
 
     /**
-     * Returns the index of the bracket that closes the one at `open`, or `-1`
-     * when it is never closed.
+     * Returns the index of the bracket that closes the bracket at the
+     * specified position.
      *
-     * Works for `(`, `[`, `{` and `<`. For `<`, a `>>` or `>>>` closes two or
-     * three angle brackets at once, as in `Map<String, List<int>>`.
+     * <p>Works for {@code (}, {@code [}, <code>{</code> and {@code <}. For
+     * {@code <}, a {@code >>} or {@code >>>} token closes two or three angle
+     * brackets at once, as in {@code Map<String, List<int>>}.
      *
-     * # Throws
-     *
-     * `IllegalArgumentException` if the token at `open` is not one of those
-     * brackets.
+     * @param open the index of the opening bracket
+     * @return the index of the closing bracket, or -1 if it is never closed
+     * @throws IllegalArgumentException if the token at {@code open} is not one
+     *         of these brackets
      */
     int matching(int open) {
         String opening = this.get(open).text();
@@ -223,17 +263,29 @@ final class TokenStream implements Iterable<Token> {
         return -1;
     }
 
-    /** Returns a copy of this stream. */
+    /**
+     * Returns a copy of this stream.
+     *
+     * @return a new stream containing the same tokens
+     */
     TokenStream copy() {
         return this.slice(0, this.size());
     }
 
-    /** Returns an iterator over the tokens, in order. */
+    /**
+     * Returns an iterator over the tokens of this stream, in order.
+     *
+     * @return an iterator that borrows this stream
+     */
     Iterator<Token> iterator() {
         return this.tokens.iterator();
     }
 
-    /** Returns the tokens' text separated by single spaces. */
+    /**
+     * Returns the text of the tokens, separated by single spaces.
+     *
+     * @return the tokens as text
+     */
     String toString() {
         String text = "";
         for (int i = 0; i < this.size(); i++) {

@@ -4,16 +4,18 @@ import std.util.ArrayList;
 import std.util.List;
 
 /**
- * One member of a type: a field, method, constructor, nested type or
- * initializer block.
+ * A member of a type declaration: a field, method, constructor, nested
+ * type or initializer block.
  *
- * ```
+ * <pre>{@code
  * for (&Member member : item.members()) {
  *     if (member.isMethod() && member.hasAttribute("Trace")) {
  *         // member.name(), member.params() and member.body() are available here
  *     }
  * }
- * ```
+ * }</pre>
+ *
+ * @see Item#members
  */
 final class Member {
     private TokenStream docs;
@@ -46,12 +48,11 @@ final class Member {
     }
 
     /**
-     * Reads a member: its doc comments, its annotations, then the declaration
-     * itself.
+     * Parses a member, including its doc comments and annotations.
      *
-     * # Throws
-     *
-     * `MacroError` if `tokens` doesn't hold a member.
+     * @param tokens the tokens of the member
+     * @return the parsed member
+     * @throws MacroError if {@code tokens} does not contain a member
      */
     static Member parse(&TokenStream tokens) {
         int at = 0;
@@ -73,27 +74,40 @@ final class Member {
         return new Member(docs, attributes, tokens.slice(at, tokens.size()));
     }
 
-    /** Returns what kind of member this is. */
+    /**
+     * Returns the kind of this member.
+     *
+     * @return the kind of member
+     */
     MemberKind kind() {
         return this.kind;
     }
 
-    /** Returns whether this is a field of each object, not `static` or `const`. */
+    /**
+     * Returns whether this member is an instance field.
+     *
+     * @return {@code true} for a field that is neither {@code static} nor
+     *         {@code const}
+     */
     boolean isField() {
         return this.kind == MemberKind.FIELD && !this.isStatic();
     }
 
-    /** Returns whether this is a method. */
+    /**
+     * Returns whether this member is a method.
+     *
+     * @return {@code true} for a method
+     */
     boolean isMethod() {
         return this.kind == MemberKind.METHOD;
     }
 
     /**
-     * Returns the member's name. For a constructor it is the class name.
+     * Returns the name of this member.
      *
-     * # Throws
-     *
-     * `MacroError` for an initializer block, which has no name.
+     * @return the name token; for a constructor, the name of the class
+     * @throws MacroError if this member is an initializer block, which has no
+     *         name
      */
     Token name() {
         if (this.nameAt < 0) {
@@ -102,7 +116,12 @@ final class Member {
         return this.rest.get(this.nameAt);
     }
 
-    /** Returns whether the member is declared with `modifier`, like `private`. */
+    /**
+     * Returns whether this member is declared with a modifier.
+     *
+     * @param modifier the modifier, such as {@code "private"}
+     * @return {@code true} if the member has {@code modifier}
+     */
     boolean hasModifier(String modifier) {
         for (int i = 0; i < this.modifiersEnd; i++) {
             if (this.rest.get(i).isIdent(modifier)) {
@@ -112,15 +131,21 @@ final class Member {
         return false;
     }
 
-    /** Returns whether the member is `static` or `const`. */
+    /**
+     * Returns whether this member is static.
+     *
+     * @return {@code true} if the member is {@code static} or {@code const}
+     */
     boolean isStatic() {
         return this.hasModifier("static") || this.hasModifier("const");
     }
 
     /**
-     * Returns the type of a field or the return type of a method, and no
-     * tokens for other members. For `private List<String> names;` it is
-     * `List<String>`.
+     * Returns the type of a field or the return type of a method.
+     *
+     * @return the type, such as {@code List<String>} for
+     *         {@code private List<String> names;}, or no tokens for other
+     *         members
      */
     TokenStream type() {
         if (this.kind != MemberKind.FIELD && this.kind != MemberKind.METHOD) {
@@ -130,8 +155,10 @@ final class Member {
     }
 
     /**
-     * Returns the tokens between the parentheses of a method or constructor,
-     * and no tokens for other members.
+     * Returns the parameters of a method or constructor.
+     *
+     * @return the tokens between the parentheses, or no tokens for other
+     *         members
      */
     TokenStream params() {
         if (this.open < 0) {
@@ -141,14 +168,21 @@ final class Member {
     }
 
     /**
-     * Returns whether the member has a `{ ... }` body: a method or constructor
-     * with a body, a nested type or an initializer block.
+     * Returns whether this member has a body in braces.
+     *
+     * @return {@code true} for a method or constructor with a body, a nested
+     *         type or an initializer block
      */
     boolean hasBody() {
         return this.bodyOpen >= 0;
     }
 
-    /** Returns the tokens inside the body's braces, or no tokens without a body. */
+    /**
+     * Returns the body of this member.
+     *
+     * @return the tokens between the braces of the body, or no tokens if the
+     *         member has no body
+     */
     TokenStream body() {
         if (this.bodyOpen < 0) {
             return new TokenStream();
@@ -157,8 +191,10 @@ final class Member {
     }
 
     /**
-     * Returns the expression after the `=` of a field, or no tokens when the
-     * field has none.
+     * Returns the initializer of a field.
+     *
+     * @return the expression after the {@code =}, or no tokens if the field
+     *         has no initializer
      */
     TokenStream initializer() {
         if (this.initAt < 0) {
@@ -168,17 +204,16 @@ final class Member {
     }
 
     /**
-     * Replaces the tokens inside the body's braces with `body`.
+     * Replaces the body of this member.
      *
-     * ```
+     * <pre>{@code
      * TokenStream traced = TokenStream.parse("Console.println(\"enter\");");
      * traced.addAll(&member.body());
      * member.setBody(&traced);
-     * ```
+     * }</pre>
      *
-     * # Throws
-     *
-     * `MacroError` if the member has no body or is a nested type.
+     * @param body the tokens to place between the braces
+     * @throws MacroError if this member has no body or is a nested type
      */
     mut void setBody(&TokenStream body) {
         if (this.bodyOpen < 0 || this.kind == MemberKind.TYPE) {
@@ -192,12 +227,21 @@ final class Member {
         this.analyze();
     }
 
-    /** Returns the annotations written on the member, in order. */
+    /**
+     * Returns the annotations written on this member.
+     *
+     * @return the annotations, in source order
+     */
     &List<Attribute> attributes() {
         return &this.attributes;
     }
 
-    /** Returns whether the member has an annotation called `name`. */
+    /**
+     * Returns whether this member has an annotation with the specified name.
+     *
+     * @param name the simple name of the annotation
+     * @return {@code true} if such an annotation is present
+     */
     boolean hasAttribute(String name) {
         for (&Attribute attribute : this.attributes) {
             if (attribute.is(name)) {
@@ -208,8 +252,11 @@ final class Member {
     }
 
     /**
-     * Returns the arguments of the first annotation called `name`, or no
-     * tokens when there is none. For `@Default(10)` it is `10`.
+     * Returns the arguments of the first annotation with the specified name.
+     *
+     * @param name the simple name of the annotation
+     * @return the arguments, such as {@code 10} for {@code @Default(10)}, or no
+     *         tokens if there is no such annotation
      */
     TokenStream attribute(String name) {
         for (&Attribute attribute : this.attributes) {
@@ -220,7 +267,12 @@ final class Member {
         return new TokenStream();
     }
 
-    /** Removes every annotation called `name` and returns how many there were. */
+    /**
+     * Removes every annotation with the specified name from this member.
+     *
+     * @param name the simple name of the annotations to remove
+     * @return the number of annotations removed
+     */
     mut int removeAttribute(String name) {
         int removed = 0;
         int i = 0;
@@ -235,7 +287,11 @@ final class Member {
         return removed;
     }
 
-    /** Returns the member as tokens, with any changes made to it. */
+    /**
+     * Returns this member as tokens, including any changes made to it.
+     *
+     * @return the tokens of the member
+     */
     TokenStream toTokens() {
         TokenStream out = this.docs.copy();
         for (&Attribute attribute : this.attributes) {

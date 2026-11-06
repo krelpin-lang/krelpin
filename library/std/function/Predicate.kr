@@ -1,7 +1,16 @@
 package std.function;
 
-/** A test on a value, like `n -> n > 0`. */
+/**
+ * A boolean-valued function of one argument, such as {@code n -> n > 0}.
+ *
+ * @param <T> the type of the argument
+ */
 interface Predicate<T> {
-    /** Returns whether `value` passes the test. */
+    /**
+     * Evaluates this predicate on an argument.
+     *
+     * @param value the argument
+     * @return {@code true} if the argument satisfies the predicate
+     */
     mut boolean test(T value);
 }

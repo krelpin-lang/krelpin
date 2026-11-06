@@ -1,51 +1,73 @@
 package std.primitive;
 
 /**
- * Methods and constants for `float`, a 32-bit IEEE 754 floating-point number.
+ * The {@code float} primitive type, a 32-bit IEEE 754 floating-point number.
  *
- * Arithmetic follows IEEE 754, so `float` has NaN ("not a number") and
- * infinite values. `==` and `<` treat NaN the way the standard says: it is
- * not equal to anything, itself included. `equals` and `compareTo` instead
- * order every value, so floating-point numbers can be keys in a `HashMap`
- * and can be sorted:
+ * <p>Arithmetic follows IEEE 754, so {@code float} has NaN ("not a number")
+ * and infinite values. The operators {@code ==} and {@code <} treat NaN as
+ * the standard requires: it is not equal to any value, including itself.
+ * {@link #equals} and {@link #compareTo} instead define a total order, so
+ * that floating-point numbers can be sorted and used as keys in a
+ * {@code HashMap}:
  *
- * - every NaN equals every other NaN and sorts after all other values,
- * - `-0.0` sorts before `0.0`, and the two are not `equals`.
+ * <ul>
+ * <li>all NaN values are equal to each other and sort after every other
+ *     value;
+ * <li>{@code -0.0} sorts before {@code 0.0}, and the two are not equal.
+ * </ul>
  *
- * ```
+ * <pre>{@code
  * float nan = 0.0f / 0.0f;
  * nan == nan        // false
  * nan.equals(&nan)  // true
  * nan.isNaN()       // true
- * ```
+ * }</pre>
  */
 final class Float implements Comparable<float>, Hashable<float> {
-    /** The smallest positive `float`. */
+    /** The smallest positive value of a {@code float}. */
     public const float MIN_VALUE = 1.4e-45f;
 
-    /** The largest finite `float`. */
+    /** The largest finite value of a {@code float}. */
     public const float MAX_VALUE = 3.4028235e38f;
 
     private Float() {}
 
-    /** Returns whether this value is NaN. */
+    /**
+     * Returns whether this value is NaN.
+     *
+     * @return {@code true} if this value is NaN
+     */
     boolean isNaN() {
         return this != this;
     }
 
-    /** Returns whether this value is positive or negative infinity. */
+    /**
+     * Returns whether this value is infinite.
+     *
+     * @return {@code true} if this value is positive or negative infinity
+     */
     boolean isInfinite() {
         return this == 1.0f / 0.0f || this == -1.0f / 0.0f;
     }
 
-    /** Returns whether this value is neither infinite nor NaN. */
+    /**
+     * Returns whether this value is finite.
+     *
+     * @return {@code true} if this value is neither infinite nor NaN
+     */
     boolean isFinite() {
         return !this.isNaN() && !this.isInfinite();
     }
 
     /**
-     * Orders this value and `other` totally: NaN after everything else, and
-     * `-0.0` before `0.0`. Otherwise the same as `<` and `>`.
+     * Compares this value with another value, using a total order.
+     *
+     * <p>NaN sorts after every other value and {@code -0.0} sorts before
+     * {@code 0.0}; all other values are ordered as by {@code <} and {@code >}.
+     *
+     * @param other the value to compare with
+     * @return a negative number, zero or a positive number if this value sorts
+     *         before, equal to or after {@code other}
      */
     int compareTo(&float other) {
         if (this < other) {
@@ -69,44 +91,58 @@ final class Float implements Comparable<float>, Hashable<float> {
     }
 
     /**
-     * Parses a decimal number like `"3.25"`, `"-1e-9"` or `"inf"`.
+     * Parses a decimal floating-point number, such as {@code "3.25"},
+     * {@code "-1e-9"} or {@code "inf"}.
      *
-     * Accepts an optional sign followed by digits with an optional fraction
-     * and exponent, or `inf`, `infinity` or `nan` in any case. Spaces and
-     * hexadecimal numbers aren't accepted.
+     * <p>The text consists of an optional sign followed by digits with an
+     * optional fraction and exponent, or by {@code inf}, {@code infinity} or
+     * {@code nan} in any case. Whitespace and hexadecimal notation are not
+     * accepted.
      *
-     * # Throws
-     *
-     * `NumberFormatException` if the text isn't a number.
+     * @param text the text to parse
+     * @return the parsed value
+     * @throws NumberFormatException if {@code text} is not a valid number
      */
     @Intrinsic
     static float parse(String text);
 
     /**
-     * Returns whether this value is the same number as `other`. Unlike `==`,
-     * NaN equals NaN and `0.0` doesn't equal `-0.0`, which keeps `equals`
-     * consistent with `hashCode` and `compareTo`.
+     * Returns whether this value is the same number as another value.
+     *
+     * <p>Unlike {@code ==}, NaN is equal to NaN and {@code 0.0} is not equal to
+     * {@code -0.0}, which keeps this method consistent with {@link #hashCode}
+     * and {@link #compareTo}.
+     *
+     * @param other the value to compare with
+     * @return {@code true} if {@link #compareTo} returns 0
      */
     boolean equals(&float other) {
         return this.compareTo(other) == 0;
     }
 
-    /** Returns a hash of this value, consistent with `equals`. */
+    /**
+     * Returns a hash code for this value, consistent with {@link #equals}.
+     *
+     * @return a hash code for this value
+     */
     @Intrinsic
     int hashCode();
 
     /**
-     * Formats this value with a format spec, the same as `"${value:spec}"`
-     * in an interpolated string.
+     * Formats this value according to a format specification.
      *
-     * ```
+     * <p>{@code value.format(spec)} produces the same text as the
+     * interpolation {@code "${value:spec}"}.
+     *
+     * <pre>{@code
      * 3.14159.format(".2")   // "3.14"
      * 2.5.format(">8.1")     // "     2.5"
-     * ```
+     * }</pre>
      *
-     * # Throws
-     *
-     * `IllegalArgumentException` if the spec can't be used on numbers.
+     * @param spec the format specification, as described in {@link Format}
+     * @return the formatted text
+     * @throws IllegalArgumentException if {@code spec} is malformed or does
+     *         not apply to floating-point numbers
      */
     String format(String spec) {
         return Format.decimal(this, spec);

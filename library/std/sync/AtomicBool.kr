@@ -1,30 +1,47 @@
 package std.sync;
 
 /**
- * A `boolean` that several threads can read and change safely.
+ * A {@code boolean} value that can be read and updated atomically by
+ * several threads.
  *
- * Every operation is sequentially consistent: all threads see the
- * operations in the same order.
+ * <p>All operations are sequentially consistent: every thread observes them
+ * in the same order.
  */
 final class AtomicBool {
     private boolean value;
 
-    /** Creates an atomic holding `value`. */
+    /**
+     * Constructs an atomic boolean with an initial value.
+     *
+     * @param value the initial value
+     */
     AtomicBool(boolean value) {
         this.value = value;
     }
 
-    /** Returns the current value. */
+    /**
+     * Returns the current value.
+     *
+     * @return the current value
+     */
     @Intrinsic
     boolean get();
 
-    /** Replaces the value. */
+    /**
+     * Sets the value.
+     *
+     * @param value the new value
+     */
     @Intrinsic
     void set(boolean value);
 
     /**
-     * Sets the value to `value` if it is currently `expected`, and returns
-     * whether it did.
+     * Atomically sets the value if the current value equals an expected value.
+     *
+     * @param expected the expected current value
+     * @param value the new value
+     * @return {@code true} if the value was updated, {@code false} if the
+     *         current value was not {@code expected}
      */
     @Intrinsic
     boolean compareAndSet(boolean expected, boolean value);

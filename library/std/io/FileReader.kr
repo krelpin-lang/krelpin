@@ -1,9 +1,10 @@
 package std.io;
 
 /**
- * Reads a file line by line, without loading all of it at once.
+ * Reads a text file sequentially, line by line, without loading the whole
+ * file into memory.
  *
- * ```
+ * <pre>{@code
  * FileReader reader = FileReader.open("data.csv");
  * while (true) {
  *     String? line = reader.readLine();
@@ -12,14 +13,22 @@ package std.io;
  *     }
  *     Console.println(line.split(",")[0]);
  * }
- * ```
+ * }</pre>
  *
- * The file is closed when the reader is dropped.
+ * <p>The file is closed when the reader is dropped.
+ *
+ * @see Files
  */
 final class FileReader {
     private FileReader() {}
 
-    /** Opens the file at `path` for reading. */
+    /**
+     * Opens a file for reading.
+     *
+     * @param path the path of the file
+     * @return a reader positioned at the beginning of the file
+     * @throws IOException if the file cannot be opened
+     */
     static FileReader open(String path) throws IOException {
         FileReader reader = new FileReader();
         if (!reader.openRaw(path)) {
@@ -29,12 +38,11 @@ final class FileReader {
     }
 
     /**
-     * Returns the next line without its `\n` or `\r\n`, or `null` at the end of
-     * the file.
+     * Reads the next line of the file.
      *
-     * # Throws
-     *
-     * `IOException` if reading fails or the line isn't valid UTF-8.
+     * @return the line without its {@code \n} or {@code \r\n} terminator, or
+     *         {@code null} at the end of the file
+     * @throws IOException if reading fails or the line is not valid UTF-8
      */
     mut String? readLine() throws IOException {
         String? line = this.readLineRaw();
@@ -44,7 +52,12 @@ final class FileReader {
         return line;
     }
 
-    /** Returns everything from the current position to the end of the file. */
+    /**
+     * Reads the rest of the file.
+     *
+     * @return the text from the current position to the end of the file
+     * @throws IOException if reading fails or the text is not valid UTF-8
+     */
     mut String readAll() throws IOException {
         String? text = this.readAllRaw();
         if (text == null) {

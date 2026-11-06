@@ -1,28 +1,33 @@
 package std.lang;
 
 /**
- * Thrown when a cast names a type the value doesn't have.
+ * Thrown when a cast converts a value to a type that it is not an
+ * instance of.
  *
- * ```
+ * <pre>{@code
  * Object value = "text";
- * StringBuilder builder = (StringBuilder) value; // throws
- * ```
+ * StringBuilder builder = (StringBuilder) value; // throws ClassCastException
+ * }</pre>
  *
- * Check with `instanceof` first to avoid it:
+ * <p>Test the type with {@code instanceof} to avoid the exception:
  *
- * ```
+ * <pre>{@code
  * if (value instanceof String text) {
  *     Console.println(text.length());
  * }
- * ```
+ * }</pre>
  */
 class ClassCastException extends RuntimeException {
-    /** Creates an exception without a message. */
+    /** Constructs an exception with no detail message. */
     ClassCastException() {
         super();
     }
 
-    /** Creates an exception with a message that says what went wrong. */
+    /**
+     * Constructs an exception with the specified detail message.
+     *
+     * @param message the detail message, which describes what went wrong
+     */
     ClassCastException(String message) {
         super(message);
     }

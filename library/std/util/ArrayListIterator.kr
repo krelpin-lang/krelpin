@@ -1,11 +1,20 @@
 package std.util;
 
-/** The iterator of an `ArrayList`, which visits the elements in order. */
+/**
+ * The iterator returned by {@link ArrayList#iterator}, which visits the
+ * elements in order.
+ *
+ * @param <T> the type of the elements
+ */
 final class ArrayListIterator<T> borrows src implements Iterator<T> {
     private &ArrayList<T> list;
     private int next;
 
-    /** Creates an iterator that starts at the first element of `list`. */
+    /**
+     * Constructs an iterator positioned at the first element of a list.
+     *
+     * @param list the list to iterate over
+     */
     ArrayListIterator(&ArrayList<T> list) keeps list {
         this.list = list;
         this.next = 0;

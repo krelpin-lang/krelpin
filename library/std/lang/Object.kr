@@ -1,20 +1,24 @@
 package std.lang;
 
 /**
- * The root of the class hierarchy: every class extends `Object`, directly or
- * through its superclass.
+ * The root of the class hierarchy. Every class has {@code Object} as a
+ * superclass, directly or indirectly.
  */
 class Object {
     /**
-     * Returns this object as text. `+` and `Console.println` call it to show
-     * an object.
+     * Returns a string representation of this object.
      *
-     * The default shows the class name and the object's address, like
-     * `Money@6000014e8020`. Records show their components, like
-     * `Point[x=1, y=2]`, and enums their variant. Override it to show
-     * something more useful:
+     * <p>String concatenation, string interpolation and
+     * {@link Console#println} call this method to convert an object to text.
+     * The default implementation returns the class name followed by the
+     * object's address, for example {@code Money@6000014e8020}. Records
+     * return their components, for example {@code Point[x=1, y=2]}, and enum
+     * variants return their name.
      *
-     * ```
+     * <p>Subclasses should override this method to return a concise,
+     * human-readable description:
+     *
+     * <pre>{@code
      * class Money {
      *     long cents;
      *
@@ -22,14 +26,24 @@ class Object {
      *         return "${this.cents / 100}.${(this.cents % 100).format("02")}";
      *     }
      * }
-     * ```
+     * }</pre>
+     *
+     * @return a string representation of this object
      */
     @Intrinsic
     String toString();
 
     /**
-     * Formats `toString()` with a text format spec, the same as
-     * `"${value:spec}"` in an interpolated string.
+     * Returns the string representation of this object formatted according
+     * to a format specification.
+     *
+     * <p>{@code value.format(spec)} is equivalent to the interpolation
+     * {@code "${value:spec}"}.
+     *
+     * @param spec the format specification, as described in {@link Format}
+     * @return the formatted string
+     * @throws IllegalArgumentException if {@code spec} is not a valid
+     *         format specification
      */
     String format(String spec) {
         return Format.text(this.toString(), spec);

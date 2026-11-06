@@ -6,14 +6,16 @@ import std.util.ArrayList;
 import std.util.List;
 
 /**
- * Waits until any of a set of non-blocking sockets is ready, so one thread
- * can serve many connections. It uses epoll on Linux and kqueue on macOS
- * and the BSDs.
+ * Waits for readiness events on a set of non-blocking sockets, so that a
+ * single thread can serve many connections.
  *
- * Register each socket with a token of your choice and the `Interest` it
- * has, then call `poll` in a loop and handle the sockets it reports:
+ * <p>The poller uses epoll on Linux and kqueue on macOS and the BSDs.
  *
- * ```
+ * <p>Register each socket with a token of your choice and the
+ * {@link Interest} to report, then call {@link #poll} in a loop and handle
+ * the sockets it reports:
+ *
+ * <pre>{@code
  * Poller poller = Poller.create();
  * TcpListener listener = TcpListener.bind("127.0.0.1:8080");
  * listener.setNonBlocking(true);
@@ -47,26 +49,26 @@ import std.util.List;
  *         }
  *     }
  * }
- * ```
+ * }</pre>
  *
- * Polling is level-triggered: a socket that still has data is reported
- * again by the next `poll`, so a handler may read just part of it. Register
- * for `Interest.WRITABLE` only while there is something to send, because a
- * socket with room in its send buffer is reported as writable every time.
+ * <p>Polling is level-triggered: a socket that still has unread data is
+ * reported again by the next call to {@code poll}, so a handler may read
+ * only part of it. Register for {@code Interest.WRITABLE} only while there
+ * is data to send, because a socket with room in its send buffer is
+ * reported as writable on every call.
  *
- * A socket is removed from the poller when it is dropped. The poller is
- * closed when it is dropped.
+ * <p>A socket is removed from the poller when the socket is dropped, and
+ * the poller is closed when it is dropped.
  */
 final class Poller {
     private Poller() {}
 
     /**
-     * Opens a poller.
+     * Creates a poller.
      *
-     * # Throws
-     *
-     * `IOException` if the system is out of descriptors, or has neither
-     * epoll nor kqueue.
+     * @return a new poller with no registered sockets
+     * @throws IOException if the process has no free descriptors, or the
+     *         system supports neither epoll nor kqueue
      */
     static Poller create() throws IOException {
         Poller poller = new Poller();
@@ -77,17 +79,16 @@ final class Poller {
     }
 
     /**
-     * Waits until at least one registered socket is ready, or
-     * `timeoutMillis` milliseconds have passed, and returns the ready
-     * sockets. Each token appears at most once.
+     * Waits until at least one registered socket is ready or the timeout
+     * expires.
      *
-     * A negative timeout waits for as long as it takes and `0` returns at
-     * once. The list is empty when the timeout passes or a signal
-     * interrupts the wait.
+     * <p>A negative timeout waits indefinitely, and a timeout of 0 returns
+     * immediately. The returned list is empty if the timeout expires or the
+     * wait is interrupted by a signal.
      *
-     * # Throws
-     *
-     * `IOException` if the system call fails.
+     * @param timeoutMillis the maximum time to wait, in milliseconds
+     * @return the events of the ready sockets, with at most one event per token
+     * @throws IOException if the underlying system call fails
      */
     mut List<Event> poll(long timeoutMillis) throws IOException {
         int count = this.pollRaw(timeoutMillis);
@@ -108,7 +109,13 @@ final class Poller {
         return events;
     }
 
-    /** Throws unless `interest` is a non-empty combination of `Interest` constants. */
+    /**
+     * Validates an interest set.
+     *
+     * @param interest the interest to check
+     * @throws IllegalArgumentException if {@code interest} is not a non-empty
+     *         combination of {@link Interest} constants
+     */
     static void checkInterest(int interest) {
         if (interest <= 0 || interest > (Interest.READABLE | Interest.WRITABLE)) {
             throw new IllegalArgumentException("$interest is not a combination of `Interest` constants");

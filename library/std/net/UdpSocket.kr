@@ -4,32 +4,32 @@ import std.io.Files;
 import std.io.IOException;
 
 /**
- * A UDP socket, which sends and receives separate messages without a
+ * A UDP socket, which sends and receives individual messages without a
  * connection.
  *
- * A message is delivered whole or not at all: UDP doesn't retry, and
- * messages can arrive out of order.
+ * <p>A message is delivered whole or not at all. UDP does not retransmit
+ * lost messages, and messages may arrive out of order.
  *
- * ```
+ * <pre>{@code
  * UdpSocket socket = UdpSocket.bind("127.0.0.1:0");
  * socket.sendText("ping", "127.0.0.1:9000");
  * Datagram reply = socket.receive(1500);
  * Console.println("${reply.sender()} answered ${reply.text()}");
- * ```
+ * }</pre>
  *
- * The socket is closed when it is dropped.
+ * <p>The socket is closed when it is dropped.
  */
 final class UdpSocket {
     private UdpSocket() {}
 
     /**
-     * Opens a socket on `address`, written as `host:port`. Port 0 asks the
-     * system for any free port.
+     * Creates a socket bound to an address.
      *
-     * # Throws
-     *
-     * `IOException` if the address is malformed or can't be resolved, or
-     * the port is taken.
+     * @param address the address to bind to, in the form {@code host:port};
+     *        port 0 lets the system choose any free port
+     * @return the socket
+     * @throws IOException if the address is malformed or cannot be resolved,
+     *         or the port is in use
      */
     static UdpSocket bind(String address) throws IOException {
         UdpSocket socket = new UdpSocket();
@@ -40,12 +40,12 @@ final class UdpSocket {
     }
 
     /**
-     * Sends `data` as one message to `address`, written as `host:port`.
+     * Sends bytes as one message.
      *
-     * # Throws
-     *
-     * `IOException` if the address can't be resolved, the message is too
-     * large, or sending fails.
+     * @param data the content of the message
+     * @param address the destination, in the form {@code host:port}
+     * @throws IOException if the address cannot be resolved, the message is
+     *         too large, or sending fails
      */
     mut void send(&byte[] data, String address) throws IOException {
         if (!this.sendRaw(data, address)) {
@@ -53,20 +53,30 @@ final class UdpSocket {
         }
     }
 
-    /** Sends `text` as one UTF-8 message to `address`, like `send`. */
+    /**
+     * Sends text, encoded as UTF-8, as one message.
+     *
+     * @param text the content of the message
+     * @param address the destination, in the form {@code host:port}
+     * @throws IOException if the address cannot be resolved, the message is
+     *         too large, or sending fails
+     */
     mut void sendText(String text, String address) throws IOException {
         byte[] data = text.bytes();
         this.send(&data, address);
     }
 
     /**
-     * Waits for the next message and returns it. A message longer than `max`
-     * bytes is cut short, and the rest of it is lost.
+     * Receives the next message, blocking until one arrives.
      *
-     * # Throws
+     * <p>A message longer than {@code max} bytes is truncated, and the rest of
+     * it is discarded.
      *
-     * `IllegalArgumentException` unless `max` is from 1 to 65536.
-     * `IOException` if receiving fails or times out.
+     * @param max the maximum number of bytes to receive
+     * @return the message and its sender
+     * @throws IllegalArgumentException if {@code max} is not between 1 and
+     *         65536
+     * @throws IOException if receiving fails or times out
      */
     mut Datagram receive(int max) throws IOException {
         if (max <= 0 || max > 65536) {
@@ -84,17 +94,20 @@ final class UdpSocket {
     }
 
     /**
-     * Sends `data` as one message to `address` if the socket can take it
-     * now, and returns whether it did. Meant for a non-blocking socket; a
-     * blocking one waits instead and always returns `true`.
+     * Sends bytes as one message if the socket can accept it without
+     * blocking.
      *
-     * The address is resolved before sending, which can block on a host
-     * name. Use an IP address to avoid that.
+     * <p>This method is meant for a non-blocking socket; a blocking socket
+     * waits instead and always returns {@code true}. The address is
+     * resolved before sending, which can block for a host name; pass an IP
+     * address to avoid that.
      *
-     * # Throws
-     *
-     * `IOException` if the address can't be resolved, the message is too
-     * large, or sending fails.
+     * @param data the content of the message
+     * @param address the destination, in the form {@code host:port}
+     * @return {@code true} if the message was sent, {@code false} if the
+     *         socket was not ready
+     * @throws IOException if the address cannot be resolved, the message is
+     *         too large, or sending fails
      */
     mut boolean trySend(&byte[] data, String address) throws IOException {
         int status = this.trySendRaw(data, address);
@@ -105,13 +118,17 @@ final class UdpSocket {
     }
 
     /**
-     * Returns the next message if one has arrived, or `null` at once if none
-     * has. Meant for a non-blocking socket; a blocking one waits instead.
+     * Receives the next message if one has arrived, without blocking.
      *
-     * # Throws
+     * <p>This method is meant for a non-blocking socket; a blocking socket
+     * waits for a message instead.
      *
-     * `IllegalArgumentException` unless `max` is from 1 to 65536.
-     * `IOException` if receiving fails.
+     * @param max the maximum number of bytes to receive
+     * @return the message and its sender, or {@code null} if no message is
+     *         available
+     * @throws IllegalArgumentException if {@code max} is not between 1 and
+     *         65536
+     * @throws IOException if receiving fails
      */
     mut Datagram? tryReceive(int max) throws IOException {
         if (max <= 0 || max > 65536) {
@@ -131,7 +148,12 @@ final class UdpSocket {
         return new Datagram(data, SocketAddr.parse(sender));
     }
 
-    /** Returns the address the socket is bound to. */
+    /**
+     * Returns the local address this socket is bound to.
+     *
+     * @return the local address
+     * @throws IOException if the address cannot be obtained
+     */
     SocketAddr localAddr() throws IOException {
         String? address = this.localAddrRaw();
         if (address == null) {
@@ -141,12 +163,12 @@ final class UdpSocket {
     }
 
     /**
-     * Makes `receive` give up after `millis` milliseconds without a message.
-     * `0` waits forever, which is the default.
+     * Sets the time {@link #receive} waits for a message before it fails.
      *
-     * # Throws
-     *
-     * `IOException` if `millis` is negative or the system refuses.
+     * @param millis the timeout in milliseconds, or 0 to wait indefinitely,
+     *        which is the default
+     * @throws IOException if {@code millis} is negative or the timeout cannot
+     *         be set
      */
     mut void setReadTimeout(long millis) throws IOException {
         if (!this.setTimeoutRaw(millis, false)) {
@@ -156,9 +178,15 @@ final class UdpSocket {
 
 
     /**
-     * Makes the socket non-blocking (`true`) or blocking again. A
-     * non-blocking socket is meant to be driven by a `Poller`; its blocking
-     * methods throw an `IOException` instead of waiting when it isn't ready.
+     * Sets whether this socket is in non-blocking mode.
+     *
+     * <p>A non-blocking socket is meant to be driven by a {@link Poller}. Its
+     * blocking methods throw an {@link IOException} instead of waiting when the
+     * socket is not ready.
+     *
+     * @param nonBlocking {@code true} to enable non-blocking mode, or
+     *        {@code false} to restore blocking mode
+     * @throws IOException if the mode cannot be changed
      */
     mut void setNonBlocking(boolean nonBlocking) throws IOException {
         if (!this.setNonBlockingRaw(nonBlocking)) {
@@ -167,14 +195,18 @@ final class UdpSocket {
     }
 
     /**
-     * Asks `poller` to report this socket under `token` when it is ready for
-     * `interest`, a combination of the `Interest` constants.
+     * Registers this socket with a poller.
      *
-     * # Throws
-     *
-     * `IllegalArgumentException` if `interest` asks for nothing.
-     * `IOException` if the system refuses. On Linux that includes a socket
-     * already registered with `poller`; use `reregister` to change it.
+     * @param poller the poller that reports the socket
+     * @param token the token that identifies the socket in the poller's
+     *        {@link Event}s
+     * @param interest the readiness to report, a combination of the
+     *        {@link Interest} constants
+     * @throws IllegalArgumentException if {@code interest} is not a non-empty
+     *         combination of {@code Interest} constants
+     * @throws IOException if the registration fails; on Linux this includes a
+     *         socket that is already registered with {@code poller}, which
+     *         {@link #reregister} must be used for
      */
     void register(&mut Poller poller, int token, int interest) throws IOException {
         Poller.checkInterest(interest);
@@ -184,13 +216,17 @@ final class UdpSocket {
     }
 
     /**
-     * Changes the token and interest of a socket registered with `poller`.
+     * Changes the token and interest of this socket in a poller it is
+     * registered with.
      *
-     * # Throws
-     *
-     * `IllegalArgumentException` if `interest` asks for nothing.
-     * `IOException` if the system refuses. On Linux that includes a socket
-     * that isn't registered with `poller`.
+     * @param poller the poller the socket is registered with
+     * @param token the new token
+     * @param interest the new interest, a combination of the {@link Interest}
+     *        constants
+     * @throws IllegalArgumentException if {@code interest} is not a non-empty
+     *         combination of {@code Interest} constants
+     * @throws IOException if the registration fails; on Linux this includes a
+     *         socket that is not registered with {@code poller}
      */
     void reregister(&mut Poller poller, int token, int interest) throws IOException {
         Poller.checkInterest(interest);
@@ -200,12 +236,11 @@ final class UdpSocket {
     }
 
     /**
-     * Stops `poller` from reporting this socket. Dropping the socket does the
-     * same.
+     * Removes this socket from a poller. Dropping the socket has the same
+     * effect.
      *
-     * # Throws
-     *
-     * `IOException` if the socket isn't registered with `poller`.
+     * @param poller the poller the socket is registered with
+     * @throws IOException if the socket is not registered with {@code poller}
      */
     void deregister(&mut Poller poller) throws IOException {
         if (!this.deregisterRaw(poller)) {

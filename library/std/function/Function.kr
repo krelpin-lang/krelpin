@@ -1,7 +1,18 @@
 package std.function;
 
-/** A function from `T` to `R`, like `s -> s.length()`. */
+/**
+ * A function that accepts one argument and produces a result, such as
+ * {@code s -> s.length()}.
+ *
+ * @param <T> the type of the argument
+ * @param <R> the type of the result
+ */
 interface Function<T, R> {
-    /** Calls the function with `value` and returns its result. */
+    /**
+     * Applies this function to an argument.
+     *
+     * @param value the argument
+     * @return the result of the function
+     */
     mut R apply(T value);
 }

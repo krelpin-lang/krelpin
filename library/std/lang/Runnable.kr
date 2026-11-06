@@ -1,6 +1,10 @@
 package std.lang;
 
-/** A task with no arguments and no result, like the body of a `Thread`. */
+/**
+ * A task that takes no arguments and returns no result.
+ *
+ * @see Thread
+ */
 interface Runnable {
     /** Runs the task. */
     mut void run();

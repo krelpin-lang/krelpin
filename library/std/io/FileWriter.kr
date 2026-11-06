@@ -1,45 +1,74 @@
 package std.io;
 
 /**
- * Writes a file piece by piece.
+ * Writes a text file sequentially, piece by piece.
  *
- * ```
+ * <pre>{@code
  * FileWriter out = FileWriter.create("report.txt");
  * out.writeLine("total: $total");
  * out.flush();
- * ```
+ * }</pre>
  *
- * Writes are buffered; `flush` pushes them to the file. The file is flushed
- * and closed when the writer is dropped, but errors at that point are lost,
- * so call `flush` when they matter.
+ * <p>Writes are buffered, and {@link #flush} writes the buffered text to the
+ * file. The writer is flushed and the file closed when the writer is
+ * dropped, but any error at that point is lost, so call {@code flush}
+ * explicitly when errors must be detected.
+ *
+ * @see Files
  */
 final class FileWriter {
     private FileWriter() {}
 
-    /** Opens the file at `path` for writing, creating it or emptying what it held. */
+    /**
+     * Opens a file for writing, creating it or truncating its content.
+     *
+     * @param path the path of the file
+     * @return a writer positioned at the beginning of the empty file
+     * @throws IOException if the file cannot be opened
+     */
     static FileWriter create(String path) throws IOException {
         return open(path, false);
     }
 
-    /** Opens the file at `path` for adding to its end, creating it if needed. */
+    /**
+     * Opens a file for appending, creating it if it does not exist.
+     *
+     * @param path the path of the file
+     * @return a writer positioned at the end of the file
+     * @throws IOException if the file cannot be opened
+     */
     static FileWriter append(String path) throws IOException {
         return open(path, true);
     }
 
-    /** Writes `text`. */
+    /**
+     * Writes text.
+     *
+     * @param text the text to write
+     * @throws IOException if writing fails
+     */
     mut void write(String text) throws IOException {
         if (!this.writeRaw(text)) {
             throw new IOException("couldn't write: ${Files.lastError()}");
         }
     }
 
-    /** Writes `text` and a `\n`. */
+    /**
+     * Writes text followed by a line terminator ({@code \n}).
+     *
+     * @param text the text to write
+     * @throws IOException if writing fails
+     */
     mut void writeLine(String text) throws IOException {
         this.write(text);
         this.write("\n");
     }
 
-    /** Pushes everything written so far to the file. */
+    /**
+     * Writes all buffered text to the file.
+     *
+     * @throws IOException if writing fails
+     */
     mut void flush() throws IOException {
         if (!this.flushRaw()) {
             throw new IOException("couldn't flush: ${Files.lastError()}");

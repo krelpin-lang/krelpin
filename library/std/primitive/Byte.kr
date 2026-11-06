@@ -1,28 +1,35 @@
 package std.primitive;
 
 /**
- * Methods and constants for `byte`, an 8-bit signed integer.
+ * The {@code byte} primitive type, an 8-bit signed two's complement integer.
  *
- * The methods are called on the values themselves:
+ * <p>The methods of this class are called on {@code byte} values directly,
+ * and its constants are accessed through the type name:
  *
- * ```
+ * <pre>{@code
  * byte value = byte.parse("-12");
  * String padded = value.format(">8");
- * ```
+ * }</pre>
  *
- * Arithmetic on `byte` wraps around on overflow: `byte.MAX_VALUE + 1` is
- * `byte.MIN_VALUE`.
+ * <p>Arithmetic on {@code byte} wraps around on overflow:
+ * {@code byte.MAX_VALUE + 1} is {@code byte.MIN_VALUE}.
  */
 final class Byte implements Comparable<byte>, Hashable<byte> {
-    /** The smallest `byte`, -2<sup>7</sup>. */
+    /** The minimum value of a {@code byte}, -2<sup>7</sup>. */
     public const byte MIN_VALUE = -128;
 
-    /** The largest `byte`, 2<sup>7</sup> - 1, which is 127. */
+    /** The maximum value of a {@code byte}, 2<sup>7</sup> - 1 (127). */
     public const byte MAX_VALUE = 127;
 
     private Byte() {}
 
-    /** Returns a negative number, zero or a positive number when this value is smaller than, equal to or larger than `other`. */
+    /**
+     * Compares this value with another value numerically.
+     *
+     * @param other the value to compare with
+     * @return a negative number, zero or a positive number if this value is
+     *         less than, equal to or greater than {@code other}
+     */
     int compareTo(&byte other) {
         if (this < other) {
             return -1;
@@ -31,41 +38,54 @@ final class Byte implements Comparable<byte>, Hashable<byte> {
     }
 
     /**
-     * Parses a decimal number, like `"-12"` or `"+7"`.
+     * Parses a signed decimal integer, such as {@code "-12"} or {@code "+7"}.
      *
-     * The text may start with `+` or `-` and must otherwise be made of the
-     * digits `0` to `9` only: no spaces, underscores or prefixes like `0x`.
+     * <p>The text may begin with {@code +} or {@code -} and must otherwise
+     * consist only of the digits {@code 0} to {@code 9}. Whitespace,
+     * underscores and radix prefixes such as {@code 0x} are not accepted.
      *
-     * # Throws
-     *
-     * `NumberFormatException` if the text isn't a number or the number
-     * doesn't fit in a `byte`.
+     * @param text the text to parse
+     * @return the parsed value
+     * @throws NumberFormatException if {@code text} is not a valid integer or
+     *         its value does not fit in a {@code byte}
      */
     @Intrinsic
     static byte parse(String text);
 
-    /** Returns whether this value is equal to `other`. */
+    /**
+     * Returns whether this value is equal to another value.
+     *
+     * @param other the value to compare with
+     * @return {@code true} if the values are equal
+     */
     boolean equals(&byte other) {
         return this == other;
     }
 
-    /** Returns a hash of this value, consistent with `equals`. */
+    /**
+     * Returns a hash code for this value, consistent with {@link #equals}.
+     *
+     * @return a hash code for this value
+     */
     @Intrinsic
     int hashCode();
 
     /**
-     * Formats this value with a format spec, the same as `"${value:spec}"`
-     * in an interpolated string.
+     * Formats this value according to a format specification.
      *
-     * ```
+     * <p>{@code value.format(spec)} produces the same text as the
+     * interpolation {@code "${value:spec}"}.
+     *
+     * <pre>{@code
      * 42.format(">6")  // "    42"
      * 42.format("06")  // "000042"
      * 255.format("x")  // "ff"
-     * ```
+     * }</pre>
      *
-     * # Throws
-     *
-     * `IllegalArgumentException` if the spec can't be used on integers.
+     * @param spec the format specification, as described in {@link Format}
+     * @return the formatted text
+     * @throws IllegalArgumentException if {@code spec} is malformed or does
+     *         not apply to integers
      */
     String format(String spec) {
         return Format.integer(this, spec);

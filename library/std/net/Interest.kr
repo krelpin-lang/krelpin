@@ -1,22 +1,27 @@
 package std.net;
 
 /**
- * The readiness a socket is registered for with a `Poller`. Combine them
- * with `|`:
+ * Constants for the readiness a socket is registered for with a
+ * {@link Poller}.
  *
- * ```
+ * <p>The constants can be combined with {@code |}:
+ *
+ * <pre>{@code
  * stream.register(&mut poller, 7, Interest.READABLE | Interest.WRITABLE);
- * ```
+ * }</pre>
  */
 final class Interest {
     private Interest() {}
 
-    /** Report the socket when a read, `tryAccept` or `tryReceive` won't block. */
+    /**
+     * Reports the socket when a read, {@code tryAccept} or
+     * {@code tryReceive} would not block.
+     */
     public const int READABLE = 1;
 
     /**
-     * Report the socket when a write won't block, and when a connection
-     * started with `TcpStream.startConnect` has finished or failed.
+     * Reports the socket when a write would not block, and when a connection
+     * started with {@link TcpStream#startConnect} has completed or failed.
      */
     public const int WRITABLE = 2;
 }

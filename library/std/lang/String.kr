@@ -1,148 +1,206 @@
 package std.lang;
 
 /**
- * An immutable sequence of Unicode characters, stored as UTF-8.
+ * An immutable sequence of Unicode characters, encoded as UTF-8.
  *
- * Lengths and indices count characters (Unicode scalar values), not bytes,
- * so `"héllo".length()` is 5 and `"héllo".charAt(1)` is `'é'`. Strings are
- * shared, not copied, so passing one around is cheap.
+ * <p>Lengths and indices count characters (Unicode scalar values), not
+ * bytes: {@code "héllo".length()} is 5 and {@code "héllo".charAt(1)} is
+ * {@code 'é'}. Strings are shared rather than copied, so passing one is
+ * inexpensive.
  *
- * Strings are built with `+`, which turns any value into text, or with
- * interpolation:
+ * <p>Strings are usually built with the {@code +} operator, which converts
+ * any value to text, or with string interpolation:
  *
- * ```
+ * <pre>{@code
  * String name = "Krelpin";
  * int version = 2;
  * String title = "$name v$version";          // "Krelpin v2"
  * String padded = "[${name:>10}]";           // "[   Krelpin]"
- * ```
+ * }</pre>
  *
- * Use a `StringBuilder` to build a long string piece by piece.
+ * <p>To build a long string from many pieces, use a {@link StringBuilder}.
+ *
+ * @see StringBuilder
+ * @see Format
  */
 final class String implements Comparable<String>, Hashable<String> {
-    /** Returns the number of characters in this string. */
+    /**
+     * Returns the length of this string.
+     *
+     * @return the number of characters in this string
+     */
     @Intrinsic
     int length();
 
-    /** Returns whether this string has no characters. */
+    /**
+     * Returns whether this string is empty.
+     *
+     * @return {@code true} if {@link #length} is 0
+     */
     boolean isEmpty() {
         return this.length() == 0;
     }
 
     /**
-     * Returns whether this string is empty or made only of whitespace, as
-     * defined by `Char.isWhitespace`.
+     * Returns whether this string is empty or contains only whitespace.
+     *
+     * @return {@code true} if every character is whitespace, as defined by
+     *         {@link std.primitive.Char#isWhitespace}
      */
     boolean isBlank() {
         return this.trim().isEmpty();
     }
 
-    /** Returns the characters of this string as a new array. */
+    /**
+     * Returns the characters of this string.
+     *
+     * @return a new array containing the characters of this string
+     */
     @Intrinsic
     char[] chars();
 
     /**
-     * Returns the UTF-8 encoding of this string as a new array.
+     * Returns the UTF-8 encoding of this string.
      *
-     * ```
+     * <pre>{@code
      * "hé".bytes() // [104, -61, -87]
-     * ```
+     * }</pre>
+     *
+     * @return a new array containing the UTF-8 bytes of this string
      */
     @Intrinsic
     byte[] bytes();
 
     /**
-     * Decodes `bytes` as UTF-8, or returns `null` when they aren't valid
-     * UTF-8.
+     * Decodes a string from UTF-8 bytes.
      *
-     * ```
+     * <pre>{@code
      * byte[] data = "hé".bytes();
      * String.fromUtf8(&data) // "hé"
-     * ```
+     * }</pre>
+     *
+     * @param bytes the bytes to decode
+     * @return the decoded string, or {@code null} if {@code bytes} is not
+     *         valid UTF-8
      */
     @Intrinsic
     static String? fromUtf8(&byte[] bytes);
 
     /**
-     * Returns the character at `index`, counting from 0.
+     * Returns the character at the specified index.
      *
-     * Each call walks the string from the start when it contains non-ASCII
-     * characters, so use `chars()` to visit every character of a long string.
+     * <p>For strings that contain non-ASCII characters, this method scans
+     * the string from the beginning. Use {@link #chars} to visit every
+     * character of a long string.
      *
-     * # Throws
-     *
-     * `IndexOutOfBoundsException` if `index` is negative or not below
-     * `length()`.
+     * @param index the zero-based index of the character
+     * @return the character at {@code index}
+     * @throws IndexOutOfBoundsException if {@code index} is negative or not
+     *         less than {@link #length}
      */
     @Intrinsic
     char charAt(int index);
 
     /**
-     * Returns the characters from `begin` to the end.
+     * Returns the substring that begins at the specified index and extends
+     * to the end of this string.
      *
-     * # Throws
-     *
-     * `IndexOutOfBoundsException` if `begin` is negative or above `length()`.
+     * @param begin the index of the first character, inclusive
+     * @return the substring
+     * @throws IndexOutOfBoundsException if {@code begin} is negative or
+     *         greater than {@link #length}
      */
     @Intrinsic
     String substring(int begin);
 
     /**
-     * Returns the characters from `begin` (included) to `end` (excluded).
+     * Returns the substring between two indices.
      *
-     * ```
+     * <pre>{@code
      * "Krelpin".substring(1, 4) // "rel"
-     * ```
+     * }</pre>
      *
-     * # Throws
-     *
-     * `IndexOutOfBoundsException` unless `0 <= begin <= end <= length()`.
+     * @param begin the index of the first character, inclusive
+     * @param end the index after the last character, exclusive
+     * @return the substring
+     * @throws IndexOutOfBoundsException unless
+     *         {@code 0 <= begin <= end <= length()}
      */
     @Intrinsic
     String substring(int begin, int end);
 
     /**
-     * Returns the index of the first occurrence of `text`, or `-1` when there
-     * is none. An empty `text` is found at index 0.
+     * Returns the index of the first occurrence of the specified text.
+     *
+     * @param text the text to search for; an empty string is found at
+     *        index 0
+     * @return the index of the first occurrence, or -1 if there is none
      */
     @Intrinsic
     int indexOf(String text);
 
     /**
-     * Returns the index of the first occurrence of `text` at or after `from`,
-     * or `-1` when there is none. A negative `from` counts as 0.
+     * Returns the index of the first occurrence of the specified text,
+     * starting the search at the specified index.
+     *
+     * @param text the text to search for
+     * @param from the index to start the search at; a negative value is
+     *        treated as 0
+     * @return the index of the first occurrence at or after {@code from}, or
+     *         -1 if there is none
      */
     @Intrinsic
     int indexOf(String text, int from);
 
     /**
-     * Returns the index of the last occurrence of `text`, or `-1` when there
-     * is none. An empty `text` is found at `length()`.
+     * Returns the index of the last occurrence of the specified text.
+     *
+     * @param text the text to search for; an empty string is found at
+     *        {@link #length}
+     * @return the index of the last occurrence, or -1 if there is none
      */
     @Intrinsic
     int lastIndexOf(String text);
 
-    /** Returns whether `text` occurs in this string. */
+    /**
+     * Returns whether this string contains the specified text.
+     *
+     * @param text the text to search for
+     * @return {@code true} if {@code text} occurs in this string
+     */
     boolean contains(String text) {
         return this.indexOf(text) >= 0;
     }
 
-    /** Returns whether this string starts with `prefix`. */
+    /**
+     * Returns whether this string starts with the specified prefix.
+     *
+     * @param prefix the prefix to test
+     * @return {@code true} if this string starts with {@code prefix}
+     */
     @Intrinsic
     boolean startsWith(String prefix);
 
-    /** Returns whether this string ends with `suffix`. */
+    /**
+     * Returns whether this string ends with the specified suffix.
+     *
+     * @param suffix the suffix to test
+     * @return {@code true} if this string ends with {@code suffix}
+     */
     @Intrinsic
     boolean endsWith(String suffix);
 
     /**
-     * Returns this string with `prefix` removed from the start, or `null`
-     * when it doesn't start with `prefix`.
+     * Returns this string with the specified prefix removed.
      *
-     * ```
+     * <pre>{@code
      * "v1.2".stripPrefix("v")  // "1.2"
      * "1.2".stripPrefix("v")   // null
-     * ```
+     * }</pre>
+     *
+     * @param prefix the prefix to remove
+     * @return the rest of the string, or {@code null} if this string does
+     *         not start with {@code prefix}
      */
     String? stripPrefix(String prefix) {
         if (!this.startsWith(prefix)) {
@@ -152,8 +210,11 @@ final class String implements Comparable<String>, Hashable<String> {
     }
 
     /**
-     * Returns this string with `suffix` removed from the end, or `null` when
-     * it doesn't end with `suffix`.
+     * Returns this string with the specified suffix removed.
+     *
+     * @param suffix the suffix to remove
+     * @return the rest of the string, or {@code null} if this string does
+     *         not end with {@code suffix}
      */
     String? stripSuffix(String suffix) {
         if (!this.endsWith(suffix)) {
@@ -163,44 +224,63 @@ final class String implements Comparable<String>, Hashable<String> {
     }
 
     /**
-     * Returns this string in uppercase.
+     * Converts this string to uppercase.
      *
-     * Uses the full Unicode case mappings, which may change the length:
-     * `"straße".toUpperCase()` is `"STRASSE"`. The mapping is the same in
-     * every language and locale.
+     * <p>The full Unicode case mappings are used, which can change the
+     * length of the string: {@code "straße".toUpperCase()} is
+     * {@code "STRASSE"}. The result does not depend on the locale.
+     *
+     * @return this string in uppercase
      */
     @Intrinsic
     String toUpperCase();
 
     /**
-     * Returns this string in lowercase, using the full Unicode case mappings
-     * the same way `toUpperCase` does.
+     * Converts this string to lowercase, using the full Unicode case
+     * mappings as {@link #toUpperCase} does.
+     *
+     * @return this string in lowercase
      */
     @Intrinsic
     String toLowerCase();
 
     /**
-     * Returns this string without whitespace at either end. Whitespace is
-     * every character with the Unicode `White_Space` property.
+     * Removes whitespace from both ends of this string.
      *
-     * ```
+     * <p>Whitespace is any character with the Unicode {@code White_Space}
+     * property.
+     *
+     * <pre>{@code
      * "  hello\n".trim() // "hello"
-     * ```
+     * }</pre>
+     *
+     * @return this string without leading and trailing whitespace
      */
     @Intrinsic
     String trim();
 
-    /** Returns this string without whitespace at the start. */
+    /**
+     * Removes whitespace from the beginning of this string.
+     *
+     * @return this string without leading whitespace
+     */
     @Intrinsic
     String trimStart();
 
-    /** Returns this string without whitespace at the end. */
+    /**
+     * Removes whitespace from the end of this string.
+     *
+     * @return this string without trailing whitespace
+     */
     @Intrinsic
     String trimEnd();
 
     /**
-     * Returns whether this string equals `other` when both are converted to
-     * lowercase.
+     * Compares this string with another string, ignoring case.
+     *
+     * @param other the string to compare with
+     * @return {@code true} if both strings are equal after conversion to
+     *         lowercase
      */
     boolean equalsIgnoreCase(&String other) {
         return this.toLowerCase().equals(&other.toLowerCase());
@@ -209,12 +289,15 @@ final class String implements Comparable<String>, Hashable<String> {
     /**
      * Splits this string into lines.
      *
-     * Lines end with `\n` or `\r\n`, which aren't part of the result. A final
-     * line ending doesn't start another, empty line.
+     * <p>Lines are terminated by {@code \n} or {@code \r\n}; the terminators
+     * are not included in the result. A terminator at the end of the string
+     * does not start an additional empty line.
      *
-     * ```
+     * <pre>{@code
      * "one\ntwo\r\n".lines() // ["one", "two"]
-     * ```
+     * }</pre>
+     *
+     * @return the lines of this string
      */
     String[] lines() {
         String[] parts = this.replace("\r\n", "\n").split("\n");
@@ -230,64 +313,93 @@ final class String implements Comparable<String>, Hashable<String> {
     }
 
     /**
-     * Returns this string with every occurrence of `target` replaced by
-     * `replacement`, from left to right. An empty `target` changes nothing.
+     * Replaces every occurrence of a target string, from left to right.
+     *
+     * @param target the text to replace; if it is empty, nothing is replaced
+     * @param replacement the text to insert in its place
+     * @return the resulting string
      */
     @Intrinsic
     String replace(String target, String replacement);
 
     /**
-     * Returns this string repeated `count` times.
+     * Returns this string repeated the specified number of times.
      *
-     * # Throws
-     *
-     * `IllegalArgumentException` if `count` is negative.
+     * @param count the number of repetitions
+     * @return the repeated string, or an empty string if {@code count} is 0
+     * @throws IllegalArgumentException if {@code count} is negative
      */
     @Intrinsic
     String repeat(int count);
 
     /**
-     * Splits this string around every occurrence of `separator`.
+     * Splits this string around each occurrence of a separator.
      *
-     * Empty pieces are kept, so the result always has one more element than
-     * there are separators. An empty `separator` splits the string into its
-     * characters.
+     * <p>Empty pieces are kept, so the result always has one more element
+     * than there are separators. An empty separator splits the string into
+     * its characters.
      *
-     * ```
+     * <pre>{@code
      * "a,b,,c".split(",") // ["a", "b", "", "c"]
      * "abc".split("")     // ["a", "b", "c"]
-     * ```
+     * }</pre>
+     *
+     * @param separator the separator
+     * @return the pieces of this string
      */
     @Intrinsic
     String[] split(String separator);
 
     /**
-     * Compares this string and `other` character by character, by code
-     * point. Returns a negative number, zero or a positive number when this
-     * string sorts before, the same as or after `other`.
+     * Compares this string with another string lexicographically, by code
+     * point.
+     *
+     * @param other the string to compare with
+     * @return a negative number, zero or a positive number if this string
+     *         sorts before, equal to or after {@code other}
      */
     @Intrinsic
     int compareTo(&String other);
 
-    /** Returns whether this string has the same characters as `other`. */
+    /**
+     * Returns whether this string contains the same characters as another
+     * string.
+     *
+     * @param other the string to compare with
+     * @return {@code true} if the strings are equal
+     */
     @Intrinsic
     boolean equals(&String other);
 
-    /** Returns a hash of the characters, consistent with `equals`. */
+    /**
+     * Returns a hash code for this string, consistent with {@link #equals}.
+     *
+     * @return a hash code for this string
+     */
     @Intrinsic
     int hashCode();
 
     /**
-     * Joins `parts` into one string with `separator` between them.
+     * Joins strings with a separator between them.
      *
-     * ```
+     * <pre>{@code
      * String.join(", ", "a", "b", "c") // "a, b, c"
-     * ```
+     * }</pre>
+     *
+     * @param separator the text to insert between consecutive parts
+     * @param parts the strings to join
+     * @return the joined string
      */
     @Intrinsic
     static String join(String separator, String... parts);
 
-    /** Returns `value` as text, the way `+` and `Console.println` show it. */
+    /**
+     * Returns the string representation of a value, as produced by string
+     * concatenation.
+     *
+     * @param value the value to convert
+     * @return the value as text, or {@code "null"} if it is {@code null}
+     */
     @Intrinsic
     static String valueOf(Object? value);
 }

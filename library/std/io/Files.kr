@@ -1,27 +1,38 @@
 package std.io;
 
 /**
- * Reads, writes and inspects files as a whole.
+ * Static methods that read, write and inspect files as a whole.
  *
- * Paths are strings, relative to the current directory unless they start
- * with `/`. Text is UTF-8: reading a file that isn't valid UTF-8 throws.
+ * <p>Paths are strings and are relative to the current working directory
+ * unless they begin with {@code /}. Text is encoded as UTF-8; reading a file
+ * that is not valid UTF-8 throws an exception.
  *
- * ```
+ * <pre>{@code
  * Files.writeString("notes.txt", "first line\n");
  * Files.appendString("notes.txt", "second line\n");
  * for (String line : Files.readLines("notes.txt")) {
  *     Console.println(line);
  * }
- * ```
+ * }</pre>
  *
- * Every method that can fail throws an `IOException` whose message names
- * the path and the reason, like
- * ``couldn't read `notes.txt`: No such file or directory``.
+ * <p>Every method that can fail throws an {@link IOException} whose message
+ * names the path and the reason, such as
+ * {@code couldn't read `notes.txt`: No such file or directory}.
+ *
+ * @see FileReader
+ * @see FileWriter
+ * @see Path
  */
 final class Files {
     private Files() {}
 
-    /** Returns the whole content of the file at `path`. */
+    /**
+     * Reads the entire content of a file.
+     *
+     * @param path the path of the file
+     * @return the content of the file
+     * @throws IOException if the file cannot be read or is not valid UTF-8
+     */
     static String readString(String path) throws IOException {
         String? text = readFile(path);
         if (text == null) {
@@ -30,38 +41,79 @@ final class Files {
         return text;
     }
 
-    /** Returns the lines of the file at `path`, split the way `String.lines` splits. */
+    /**
+     * Reads all lines of a file, split as by {@link String#lines}.
+     *
+     * @param path the path of the file
+     * @return the lines of the file
+     * @throws IOException if the file cannot be read or is not valid UTF-8
+     */
     static String[] readLines(String path) throws IOException {
         return readString(path).lines();
     }
 
-    /** Writes `text` to the file at `path`, creating it or replacing what it held. */
+    /**
+     * Writes text to a file, creating the file or replacing its content.
+     *
+     * @param path the path of the file
+     * @param text the text to write
+     * @throws IOException if the file cannot be written
+     */
     static void writeString(String path, String text) throws IOException {
         if (!writeFile(path, text, false)) {
             throw failure("write", path);
         }
     }
 
-    /** Adds `text` to the end of the file at `path`, creating it if needed. */
+    /**
+     * Appends text to the end of a file, creating the file if it does not
+     * exist.
+     *
+     * @param path the path of the file
+     * @param text the text to append
+     * @throws IOException if the file cannot be written
+     */
     static void appendString(String path, String text) throws IOException {
         if (!writeFile(path, text, true)) {
             throw failure("append to", path);
         }
     }
 
-    /** Returns whether something exists at `path`. Never throws. */
+    /**
+     * Returns whether a file or directory exists at a path. This method never
+     * throws.
+     *
+     * @param path the path to test
+     * @return {@code true} if something exists at {@code path}
+     */
     @Intrinsic
     static boolean exists(String path);
 
-    /** Returns whether `path` names a regular file. Never throws. */
+    /**
+     * Returns whether a path names a regular file. This method never throws.
+     *
+     * @param path the path to test
+     * @return {@code true} if {@code path} is a regular file
+     */
     @Intrinsic
     static boolean isFile(String path);
 
-    /** Returns whether `path` names a directory. Never throws. */
+    /**
+     * Returns whether a path names a directory. This method never throws.
+     *
+     * @param path the path to test
+     * @return {@code true} if {@code path} is a directory
+     */
     @Intrinsic
     static boolean isDirectory(String path);
 
-    /** Returns the size of the file at `path` in bytes. */
+    /**
+     * Returns the size of a file.
+     *
+     * @param path the path of the file
+     * @return the size of the file, in bytes
+     * @throws IOException if the size cannot be read
+     */
     static long size(String path) throws IOException {
         long size = sizeOf(path);
         if (size < 0) {
@@ -70,7 +122,12 @@ final class Files {
         return size;
     }
 
-    /** Deletes the file or empty directory at `path`. */
+    /**
+     * Deletes a file or an empty directory.
+     *
+     * @param path the path to delete
+     * @throws IOException if the path cannot be deleted
+     */
     static void delete(String path) throws IOException {
         if (!remove(path)) {
             throw failure("delete", path);
@@ -78,8 +135,12 @@ final class Files {
     }
 
     /**
-     * Creates the directory at `path` and every missing parent. Succeeds when
-     * the directory already exists.
+     * Creates a directory, including any missing parent directories.
+     *
+     * <p>Succeeds without doing anything if the directory already exists.
+     *
+     * @param path the path of the directory
+     * @throws IOException if a directory cannot be created
      */
     static void createDirectories(String path) throws IOException {
         if (!makeDirectories(path)) {
@@ -87,7 +148,14 @@ final class Files {
         }
     }
 
-    /** Returns the names of the entries in `directory`, sorted, without `.` and `..`. */
+    /**
+     * Returns the names of the entries in a directory.
+     *
+     * @param directory the path of the directory
+     * @return the entry names in sorted order, excluding {@code .} and
+     *         {@code ..}
+     * @throws IOException if the directory cannot be read
+     */
     static String[] list(String directory) throws IOException {
         String[]? names = listDirectory(directory);
         if (names == null) {
@@ -96,16 +164,32 @@ final class Files {
         return names;
     }
 
-    /** Builds the exception for a failed `action` on `path`, with the reason from `lastError`. */
+    /**
+     * Creates the exception for a failed file operation, with the reason
+     * given by {@link #lastError}.
+     *
+     * @param action the operation that failed, such as {@code "read"}
+     * @param path the path the operation was applied to
+     * @return the exception to throw
+     */
     static IOException failure(String action, String path) {
         return new IOException("couldn't $action `$path`: ${lastError()}");
     }
 
-    /** Describes why the last file operation on this thread failed. */
+    /**
+     * Returns a description of why the last file operation on the current
+     * thread failed.
+     *
+     * @return the system's description of the last error
+     */
     @Intrinsic
     static String lastError();
 
-    /** Returns whether the last file operation on this thread failed. */
+    /**
+     * Returns whether the last file operation on the current thread failed.
+     *
+     * @return {@code true} if the last operation failed
+     */
     @Intrinsic
     static boolean lastFailed();
 

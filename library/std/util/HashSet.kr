@@ -1,14 +1,16 @@
 package std.util;
 
 /**
- * A set backed by a hash table. Adding, removing and looking up an element
- * take constant time on average.
+ * A hash table implementation of {@link Set}.
  *
- * Elements must be `Hashable`. The order in which they are visited is
- * unspecified and may change as elements are added or removed.
+ * <p>{@link #add}, {@link #remove} and {@link #contains} run in constant
+ * time on average. The iteration order of the elements is unspecified and
+ * may change as elements are added or removed.
+ *
+ * @param <T> the type of the elements, which must be {@link Hashable}
  */
 class HashSet<T extends Hashable<T>> implements Set<T> {
-    /** Creates an empty set. */
+    /** Constructs an empty set. */
     HashSet() {}
 
     @Intrinsic
@@ -26,12 +28,24 @@ class HashSet<T extends Hashable<T>> implements Set<T> {
     @Intrinsic
     mut void clear();
 
-    /** Returns an iterator over the elements. */
+    /**
+     * Returns an iterator over the elements of this set, in no particular
+     * order.
+     *
+     * @return an iterator that borrows this set
+     */
     Iterator<T> iterator() {
         return new HashSetIterator<>(this);
     }
 
-    /** Shows the elements in brackets, like `[a, b]`. */
+    /**
+     * Returns a string representation of this set.
+     *
+     * <p>The elements are shown separated by commas and enclosed in brackets,
+     * such as {@code [a, b]}.
+     *
+     * @return a string representation of this set
+     */
     String toString() {
         StringBuilder text = new StringBuilder();
         text.append("[");
@@ -47,11 +61,22 @@ class HashSet<T extends Hashable<T>> implements Set<T> {
         return text.toString();
     }
 
-    /** The number of slots in the table, for `HashSetIterator`. */
+    /**
+     * Returns the number of slots in the hash table. Used by
+     * {@link HashSetIterator}.
+     *
+     * @return the capacity of the table
+     */
     @Intrinsic
     int slotCount();
 
-    /** The element in slot `index`, or `null` for an empty slot, for `HashSetIterator`. */
+    /**
+     * Returns the element stored in a slot of the hash table. Used by
+     * {@link HashSetIterator}.
+     *
+     * @param index the index of the slot, less than {@link #slotCount}
+     * @return the element in the slot, or {@code null} if the slot is empty
+     */
     @Intrinsic
     (&T)? slotAt(int index);
 }

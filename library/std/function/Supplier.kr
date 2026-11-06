@@ -1,7 +1,16 @@
 package std.function;
 
-/** A function with no arguments that produces a value, like `() -> new ArrayList<>()`. */
+/**
+ * A function that takes no arguments and produces a result, such as
+ * {@code () -> new ArrayList<>()}.
+ *
+ * @param <T> the type of the result
+ */
 interface Supplier<T> {
-    /** Calls the function and returns the value it produces. */
+    /**
+     * Produces a result.
+     *
+     * @return the result
+     */
     mut T get();
 }

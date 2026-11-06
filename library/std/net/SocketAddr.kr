@@ -3,27 +3,33 @@ package std.net;
 import std.primitive.Int;
 
 /**
- * An IP address and a port, like `127.0.0.1:8080` or `[::1]:443`.
+ * An IP socket address: an IP address and a port, such as
+ * {@code 127.0.0.1:8080} or {@code [::1]:443}.
  *
- * Sockets report their own address and their peer's as a `SocketAddr`:
+ * <p>Sockets report their local and peer addresses as a
+ * {@code SocketAddr}:
  *
- * ```
+ * <pre>{@code
  * TcpListener listener = TcpListener.bind("127.0.0.1:0");
  * int port = listener.localAddr().port(); // the port the system picked
- * ```
+ * }</pre>
  *
- * Methods that open a socket take the address as a string instead, so they
- * can also accept a host name like `example.com:80`.
+ * <p>Methods that open a socket take the address as a string instead, so
+ * that they also accept host names such as {@code example.com:80}.
+ *
+ * @param ip the numeric IPv4 or IPv6 address, without brackets
+ * @param port the port number, from 0 to 65535
  */
 record SocketAddr(String ip, int port) {
     /**
-     * Creates the address of port `port` on `ip`, an IPv4 address like
-     * `10.0.0.1` or an IPv6 address like `fe80::1`, without brackets.
+     * Constructs a socket address.
      *
-     * # Throws
+     * <p>{@code ip} is an IPv4 address such as {@code 10.0.0.1}, or an IPv6
+     * address such as {@code fe80::1} without brackets, optionally with a zone
+     * such as {@code %en0}.
      *
-     * `IllegalArgumentException` if `ip` isn't a numeric IP address or
-     * `port` isn't from 0 to 65535.
+     * @throws IllegalArgumentException if {@code ip} is not a numeric IP
+     *         address or {@code port} is not between 0 and 65535
      */
     SocketAddr {
         if (port < 0 || port > 65535) {
@@ -35,13 +41,16 @@ record SocketAddr(String ip, int port) {
     }
 
     /**
-     * Parses a numeric address such as `10.0.0.1:80` or `[fe80::1]:8080`.
-     * Host names aren't resolved; pass them to `TcpStream.connect` instead.
+     * Parses a numeric socket address, such as {@code 10.0.0.1:80} or
+     * {@code [fe80::1]:8080}.
      *
-     * # Throws
+     * <p>Host names are not resolved; pass them to {@link TcpStream#connect}
+     * instead.
      *
-     * `IllegalArgumentException` if `text` isn't an IP address followed by
-     * `:` and a port from 0 to 65535.
+     * @param text the text to parse
+     * @return the parsed address
+     * @throws IllegalArgumentException if {@code text} is not an IP address
+     *         followed by {@code :} and a port between 0 and 65535
      */
     static SocketAddr parse(String text) {
         int colon = text.lastIndexOf(":");
@@ -70,7 +79,11 @@ record SocketAddr(String ip, int port) {
         return new SocketAddr(ip, port);
     }
 
-    /** Returns whether the address is an IPv6 address. */
+    /**
+     * Returns whether this is an IPv6 address.
+     *
+     * @return {@code true} for an IPv6 address, {@code false} for IPv4
+     */
     boolean isIpv6() {
         return this.ip.contains(":");
     }
@@ -159,8 +172,11 @@ record SocketAddr(String ip, int port) {
     }
 
     /**
-     * Returns the address the way `parse` and the socket methods read it,
-     * with brackets around an IPv6 address: `[::1]:8080`.
+     * Returns this address in the form accepted by {@link #parse} and the
+     * socket methods, with brackets around an IPv6 address, such as
+     * {@code [::1]:8080}.
+     *
+     * @return the address as text
      */
     String toString() {
         return this.isIpv6() ? "[${this.ip}]:${this.port}" : "${this.ip}:${this.port}";

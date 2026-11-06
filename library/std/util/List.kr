@@ -3,36 +3,59 @@ package std.util;
 import std.function.Predicate;
 
 /**
- * An ordered collection that can be indexed, like `ArrayList`.
+ * An ordered collection whose elements are accessed by their position.
  *
- * Indices count from 0. Methods that take an index throw
- * `IndexOutOfBoundsException` when it is out of range.
+ * <p>Indices are zero-based. Methods that take an index throw
+ * {@link IndexOutOfBoundsException} if it is out of range.
  *
- * Elements are owned by the list: `add` moves a value in, `remove` moves it
- * back out, and `get` lends a reference that keeps the list borrowed while
- * it is used.
+ * <p>A list owns its elements: {@link #add} moves a value into the list,
+ * {@link #remove} moves it back out, and {@link #get} returns a reference
+ * that keeps the list borrowed while it is in use.
  *
- * ```
+ * <pre>{@code
  * List<String> names = new ArrayList<>();
  * names.add("Ada");
  * names.add("Grace");
  * names.sort();
  * &String first = names.get(0);
- * ```
+ * }</pre>
+ *
+ * @param <T> the type of the elements
+ * @see ArrayList
  */
 interface List<T> extends Iterable<T> {
-    /** Returns the number of elements. */
+    /**
+     * Returns the number of elements in this list.
+     *
+     * @return the number of elements
+     */
     int size();
 
-    /** Returns whether the list has no elements. */
+    /**
+     * Returns whether this list contains no elements.
+     *
+     * @return {@code true} if {@link #size} is 0
+     */
     boolean isEmpty() {
         return this.size() == 0;
     }
 
-    /** Returns a reference to the element at `index`. */
+    /**
+     * Returns the element at the specified position.
+     *
+     * @param index the index of the element
+     * @return a reference to the element
+     * @throws IndexOutOfBoundsException if {@code index} is negative or not
+     *         less than {@link #size}
+     */
     &T get(int index);
 
-    /** Returns a reference to the first element, or `null` when the list is empty. */
+    /**
+     * Returns the first element of this list.
+     *
+     * @return a reference to the first element, or {@code null} if this list
+     *         is empty
+     */
     (&T)? first() {
         if (this.isEmpty()) {
             return null;
@@ -40,7 +63,12 @@ interface List<T> extends Iterable<T> {
         return this.get(0);
     }
 
-    /** Returns a reference to the last element, or `null` when the list is empty. */
+    /**
+     * Returns the last element of this list.
+     *
+     * @return a reference to the last element, or {@code null} if this list is
+     *         empty
+     */
     (&T)? last() {
         if (this.isEmpty()) {
             return null;
@@ -48,31 +76,57 @@ interface List<T> extends Iterable<T> {
         return this.get(this.size() - 1);
     }
 
-    /** Replaces the element at `index` with `value` and returns the old element. */
+    /**
+     * Replaces the element at the specified position.
+     *
+     * @param index the index of the element to replace
+     * @param value the new element
+     * @return the element previously at {@code index}
+     * @throws IndexOutOfBoundsException if {@code index} is negative or not
+     *         less than {@link #size}
+     */
     mut T set(int index, T value);
 
-    /** Adds `value` at the end. */
+    /**
+     * Appends an element to the end of this list.
+     *
+     * @param value the element to append
+     */
     mut void add(T value);
 
     /**
-     * Inserts `value` at `index`, moving the elements from there on one
-     * place up. An `index` equal to `size()` adds at the end.
+     * Inserts an element at the specified position, shifting the element at
+     * that position and all subsequent elements one position up.
+     *
+     * @param index the index to insert at; {@link #size} appends
+     * @param value the element to insert
+     * @throws IndexOutOfBoundsException if {@code index} is negative or
+     *         greater than {@link #size}
      */
     mut void add(int index, T value);
 
     /**
-     * Removes the element at `index` and returns it, moving the elements
-     * after it one place down.
+     * Removes the element at the specified position, shifting all subsequent
+     * elements one position down.
+     *
+     * @param index the index of the element to remove
+     * @return the removed element
+     * @throws IndexOutOfBoundsException if {@code index} is negative or not
+     *         less than {@link #size}
      */
     mut T remove(int index);
 
     /**
-     * Removes every element for which `filter` returns `true` and returns how
-     * many were removed. The others keep their order.
+     * Removes every element that satisfies a predicate. The remaining
+     * elements keep their relative order.
      *
-     * ```
+     * <pre>{@code
      * numbers.removeIf(n -> n % 2 == 0); // keeps the odd numbers
-     * ```
+     * }</pre>
+     *
+     * @param filter the predicate, which returns {@code true} for the elements
+     *        to remove
+     * @return the number of elements removed
      */
     mut int removeIf(Predicate<&T> filter) {
         int count = this.size();
@@ -96,10 +150,16 @@ interface List<T> extends Iterable<T> {
         return count - kept;
     }
 
-    /** Exchanges the elements at indices `a` and `b`. */
+    /**
+     * Exchanges the elements at two positions.
+     *
+     * @param a the index of the first element
+     * @param b the index of the second element
+     * @throws IndexOutOfBoundsException if either index is out of range
+     */
     mut void swap(int a, int b);
 
-    /** Reverses the order of the elements. */
+    /** Reverses the order of the elements in this list. */
     mut void reverse() {
         int low = 0;
         int high = this.size() - 1;
@@ -110,15 +170,30 @@ interface List<T> extends Iterable<T> {
         }
     }
 
-    /** Returns whether an element equal to `value` is in the list. */
+    /**
+     * Returns whether this list contains an element equal to a value.
+     *
+     * @param value the value to search for
+     * @return {@code true} if an element equal to {@code value} is present
+     */
     boolean contains(&T value) where T extends Equatable<T> {
         return this.indexOf(value) >= 0;
     }
 
-    /** Returns the index of the first element equal to `value`, or `-1`. */
+    /**
+     * Returns the index of the first element equal to a value.
+     *
+     * @param value the value to search for
+     * @return the index of the first equal element, or -1 if there is none
+     */
     int indexOf(&T value) where T extends Equatable<T>;
 
-    /** Returns the index of the last element equal to `value`, or `-1`. */
+    /**
+     * Returns the index of the last element equal to a value.
+     *
+     * @param value the value to search for
+     * @return the index of the last equal element, or -1 if there is none
+     */
     int lastIndexOf(&T value) where T extends Equatable<T> {
         for (int index = this.size() - 1; index >= 0; index--) {
             if (this.get(index).equals(value)) {
@@ -128,19 +203,26 @@ interface List<T> extends Iterable<T> {
         return -1;
     }
 
-    /** Sorts the elements in their natural order. Equal elements keep their order. */
+    /**
+     * Sorts this list into the natural order of its elements.
+     *
+     * <p>The sort is stable: equal elements keep their relative order.
+     */
     mut void sort() where T extends Comparable<T> {
         this.sort((a, b) -> a.compareTo(b));
     }
 
     /**
-     * Sorts the elements in the order `comparator` defines. The sort is
-     * stable, so elements it considers equal keep their order, and takes
-     * O(n log n) comparisons.
+     * Sorts this list into the order defined by a comparator.
      *
-     * ```
+     * <p>The sort is stable, so elements that the comparator considers equal
+     * keep their relative order. It performs O(n log n) comparisons.
+     *
+     * <pre>{@code
      * words.sort((a, b) -> a.length() - b.length());
-     * ```
+     * }</pre>
+     *
+     * @param comparator the comparator that defines the order
      */
     mut void sort(Comparator<T> comparator) {
         int count = this.size();
@@ -207,6 +289,6 @@ interface List<T> extends Iterable<T> {
         }
     }
 
-    /** Removes every element. */
+    /** Removes all elements from this list. */
     mut void clear();
 }

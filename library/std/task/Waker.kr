@@ -1,20 +1,26 @@
 package std.task;
 
 /**
- * Tells an executor to poll a task again.
+ * A handle that tells an executor to poll a task again.
  *
- * Executors implement this interface, and futures use it: a future that
- * returns `Poll.Pending` keeps the waker from `Context.waker()`, and calls
- * `wake` when the thing it waits for has happened, for example from a
- * timer or when a socket becomes ready.
+ * <p>Executors implement this interface and futures use it: a future that
+ * returns {@code Poll.Pending} keeps the waker obtained from
+ * {@link Context#waker} and calls {@link #wake} once the event it waits for
+ * has occurred, for example when a timer expires or a socket becomes ready.
  */
 interface Waker {
     /**
-     * Schedules the task to be polled again. Waking a task that is already
-     * scheduled doesn't poll it twice.
+     * Schedules the task to be polled again.
+     *
+     * <p>Waking a task that is already scheduled does not cause it to be polled
+     * twice.
      */
     void wake();
 
-    /** Returns a waker for the same task. */
+    /**
+     * Returns a new waker for the same task.
+     *
+     * @return a waker that wakes the same task as this one
+     */
     Waker copy();
 }

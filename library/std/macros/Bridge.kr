@@ -5,11 +5,11 @@ import std.util.ArrayList;
 import std.util.List;
 
 /**
- * Connects a macro crate to the compiler that runs it.
+ * The connection between a macro crate and the compiler that runs it.
  *
- * The compiler generates the `main` of every macro crate around this class,
- * so macros never use it themselves. Requests and replies are lines of
- * tab-separated text.
+ * <p>The compiler generates the {@code main} method of every macro crate
+ * around this class, so macros never use it directly. Requests and replies
+ * are exchanged as lines of tab-separated text.
  */
 final class Bridge {
     private List<String> macros;
@@ -20,12 +20,21 @@ final class Bridge {
         this.current = "";
     }
 
-    /** Adds `name` to the macros this crate offers. */
+    /**
+     * Declares a macro that this crate provides.
+     *
+     * @param name the name of the macro
+     */
     mut void declare(String name) {
         this.macros.add(name);
     }
 
-    /** Tells the compiler which macros the crate offers. */
+    /**
+     * Tells the compiler that this crate is ready, and which macros it
+     * provides.
+     *
+     * @param crateName the name of the macro crate
+     */
     mut void ready(String crateName) {
         open();
         String line = "krelpin-macro-server\t1\t" + escape(crateName);
@@ -36,12 +45,11 @@ final class Bridge {
     }
 
     /**
-     * Waits for the next request and returns `true`, or `false` once the
-     * compiler has no more.
+     * Waits for the next request from the compiler.
      *
-     * # Throws
-     *
-     * `IllegalStateException` if the request is malformed.
+     * @return {@code true} if a request was received, or {@code false} if the
+     *         compiler has no more requests
+     * @throws IllegalStateException if the request is malformed
      */
     mut boolean next() {
         String? line = receive();
@@ -56,17 +64,30 @@ final class Bridge {
         return true;
     }
 
-    /** Returns whether the current request is for the macro `name`. */
+    /**
+     * Returns whether the current request is for a macro.
+     *
+     * @param name the name of the macro
+     * @return {@code true} if the compiler requested {@code name}
+     */
     boolean calls(String name) {
         return this.current.equals(&name);
     }
 
-    /** Reads a token stream sent with the current request. */
+    /**
+     * Reads a token stream sent with the current request.
+     *
+     * @return the token stream
+     */
     TokenStream read() {
         return readStream();
     }
 
-    /** Sends the tokens a macro returned. */
+    /**
+     * Sends the tokens that a macro returned to the compiler.
+     *
+     * @param output the tokens produced by the macro
+     */
     void reply(TokenStream output) {
         send("ok\t" + output.size());
         for (int i = 0; i < output.size(); i++) {
@@ -75,18 +96,27 @@ final class Bridge {
         }
     }
 
-    /** Reports an error a macro threw. */
+    /**
+     * Reports an error that a macro threw to the compiler.
+     *
+     * @param error the error
+     */
     void fail(&MacroError error) {
         String message = error.getMessage() ?: "the macro failed";
         send("error\t" + error.span().id() + "\t" + escape(message));
     }
 
-    /** Reports that the requested macro doesn't exist in this crate. */
+    /** Reports that the requested macro does not exist in this crate. */
     void unknown() {
         send("error\t-1\t" + escape("this crate has no macro `" + this.current + "`"));
     }
 
-    /** Asks the compiler to split `source` into tokens. */
+    /**
+     * Asks the compiler to split source code into tokens.
+     *
+     * @param source the source code
+     * @return the tokens of {@code source}
+     */
     static TokenStream lex(String source) {
         send("lex\t" + escape(source));
         return readStream();

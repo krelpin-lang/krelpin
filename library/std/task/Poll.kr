@@ -1,12 +1,17 @@
 package std.task;
 
 /**
- * The result of `Future.poll`: the value, or `Pending` if the future isn't
- * finished yet.
+ * The result of {@link Future#poll}: either the result of the
+ * computation, or an indication that it has not finished yet.
+ *
+ * @param <T> the type of the result
  */
 enum Poll<T> {
-    /** The future finished with `value`. */
+    /** The computation has finished with {@code value}. */
     Ready(T value),
-    /** The future isn't finished; its waker is woken when it can go on. */
+    /**
+     * The computation has not finished; the task's waker is woken when it
+     * can make progress.
+     */
     Pending
 }

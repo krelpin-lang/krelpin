@@ -1,16 +1,20 @@
 package std.lang;
 
 /**
- * Thrown when an index is negative or past the end of an array, list or
- * string.
+ * Thrown when an index into an array, list or string is negative or not
+ * less than its length.
  */
 class IndexOutOfBoundsException extends RuntimeException {
-    /** Creates an exception without a message. */
+    /** Constructs an exception with no detail message. */
     IndexOutOfBoundsException() {
         super();
     }
 
-    /** Creates an exception with a message that says what went wrong. */
+    /**
+     * Constructs an exception with the specified detail message.
+     *
+     * @param message the detail message, which describes what went wrong
+     */
     IndexOutOfBoundsException(String message) {
         super(message);
     }

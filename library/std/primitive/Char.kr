@@ -1,29 +1,38 @@
 package std.primitive;
 
 /**
- * Methods and constants for `char`, a Unicode scalar value: any code point
- * from `U+0000` to `U+10FFFF` except the surrogates `U+D800` to `U+DFFF`.
+ * The {@code char} primitive type, a Unicode scalar value.
  *
- * The classification and case methods use the Unicode Character Database
- * built into the runtime, so they give the same answers on every platform
- * and in every locale.
+ * <p>A {@code char} holds any code point from {@code U+0000} to
+ * {@code U+10FFFF} except the surrogates {@code U+D800} to {@code U+DFFF}.
  *
- * ```
+ * <p>The classification and case-mapping methods use the Unicode Character
+ * Database built into the runtime, so their results are the same on every
+ * platform and in every locale.
+ *
+ * <pre>{@code
  * 'ж'.isLetter()      // true
  * '٣'.isDigit()       // true, ARABIC-INDIC DIGIT THREE
  * 'ç'.toUpperCase()   // 'Ç'
- * ```
+ * }</pre>
  */
 final class Char implements Comparable<char>, Hashable<char> {
-    /** The smallest `char`, `U+0000`. */
+    /** The minimum value of a {@code char}, {@code U+0000}. */
     public const char MIN_VALUE = '\u{0}';
 
-    /** The largest `char`, `U+10FFFF`. */
+    /** The maximum value of a {@code char}, {@code U+10FFFF}. */
     public const char MAX_VALUE = '\u{10FFFF}';
 
     private Char() {}
 
-    /** Compares the code points of this character and `other`. */
+    /**
+     * Compares this character with another character by code point.
+     *
+     * @param other the character to compare with
+     * @return a negative number, zero or a positive number if this character's
+     *         code point is less than, equal to or greater than that of
+     *         {@code other}
+     */
     int compareTo(&char other) {
         if (this < other) {
             return -1;
@@ -31,63 +40,116 @@ final class Char implements Comparable<char>, Hashable<char> {
         return this > other ? 1 : 0;
     }
 
-    /** Returns whether this is a decimal digit (general category `Nd`), in any script. */
+    /**
+     * Returns whether this character is a decimal digit in any script.
+     *
+     * @return {@code true} if the general category of this character is
+     *         {@code Nd}
+     */
     @Intrinsic
     boolean isDigit();
 
-    /** Returns whether this is a letter (a general category starting with `L`). */
+    /**
+     * Returns whether this character is a letter.
+     *
+     * @return {@code true} if the general category of this character is one of
+     *         the {@code L} categories
+     */
     @Intrinsic
     boolean isLetter();
 
-    /** Returns whether this is a letter or a decimal digit. */
+    /**
+     * Returns whether this character is a letter or a decimal digit.
+     *
+     * @return {@code true} if {@link #isLetter} or {@link #isDigit} is
+     *         {@code true}
+     */
     @Intrinsic
     boolean isLetterOrDigit();
 
     /**
-     * Returns whether this has the Unicode `White_Space` property. That
-     * includes the ASCII spaces, tabs and line breaks, and also characters
-     * like the no-break space `U+00A0`.
+     * Returns whether this character is whitespace.
+     *
+     * <p>Whitespace includes the ASCII space, tab and line break characters, as
+     * well as characters such as the no-break space {@code U+00A0}.
+     *
+     * @return {@code true} if this character has the Unicode
+     *         {@code White_Space} property
      */
     @Intrinsic
     boolean isWhitespace();
 
-    /** Returns whether this is an uppercase letter (general category `Lu`). */
+    /**
+     * Returns whether this character is an uppercase letter.
+     *
+     * @return {@code true} if the general category of this character is
+     *         {@code Lu}
+     */
     @Intrinsic
     boolean isUpperCase();
 
-    /** Returns whether this is a lowercase letter (general category `Ll`). */
+    /**
+     * Returns whether this character is a lowercase letter.
+     *
+     * @return {@code true} if the general category of this character is
+     *         {@code Ll}
+     */
     @Intrinsic
     boolean isLowerCase();
 
     /**
-     * Returns the uppercase form of this character, or the character itself
-     * when it has none.
+     * Converts this character to uppercase.
      *
-     * A `char` can only map to one `char`, so characters whose uppercase
-     * form is longer stay as they are: `'ß'.toUpperCase()` is `'ß'`. Use
-     * `String.toUpperCase` to get `"SS"`.
+     * <p>A {@code char} can map only to a single {@code char}, so a character
+     * whose uppercase form consists of several characters is returned
+     * unchanged: {@code 'ß'.toUpperCase()} is {@code 'ß'}. Use
+     * {@link String#toUpperCase} to obtain {@code "SS"}.
+     *
+     * @return the uppercase form of this character, or this character if it
+     *         has none
      */
     @Intrinsic
     char toUpperCase();
 
     /**
-     * Returns the lowercase form of this character, or the character itself
-     * when it has none. The mapping doesn't depend on the language, so `'I'`
-     * becomes `'i'` (not the dotless `'ı'` of Turkish).
+     * Converts this character to lowercase.
+     *
+     * <p>The mapping does not depend on the locale: {@code 'I'} becomes
+     * {@code 'i'}, not the dotless {@code 'ı'} used in Turkish.
+     *
+     * @return the lowercase form of this character, or this character if it
+     *         has none
      */
     @Intrinsic
     char toLowerCase();
 
-    /** Returns whether this character is equal to `other`. */
+    /**
+     * Returns whether this character is equal to another character.
+     *
+     * @param other the character to compare with
+     * @return {@code true} if the characters are equal
+     */
     boolean equals(&char other) {
         return this == other;
     }
 
-    /** Returns the code point, which is also the hash. */
+    /**
+     * Returns a hash code for this character.
+     *
+     * @return the code point of this character
+     */
     @Intrinsic
     int hashCode();
 
-    /** Formats this character as text with a format spec, like `"^3"`. */
+    /**
+     * Formats this character according to a format specification for text,
+     * such as {@code "^3"}.
+     *
+     * @param spec the format specification, as described in {@link Format}
+     * @return the formatted text
+     * @throws IllegalArgumentException if {@code spec} is malformed or does
+     *         not apply to text
+     */
     String format(String spec) {
         return Format.text("" + this, spec);
     }

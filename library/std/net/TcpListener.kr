@@ -4,14 +4,14 @@ import std.io.Files;
 import std.io.IOException;
 
 /**
- * A TCP socket that waits for connections.
+ * A TCP socket server, which listens for incoming connections.
  *
- * Each call to `accept` blocks until a client connects and returns the
- * connection as a `TcpStream`. To serve several clients at once, handle
- * each connection on its own `Thread`, or make the listener non-blocking
- * and wait for clients with a `Poller` (see there).
+ * <p>Each call to {@link #accept} blocks until a client connects and returns
+ * the connection as a {@link TcpStream}. To serve several clients at once,
+ * handle each connection on its own {@link Thread}, or put the listener in
+ * non-blocking mode and wait for clients with a {@link Poller}.
  *
- * ```
+ * <pre>{@code
  * TcpListener listener = TcpListener.bind("127.0.0.1:8080");
  * while (true) {
  *     TcpStream client = listener.accept();
@@ -20,30 +20,31 @@ import std.io.IOException;
  *         client.write("you said: $line\n");
  *     }
  * }
- * ```
+ * }</pre>
  *
- * The socket is closed when the listener is dropped.
+ * <p>The socket is closed when the listener is dropped.
  */
 final class TcpListener {
     private TcpListener() {}
 
     /**
-     * Opens a listener on `address`, written as `host:port`.
+     * Creates a listener bound to an address.
      *
-     * Port 0 asks the system for any free port; `localAddr` tells which one
-     * it picked. `0.0.0.0` listens on every IPv4 interface and `[::]` on
-     * every IPv6 one. Like Rust, the listener sets `SO_REUSEADDR`, so a
-     * restarted server can take its port back right away.
+     * <p>Port 0 lets the system choose any free port, which
+     * {@link #localAddr} then reports. {@code 0.0.0.0} listens on every IPv4
+     * interface and {@code [::]} on every IPv6 interface. The listener sets
+     * {@code SO_REUSEADDR}, so a restarted server can bind its port again
+     * immediately.
      *
-     * ```
+     * <pre>{@code
      * TcpListener listener = TcpListener.bind("0.0.0.0:0");
      * Console.println("listening on ${listener.localAddr()}");
-     * ```
+     * }</pre>
      *
-     * # Throws
-     *
-     * `IOException` if the address is malformed or can't be resolved, or
-     * the port is taken or needs privileges.
+     * @param address the address to bind to, in the form {@code host:port}
+     * @return the listener
+     * @throws IOException if the address is malformed or cannot be resolved,
+     *         or the port is in use or requires privileges
      */
     static TcpListener bind(String address) throws IOException {
         TcpListener listener = new TcpListener();
@@ -54,35 +55,39 @@ final class TcpListener {
     }
 
     /**
-     * Waits for the next client and returns the connection to it.
+     * Waits for a client to connect and accepts the connection.
      *
-     * # Throws
-     *
-     * `IOException` if accepting fails, or the timeout set with
-     * `setAcceptTimeout` passes first.
+     * @return the connection to the client
+     * @throws IOException if accepting fails, or the timeout set with
+     *         {@link #setAcceptTimeout} expires first
      */
     mut TcpStream accept() throws IOException {
         return TcpStream.accept(this);
     }
 
     /**
-     * Returns the next client if one is waiting, or `null` at once if none
-     * is. Meant for a non-blocking listener that a `Poller` reported
-     * readable; a blocking listener waits for a client instead.
+     * Accepts a connection if a client is waiting, without blocking.
      *
-     * The connection is non-blocking, ready to be registered with a
-     * `Poller`.
+     * <p>This method is meant for a non-blocking listener that a
+     * {@link Poller} has reported readable; on a blocking listener it waits for
+     * a client instead. The returned connection is in non-blocking mode, ready
+     * to be registered with a poller.
      *
-     * # Throws
-     *
-     * `IOException` if accepting fails, for example because the process is
-     * out of descriptors.
+     * @return the connection to the client, or {@code null} if no client is
+     *         waiting
+     * @throws IOException if accepting fails, for example because the process
+     *         has no free descriptors
      */
     mut TcpStream? tryAccept() throws IOException {
         return TcpStream.tryAccept(this);
     }
 
-    /** Returns the address the listener is bound to. */
+    /**
+     * Returns the local address this listener is bound to.
+     *
+     * @return the local address
+     * @throws IOException if the address cannot be obtained
+     */
     SocketAddr localAddr() throws IOException {
         String? address = this.localAddrRaw();
         if (address == null) {
@@ -92,12 +97,12 @@ final class TcpListener {
     }
 
     /**
-     * Makes `accept` give up after `millis` milliseconds without a client.
-     * `0` waits forever, which is the default.
+     * Sets the time {@link #accept} waits for a client before it fails.
      *
-     * # Throws
-     *
-     * `IOException` if `millis` is negative or the system refuses.
+     * @param millis the timeout in milliseconds, or 0 to wait indefinitely,
+     *        which is the default
+     * @throws IOException if {@code millis} is negative or the timeout cannot
+     *         be set
      */
     mut void setAcceptTimeout(long millis) throws IOException {
         if (!this.setTimeoutRaw(millis, false)) {
@@ -107,9 +112,15 @@ final class TcpListener {
 
 
     /**
-     * Makes the listener non-blocking (`true`) or blocking again. A
-     * non-blocking listener is meant to be driven by a `Poller`; its blocking
-     * methods throw an `IOException` instead of waiting when it isn't ready.
+     * Sets whether this listener is in non-blocking mode.
+     *
+     * <p>A non-blocking listener is meant to be driven by a {@link Poller}. Its
+     * blocking methods throw an {@link IOException} instead of waiting when the
+     * listener is not ready.
+     *
+     * @param nonBlocking {@code true} to enable non-blocking mode, or
+     *        {@code false} to restore blocking mode
+     * @throws IOException if the mode cannot be changed
      */
     mut void setNonBlocking(boolean nonBlocking) throws IOException {
         if (!this.setNonBlockingRaw(nonBlocking)) {
@@ -118,14 +129,18 @@ final class TcpListener {
     }
 
     /**
-     * Asks `poller` to report this listener under `token` when it is ready for
-     * `interest`, a combination of the `Interest` constants.
+     * Registers this listener with a poller.
      *
-     * # Throws
-     *
-     * `IllegalArgumentException` if `interest` asks for nothing.
-     * `IOException` if the system refuses. On Linux that includes a listener
-     * already registered with `poller`; use `reregister` to change it.
+     * @param poller the poller that reports the listener
+     * @param token the token that identifies the listener in the poller's
+     *        {@link Event}s
+     * @param interest the readiness to report, a combination of the
+     *        {@link Interest} constants
+     * @throws IllegalArgumentException if {@code interest} is not a non-empty
+     *         combination of {@code Interest} constants
+     * @throws IOException if the registration fails; on Linux this includes a
+     *         listener that is already registered with {@code poller}, which
+     *         {@link #reregister} must be used for
      */
     void register(&mut Poller poller, int token, int interest) throws IOException {
         Poller.checkInterest(interest);
@@ -135,13 +150,17 @@ final class TcpListener {
     }
 
     /**
-     * Changes the token and interest of a listener registered with `poller`.
+     * Changes the token and interest of this listener in a poller it is
+     * registered with.
      *
-     * # Throws
-     *
-     * `IllegalArgumentException` if `interest` asks for nothing.
-     * `IOException` if the system refuses. On Linux that includes a listener
-     * that isn't registered with `poller`.
+     * @param poller the poller the listener is registered with
+     * @param token the new token
+     * @param interest the new interest, a combination of the {@link Interest}
+     *        constants
+     * @throws IllegalArgumentException if {@code interest} is not a non-empty
+     *         combination of {@code Interest} constants
+     * @throws IOException if the registration fails; on Linux this includes a
+     *         listener that is not registered with {@code poller}
      */
     void reregister(&mut Poller poller, int token, int interest) throws IOException {
         Poller.checkInterest(interest);
@@ -151,12 +170,11 @@ final class TcpListener {
     }
 
     /**
-     * Stops `poller` from reporting this listener. Dropping the listener does the
-     * same.
+     * Removes this listener from a poller. Dropping the listener has the same
+     * effect.
      *
-     * # Throws
-     *
-     * `IOException` if the listener isn't registered with `poller`.
+     * @param poller the poller the listener is registered with
+     * @throws IOException if the listener is not registered with {@code poller}
      */
     void deregister(&mut Poller poller) throws IOException {
         if (!this.deregisterRaw(poller)) {

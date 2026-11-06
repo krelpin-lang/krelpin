@@ -1,19 +1,25 @@
 package std.util;
 
 /**
- * A list backed by a growable array: indexing and adding at the end are
- * fast, inserting and removing elsewhere move the elements after.
+ * A resizable-array implementation of {@link List}.
  *
- * ```
+ * <p>{@link #get}, {@link #set} and adding at the end run in constant
+ * time (amortized, for adding). Inserting or removing at any other position
+ * takes time proportional to the number of elements after it, which must be
+ * shifted.
+ *
+ * <pre>{@code
  * List<int> squares = new ArrayList<>();
  * for (int i = 1; i <= 4; i++) {
  *     squares.add(i * i);
  * }
  * Console.println(squares); // [1, 4, 9, 16]
- * ```
+ * }</pre>
+ *
+ * @param <T> the type of the elements
  */
 class ArrayList<T> implements List<T> {
-    /** Creates an empty list. */
+    /** Constructs an empty list. */
     ArrayList() {}
 
     @Intrinsic
@@ -43,12 +49,23 @@ class ArrayList<T> implements List<T> {
     @Intrinsic
     mut void clear();
 
-    /** Returns an iterator over the elements, in order. */
+    /**
+     * Returns an iterator over the elements of this list, in order.
+     *
+     * @return an iterator that borrows this list
+     */
     Iterator<T> iterator() {
         return new ArrayListIterator<>(this);
     }
 
-    /** Shows the elements in brackets, like `[1, 2, 3]`. */
+    /**
+     * Returns a string representation of this list.
+     *
+     * <p>The elements are shown in order, separated by commas and enclosed in
+     * brackets, such as {@code [1, 2, 3]}.
+     *
+     * @return a string representation of this list
+     */
     String toString() {
         StringBuilder text = new StringBuilder();
         text.append("[");

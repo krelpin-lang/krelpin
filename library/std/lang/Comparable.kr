@@ -1,27 +1,40 @@
 package std.lang;
 
 /**
- * A type whose values have a natural order, like numbers or strings.
+ * A type whose values have a natural ordering, such as numbers or strings.
  *
- * `compareTo` must define a total order: it must be consistent with itself
- * (`a < b` and `b < c` mean `a < c`), with its reverse (`a.compareTo(&b)` has
- * the opposite sign of `b.compareTo(&a)`), and with `equals` when the type is
- * also `Equatable`.
+ * <p>Implementations of {@link #compareTo} must define a total order. The
+ * ordering must be:
+ * <ul>
+ * <li>antisymmetric: {@code a.compareTo(&b)} has the opposite sign of
+ *     {@code b.compareTo(&a)};
+ * <li>transitive: if {@code a} is less than {@code b} and {@code b} is less
+ *     than {@code c}, then {@code a} is less than {@code c};
+ * <li>consistent with {@link Equatable#equals} when the type is also
+ *     {@code Equatable}: {@code a.compareTo(&b) == 0} exactly when
+ *     {@code a.equals(&b)}.
+ * </ul>
  *
- * ```
+ * <pre>{@code
  * record Version(int major, int minor) implements Comparable<Version> {
  *     int compareTo(&Version other) {
  *         int major = this.major.compareTo(&other.major);
  *         return major != 0 ? major : this.minor.compareTo(&other.minor);
  *     }
  * }
- * ```
+ * }</pre>
+ *
+ * @param <T> the type of values this value can be compared with
+ * @see std.util.Comparator
  */
 interface Comparable<T> {
     /**
-     * Returns a negative number, zero or a positive number when this value
-     * is smaller than, equal to or larger than `other`. Only the sign
-     * matters.
+     * Compares this value with another value for order.
+     *
+     * @param other the value to compare with
+     * @return a negative number, zero or a positive number if this value is
+     *         less than, equal to or greater than {@code other}; only the
+     *         sign is significant
      */
     int compareTo(&T other);
 }

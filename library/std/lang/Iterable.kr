@@ -4,25 +4,38 @@ import std.function.Consumer;
 import std.util.Iterator;
 
 /**
- * A collection that can be visited element by element, for example with a
- * `for` loop:
+ * A collection whose elements can be visited one at a time.
  *
- * ```
+ * <p>An {@code Iterable} can be the target of an enhanced {@code for}
+ * statement:
+ *
+ * <pre>{@code
  * for (&String name : names) {
  *     Console.println(name);
  * }
- * ```
+ * }</pre>
+ *
+ * @param <T> the type of the elements
  */
 interface Iterable<T> {
-    /** Returns an iterator over the elements, which borrows the collection. */
+    /**
+     * Returns an iterator over the elements of this collection.
+     *
+     * <p>The iterator borrows the collection, so the collection cannot be
+     * modified while the iterator is in use.
+     *
+     * @return an iterator over the elements
+     */
     Iterator<T> iterator();
 
     /**
-     * Calls `action` with a reference to each element in turn.
+     * Performs an action for each element, in iteration order.
      *
-     * ```
+     * <pre>{@code
      * names.forEach(name -> Console.println(name));
-     * ```
+     * }</pre>
+     *
+     * @param action the action to perform, given a reference to each element
      */
     void forEach(Consumer<&T> action) {
         Iterator<T> values = this.iterator();

@@ -1,7 +1,8 @@
 package std.task;
 
 /**
- * The result of an `async void` method, which has no value: calling one
- * gives a `Future<Unit>`.
+ * The result type of an {@code async void} method, which has no value.
+ *
+ * <p>Calling such a method returns a {@code Future<Unit>}.
  */
 record Unit() {}

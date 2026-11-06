@@ -1,11 +1,15 @@
 package std.macros;
 
 /**
- * An annotation such as `@Default(10)` written on an item or a member.
+ * An annotation, such as {@code @Default(10)}, written on an item or a
+ * member.
  *
- * Macros use attributes as options for themselves: `@Builder` can read the
- * `@Default` of each field and then remove it, so the compiler never sees
- * an annotation it doesn't know.
+ * <p>Macros use annotations as options: a {@code @Builder} macro can read
+ * the {@code @Default} annotation of each field and then remove it, so that
+ * the compiler never sees an annotation it does not recognize.
+ *
+ * @see Item#attributes
+ * @see Member#attributes
  */
 final class Attribute {
     private Token name;
@@ -18,36 +22,55 @@ final class Attribute {
         this.args = args;
     }
 
-    /** Returns the annotation's name. For `@a.b.Name` it is `Name`. */
+    /**
+     * Returns the simple name of this annotation.
+     *
+     * @return the name token; for {@code @a.b.Name} this is {@code Name}
+     */
     Token name() {
         return this.name;
     }
 
-    /** Returns whether the annotation is called `name`. */
+    /**
+     * Returns whether this annotation has the specified simple name.
+     *
+     * @param name the name to test
+     * @return {@code true} if the annotation is called {@code name}
+     */
     boolean is(String name) {
         return this.name.text().equals(&name);
     }
 
     /**
-     * Returns the tokens between the parentheses, or no tokens when the
-     * annotation has no parentheses. For `@Default(1 + 2)` they are `1 + 2`.
+     * Returns the arguments of this annotation.
+     *
+     * @return the tokens between the parentheses, such as {@code 1 + 2} for
+     *         {@code @Default(1 + 2)}, or no tokens if the annotation has no
+     *         parentheses
      */
     &TokenStream args() {
         return &this.args;
     }
 
-    /** Returns the annotation as it was written. */
+    /**
+     * Returns this annotation as it was written.
+     *
+     * @return a copy of the annotation's tokens
+     */
     TokenStream toTokens() {
         return this.tokens.copy();
     }
 
     /**
-     * Returns the index just past the annotation that starts at `at`, or `-1`
-     * when no annotation starts there. Used by `Item.parse` and `Member.parse`.
+     * Finds the end of an annotation. Used by {@link Item#parse} and
+     * {@link Member#parse}.
      *
-     * # Throws
-     *
-     * `MacroError` if the annotation's `(` is never closed.
+     * @param tokens the tokens to search
+     * @param at the index where an annotation may start
+     * @return the index just past the annotation, or -1 if no annotation
+     *         starts at {@code at}
+     * @throws MacroError if the annotation's opening parenthesis is never
+     *         closed
      */
     static int end(&TokenStream tokens, int at) {
         if (at + 1 >= tokens.size() || !tokens.get(at).isPunct("@")
@@ -69,7 +92,14 @@ final class Attribute {
         return end;
     }
 
-    /** Reads the annotation found by `end` between `start` and `end`. */
+    /**
+     * Reads an annotation whose bounds were found by {@link #end}.
+     *
+     * @param tokens the tokens that contain the annotation
+     * @param start the index of the {@code @}
+     * @param end the index just past the annotation
+     * @return the annotation
+     */
     static Attribute read(&TokenStream tokens, int start, int end) {
         int nameEnd = start + 2;
         while (nameEnd + 1 < end && tokens.get(nameEnd).isPunct(".")) {

@@ -1,13 +1,13 @@
 package std.task;
 
 /**
- * A computation that finishes later.
+ * An asynchronous computation that may not have finished yet.
  *
- * Calling an `async` method returns a `Future` of its result without
- * running any of the method. The method runs as the future is polled, and
- * stops at each `await` whose future isn't ready yet:
+ * <p>Calling an {@code async} method returns a {@code Future} of its result
+ * without executing any of its body. The body runs as the future is polled,
+ * and suspends at each {@code await} whose future is not yet ready:
  *
- * ```
+ * <pre>{@code
  * async int total(&List<String> words) {
  *     int sum = 0;
  *     for (String word : words) {
@@ -15,52 +15,60 @@ package std.task;
  *     }
  *     return sum;
  * }
- * ```
+ * }</pre>
  *
- * The standard library defines what a future is, not how futures are run.
- * An executor, which comes from a library, polls them: it calls `poll` and,
- * when the result is `Poll.Pending`, waits until the future's `Waker` is
- * woken before polling it again.
+ * <p>The standard library defines what a future is, but not how futures are
+ * run. Futures are run by an <em>executor</em>, which is provided by a
+ * library: it calls {@link #poll} and, when the result is
+ * {@code Poll.Pending}, waits until the task's {@link Waker} is woken before
+ * polling the future again.
  *
- * # Borrowing
+ * <h2>Borrowing</h2>
  *
- * The future of an `async` method holds its arguments, so it borrows
- * whatever they borrow, for as long as the future exists:
+ * <p>The future of an {@code async} method holds the method's arguments, so
+ * it borrows whatever they borrow for as long as the future exists:
  *
- * ```
+ * <pre>{@code
  * String text = "hello";
  * Future<int> future = lengthOf(&text);
  * text = "bye"; // error: `text` is borrowed by `future`
- * ```
+ * }</pre>
  *
- * # Exceptions
+ * <h2>Exceptions</h2>
  *
- * Calling an `async` method doesn't throw. Its exceptions come out of
- * `poll`, and so out of the `await` of its future.
+ * <p>Calling an {@code async} method never throws. Exceptions thrown by its
+ * body are thrown by {@code poll}, and therefore by the {@code await}
+ * expression that awaits its future.
  *
- * # Cancelling
+ * <h2>Cancellation</h2>
  *
- * Dropping a future that isn't finished cancels it: it is never polled
+ * <p>Dropping a future that has not finished cancels it: it is never polled
  * again, and the values it holds are dropped.
  *
- * # Implementing `Future`
+ * <h2>Implementing {@code Future}</h2>
  *
- * `poll` makes as much progress as it can without blocking. It returns
- * `Poll.Ready` with the value once there is one, and `Poll.Pending`
- * otherwise. Before returning `Poll.Pending`, it arranges for
- * `cx.waker()` to be woken once polling again can make progress; a future
- * that doesn't is never polled again.
+ * <p>{@code poll} makes as much progress as possible without blocking. It
+ * returns {@code Poll.Ready} with the result once one is available, and
+ * {@code Poll.Pending} otherwise. Before returning {@code Poll.Pending}, it
+ * must arrange for {@code cx.waker()} to be woken once polling again can make
+ * progress; a future that does not is never polled again.
+ *
+ * @param <T> the type of the result
+ * @see Poll
+ * @see Waker
  */
 interface Future<T> {
     /**
-     * Makes progress without blocking, and returns the value if it is
-     * ready. A future must not be polled again after it returned
-     * `Poll.Ready`; the future of an `async` method throws an
-     * `IllegalStateException` if it is.
+     * Attempts to make progress without blocking.
      *
-     * # Throws
+     * <p>A future must not be polled again after it has returned
+     * {@code Poll.Ready}; the future of an {@code async} method throws an
+     * {@link IllegalStateException} if it is.
      *
-     * Whatever the computation throws.
+     * @param cx the context of the task being polled
+     * @return {@code Poll.Ready} with the result if the computation has
+     *         finished, or {@code Poll.Pending} otherwise
+     * @throws Exception any exception thrown by the computation
      */
     mut Poll<T> poll(&mut Context cx) throws Exception;
 }

@@ -1,4 +1,7 @@
 package std.lang;
 
-/** Marks a class whose objects can be copied field by field. */
+/**
+ * A marker interface for classes whose objects can be copied field by
+ * field.
+ */
 interface Cloneable {}

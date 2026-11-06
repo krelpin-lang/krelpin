@@ -1,16 +1,29 @@
 package std.lang;
 
 /**
- * A type that can be a key in a `HashMap` or an element of a `HashSet`.
+ * A type whose values can be used as keys in a {@code HashMap} or as
+ * elements of a {@code HashSet}.
  *
- * Values that are `equals` must have the same `hashCode`. Different values
- * may share a hash, but the fewer do, the faster hash tables are. Records
- * get a `hashCode` that combines the hashes of their components.
+ * <p>Values that are equal according to {@link Equatable#equals} must
+ * return the same {@link #hashCode}. Unequal values may share a hash code,
+ * but hash tables perform better when they rarely do.
  *
- * A key must not change while it is in a table, or the table won't find it
- * again.
+ * <p>Records implement this interface automatically by combining the hash
+ * codes of their components.
+ *
+ * <p>A key must not change in a way that affects its hash code while it is
+ * in a hash table; otherwise the table can no longer find it.
+ *
+ * @param <T> the type of values this value can be compared with
+ * @see std.util.HashMap
+ * @see std.util.HashSet
  */
 interface Hashable<T> extends Equatable<T> {
-    /** Returns a hash of this value, consistent with `equals`. */
+    /**
+     * Returns a hash code for this value, consistent with
+     * {@link Equatable#equals}.
+     *
+     * @return a hash code for this value
+     */
     int hashCode();
 }

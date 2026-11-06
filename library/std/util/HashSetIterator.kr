@@ -1,11 +1,20 @@
 package std.util;
 
-/** The iterator of a `HashSet`. The order of the elements is unspecified. */
+/**
+ * The iterator returned by {@link HashSet#iterator}. The order of the
+ * elements is unspecified.
+ *
+ * @param <T> the type of the elements
+ */
 final class HashSetIterator<T extends Hashable<T>> borrows src implements Iterator<T> {
     private &HashSet<T> set;
     private int next;
 
-    /** Creates an iterator over the elements of `set`. */
+    /**
+     * Constructs an iterator over the elements of a set.
+     *
+     * @param set the set to iterate over
+     */
     HashSetIterator(&HashSet<T> set) keeps set {
         this.set = set;
         this.next = 0;

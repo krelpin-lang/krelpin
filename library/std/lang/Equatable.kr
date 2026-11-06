@@ -1,13 +1,29 @@
 package std.lang;
 
 /**
- * A type whose values can be compared for equality with `equals`.
+ * A type whose values can be compared for equality.
  *
- * `equals` must be an equivalence relation: every value equals itself, `a`
- * equals `b` exactly when `b` equals `a`, and two values equal to a third
- * equal each other. Records get an `equals` that compares their components.
+ * <p>Implementations of {@link #equals} must be an equivalence relation:
+ * <ul>
+ * <li>reflexive: {@code a.equals(&a)} is {@code true};
+ * <li>symmetric: {@code a.equals(&b)} is {@code true} exactly when
+ *     {@code b.equals(&a)} is;
+ * <li>transitive: if {@code a.equals(&b)} and {@code b.equals(&c)}, then
+ *     {@code a.equals(&c)}.
+ * </ul>
+ *
+ * <p>Records implement this interface automatically by comparing their
+ * components.
+ *
+ * @param <T> the type of values this value can be compared with
+ * @see Hashable
  */
 interface Equatable<T> {
-    /** Returns whether this value is equal to `other`. */
+    /**
+     * Returns whether this value is equal to another value.
+     *
+     * @param other the value to compare with
+     * @return {@code true} if the two values are equal
+     */
     boolean equals(&T other);
 }

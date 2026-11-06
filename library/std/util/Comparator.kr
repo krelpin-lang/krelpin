@@ -1,19 +1,30 @@
 package std.util;
 
 /**
- * Orders two values, for sorting by something other than their natural
- * order. Usually written as a lambda:
+ * A comparison function, which imposes an ordering other than the natural
+ * ordering of the values.
  *
- * ```
- * people.sort((a, b) -> a.age.compareTo(&b.age));
+ * <p>A comparator is usually written as a lambda:
+ *
+ * <pre>{@code
+ * people.sort((a, b) -> a.age().compareTo(&b.age()));
  * words.sort((a, b) -> b.length() - a.length());   // longest first
- * ```
+ * }</pre>
+ *
+ * @param <T> the type of the values compared
+ * @see Comparable
  */
 interface Comparator<T> {
     /**
-     * Returns a negative number, zero or a positive number when `a` sorts
-     * before, together with or after `b`. Must be a total order, like
-     * `Comparable.compareTo`.
+     * Compares two values for order.
+     *
+     * <p>The ordering must be a total order, with the same requirements as
+     * {@link Comparable#compareTo}.
+     *
+     * @param a the first value
+     * @param b the second value
+     * @return a negative number, zero or a positive number if {@code a} sorts
+     *         before, together with or after {@code b}
      */
     mut int compare(&T a, &T b);
 }

@@ -1,23 +1,31 @@
 package std.io;
 
 /**
- * Functions on paths written as strings with `/` between the parts.
+ * Static methods for manipulating paths written as strings, with
+ * {@code /} as the separator.
  *
- * They only look at the text and never touch the file system.
+ * <p>These methods operate only on the text of a path and never access the
+ * file system.
  *
- * ```
+ * <pre>{@code
  * String file = Path.join("src", "main.kr"); // "src/main.kr"
  * Path.fileName(file);                       // "main.kr"
  * Path.parent(file);                         // "src"
  * Path.extension(file);                      // "kr"
- * ```
+ * }</pre>
  */
 final class Path {
     private Path() {}
 
     /**
-     * Joins `child` to `base` with a `/`. An absolute `child` replaces `base`,
-     * and an empty `base` gives `child`.
+     * Joins two paths with a separator.
+     *
+     * <p>If {@code child} is absolute, it replaces {@code base}; if
+     * {@code base} is empty, the result is {@code child}.
+     *
+     * @param base the base path
+     * @param child the path to append
+     * @return the joined path
      */
     static String join(String base, String child) {
         if (base.isEmpty() || child.startsWith("/")) {
@@ -29,15 +37,25 @@ final class Path {
         return "$base/$child";
     }
 
-    /** Returns the part of `path` after the last `/`, or all of it when there is none. */
+    /**
+     * Returns the last component of a path.
+     *
+     * @param path the path
+     * @return the part of {@code path} after the last {@code /}, or the whole
+     *         path if it contains none
+     */
     static String fileName(String path) {
         int slash = path.lastIndexOf("/");
         return slash < 0 ? path : path.substring(slash + 1);
     }
 
     /**
-     * Returns the part of `path` before the last `/`: `""` when there is none
-     * and `"/"` for a file at the root.
+     * Returns the parent of a path.
+     *
+     * @param path the path
+     * @return the part of {@code path} before the last {@code /}; an empty
+     *         string if it contains none, and {@code "/"} for a path directly
+     *         under the root
      */
     static String parent(String path) {
         int slash = path.lastIndexOf("/");
@@ -48,8 +66,14 @@ final class Path {
     }
 
     /**
-     * Returns the part of the file name after its last `.`, or `""` when there
-     * is none. A leading dot doesn't count, so `.profile` has no extension.
+     * Returns the extension of the file name of a path.
+     *
+     * <p>A leading dot does not start an extension, so {@code .profile} has
+     * none.
+     *
+     * @param path the path
+     * @return the part of the file name after its last {@code .}, or an empty
+     *         string if there is none
      */
     static String extension(String path) {
         String name = fileName(path);

@@ -1,51 +1,94 @@
 package std.util;
 
 /**
- * A collection of key-value pairs where each key appears at most once, like
- * `HashMap`.
+ * An object that maps keys to values, in which each key appears at most
+ * once.
  *
- * The map owns its keys and values: `put` moves them in, `remove` moves the
- * value back out, and `get` lends a reference to it.
+ * <p>A map owns its keys and values: {@link #put} moves them into the map,
+ * {@link #remove} moves the value back out, and {@link #get} returns a
+ * reference to it.
  *
- * ```
+ * <pre>{@code
  * Map<String, int> ages = new HashMap<>();
  * ages.put("Ada", 36);
  * (&int)? age = ages.get(&"Ada");
  * if (age != null) {
  *     Console.println("Ada is $age");
  * }
- * ```
+ * }</pre>
+ *
+ * @param <K> the type of the keys
+ * @param <V> the type of the values
+ * @see HashMap
  */
 interface Map<K, V> {
-    /** Returns the number of entries. */
+    /**
+     * Returns the number of entries in this map.
+     *
+     * @return the number of entries
+     */
     int size();
 
-    /** Returns whether the map has no entries. */
+    /**
+     * Returns whether this map contains no entries.
+     *
+     * @return {@code true} if {@link #size} is 0
+     */
     boolean isEmpty() {
         return this.size() == 0;
     }
 
-    /** Returns a reference to the value for `key`, or `null` when there is none. */
+    /**
+     * Returns the value associated with a key.
+     *
+     * @param key the key to look up
+     * @return a reference to the value, or {@code null} if there is no entry
+     *         for {@code key}
+     */
     (&V)? get(&K key);
 
     /**
-     * Sets the value for `key` and returns the value it replaces, or `null`
-     * when the key is new.
+     * Associates a value with a key, replacing any previous value.
+     *
+     * @param key the key
+     * @param value the value to associate with {@code key}
+     * @return the previous value, or {@code null} if there was no entry for
+     *         {@code key}
      */
     mut V? put(K key, V value);
 
-    /** Removes the entry for `key` and returns its value, or `null` when there was none. */
+    /**
+     * Removes the entry for a key.
+     *
+     * @param key the key whose entry is removed
+     * @return the removed value, or {@code null} if there was no entry for
+     *         {@code key}
+     */
     mut V? remove(&K key);
 
-    /** Returns whether there is an entry for `key`. */
+    /**
+     * Returns whether this map contains an entry for a key.
+     *
+     * @param key the key to look up
+     * @return {@code true} if there is an entry for {@code key}
+     */
     boolean containsKey(&K key);
 
-    /** Removes every entry. */
+    /** Removes all entries from this map. */
     mut void clear();
 
-    /** Returns references to the keys. */
+    /**
+     * Returns the keys of this map.
+     *
+     * @return a set of references to the keys
+     */
     Set<&K> keySet();
 
-    /** Returns references to the values, in the same order as `keySet`. */
+    /**
+     * Returns the values of this map, in the same order as
+     * {@link #keySet}.
+     *
+     * @return a list of references to the values
+     */
     List<&V> values();
 }

@@ -1,14 +1,14 @@
 package std.macros;
 
 /**
- * An error a macro reports to the user of the macro.
+ * An error that a macro reports to the code that uses it.
  *
- * When a macro throws a `MacroError`, the compiler stops expanding it and
- * prints the message as a compile error, pointing at the token given to the
- * constructor or else at the macro call. Any other exception is reported as
- * a crash of the macro.
+ * <p>When a macro throws a {@code MacroError}, the compiler stops expanding
+ * the macro and reports the message as a compile error, at the token given
+ * to the constructor or otherwise at the macro invocation. Any other
+ * exception is reported as a crash of the macro.
  *
- * ```
+ * <pre>{@code
  * macro Getters(TokenStream args, TokenStream input) {
  *     Item item = Item.parse(&input);
  *     if (item.kind() == ItemKind.INTERFACE) {
@@ -16,24 +16,37 @@ package std.macros;
  *     }
  *     ...
  * }
- * ```
+ * }</pre>
  */
 class MacroError extends RuntimeException {
     private Span span;
 
-    /** Creates an error reported at the macro call. */
+    /**
+     * Constructs an error reported at the macro invocation.
+     *
+     * @param message the error message
+     */
     MacroError(String message) {
         super(message);
         this.span = Span.callSite();
     }
 
-    /** Creates an error reported at the token `at`. */
+    /**
+     * Constructs an error reported at a token.
+     *
+     * @param message the error message
+     * @param at the token the error points at
+     */
     MacroError(String message, &Token at) {
         super(message);
         this.span = at.span();
     }
 
-    /** Returns where the compiler reports this error. */
+    /**
+     * Returns the location at which the compiler reports this error.
+     *
+     * @return the span of the error
+     */
     Span span() {
         return this.span;
     }

@@ -1,13 +1,22 @@
 package std.macros;
 
-/** What a `Token` is. */
+/** The kind of a {@link Token}. */
 enum TokenKind {
-    /** A name or a keyword, such as `count`, `String` or `class`. */
+    /**
+     * An identifier or keyword, such as {@code count}, {@code String} or
+     * {@code class}.
+     */
     IDENT,
-    /** A number, character, string or boolean literal, written as in the source. */
+    /**
+     * A number, character, string or boolean literal, as written in the
+     * source.
+     */
     LITERAL,
-    /** An operator or punctuation, such as `{`, `->` or `>>=`. */
+    /**
+     * An operator or punctuation token, such as <code>{</code>, {@code ->}
+     * or {@code >>=}.
+     */
     PUNCT,
-    /** A documentation comment, the kind that starts with two stars. */
+    /** A documentation comment, which begins with two asterisks. */
     DOC
 }

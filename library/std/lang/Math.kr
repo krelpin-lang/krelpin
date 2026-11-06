@@ -1,18 +1,18 @@
 package std.lang;
 
 /**
- * Basic numeric functions: absolute values, minimums and maximums, rounding,
- * roots, powers, logarithms and trigonometry.
+ * Basic numeric operations: absolute values, minimums and maximums,
+ * rounding, roots, powers, logarithms and trigonometric functions.
  *
- * Integer functions follow the language's arithmetic and wrap around on
- * overflow. Floating-point functions follow IEEE 754: a NaN argument gives a
- * NaN result unless the function says otherwise.
+ * <p>Integer operations follow the arithmetic of the language and wrap
+ * around on overflow. Floating-point operations follow IEEE 754: unless
+ * stated otherwise, a NaN argument produces a NaN result.
  *
- * ```
+ * <pre>{@code
  * double side = Math.hypot(3.0, 4.0);       // 5.0
  * int percent = Math.clamp(130, 0, 100);    // 100
  * long rounded = Math.round(-2.5);          // -3
- * ```
+ * }</pre>
  */
 final class Math {
     /** The ratio of a circle's circumference to its diameter. */
@@ -24,49 +24,77 @@ final class Math {
     private Math() {}
 
     /**
-     * Returns the absolute value of `value`.
+     * Returns the absolute value of an {@code int}.
      *
-     * `Math.abs(Int.MIN_VALUE)` is `Int.MIN_VALUE`, because the positive value
-     * doesn't fit in an `int`.
+     * <p>{@code Math.abs(Int.MIN_VALUE)} is {@code Int.MIN_VALUE}, because
+     * its positive value cannot be represented as an {@code int}.
+     *
+     * @param value the value
+     * @return the absolute value of {@code value}
      */
     static int abs(int value) {
         return value < 0 ? -value : value;
     }
 
     /**
-     * Returns the absolute value of `value`.
+     * Returns the absolute value of a {@code long}.
      *
-     * `Math.abs(Long.MIN_VALUE)` is `Long.MIN_VALUE`, because the positive
-     * value doesn't fit in a `long`.
+     * <p>{@code Math.abs(Long.MIN_VALUE)} is {@code Long.MIN_VALUE}, because
+     * its positive value cannot be represented as a {@code long}.
+     *
+     * @param value the value
+     * @return the absolute value of {@code value}
      */
     static long abs(long value) {
         return value < 0 ? -value : value;
     }
 
-    /** Returns the absolute value of `value`, turning `-0.0` into `0.0`. */
+    /**
+     * Returns the absolute value of a {@code double}.
+     *
+     * @param value the value
+     * @return the absolute value of {@code value}; {@code -0.0} becomes
+     *         {@code 0.0}
+     */
     static double abs(double value) {
         return value <= 0.0 ? 0.0 - value : value;
     }
 
-    /** Returns the smaller of `a` and `b`. */
+    /**
+     * Returns the smaller of two values.
+     *
+     * @param a the first value
+     * @param b the second value
+     * @return the smaller of {@code a} and {@code b}
+     */
     static int min(int a, int b) {
         return a < b ? a : b;
     }
 
-    /** Returns the smaller of `a` and `b`. */
+    /**
+     * Returns the smaller of two values.
+     *
+     * @param a the first value
+     * @param b the second value
+     * @return the smaller of {@code a} and {@code b}
+     */
     static long min(long a, long b) {
         return a < b ? a : b;
     }
 
     /**
-     * Returns the smaller of `a` and `b`.
+     * Returns the smaller of two values.
      *
-     * A NaN is ignored: if one argument is NaN the other one is returned, so
-     * the result is NaN only when both are.
+     * <p>NaN arguments are ignored: if one argument is NaN, the other is
+     * returned, so the result is NaN only if both arguments are.
      *
-     * ```
+     * <pre>{@code
      * Math.min(1.5, 0.0 / 0.0) // 1.5
-     * ```
+     * }</pre>
+     *
+     * @param a the first value
+     * @param b the second value
+     * @return the smaller of {@code a} and {@code b}
      */
     static double min(double a, double b) {
         if (a != a) {
@@ -78,21 +106,36 @@ final class Math {
         return a < b ? a : b;
     }
 
-    /** Returns the larger of `a` and `b`. */
+    /**
+     * Returns the larger of two values.
+     *
+     * @param a the first value
+     * @param b the second value
+     * @return the larger of {@code a} and {@code b}
+     */
     static int max(int a, int b) {
         return a > b ? a : b;
     }
 
-    /** Returns the larger of `a` and `b`. */
+    /**
+     * Returns the larger of two values.
+     *
+     * @param a the first value
+     * @param b the second value
+     * @return the larger of {@code a} and {@code b}
+     */
     static long max(long a, long b) {
         return a > b ? a : b;
     }
 
     /**
-     * Returns the larger of `a` and `b`.
+     * Returns the larger of two values.
      *
-     * A NaN is ignored: if one argument is NaN the other one is returned, so
-     * the result is NaN only when both are.
+     * <p>NaN arguments are ignored, as in {@link #min(double, double)}.
+     *
+     * @param a the first value
+     * @param b the second value
+     * @return the larger of {@code a} and {@code b}
      */
     static double max(double a, double b) {
         if (a != a) {
@@ -105,16 +148,20 @@ final class Math {
     }
 
     /**
-     * Restricts `value` to the range from `low` to `high`, both included.
+     * Restricts a value to an inclusive range.
      *
-     * ```
+     * <pre>{@code
      * Math.clamp(-4, 0, 10) // 0
      * Math.clamp(7, 0, 10)  // 7
-     * ```
+     * }</pre>
      *
-     * # Throws
-     *
-     * `IllegalArgumentException` if `low` is greater than `high`.
+     * @param value the value to restrict
+     * @param low the lower bound, inclusive
+     * @param high the upper bound, inclusive
+     * @return {@code low} if {@code value} is below it, {@code high} if
+     *         {@code value} is above it, and {@code value} otherwise
+     * @throws IllegalArgumentException if {@code low} is greater than
+     *         {@code high}
      */
     static int clamp(int value, int low, int high) {
         if (low > high) {
@@ -124,11 +171,14 @@ final class Math {
     }
 
     /**
-     * Restricts `value` to the range from `low` to `high`, both included.
+     * Restricts a value to an inclusive range.
      *
-     * # Throws
-     *
-     * `IllegalArgumentException` if `low` is greater than `high`.
+     * @param value the value to restrict
+     * @param low the lower bound, inclusive
+     * @param high the upper bound, inclusive
+     * @return {@code value} restricted to the range
+     * @throws IllegalArgumentException if {@code low} is greater than
+     *         {@code high}
      */
     static long clamp(long value, long low, long high) {
         if (low > high) {
@@ -138,13 +188,15 @@ final class Math {
     }
 
     /**
-     * Restricts `value` to the range from `low` to `high`, both included. A
-     * NaN `value` stays NaN.
+     * Restricts a value to an inclusive range.
      *
-     * # Throws
-     *
-     * `IllegalArgumentException` if `low` is greater than `high` or either
-     * bound is NaN.
+     * @param value the value to restrict
+     * @param low the lower bound, inclusive
+     * @param high the upper bound, inclusive
+     * @return {@code value} restricted to the range, or NaN if
+     *         {@code value} is NaN
+     * @throws IllegalArgumentException if {@code low} is greater than
+     *         {@code high}, or if either bound is NaN
      */
     static double clamp(double value, double low, double high) {
         if (!(low <= high)) {
@@ -153,144 +205,265 @@ final class Math {
         return value < low ? low : value > high ? high : value;
     }
 
-    /** Returns `-1`, `0` or `1` when `value` is negative, zero or positive. */
+    /**
+     * Returns the sign of a value.
+     *
+     * @param value the value
+     * @return -1, 0 or 1 if {@code value} is negative, zero or positive
+     */
     static int signum(int value) {
         return value < 0 ? -1 : value > 0 ? 1 : 0;
     }
 
-    /** Returns `-1`, `0` or `1` when `value` is negative, zero or positive. */
+    /**
+     * Returns the sign of a value.
+     *
+     * @param value the value
+     * @return -1, 0 or 1 if {@code value} is negative, zero or positive
+     */
     static int signum(long value) {
         return value < 0 ? -1 : value > 0 ? 1 : 0;
     }
 
     /**
-     * Returns `-1.0`, `1.0` or `value` itself when `value` is negative,
-     * positive, or zero or NaN.
+     * Returns the sign of a value.
+     *
+     * @param value the value
+     * @return -1.0 if {@code value} is negative, 1.0 if it is positive, and
+     *         {@code value} itself if it is zero or NaN
      */
     static double signum(double value) {
         return value < 0.0 ? -1.0 : value > 0.0 ? 1.0 : value;
     }
 
     /**
-     * Returns the square root of `value`, or NaN when `value` is negative.
+     * Returns the square root of a value.
      *
-     * ```
+     * <pre>{@code
      * Math.sqrt(2.0) // 1.4142135623730951
-     * ```
+     * }</pre>
+     *
+     * @param value the value
+     * @return the positive square root of {@code value}, or NaN if it is
+     *         negative
      */
     @Intrinsic
     static double sqrt(double value);
 
-    /** Returns the cube root of `value`. Unlike `sqrt`, negative values work. */
+    /**
+     * Returns the cube root of a value.
+     *
+     * @param value the value, which may be negative
+     * @return the cube root of {@code value}
+     */
     @Intrinsic
     static double cbrt(double value);
 
-    /** Returns `base` raised to the power `exponent`. */
+    /**
+     * Returns a value raised to a power.
+     *
+     * @param base the base
+     * @param exponent the exponent
+     * @return {@code base} raised to the power {@code exponent}
+     */
     @Intrinsic
     static double pow(double base, double exponent);
 
     /**
-     * Returns `sqrt(x * x + y * y)` without overflowing or underflowing in
-     * between.
+     * Returns {@code sqrt(x * x + y * y)} without intermediate overflow or
+     * underflow.
+     *
+     * @param x the first value
+     * @param y the second value
+     * @return the length of the hypotenuse
      */
     @Intrinsic
     static double hypot(double x, double y);
 
-    /** Returns `e` raised to the power `value`. */
+    /**
+     * Returns Euler's number raised to a power.
+     *
+     * @param value the exponent
+     * @return {@link #E} raised to the power {@code value}
+     */
     @Intrinsic
     static double exp(double value);
 
-    /** Returns the natural logarithm of `value`, or NaN when it is negative. */
+    /**
+     * Returns the natural logarithm of a value.
+     *
+     * @param value the value
+     * @return the natural logarithm of {@code value}, or NaN if it is
+     *         negative
+     */
     @Intrinsic
     static double ln(double value);
 
-    /** Returns the base 10 logarithm of `value`, or NaN when it is negative. */
+    /**
+     * Returns the base-10 logarithm of a value.
+     *
+     * @param value the value
+     * @return the base-10 logarithm of {@code value}, or NaN if it is
+     *         negative
+     */
     @Intrinsic
     static double log10(double value);
 
-    /** Returns the base 2 logarithm of `value`, or NaN when it is negative. */
+    /**
+     * Returns the base-2 logarithm of a value.
+     *
+     * @param value the value
+     * @return the base-2 logarithm of {@code value}, or NaN if it is
+     *         negative
+     */
     @Intrinsic
     static double log2(double value);
 
-    /** Returns the largest whole number that is not above `value`. */
+    /**
+     * Rounds a value down.
+     *
+     * @param value the value
+     * @return the largest integral value that is not greater than
+     *         {@code value}
+     */
     @Intrinsic
     static double floor(double value);
 
-    /** Returns the smallest whole number that is not below `value`. */
+    /**
+     * Rounds a value up.
+     *
+     * @param value the value
+     * @return the smallest integral value that is not less than
+     *         {@code value}
+     */
     @Intrinsic
     static double ceil(double value);
 
-    /** Returns `value` without its fractional part, rounding towards zero. */
+    /**
+     * Rounds a value towards zero.
+     *
+     * @param value the value
+     * @return {@code value} without its fractional part
+     */
     @Intrinsic
     static double trunc(double value);
 
     /**
-     * Returns the nearest whole number to `value` as a `long`. Halfway cases
-     * round away from zero.
+     * Rounds a value to the nearest {@code long}, with ties rounding away
+     * from zero.
      *
-     * NaN gives `0`, and values beyond the range of `long` give
-     * `Long.MIN_VALUE` or `Long.MAX_VALUE`.
-     *
-     * ```
+     * <pre>{@code
      * Math.round(2.5)  // 3
      * Math.round(-2.5) // -3
      * Math.round(0.49999999999999994) // 0
-     * ```
+     * }</pre>
+     *
+     * @param value the value to round
+     * @return the nearest {@code long}; 0 if {@code value} is NaN, and
+     *         {@code Long.MIN_VALUE} or {@code Long.MAX_VALUE} if it is
+     *         outside the range of {@code long}
      */
     @Intrinsic
     static long round(double value);
 
-    /** Returns the sine of `radians`. */
+    /**
+     * Returns the sine of an angle.
+     *
+     * @param radians the angle, in radians
+     * @return the sine of the angle
+     */
     @Intrinsic
     static double sin(double radians);
 
-    /** Returns the cosine of `radians`. */
+    /**
+     * Returns the cosine of an angle.
+     *
+     * @param radians the angle, in radians
+     * @return the cosine of the angle
+     */
     @Intrinsic
     static double cos(double radians);
 
-    /** Returns the tangent of `radians`. */
+    /**
+     * Returns the tangent of an angle.
+     *
+     * @param radians the angle, in radians
+     * @return the tangent of the angle
+     */
     @Intrinsic
     static double tan(double radians);
 
-    /** Returns the arcsine of `value` in radians, from `-PI / 2` to `PI / 2`. */
+    /**
+     * Returns the arcsine of a value.
+     *
+     * @param value the value
+     * @return the angle in radians, from {@code -PI / 2} to {@code PI / 2}
+     */
     @Intrinsic
     static double asin(double value);
 
-    /** Returns the arccosine of `value` in radians, from `0` to `PI`. */
+    /**
+     * Returns the arccosine of a value.
+     *
+     * @param value the value
+     * @return the angle in radians, from 0 to {@link #PI}
+     */
     @Intrinsic
     static double acos(double value);
 
-    /** Returns the arctangent of `value` in radians, from `-PI / 2` to `PI / 2`. */
+    /**
+     * Returns the arctangent of a value.
+     *
+     * @param value the value
+     * @return the angle in radians, from {@code -PI / 2} to {@code PI / 2}
+     */
     @Intrinsic
     static double atan(double value);
 
     /**
-     * Returns the angle in radians, from `-PI` to `PI`, between the positive
-     * x axis and the point `(x, y)`.
+     * Returns the angle between the positive x axis and the point
+     * {@code (x, y)}.
      *
-     * ```
+     * <pre>{@code
      * Math.atan2(1.0, 1.0) // 0.7853981633974483, which is PI / 4
-     * ```
+     * }</pre>
+     *
+     * @param y the y coordinate
+     * @param x the x coordinate
+     * @return the angle in radians, from {@code -PI} to {@link #PI}
      */
     @Intrinsic
     static double atan2(double y, double x);
 
-    /** Converts an angle from degrees to radians. */
+    /**
+     * Converts an angle from degrees to radians.
+     *
+     * @param degrees the angle, in degrees
+     * @return the angle, in radians
+     */
     static double toRadians(double degrees) {
         return degrees * (Math.PI / 180.0);
     }
 
-    /** Converts an angle from radians to degrees. */
+    /**
+     * Converts an angle from radians to degrees.
+     *
+     * @param radians the angle, in radians
+     * @return the angle, in degrees
+     */
     static double toDegrees(double radians) {
         return radians * (180.0 / Math.PI);
     }
 
     /**
-     * Returns a pseudo-random number from `0.0` (included) to `1.0`
-     * (excluded).
+     * Returns a pseudo-random number greater than or equal to 0.0 and less
+     * than 1.0.
      *
-     * Each thread has its own generator, seeded from the clock. It is fast
-     * but predictable, so don't use it for anything secret.
+     * <p>Each thread has its own generator, seeded from the clock. The
+     * generator is fast but predictable and must not be used for
+     * security-sensitive purposes.
+     *
+     * @return a pseudo-random number in the range [0.0, 1.0)
      */
     @Intrinsic
     static double random();

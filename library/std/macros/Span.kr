@@ -1,17 +1,22 @@
 package std.macros;
 
 /**
- * A place in the source code the compiler is reading.
+ * A location in the source code being compiled.
  *
- * Spans are opaque: a macro can only copy them from one token to another.
- * The compiler uses them to point errors and the code a macro produces at
- * the right place.
+ * <p>Spans are opaque: a macro can only copy them from one token to
+ * another. The compiler uses them to attribute errors, and the code a
+ * macro produces, to the right location.
+ *
+ * @param id the compiler's identifier for the location
  */
 record Span(int id) {
     /**
-     * Returns the span of the macro call itself, the one tokens built from
-     * strings get. An error reported there points at the `@Name` that invoked
-     * the macro.
+     * Returns the span of the macro invocation.
+     *
+     * <p>Tokens created from strings have this span. An error reported there
+     * points at the {@code @Name} that invoked the macro.
+     *
+     * @return the span of the invocation
      */
     static Span callSite() {
         return new Span(-1);

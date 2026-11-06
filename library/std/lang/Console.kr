@@ -1,79 +1,114 @@
 package std.lang;
 
 /**
- * Standard input, output and error.
+ * Provides access to standard input, standard output and standard error.
  *
- * `print` and `println` write to standard output, `eprint` and `eprintln` to
- * standard error. Any value can be printed; it is shown the same way `+`
- * shows it, and `null` prints as `null`.
+ * <p>The {@code print} and {@code println} methods write to standard
+ * output, and {@code eprint} and {@code eprintln} write to standard error.
+ * Values are converted to text the same way as in string concatenation;
+ * {@code null} is written as {@code null}.
  *
- * ```
+ * <pre>{@code
  * Console.println("Hello, world!");
  * Console.eprintln("warning: ${count} files skipped");
  * String? line = Console.readLine();
- * ```
+ * }</pre>
  *
- * Writing is safe from several threads: each call writes its text in one
- * piece. Standard output is flushed before anything is written to standard
- * error and before a line is read, so prompts and messages appear in order.
+ * <p>All methods are thread-safe, and each call writes its text as a single
+ * unit. Standard output is flushed before anything is written to standard
+ * error and before a line is read, so that prompts and messages appear in
+ * order.
  */
 final class Console {
     private Console() {}
 
-    /** Writes `value` to standard output. */
+    /**
+     * Writes the value to standard output.
+     *
+     * @param value the value to write
+     */
     @Intrinsic
     static void print(Object? value);
 
-    /** Writes the value behind `value` to standard output. */
+    /**
+     * Writes the value to standard output.
+     *
+     * @param value a reference to the value to write
+     */
     @Intrinsic
     static void print(&Object? value);
 
-    /** Writes a line break to standard output. */
+    /** Writes a line separator to standard output. */
     @Intrinsic
     static void println();
 
-    /** Writes `value` and a line break to standard output. */
+    /**
+     * Writes the value and a line separator to standard output.
+     *
+     * @param value the value to write
+     */
     @Intrinsic
     static void println(Object? value);
 
-    /** Writes the value behind `value` and a line break to standard output. */
+    /**
+     * Writes the value and a line separator to standard output.
+     *
+     * @param value a reference to the value to write
+     */
     @Intrinsic
     static void println(&Object? value);
 
-    /** Writes `value` to standard error. */
+    /**
+     * Writes the value to standard error.
+     *
+     * @param value the value to write
+     */
     @Intrinsic
     static void eprint(Object? value);
 
-    /** Writes the value behind `value` to standard error. */
+    /**
+     * Writes the value to standard error.
+     *
+     * @param value a reference to the value to write
+     */
     @Intrinsic
     static void eprint(&Object? value);
 
-    /** Writes a line break to standard error. */
+    /** Writes a line separator to standard error. */
     @Intrinsic
     static void eprintln();
 
-    /** Writes `value` and a line break to standard error. */
+    /**
+     * Writes the value and a line separator to standard error.
+     *
+     * @param value the value to write
+     */
     @Intrinsic
     static void eprintln(Object? value);
 
-    /** Writes the value behind `value` and a line break to standard error. */
+    /**
+     * Writes the value and a line separator to standard error.
+     *
+     * @param value a reference to the value to write
+     */
     @Intrinsic
     static void eprintln(&Object? value);
 
     /**
-     * Reads a line from standard input, without its line ending, or returns
-     * `null` at the end of the input. Bytes that aren't valid UTF-8 become
-     * `U+FFFD`.
+     * Reads a line of text from standard input.
      *
-     * ```
-     * while (true) {
-     *     String? line = Console.readLine();
-     *     if (line == null) {
-     *         break;
-     *     }
+     * <p>The line separator is not included. Bytes that are not valid UTF-8
+     * are replaced with {@code U+FFFD}.
+     *
+     * <pre>{@code
+     * String? line = Console.readLine();
+     * while (line != null) {
      *     Console.println(line.toUpperCase());
+     *     line = Console.readLine();
      * }
-     * ```
+     * }</pre>
+     *
+     * @return the line, or {@code null} at the end of the input
      */
     @Intrinsic
     static String? readLine();

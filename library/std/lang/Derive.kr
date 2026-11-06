@@ -1,19 +1,20 @@
 package std.lang;
 
 /**
- * Generates implementations of `Equatable`, `Hashable` and `Comparable` for
- * a class.
+ * Generates implementations of {@link Equatable}, {@link Hashable} and
+ * {@link Comparable} for a class.
  *
- * ```
+ * <p>The generated methods consider every field in declaration order.
+ * {@code equals} compares all fields, {@code hashCode} combines their hash
+ * codes, and {@code compareTo} orders by the first field that differs.
+ *
+ * <pre>{@code
  * @Derive(Equatable, Hashable)
  * class Point {
  *     int x;
  *     int y;
  * }
- * ```
- *
- * The generated methods compare and hash every field in declaration order;
- * `Comparable` orders by the first field that differs.
+ * }</pre>
  */
 @Intrinsic
 macro Derive;

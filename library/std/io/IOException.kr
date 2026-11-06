@@ -1,19 +1,24 @@
 package std.io;
 
 /**
- * Thrown when an input or output operation fails, like opening a file that
- * doesn't exist. The message says which operation failed and why.
+ * Signals that an input or output operation failed, such as opening a
+ * file that does not exist.
  *
- * `IOException` is checked: a method that can throw it says so with
- * `throws IOException`.
+ * <p>The detail message describes the operation that failed and the
+ * reason. {@code IOException} is a checked exception: a method that can
+ * throw it must declare {@code throws IOException}.
  */
 class IOException extends Exception {
-    /** Creates an exception without a message. */
+    /** Constructs an exception with no detail message. */
     IOException() {
         super();
     }
 
-    /** Creates an exception with a message that says what went wrong. */
+    /**
+     * Constructs an exception with a detail message.
+     *
+     * @param message the detail message, which describes what went wrong
+     */
     IOException(String message) {
         super(message);
     }

@@ -1,26 +1,30 @@
 package std.lang;
 
 /**
- * The superclass of the conditions a program is expected to handle.
+ * The superclass of conditions that a program is expected to handle.
  *
- * Exceptions are checked: a method that can throw one must say so with
- * `throws`, and a caller must catch it or declare it in turn.
+ * <p>Exceptions are checked: a method that can throw one must declare it in
+ * its {@code throws} clause, and every caller must either catch it or
+ * declare it in turn. The exception to this rule is
+ * {@link RuntimeException} and its subclasses, which are unchecked.
  *
- * ```
+ * <pre>{@code
  * static String firstLine(String path) throws IOException {
  *     return Files.readLines(path)[0];
  * }
- * ```
- *
- * Subclasses of `RuntimeException` are the exception: they are unchecked.
+ * }</pre>
  */
 class Exception extends Throwable {
-    /** Creates an exception without a message. */
+    /** Constructs an exception with no detail message. */
     Exception() {
         super();
     }
 
-    /** Creates an exception with a message that says what went wrong. */
+    /**
+     * Constructs an exception with the specified detail message.
+     *
+     * @param message the detail message, which describes what went wrong
+     */
     Exception(String message) {
         super(message);
     }

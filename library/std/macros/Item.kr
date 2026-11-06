@@ -4,19 +4,20 @@ import std.util.ArrayList;
 import std.util.List;
 
 /**
- * A class, record, interface or enum, split into its parts.
+ * A type declaration (a class, record, interface or enum), split into its
+ * parts.
  *
- * `Item.parse` reads the tokens a macro receives; `toTokens` writes the item
- * back out, with any changes. An unchanged item gives back exactly the
- * tokens it was parsed from.
+ * <p>{@link #parse} reads the tokens a macro receives, and {@link #toTokens}
+ * writes the item back out, including any changes. An unchanged item
+ * produces exactly the tokens it was parsed from.
  *
- * ```
+ * <pre>{@code
  * macro Describe(TokenStream args, TokenStream input) {
  *     Item item = Item.parse(&input);
  *     String names = "";
  *     for (&Member member : item.members()) {
  *         if (member.isField()) {
- *             names = names + member.name().text + " ";
+ *             names = names + member.name().text() + " ";
  *         }
  *     }
  *     Quote describe = new Quote("static String fields() { return #names; }");
@@ -24,7 +25,9 @@ import std.util.List;
  *     item.addMember(&describe.render());
  *     return item.toTokens();
  * }
- * ```
+ * }</pre>
+ *
+ * @see Member
  */
 final class Item {
     private TokenStream docs;
@@ -53,13 +56,13 @@ final class Item {
     }
 
     /**
-     * Reads a type declaration: its doc comments, its annotations, then the
-     * declaration itself.
+     * Parses a type declaration, including its doc comments and annotations.
      *
-     * # Throws
-     *
-     * `MacroError` if `tokens` holds no class, record, interface or enum, or
-     * if its body isn't closed or a member in it never ends.
+     * @param tokens the tokens of the declaration
+     * @return the parsed item
+     * @throws MacroError if {@code tokens} contains no class, record, interface
+     *         or enum, if its body is not closed, or if a member in it does not
+     *         end
      */
     static Item parse(&TokenStream tokens) {
         int at = 0;
@@ -95,52 +98,72 @@ final class Item {
         return item;
     }
 
-    /** Returns whether this is a class, record, interface or enum. */
+    /**
+     * Returns the kind of this declaration.
+     *
+     * @return whether this is a class, record, interface or enum
+     */
     ItemKind kind() {
         return this.kind;
     }
 
-    /** Returns the name of the type. */
+    /**
+     * Returns the name of the declared type.
+     *
+     * @return the name token
+     */
     Token name() {
         return this.name;
     }
 
-    /** Returns the annotations written on the type, in order. */
+    /**
+     * Returns the annotations written on the type.
+     *
+     * @return the annotations, in source order
+     */
     &List<Attribute> attributes() {
         return &this.attributes;
     }
 
     /**
-     * Returns the members in the body, in order. An enum's constants are not
-     * members.
+     * Returns the members declared in the body.
+     *
+     * <p>The constants of an enum are not members.
+     *
+     * @return the members, in source order
      */
     &List<Member> members() {
         return &this.members;
     }
 
     /**
-     * Returns the components of a record, each as a field member, or nothing
-     * for other kinds of types. They are read-only: `toTokens` writes the
-     * record header as it was.
+     * Returns the components of a record, each represented as a field member.
+     *
+     * <p>The components are read-only: {@link #toTokens} writes the record
+     * header unchanged.
+     *
+     * @return the components, or an empty list if this is not a record
      */
     &List<Member> components() {
         return &this.components;
     }
 
     /**
-     * Parses `member` and adds it at the end of the body.
+     * Parses a member and appends it to the end of the body.
      *
-     * # Throws
-     *
-     * `MacroError` if `member` is not a single member.
+     * @param member the tokens of the member
+     * @throws MacroError if {@code member} is not exactly one member
      */
     mut void addMember(&TokenStream member) {
         this.members.add(Member.parse(member));
     }
 
     /**
-     * Removes every annotation called `name` from the type and from all of
-     * its members, and returns how many were removed.
+     * Removes every annotation with the specified name from the type and from
+     * all of its members.
+     *
+     * @param name the simple name of the annotations to remove
+     * @return the number of annotations removed
      */
     mut int removeAttribute(String name) {
         int removed = 0;
@@ -163,7 +186,11 @@ final class Item {
         return removed;
     }
 
-    /** Returns the item as tokens, with any changes made to it. */
+    /**
+     * Returns this item as tokens, including any changes made to it.
+     *
+     * @return the tokens of the item
+     */
     TokenStream toTokens() {
         TokenStream out = this.docs.copy();
         for (&Attribute attribute : this.attributes) {

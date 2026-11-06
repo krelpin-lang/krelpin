@@ -1,50 +1,79 @@
 package std.sync;
 
 /**
- * An `int` that several threads can read and change safely, for counters
- * and ids shared between threads.
+ * An {@code int} value that can be read and updated atomically by
+ * several threads, typically used as a shared counter or identifier source.
  *
- * ```
+ * <pre>{@code
  * static AtomicInt created = new AtomicInt(0);
  *
  * int id = Main.created.increment();
- * ```
+ * }</pre>
  *
- * Every operation is sequentially consistent: all threads see the
- * operations in the same order. Arithmetic wraps around on overflow.
+ * <p>All operations are sequentially consistent: every thread observes them
+ * in the same order. Arithmetic wraps around on overflow.
  */
 final class AtomicInt {
     private int value;
 
-    /** Creates an atomic holding `value`. */
+    /**
+     * Constructs an atomic {@code int} with an initial value.
+     *
+     * @param value the initial value
+     */
     AtomicInt(int value) {
         this.value = value;
     }
 
-    /** Returns the current value. */
+    /**
+     * Returns the current value.
+     *
+     * @return the current value
+     */
     @Intrinsic
     int get();
 
-    /** Replaces the value. */
+    /**
+     * Sets the value.
+     *
+     * @param value the new value
+     */
     @Intrinsic
     void set(int value);
 
     /**
-     * Sets the value to `value` if it is currently `expected`, and returns
-     * whether it did.
+     * Atomically sets the value if the current value equals an expected value.
+     *
+     * @param expected the expected current value
+     * @param value the new value
+     * @return {@code true} if the value was updated, {@code false} if the
+     *         current value was not {@code expected}
      */
     @Intrinsic
     boolean compareAndSet(int expected, int value);
 
-    /** Adds 1 and returns the new value. */
+    /**
+     * Atomically increments the value by one.
+     *
+     * @return the updated value
+     */
     @Intrinsic
     int increment();
 
-    /** Subtracts 1 and returns the new value. */
+    /**
+     * Atomically decrements the value by one.
+     *
+     * @return the updated value
+     */
     @Intrinsic
     int decrement();
 
-    /** Adds `delta` and returns the new value. */
+    /**
+     * Atomically adds a delta to the value.
+     *
+     * @param delta the value to add
+     * @return the updated value
+     */
     @Intrinsic
     int addAndGet(int delta);
 }

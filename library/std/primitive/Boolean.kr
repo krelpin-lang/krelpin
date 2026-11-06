@@ -1,10 +1,20 @@
 package std.primitive;
 
-/** Methods for `boolean`. `false` sorts before `true`. */
+/**
+ * The {@code boolean} primitive type.
+ *
+ * <p>For ordering, {@code false} sorts before {@code true}.
+ */
 final class Boolean implements Comparable<boolean>, Hashable<boolean> {
     private Boolean() {}
 
-    /** Returns `0` when the values are equal, `-1` when this one is `false` and `1` when it is `true`. */
+    /**
+     * Compares this value with another value.
+     *
+     * @param other the value to compare with
+     * @return 0 if the values are equal, -1 if this value is {@code false},
+     *         and 1 if it is {@code true}
+     */
     int compareTo(&boolean other) {
         if (this == other) {
             return 0;
@@ -13,12 +23,15 @@ final class Boolean implements Comparable<boolean>, Hashable<boolean> {
     }
 
     /**
-     * Parses `"true"` or `"false"`. Nothing else is accepted, not even other
-     * capitalizations.
+     * Parses a boolean.
      *
-     * # Throws
+     * <p>Only the exact strings {@code "true"} and {@code "false"} are
+     * accepted; other capitalizations are rejected.
      *
-     * `IllegalArgumentException` for any other text.
+     * @param text the text to parse
+     * @return the parsed value
+     * @throws IllegalArgumentException if {@code text} is neither
+     *         {@code "true"} nor {@code "false"}
      */
     static boolean parse(String text) {
         if (text == "true") {
@@ -30,16 +43,33 @@ final class Boolean implements Comparable<boolean>, Hashable<boolean> {
         throw new IllegalArgumentException("`$text` is not a boolean; expected `true` or `false`");
     }
 
-    /** Returns whether this value is equal to `other`. */
+    /**
+     * Returns whether this value is equal to another value.
+     *
+     * @param other the value to compare with
+     * @return {@code true} if the values are equal
+     */
     boolean equals(&boolean other) {
         return this == other;
     }
 
-    /** Returns a hash of this value, consistent with `equals`. */
+    /**
+     * Returns a hash code for this value, consistent with {@link #equals}.
+     *
+     * @return a hash code for this value
+     */
     @Intrinsic
     int hashCode();
 
-    /** Formats `"true"` or `"false"` with a text format spec, like `">6"`. */
+    /**
+     * Formats {@code "true"} or {@code "false"} according to a format
+     * specification for text, such as {@code ">6"}.
+     *
+     * @param spec the format specification, as described in {@link Format}
+     * @return the formatted text
+     * @throws IllegalArgumentException if {@code spec} is malformed or does
+     *         not apply to text
+     */
     String format(String spec) {
         return Format.text("" + this, spec);
     }

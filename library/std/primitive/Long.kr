@@ -1,28 +1,38 @@
 package std.primitive;
 
 /**
- * Methods and constants for `long`, a 64-bit signed integer.
+ * The {@code long} primitive type, a 64-bit signed two's complement integer.
  *
- * The methods are called on the values themselves:
+ * <p>The methods of this class are called on {@code long} values directly,
+ * and its constants are accessed through the type name:
  *
- * ```
+ * <pre>{@code
  * long value = long.parse("9000000000");
  * String padded = value.format(">8");
- * ```
+ * }</pre>
  *
- * Arithmetic on `long` wraps around on overflow: `long.MAX_VALUE + 1` is
- * `long.MIN_VALUE`.
+ * <p>Arithmetic on {@code long} wraps around on overflow:
+ * {@code long.MAX_VALUE + 1} is {@code long.MIN_VALUE}.
  */
 final class Long implements Comparable<long>, Hashable<long> {
-    /** The smallest `long`, -2<sup>63</sup>. */
+    /** The minimum value of a {@code long}, -2<sup>63</sup>. */
     public const long MIN_VALUE = -9223372036854775808L;
 
-    /** The largest `long`, 2<sup>63</sup> - 1, which is 9223372036854775807. */
+    /**
+     * The maximum value of a {@code long}, 2<sup>63</sup> - 1
+     * (9223372036854775807).
+     */
     public const long MAX_VALUE = 9223372036854775807L;
 
     private Long() {}
 
-    /** Returns a negative number, zero or a positive number when this value is smaller than, equal to or larger than `other`. */
+    /**
+     * Compares this value with another value numerically.
+     *
+     * @param other the value to compare with
+     * @return a negative number, zero or a positive number if this value is
+     *         less than, equal to or greater than {@code other}
+     */
     int compareTo(&long other) {
         if (this < other) {
             return -1;
@@ -31,41 +41,55 @@ final class Long implements Comparable<long>, Hashable<long> {
     }
 
     /**
-     * Parses a decimal number, like `"9000000000"` or `"+7"`.
+     * Parses a signed decimal integer, such as {@code "9000000000"} or
+     * {@code "+7"}.
      *
-     * The text may start with `+` or `-` and must otherwise be made of the
-     * digits `0` to `9` only: no spaces, underscores or prefixes like `0x`.
+     * <p>The text may begin with {@code +} or {@code -} and must otherwise
+     * consist only of the digits {@code 0} to {@code 9}. Whitespace,
+     * underscores and radix prefixes such as {@code 0x} are not accepted.
      *
-     * # Throws
-     *
-     * `NumberFormatException` if the text isn't a number or the number
-     * doesn't fit in a `long`.
+     * @param text the text to parse
+     * @return the parsed value
+     * @throws NumberFormatException if {@code text} is not a valid integer or
+     *         its value does not fit in a {@code long}
      */
     @Intrinsic
     static long parse(String text);
 
-    /** Returns whether this value is equal to `other`. */
+    /**
+     * Returns whether this value is equal to another value.
+     *
+     * @param other the value to compare with
+     * @return {@code true} if the values are equal
+     */
     boolean equals(&long other) {
         return this == other;
     }
 
-    /** Returns a hash of this value, consistent with `equals`. */
+    /**
+     * Returns a hash code for this value, consistent with {@link #equals}.
+     *
+     * @return a hash code for this value
+     */
     @Intrinsic
     int hashCode();
 
     /**
-     * Formats this value with a format spec, the same as `"${value:spec}"`
-     * in an interpolated string.
+     * Formats this value according to a format specification.
      *
-     * ```
+     * <p>{@code value.format(spec)} produces the same text as the
+     * interpolation {@code "${value:spec}"}.
+     *
+     * <pre>{@code
      * 42.format(">6")  // "    42"
      * 42.format("06")  // "000042"
      * 255.format("x")  // "ff"
-     * ```
+     * }</pre>
      *
-     * # Throws
-     *
-     * `IllegalArgumentException` if the spec can't be used on integers.
+     * @param spec the format specification, as described in {@link Format}
+     * @return the formatted text
+     * @throws IllegalArgumentException if {@code spec} is malformed or does
+     *         not apply to integers
      */
     String format(String spec) {
         return Format.integer(this, spec);

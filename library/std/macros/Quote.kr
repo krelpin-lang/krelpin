@@ -4,61 +4,85 @@ import std.util.HashMap;
 import std.util.Map;
 
 /**
- * Builds code from a template with `#name` placeholders, which is easier
- * to read than adding tokens one by one.
+ * A code template with {@code #name} placeholders, which is easier to read
+ * than building code token by token.
  *
- * Each placeholder is replaced by the tokens set for it. A `#` inside a
- * string or character literal in the template is left alone.
+ * <p>Each placeholder is replaced by the tokens set for it. A {@code #}
+ * inside a string or character literal in the template is not a
+ * placeholder.
  *
- * ```
+ * <pre>{@code
  * Quote getter = new Quote("#type #getter() { return this.#name; }");
  * getter.set("type", &field.type());
  * getter.set("name", field.name());
  * getter.ident("getter", "get" + capitalized);
  * TokenStream code = getter.render();
- * ```
+ * }</pre>
  *
- * A placeholder always stands for whole tokens: `get#name` is the name
- * `get` followed by the field's name, not one longer name. Build such names
- * with `ident`, as above.
+ * <p>A placeholder always stands for whole tokens: {@code get#name} is the
+ * name {@code get} followed by the field's name, not a single longer name.
+ * Build such names with {@link #ident}, as above.
  */
 final class Quote {
     private String template;
     private Map<String, TokenStream> values;
 
-    /** Creates a quote from `template`, with no placeholders set yet. */
+    /**
+     * Constructs a quote from a template, with no placeholders set.
+     *
+     * @param template the source code of the template
+     */
     Quote(String template) {
         this.template = template;
         this.values = new HashMap<>();
     }
 
-    /** Makes `#name` stand for a copy of `tokens`. */
+    /**
+     * Sets a placeholder to a sequence of tokens.
+     *
+     * @param name the name of the placeholder, without the {@code #}
+     * @param tokens the tokens to substitute, which are copied
+     */
     mut void set(String name, &TokenStream tokens) {
         this.values.put(name, tokens.copy());
     }
 
-    /** Makes `#name` stand for `token`. */
+    /**
+     * Sets a placeholder to a single token.
+     *
+     * @param name the name of the placeholder, without the {@code #}
+     * @param token the token to substitute
+     */
     mut void set(String name, Token token) {
         this.values.put(name, TokenStream.of(token));
     }
 
-    /** Makes `#name` stand for the name `text`. */
+    /**
+     * Sets a placeholder to an identifier.
+     *
+     * @param name the name of the placeholder, without the {@code #}
+     * @param text the identifier to substitute
+     */
     mut void ident(String name, String text) {
         this.set(name, Token.ident(text));
     }
 
-    /** Makes `#name` stand for a string literal with the value `value`. */
+    /**
+     * Sets a placeholder to a string literal.
+     *
+     * @param name the name of the placeholder, without the {@code #}
+     * @param value the value of the string literal
+     */
     mut void string(String name, String value) {
         this.set(name, Token.string(value));
     }
 
     /**
-     * Returns the template's tokens with every placeholder replaced.
+     * Returns the tokens of the template with every placeholder replaced.
      *
-     * # Throws
-     *
-     * `MacroError` if the template uses a placeholder that was never set.
-     * `IllegalStateException` when called outside a macro.
+     * @return the rendered tokens
+     * @throws MacroError if the template uses a placeholder that was not set
+     * @throws IllegalStateException if called outside a running macro
      */
     TokenStream render() {
         char[] chars = this.template.chars();

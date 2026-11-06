@@ -1,7 +1,16 @@
 package std.function;
 
-/** A function that takes a value and returns nothing, like `x -> Console.println(x)`. */
+/**
+ * A function that accepts a single argument and returns no result, such
+ * as {@code x -> Console.println(x)}.
+ *
+ * @param <T> the type of the argument
+ */
 interface Consumer<T> {
-    /** Calls the function with `value`. */
+    /**
+     * Performs this operation on an argument.
+     *
+     * @param value the argument
+     */
     mut void accept(T value);
 }

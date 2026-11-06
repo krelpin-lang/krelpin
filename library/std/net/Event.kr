@@ -1,11 +1,18 @@
 package std.net;
 
 /**
- * A socket that `Poller.poll` found ready, named by the token it was
- * registered with.
+ * A readiness event reported by {@link Poller#poll} for a registered
+ * socket.
  *
- * `closed` and `error` come with `readable` or `writable`, so a handler that
- * reads on `readable` will see the end of the stream or the error from the
+ * <p>{@code closed} and {@code error} are reported together with
+ * {@code readable} or {@code writable}, so a handler that reads when the
+ * socket is readable observes the end of the stream, or the error, from the
  * read itself.
+ *
+ * @param token the token the socket was registered with
+ * @param readable whether the socket can be read without blocking
+ * @param writable whether the socket can be written without blocking
+ * @param closed whether the peer has closed the connection
+ * @param error whether an error is pending on the socket
  */
 record Event(int token, boolean readable, boolean writable, boolean closed, boolean error) {}

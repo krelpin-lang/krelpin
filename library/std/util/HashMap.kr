@@ -1,22 +1,25 @@
 package std.util;
 
 /**
- * A map backed by a hash table. Looking up, adding and removing an entry
- * take constant time on average.
+ * A hash table implementation of {@link Map}.
  *
- * Keys must be `Hashable`. The order of the entries is unspecified and may
- * change as entries are added or removed.
+ * <p>{@link #get}, {@link #put}, {@link #remove} and {@link #containsKey}
+ * run in constant time on average. The iteration order of the entries is
+ * unspecified and may change as entries are added or removed.
  *
- * ```
+ * <pre>{@code
  * Map<String, int> counts = new HashMap<>();
  * for (String word : text.split(" ")) {
  *     (&int)? seen = counts.get(&word);
  *     counts.put(word, seen == null ? 1 : seen + 1);
  * }
- * ```
+ * }</pre>
+ *
+ * @param <K> the type of the keys, which must be {@link Hashable}
+ * @param <V> the type of the values
  */
 class HashMap<K extends Hashable<K>, V> implements Map<K, V> {
-    /** Creates an empty map. */
+    /** Constructs an empty map. */
     HashMap() {}
 
     @Intrinsic
@@ -43,7 +46,14 @@ class HashMap<K extends Hashable<K>, V> implements Map<K, V> {
     @Intrinsic
     List<&V> values();
 
-    /** Shows the entries in braces, like `{a=1, b=2}`. */
+    /**
+     * Returns a string representation of this map.
+     *
+     * <p>The entries are shown as {@code key=value}, separated by commas and
+     * enclosed in braces, such as {@code {a=1, b=2}}.
+     *
+     * @return a string representation of this map
+     */
     String toString() {
         StringBuilder text = new StringBuilder();
         text.append("{");

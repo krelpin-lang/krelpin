@@ -1,16 +1,20 @@
 package std.lang;
 
 /**
- * Thrown by a method that the object doesn't support, like changing a
- * collection that can only be read.
+ * Thrown when an object does not support the requested operation, such as
+ * modifying a read-only collection.
  */
 class UnsupportedOperationException extends RuntimeException {
-    /** Creates an exception without a message. */
+    /** Constructs an exception with no detail message. */
     UnsupportedOperationException() {
         super();
     }
 
-    /** Creates an exception with a message that says what went wrong. */
+    /**
+     * Constructs an exception with the specified detail message.
+     *
+     * @param message the detail message, which describes what went wrong
+     */
     UnsupportedOperationException(String message) {
         super(message);
     }

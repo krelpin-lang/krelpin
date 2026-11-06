@@ -1,33 +1,60 @@
 package std.util;
 
 /**
- * A collection without duplicates, like `HashSet`.
+ * A collection that contains no duplicate elements.
  *
- * ```
+ * <pre>{@code
  * Set<String> seen = new HashSet<>();
  * if (!seen.add(name)) {
  *     Console.println("$name appears twice");
  * }
- * ```
+ * }</pre>
+ *
+ * @param <T> the type of the elements
+ * @see HashSet
  */
 interface Set<T> extends Iterable<T> {
-    /** Returns the number of elements. */
+    /**
+     * Returns the number of elements in this set.
+     *
+     * @return the number of elements
+     */
     int size();
 
-    /** Returns whether the set has no elements. */
+    /**
+     * Returns whether this set contains no elements.
+     *
+     * @return {@code true} if {@link #size} is 0
+     */
     boolean isEmpty() {
         return this.size() == 0;
     }
 
-    /** Adds `value` and returns `true`, or returns `false` when an equal element is already there. */
+    /**
+     * Adds an element to this set if no equal element is present.
+     *
+     * @param value the element to add
+     * @return {@code true} if the element was added, {@code false} if an equal
+     *         element was already present
+     */
     mut boolean add(T value);
 
-    /** Removes the element equal to `value` and returns whether there was one. */
+    /**
+     * Removes the element equal to a value, if it is present.
+     *
+     * @param value the value to remove
+     * @return {@code true} if an element was removed
+     */
     mut boolean remove(&T value);
 
-    /** Returns whether an element equal to `value` is in the set. */
+    /**
+     * Returns whether this set contains an element equal to a value.
+     *
+     * @param value the value to search for
+     * @return {@code true} if an equal element is present
+     */
     boolean contains(&T value);
 
-    /** Removes every element. */
+    /** Removes all elements from this set. */
     mut void clear();
 }
