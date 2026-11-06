@@ -327,6 +327,10 @@ impl<'a, 'h, 'tcx> Builder<'a, 'h, 'tcx> {
     }
 
     fn bind_var(&mut self, id: LocalId, place: Place, ty: &Ty, span: Span) {
+        self.bind_var_as(id, place, ty, false, span);
+    }
+
+    fn bind_var_as(&mut self, id: LocalId, place: Place, ty: &Ty, mutable: bool, span: Span) {
         if self.is_copy(ty) || is_movable(&place) {
             let local = self.declare_var(id);
             let value = self.operand_from_place(place, ty, span);
@@ -334,18 +338,11 @@ impl<'a, 'h, 'tcx> Builder<'a, 'h, 'tcx> {
             return;
         }
         let ref_ty = Ty::Ref {
-            mutable: false,
+            mutable,
             ty: Box::new(ty.clone()),
         };
         let local = self.declare_var_as(id, ref_ty);
-        self.assign(
-            Place::local(local),
-            Rvalue::Ref {
-                mutable: false,
-                place,
-            },
-            span,
-        );
+        self.assign(Place::local(local), Rvalue::Ref { mutable, place }, span);
         self.vars
             .insert(id, Place::local(local).project(PlaceElem::Deref));
     }

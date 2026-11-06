@@ -29,6 +29,9 @@ class ArrayList<T> implements List<T> {
     &T get(int index);
 
     @Intrinsic
+    mut &mut T getMut(int index);
+
+    @Intrinsic
     mut T set(int index, T value);
 
     @Intrinsic

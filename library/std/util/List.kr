@@ -51,6 +51,21 @@ interface List<T> extends Iterable<T> {
     &T get(int index);
 
     /**
+     * Returns the element at the specified position for modification.
+     *
+     * <pre>{@code
+     * List<StringBuilder> lines = ...;
+     * lines.getMut(0).append(" (edited)");
+     * }</pre>
+     *
+     * @param index the index of the element
+     * @return a mutable reference to the element
+     * @throws IndexOutOfBoundsException if {@code index} is negative or not
+     *         less than {@link #size}
+     */
+    mut &mut T getMut(int index);
+
+    /**
      * Returns the first element of this list.
      *
      * @return a reference to the first element, or {@code null} if this list

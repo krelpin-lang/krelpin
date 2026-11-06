@@ -1,0 +1,38 @@
+error: cannot borrow `items` as mutable, because it is behind a `&` reference
+  --> tests/ui/borrowck/mutable_access.kr:15:47
+   |
+15 |             case Items(List<String> items) -> items.add("x");
+   |                                               ^^^^^^^^^^^^^^ `items` only lets you read it
+   |
+   = help: borrow it with `&mut` to change it through `items`
+
+error: cannot borrow `slots` as mutable more than once at a time
+  --> tests/ui/borrowck/mutable_access.kr:26:21
+   |
+22 |         (&mut Slot)? slot = slots.getMut(&"a");
+   |                             ------------------ mutable borrow of `slots` happens here
+...
+26 |                     slots.clear();
+   |                     ^^^^^^^^^^^^^ second mutable borrow happens here
+27 |                     items.add("x");
+   |                     -------------- the borrow is used later here
+
+error: cannot borrow `names` as mutable, because it is behind a `&` reference
+  --> tests/ui/borrowck/mutable_access.kr:36:9
+   |
+36 |         names.getMut(0);
+   |         ^^^^^^^^^^^^^^^ `names` only lets you read it
+   |
+   = help: borrow it with `&mut` to change it through `names`
+
+error: cannot let a reference to `names` escape the method
+  --> tests/ui/borrowck/mutable_access.kr:42:16
+   |
+42 |         return names.get(&"a");
+   |         ----------------------- the reference is returned here
+   |                ^^^^^^^^^^^^^^^ `names` is borrowed here
+   |
+   = note: `names` stops existing when the method ends
+
+error: aborting due to 4 previous errors
+

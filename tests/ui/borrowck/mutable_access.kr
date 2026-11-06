@@ -1,0 +1,46 @@
+import std.util.ArrayList;
+import std.util.HashMap;
+import std.util.List;
+import std.util.Map;
+
+enum Slot {
+    Empty,
+    Items(List<String> items)
+}
+
+class Main {
+    // A value matched through `&` is still read-only.
+    static void changesThroughShared(&Slot slot) {
+        switch (slot) {
+            case Items(List<String> items) -> items.add("x");
+            default -> {}
+        }
+    }
+
+    // The mutable binding keeps the map borrowed while it is used.
+    static void usesMapWhileBound(&mut Map<String, Slot> slots) {
+        (&mut Slot)? slot = slots.getMut(&"a");
+        if (slot != null) {
+            switch (slot) {
+                case Items(List<String> items) -> {
+                    slots.clear();
+                    items.add("x");
+                }
+                default -> {}
+            }
+        }
+    }
+
+    // `getMut` needs the list to be changeable.
+    static void getMutOnShared(&List<String> names) {
+        names.getMut(0);
+    }
+
+    // The result of `get` borrows the map, so it can't outlive it.
+    static (&String)? escapes() {
+        Map<String, String> names = new HashMap<>();
+        return names.get(&"a");
+    }
+
+    static void main() {}
+}

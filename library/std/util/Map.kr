@@ -48,6 +48,24 @@ interface Map<K, V> {
     (&V)? get(&K key);
 
     /**
+     * Returns the value associated with a key, for modification.
+     *
+     * <pre>{@code
+     * Map<String, List<String>> groups = new HashMap<>();
+     * groups.put("odd", new ArrayList<>());
+     * (&mut List<String>)? odd = groups.getMut(&"odd");
+     * if (odd != null) {
+     *     odd.add("one");
+     * }
+     * }</pre>
+     *
+     * @param key the key to look up
+     * @return a mutable reference to the value, or {@code null} if there is
+     *         no entry for {@code key}
+     */
+    mut (&mut V)? getMut(&K key);
+
+    /**
      * Associates a value with a key, replacing any previous value.
      *
      * @param key the key

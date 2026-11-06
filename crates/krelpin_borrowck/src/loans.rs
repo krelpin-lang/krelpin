@@ -5,7 +5,7 @@ use krelpin_mir::{
     AggregateKind, BasicBlock, Body, Local, Operand, Place, PlaceElem, Rvalue, StatementKind,
     TerminatorKind,
 };
-use krelpin_span::Span;
+use krelpin_span::{Span, Symbol};
 use krelpin_typeck::{BorrowSource, Callee, Storage, Ty};
 
 use crate::bitset::BitSet;
@@ -399,8 +399,23 @@ impl LoanData<'_, '_> {
             });
         }
         if contains_param(&callee.method.ret) {
+            // A type parameter of the result can only be filled by the
+            // receiver, or by an argument whose type mentions that parameter.
+            let mut params = Vec::new();
+            collect_params(&callee.method.ret, &mut params);
             for index in 0..args.len() {
-                held.union(&self.element_loans(state, callee, args, index));
+                let carries = if has_receiver && index == 0 {
+                    true
+                } else {
+                    callee
+                        .method
+                        .params
+                        .get(index - usize::from(has_receiver))
+                        .is_none_or(|ty| mentions_any(ty, &params))
+                };
+                if carries {
+                    held.union(&self.element_loans(state, callee, args, index));
+                }
             }
         }
         held
@@ -486,6 +501,28 @@ fn contains_param(ty: &Ty) -> bool {
         Ty::Param(_) => true,
         Ty::Ref { ty, .. } | Ty::Nullable(ty) | Ty::Array(ty) => contains_param(ty),
         Ty::Adt { args, .. } => args.iter().any(contains_param),
+        Ty::Primitive(_) | Ty::Void | Ty::Null | Ty::Unknown => false,
+    }
+}
+
+fn collect_params(ty: &Ty, params: &mut Vec<Symbol>) {
+    match ty {
+        Ty::Param(name) => {
+            if !params.contains(name) {
+                params.push(*name);
+            }
+        }
+        Ty::Ref { ty, .. } | Ty::Nullable(ty) | Ty::Array(ty) => collect_params(ty, params),
+        Ty::Adt { args, .. } => args.iter().for_each(|arg| collect_params(arg, params)),
+        Ty::Primitive(_) | Ty::Void | Ty::Null | Ty::Unknown => {}
+    }
+}
+
+fn mentions_any(ty: &Ty, params: &[Symbol]) -> bool {
+    match ty {
+        Ty::Param(name) => params.contains(name),
+        Ty::Ref { ty, .. } | Ty::Nullable(ty) | Ty::Array(ty) => mentions_any(ty, params),
+        Ty::Adt { args, .. } => args.iter().any(|arg| mentions_any(arg, params)),
         Ty::Primitive(_) | Ty::Void | Ty::Null | Ty::Unknown => false,
     }
 }

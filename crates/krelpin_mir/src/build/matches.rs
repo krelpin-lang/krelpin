@@ -64,7 +64,7 @@ impl<'h> Builder<'_, 'h, '_> {
                 self.goto(next_arm, guard.span);
                 self.current = pass;
             }
-            self.bind(bindings, arm.span);
+            self.bind(bindings, &scrutinee.ty, arm.span);
             match &arm.body {
                 ArmBody::Expr(value) => {
                     let dest = dest
@@ -100,9 +100,13 @@ impl<'h> Builder<'_, 'h, '_> {
         )
     }
 
-    pub(super) fn bind(&mut self, bindings: Vec<Binding>, span: Span) {
+    /// Declares the variables a pattern binds. A value that can't be moved
+    /// out is bound by reference, a mutable one when the matched value is
+    /// reached through `&mut`.
+    pub(super) fn bind(&mut self, bindings: Vec<Binding>, scrutinee: &Ty, span: Span) {
+        let mutable = matches!(scrutinee.non_null(), Ty::Ref { mutable: true, .. });
         for Binding { id, place, ty } in bindings {
-            self.bind_var(id, place, &ty, span);
+            self.bind_var_as(id, place, &ty, mutable, span);
         }
     }
 

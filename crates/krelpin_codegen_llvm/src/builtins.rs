@@ -1522,7 +1522,7 @@ impl FnCx<'_, '_, '_> {
                 let value = self.assign(format!("trunc i64 {len} to i32"));
                 self.ret(&value, &Ty::INT);
             }
-            "get" => {
+            "get" | "getMut" => {
                 let index = check_index(self, &builtin.arg(0), false);
                 let address = slot(self, &index);
                 self.line(format!("ret ptr {address}"));
@@ -1635,13 +1635,13 @@ impl FnCx<'_, '_, '_> {
                 let value = self.assign(format!("trunc i64 {live} to i32"));
                 self.ret(&value, &Ty::INT);
             }
-            "get" | "containsKey" | "contains" => {
+            "get" | "getMut" | "containsKey" | "contains" => {
                 let entry = self.runtime(
                     "ptr",
                     "kr_table_find",
                     &format!("ptr {table}, ptr {shape}, ptr %a1"),
                 );
-                if name == "get" {
+                if matches!(name, "get" | "getMut") {
                     let is_null = self.assign(format!("icmp eq ptr {entry}, null"));
                     let address = self.assign(format!(
                         "getelementptr inbounds {entry_ll}, ptr {entry}, i32 0, i32 3"

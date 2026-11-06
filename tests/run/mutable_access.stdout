@@ -1,0 +1,5 @@
+name=krelp deps={tide=^0.1 json=1.2}
+missing: true
+edited in place
+{odd=[1, 3, 5]}
+absent: true

@@ -1,0 +1,92 @@
+import std.util.ArrayList;
+import std.util.HashMap;
+import std.util.List;
+import std.util.Map;
+
+enum Node {
+    Leaf(String text),
+    Branch(Table table)
+}
+
+// A wrapper that hands out what its map holds, keyed by a borrowed name.
+class Table {
+    private List<String> order;
+    private Map<String, Node> nodes;
+
+    Table() {
+        this.order = new ArrayList<>();
+        this.nodes = new HashMap<>();
+    }
+
+    mut void put(String name, Node node) {
+        if (!this.nodes.containsKey(&name)) {
+            this.order.add(name);
+        }
+        this.nodes.put(name, node);
+    }
+
+    // The result borrows only `this`, not `name`.
+    (&Node)? get(&String name) {
+        return this.nodes.get(name);
+    }
+
+    mut (&mut Table)? branch(&String name) {
+        (&mut Node)? node = this.nodes.getMut(name);
+        if (node == null) {
+            return null;
+        }
+        // Matching through `&mut` binds `table` mutably.
+        return switch (node) {
+            case Branch(Table table) -> &mut table;
+            default -> null;
+        };
+    }
+
+    String describe() {
+        StringBuilder text = new StringBuilder();
+        for (&String name : this.order) {
+            (&Node)? node = this.nodes.get(name);
+            if (node == null) {
+                continue;
+            }
+            String shown = switch (node) {
+                case Leaf(String value) -> value;
+                case Branch(Table table) -> "{" + table.describe() + "}";
+            };
+            text.append(" $name=$shown");
+        }
+        return text.toString().trim();
+    }
+}
+
+class Main {
+    static void main() {
+        Table root = new Table();
+        root.put("name", Node.Leaf("krelp"));
+        root.put("deps", Node.Branch(new Table()));
+        String key = "deps";
+        (&mut Table)? deps = root.branch(&key);
+        if (deps != null) {
+            deps.put("tide", Node.Leaf("^0.1"));
+            deps.put("json", Node.Leaf("1.2"));
+        }
+        Console.println(root.describe());
+        Console.println("missing: ${root.get(&"none") == null}");
+
+        List<StringBuilder> lines = new ArrayList<>();
+        lines.add(new StringBuilder());
+        lines.getMut(0).append("edited in place");
+        Console.println(lines.get(0).toString());
+
+        Map<String, List<int>> groups = new HashMap<>();
+        groups.put("odd", new ArrayList<>());
+        for (int i = 1; i <= 5; i++) {
+            (&mut List<int>)? odd = groups.getMut(&"odd");
+            if (odd != null && i % 2 == 1) {
+                odd.add(i);
+            }
+        }
+        Console.println(&groups);
+        Console.println("absent: ${groups.getMut(&"even") == null}");
+    }
+}

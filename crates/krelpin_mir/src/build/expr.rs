@@ -453,7 +453,7 @@ impl<'h> Builder<'_, 'h, '_> {
                 let fail = self.new_block();
                 let mut bindings = Vec::new();
                 self.test_pat(place, &scrutinee.ty, pat, fail, &mut bindings);
-                self.bind(bindings, span);
+                self.bind(bindings, &scrutinee.ty, span);
                 (self.current, fail)
             }
             _ => {
