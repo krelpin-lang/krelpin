@@ -83,6 +83,54 @@ final class UdpSocket {
         return new Datagram(data, SocketAddr.parse(sender));
     }
 
+    /**
+     * Sends `data` as one message to `address` if the socket can take it
+     * now, and returns whether it did. Meant for a non-blocking socket; a
+     * blocking one waits instead and always returns `true`.
+     *
+     * The address is resolved before sending, which can block on a host
+     * name. Use an IP address to avoid that.
+     *
+     * # Throws
+     *
+     * `IOException` if the address can't be resolved, the message is too
+     * large, or sending fails.
+     */
+    mut boolean trySend(&byte[] data, String address) throws IOException {
+        int status = this.trySendRaw(data, address);
+        if (status < 0) {
+            throw new IOException("couldn't send to `$address`: ${Files.lastError()}");
+        }
+        return status == 1;
+    }
+
+    /**
+     * Returns the next message if one has arrived, or `null` at once if none
+     * has. Meant for a non-blocking socket; a blocking one waits instead.
+     *
+     * # Throws
+     *
+     * `IllegalArgumentException` unless `max` is from 1 to 65536.
+     * `IOException` if receiving fails.
+     */
+    mut Datagram? tryReceive(int max) throws IOException {
+        if (max <= 0 || max > 65536) {
+            throw new IllegalArgumentException("tryReceive: `max` must be from 1 to 65536, not $max");
+        }
+        byte[]? data = this.tryReceiveRaw(max);
+        if (data == null) {
+            if (Files.lastFailed()) {
+                throw new IOException("couldn't receive: ${Files.lastError()}");
+            }
+            return null;
+        }
+        String? sender = this.lastSenderRaw();
+        if (sender == null) {
+            throw new IOException("couldn't read the sender: ${Files.lastError()}");
+        }
+        return new Datagram(data, SocketAddr.parse(sender));
+    }
+
     /** Returns the address the socket is bound to. */
     SocketAddr localAddr() throws IOException {
         String? address = this.localAddrRaw();
@@ -106,6 +154,74 @@ final class UdpSocket {
         }
     }
 
+
+    /**
+     * Makes the socket non-blocking (`true`) or blocking again. A
+     * non-blocking socket is meant to be driven by a `Poller`; its blocking
+     * methods throw an `IOException` instead of waiting when it isn't ready.
+     */
+    mut void setNonBlocking(boolean nonBlocking) throws IOException {
+        if (!this.setNonBlockingRaw(nonBlocking)) {
+            throw new IOException("couldn't change the blocking mode: ${Files.lastError()}");
+        }
+    }
+
+    /**
+     * Asks `poller` to report this socket under `token` when it is ready for
+     * `interest`, a combination of the `Interest` constants.
+     *
+     * # Throws
+     *
+     * `IllegalArgumentException` if `interest` asks for nothing.
+     * `IOException` if the system refuses. On Linux that includes a socket
+     * already registered with `poller`; use `reregister` to change it.
+     */
+    void register(&mut Poller poller, int token, int interest) throws IOException {
+        Poller.checkInterest(interest);
+        if (!this.registerRaw(poller, token, interest, false)) {
+            throw new IOException("couldn't register with the poller: ${Files.lastError()}");
+        }
+    }
+
+    /**
+     * Changes the token and interest of a socket registered with `poller`.
+     *
+     * # Throws
+     *
+     * `IllegalArgumentException` if `interest` asks for nothing.
+     * `IOException` if the system refuses. On Linux that includes a socket
+     * that isn't registered with `poller`.
+     */
+    void reregister(&mut Poller poller, int token, int interest) throws IOException {
+        Poller.checkInterest(interest);
+        if (!this.registerRaw(poller, token, interest, true)) {
+            throw new IOException("couldn't register with the poller: ${Files.lastError()}");
+        }
+    }
+
+    /**
+     * Stops `poller` from reporting this socket. Dropping the socket does the
+     * same.
+     *
+     * # Throws
+     *
+     * `IOException` if the socket isn't registered with `poller`.
+     */
+    void deregister(&mut Poller poller) throws IOException {
+        if (!this.deregisterRaw(poller)) {
+            throw new IOException("couldn't deregister from the poller: ${Files.lastError()}");
+        }
+    }
+
+    @Intrinsic
+    private mut boolean setNonBlockingRaw(boolean nonBlocking);
+
+    @Intrinsic
+    private boolean registerRaw(&mut Poller poller, int token, int interest, boolean again);
+
+    @Intrinsic
+    private boolean deregisterRaw(&mut Poller poller);
+
     @Intrinsic
     private mut boolean bindRaw(String address);
 
@@ -114,6 +230,12 @@ final class UdpSocket {
 
     @Intrinsic
     private mut byte[]? receiveRaw(int max);
+
+    @Intrinsic
+    private mut int trySendRaw(&byte[] data, String address);
+
+    @Intrinsic
+    private mut byte[]? tryReceiveRaw(int max);
 
     @Intrinsic
     private mut String? lastSenderRaw();

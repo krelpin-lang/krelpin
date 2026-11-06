@@ -18,6 +18,7 @@ enum {
     ERROR_NOT_UTF8 = -2,
     ERROR_RESOLVE = -3,
     ERROR_BAD_ADDRESS = -4,
+    ERROR_WOULD_BLOCK = -5,
 };
 
 static _Thread_local int last_error;
@@ -68,6 +69,9 @@ KrString *kr_io_last_error(void) {
     case ERROR_RESOLVE:
         message = gai_strerror(resolve_error);
         break;
+    case ERROR_WOULD_BLOCK:
+        message = "the socket is non-blocking and isn't ready; wait for it with a `Poller`";
+        break;
     case ERROR_BAD_ADDRESS:
         message = "expected an address like `127.0.0.1:8080`, `[::1]:8080` or `localhost:8080`";
         break;
@@ -94,6 +98,10 @@ bool kr_io_fail_resolve(int error) {
 
 bool kr_io_fail_bad_address(void) {
     return failed_with(ERROR_BAD_ADDRESS);
+}
+
+bool kr_io_fail_would_block(void) {
+    return failed_with(ERROR_WOULD_BLOCK);
 }
 
 bool kr_io_fail_not_utf8(void) {

@@ -1016,17 +1016,37 @@ impl FnCx<'_, '_, '_> {
         true
     }
 
-    /// The private `...Raw` intrinsics of `TcpListener`, `TcpStream` and
-    /// `UdpSocket`. Each runtime function takes the address of the socket's
-    /// native slot, then the remaining arguments; a socket argument is passed
-    /// as its handle and a borrowed array as the array itself.
+    /// The private `...Raw` intrinsics of `TcpListener`, `TcpStream`,
+    /// `UdpSocket` and `Poller`. Each runtime function takes the address of
+    /// the object's native slot, then the remaining arguments; a socket or
+    /// poller argument is passed as its handle and a borrowed array as the
+    /// array itself.
     fn net_builtin(&mut self, class: NetClass, name: &str, builtin: &Builtin) -> bool {
         let function = match (class, name) {
             (_, "localAddrRaw") => "kr_net_local_addr",
+            (NetClass::Poller, "createRaw") => "kr_poller_create",
+            (NetClass::Poller, "pollRaw") => "kr_poller_poll",
+            (NetClass::Poller, "tokenRaw") => "kr_poller_token",
+            (NetClass::Poller, "flagsRaw") => "kr_poller_flags",
+            (NetClass::Poller, _) => return false,
             (_, "setTimeoutRaw") => "kr_net_set_timeout",
+            (_, "setNonBlockingRaw") => "kr_net_set_nonblocking",
+            (_, "registerRaw") => "kr_net_register",
+            (_, "deregisterRaw") => "kr_net_deregister",
             (NetClass::Listener, "bindRaw") => "kr_tcp_listener_bind",
             (NetClass::Stream, "connectRaw") => "kr_tcp_stream_connect",
             (NetClass::Stream, "acceptRaw") => "kr_tcp_stream_accept",
+            (NetClass::Stream, "tryAcceptRaw") => "kr_tcp_stream_try_accept",
+            (NetClass::Stream, "startConnectRaw") => "kr_tcp_stream_start_connect",
+            (NetClass::Stream, "finishConnectRaw") => "kr_tcp_stream_finish_connect",
+            (NetClass::Stream, "tryReadLineRaw") => "kr_tcp_stream_try_read_line",
+            (NetClass::Stream, "atEndRaw") => "kr_tcp_stream_at_end",
+            (NetClass::Stream, "tryReadRaw") => "kr_tcp_stream_try_read",
+            (NetClass::Stream, "tryWriteRaw") => "kr_tcp_stream_try_write",
+            (NetClass::Stream, "queueRaw") => "kr_tcp_stream_queue_text",
+            (NetClass::Stream, "queueBytesRaw") => "kr_tcp_stream_queue_bytes",
+            (NetClass::Stream, "flushRaw") => "kr_tcp_stream_flush",
+            (NetClass::Stream, "queuedRaw") => "kr_tcp_stream_queued",
             (NetClass::Stream, "peerAddrRaw") => "kr_tcp_stream_peer_addr",
             (NetClass::Stream, "readLineRaw") => "kr_tcp_stream_read_line",
             (NetClass::Stream, "readAllRaw") => "kr_tcp_stream_read_all",
@@ -1038,6 +1058,8 @@ impl FnCx<'_, '_, '_> {
             (NetClass::Udp, "bindRaw") => "kr_udp_bind",
             (NetClass::Udp, "sendRaw") => "kr_udp_send_to",
             (NetClass::Udp, "receiveRaw") => "kr_udp_receive",
+            (NetClass::Udp, "trySendRaw") => "kr_udp_try_send_to",
+            (NetClass::Udp, "tryReceiveRaw") => "kr_udp_try_receive",
             (NetClass::Udp, "lastSenderRaw") => "kr_udp_last_sender",
             _ => return false,
         };

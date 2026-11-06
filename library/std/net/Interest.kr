@@ -1,0 +1,22 @@
+package std.net;
+
+/**
+ * The readiness a socket is registered for with a `Poller`. Combine them
+ * with `|`:
+ *
+ * ```
+ * stream.register(&mut poller, 7, Interest.READABLE | Interest.WRITABLE);
+ * ```
+ */
+final class Interest {
+    private Interest() {}
+
+    /** Report the socket when a read, `tryAccept` or `tryReceive` won't block. */
+    public const int READABLE = 1;
+
+    /**
+     * Report the socket when a write won't block, and when a connection
+     * started with `TcpStream.startConnect` has finished or failed.
+     */
+    public const int WRITABLE = 2;
+}

@@ -1,0 +1,129 @@
+package std.net;
+
+import std.io.Files;
+import std.io.IOException;
+import std.util.ArrayList;
+import std.util.List;
+
+/**
+ * Waits until any of a set of non-blocking sockets is ready, so one thread
+ * can serve many connections. It uses epoll on Linux and kqueue on macOS
+ * and the BSDs.
+ *
+ * Register each socket with a token of your choice and the `Interest` it
+ * has, then call `poll` in a loop and handle the sockets it reports:
+ *
+ * ```
+ * Poller poller = Poller.create();
+ * TcpListener listener = TcpListener.bind("127.0.0.1:8080");
+ * listener.setNonBlocking(true);
+ * listener.register(&mut poller, 0, Interest.READABLE);
+ *
+ * Map<int, TcpStream> clients = new HashMap<>();
+ * int next = 1;
+ * while (true) {
+ *     for (Event event : poller.poll(-1)) {
+ *         if (event.token == 0) {
+ *             TcpStream? client = listener.tryAccept();
+ *             if (client != null) {
+ *                 client.register(&mut poller, next, Interest.READABLE);
+ *                 clients.put(next, client);
+ *                 next++;
+ *             }
+ *             continue;
+ *         }
+ *         TcpStream? client = clients.remove(&event.token);
+ *         if (client == null) {
+ *             continue;
+ *         }
+ *         String? line = client.tryReadLine();
+ *         while (line != null) {
+ *             client.queue("you said: $line\n");
+ *             line = client.tryReadLine();
+ *         }
+ *         client.flush();
+ *         if (!client.atEnd()) {
+ *             clients.put(event.token, client); // dropping it closes it
+ *         }
+ *     }
+ * }
+ * ```
+ *
+ * Polling is level-triggered: a socket that still has data is reported
+ * again by the next `poll`, so a handler may read just part of it. Register
+ * for `Interest.WRITABLE` only while there is something to send, because a
+ * socket with room in its send buffer is reported as writable every time.
+ *
+ * A socket is removed from the poller when it is dropped. The poller is
+ * closed when it is dropped.
+ */
+final class Poller {
+    private Poller() {}
+
+    /**
+     * Opens a poller.
+     *
+     * # Throws
+     *
+     * `IOException` if the system is out of descriptors, or has neither
+     * epoll nor kqueue.
+     */
+    static Poller create() throws IOException {
+        Poller poller = new Poller();
+        if (!poller.createRaw()) {
+            throw new IOException("couldn't create a poller: ${Files.lastError()}");
+        }
+        return poller;
+    }
+
+    /**
+     * Waits until at least one registered socket is ready, or
+     * `timeoutMillis` milliseconds have passed, and returns the ready
+     * sockets. Each token appears at most once.
+     *
+     * A negative timeout waits for as long as it takes and `0` returns at
+     * once. The list is empty when the timeout passes or a signal
+     * interrupts the wait.
+     *
+     * # Throws
+     *
+     * `IOException` if the system call fails.
+     */
+    mut List<Event> poll(long timeoutMillis) throws IOException {
+        int count = this.pollRaw(timeoutMillis);
+        if (count < 0) {
+            throw new IOException("couldn't poll: ${Files.lastError()}");
+        }
+        List<Event> events = new ArrayList<>();
+        for (int i = 0; i < count; i++) {
+            int flags = this.flagsRaw(i);
+            events.add(new Event(
+                this.tokenRaw(i),
+                (flags & 1) != 0,
+                (flags & 2) != 0,
+                (flags & 4) != 0,
+                (flags & 8) != 0
+            ));
+        }
+        return events;
+    }
+
+    /** Throws unless `interest` is a non-empty combination of `Interest` constants. */
+    static void checkInterest(int interest) {
+        if (interest <= 0 || interest > (Interest.READABLE | Interest.WRITABLE)) {
+            throw new IllegalArgumentException("$interest is not a combination of `Interest` constants");
+        }
+    }
+
+    @Intrinsic
+    private mut boolean createRaw();
+
+    @Intrinsic
+    private mut int pollRaw(long millis);
+
+    @Intrinsic
+    private int tokenRaw(int index);
+
+    @Intrinsic
+    private int flagsRaw(int index);
+}

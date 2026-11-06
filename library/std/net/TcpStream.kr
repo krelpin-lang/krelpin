@@ -19,6 +19,15 @@ import std.io.IOException;
  * The connection is closed when the stream is dropped. Writing to a
  * connection the peer has closed throws an `IOException`; it never kills
  * the program with `SIGPIPE`.
+ *
+ * # Non-blocking use
+ *
+ * A stream made with `startConnect` or `TcpListener.tryAccept`, or one
+ * given `setNonBlocking(true)`, never waits. Register it with a `Poller`
+ * and use the `try` methods when the poller reports it ready: `tryRead`,
+ * `tryReadLine` and `tryWrite` return at once and say when the stream
+ * isn't ready instead of throwing. Text to send can also be queued with
+ * `queue` and sent with `flush` as the stream becomes writable.
  */
 final class TcpStream {
     private TcpStream() {}
@@ -54,6 +63,68 @@ final class TcpStream {
             throw new IOException("couldn't accept a connection: ${Files.lastError()}");
         }
         return stream;
+    }
+
+    /**
+     * Starts connecting to `address` without waiting and returns a
+     * non-blocking stream. Register it with a `Poller` for
+     * `Interest.WRITABLE`, and call `finishConnect` once the poller reports
+     * it.
+     *
+     * Only the first address a host name resolves to is tried, and the
+     * name is resolved before this returns, which can block. Use an IP
+     * address to avoid that.
+     *
+     * ```
+     * TcpStream stream = TcpStream.startConnect("127.0.0.1:8080");
+     * stream.register(&mut poller, 1, Interest.WRITABLE);
+     * // ... once the poller reports token 1:
+     * if (stream.finishConnect()) {
+     *     stream.reregister(&mut poller, 1, Interest.READABLE);
+     * }
+     * ```
+     *
+     * # Throws
+     *
+     * `IOException` if the address is malformed or can't be resolved, or
+     * the connection fails before it could start.
+     */
+    static TcpStream startConnect(String address) throws IOException {
+        TcpStream stream = new TcpStream();
+        if (!stream.startConnectRaw(address)) {
+            throw new IOException("couldn't connect to `$address`: ${Files.lastError()}");
+        }
+        return stream;
+    }
+
+    /**
+     * Returns whether a connection begun with `startConnect` is
+     * established: `true` once it is, `false` while it is still on its way.
+     *
+     * # Throws
+     *
+     * `IOException` if the connection failed, for example because it was
+     * refused.
+     */
+    mut boolean finishConnect() throws IOException {
+        int status = this.finishConnectRaw();
+        if (status < 0) {
+            throw new IOException("couldn't connect: ${Files.lastError()}");
+        }
+        return status == 1;
+    }
+
+    /**
+     * Returns the next client of `listener` if one is waiting, or `null`.
+     * The same as `listener.tryAccept()`.
+     */
+    static TcpStream? tryAccept(&mut TcpListener listener) throws IOException {
+        TcpStream stream = new TcpStream();
+        int status = stream.tryAcceptRaw(listener);
+        if (status < 0) {
+            throw new IOException("couldn't accept a connection: ${Files.lastError()}");
+        }
+        return status == 1 ? stream : null;
     }
 
     /**
@@ -112,6 +183,140 @@ final class TcpStream {
             throw new IOException("couldn't read the connection: ${Files.lastError()}");
         }
         return bytes;
+    }
+
+    /**
+     * Returns the next line without its line ending if a whole line has
+     * arrived, or `null` at once if it hasn't. Bytes of an unfinished line
+     * are kept, so call it again when the stream is readable.
+     *
+     * Once the peer has closed the connection, a last line without a line
+     * ending is returned, and after that `null` with `atEnd()` true.
+     *
+     * ```
+     * String? line = stream.tryReadLine();
+     * while (line != null) {
+     *     handle(line);
+     *     line = stream.tryReadLine();
+     * }
+     * if (stream.atEnd()) {
+     *     // the client has gone
+     * }
+     * ```
+     *
+     * # Throws
+     *
+     * `IOException` if reading fails, or the line isn't valid UTF-8.
+     */
+    mut String? tryReadLine() throws IOException {
+        String? line = this.tryReadLineRaw();
+        if (line == null && Files.lastFailed()) {
+            throw new IOException("couldn't read a line: ${Files.lastError()}");
+        }
+        return line;
+    }
+
+    /**
+     * Returns whether the peer has closed the connection and every byte it
+     * sent has been read.
+     */
+    boolean atEnd() {
+        return this.atEndRaw();
+    }
+
+    /**
+     * Returns up to `max` bytes that have arrived, an empty array once the
+     * peer has closed the connection, or `null` at once if no data is
+     * there yet.
+     *
+     * # Throws
+     *
+     * `IllegalArgumentException` if `max` isn't positive.
+     * `IOException` if reading fails.
+     */
+    mut byte[]? tryRead(int max) throws IOException {
+        if (max <= 0) {
+            throw new IllegalArgumentException("tryRead: `max` must be positive, not $max");
+        }
+        byte[]? bytes = this.tryReadRaw(max);
+        if (bytes == null && Files.lastFailed()) {
+            throw new IOException("couldn't read the connection: ${Files.lastError()}");
+        }
+        return bytes;
+    }
+
+    /**
+     * Sends as much of `bytes` from index `offset` on as the stream takes
+     * without waiting, and returns how many bytes it sent: `0` when the
+     * stream has no room.
+     *
+     * ```
+     * int sent = 0;
+     * // each time the poller reports the stream writable:
+     * sent += stream.tryWrite(&data, sent);
+     * if (sent == data.length) {
+     *     // done
+     * }
+     * ```
+     *
+     * # Throws
+     *
+     * `IndexOutOfBoundsException` unless `offset` is from 0 to the length.
+     * `IOException` if sending fails or the peer has closed the connection.
+     */
+    mut int tryWrite(&byte[] bytes, int offset) throws IOException {
+        if (offset < 0 || offset > bytes.length) {
+            throw new IndexOutOfBoundsException(
+                "tryWrite: offset $offset is outside 0..${bytes.length}"
+            );
+        }
+        int sent = this.tryWriteRaw(bytes, offset);
+        if (sent < 0) {
+            throw new IOException("couldn't write to the connection: ${Files.lastError()}");
+        }
+        return sent;
+    }
+
+    /**
+     * Adds `text` as UTF-8 to the bytes waiting to be sent, without sending
+     * anything. `flush` sends them.
+     */
+    mut void queue(String text) {
+        this.queueRaw(text);
+    }
+
+    /** Adds `bytes` to the bytes waiting to be sent, like `queue`. */
+    mut void queueBytes(&byte[] bytes) {
+        this.queueBytesRaw(bytes);
+    }
+
+    /**
+     * Sends as many queued bytes as the stream takes without waiting, and
+     * returns whether all of them are sent. When it returns `false`, wait
+     * for the stream to be writable and call it again.
+     *
+     * ```
+     * stream.queue("hello\n");
+     * if (!stream.flush()) {
+     *     stream.reregister(&mut poller, token, Interest.READABLE | Interest.WRITABLE);
+     * }
+     * ```
+     *
+     * # Throws
+     *
+     * `IOException` if sending fails or the peer has closed the connection.
+     */
+    mut boolean flush() throws IOException {
+        int status = this.flushRaw();
+        if (status < 0) {
+            throw new IOException("couldn't write to the connection: ${Files.lastError()}");
+        }
+        return status == 1;
+    }
+
+    /** Returns how many queued bytes `flush` hasn't sent yet. */
+    long queued() {
+        return this.queuedRaw();
     }
 
     /**
@@ -216,8 +421,109 @@ final class TcpStream {
         }
     }
 
+
+    /**
+     * Makes the stream non-blocking (`true`) or blocking again. A
+     * non-blocking stream is meant to be driven by a `Poller`; its blocking
+     * methods throw an `IOException` instead of waiting when it isn't ready.
+     */
+    mut void setNonBlocking(boolean nonBlocking) throws IOException {
+        if (!this.setNonBlockingRaw(nonBlocking)) {
+            throw new IOException("couldn't change the blocking mode: ${Files.lastError()}");
+        }
+    }
+
+    /**
+     * Asks `poller` to report this stream under `token` when it is ready for
+     * `interest`, a combination of the `Interest` constants.
+     *
+     * # Throws
+     *
+     * `IllegalArgumentException` if `interest` asks for nothing.
+     * `IOException` if the system refuses. On Linux that includes a stream
+     * already registered with `poller`; use `reregister` to change it.
+     */
+    void register(&mut Poller poller, int token, int interest) throws IOException {
+        Poller.checkInterest(interest);
+        if (!this.registerRaw(poller, token, interest, false)) {
+            throw new IOException("couldn't register with the poller: ${Files.lastError()}");
+        }
+    }
+
+    /**
+     * Changes the token and interest of a stream registered with `poller`.
+     *
+     * # Throws
+     *
+     * `IllegalArgumentException` if `interest` asks for nothing.
+     * `IOException` if the system refuses. On Linux that includes a stream
+     * that isn't registered with `poller`.
+     */
+    void reregister(&mut Poller poller, int token, int interest) throws IOException {
+        Poller.checkInterest(interest);
+        if (!this.registerRaw(poller, token, interest, true)) {
+            throw new IOException("couldn't register with the poller: ${Files.lastError()}");
+        }
+    }
+
+    /**
+     * Stops `poller` from reporting this stream. Dropping the stream does the
+     * same.
+     *
+     * # Throws
+     *
+     * `IOException` if the stream isn't registered with `poller`.
+     */
+    void deregister(&mut Poller poller) throws IOException {
+        if (!this.deregisterRaw(poller)) {
+            throw new IOException("couldn't deregister from the poller: ${Files.lastError()}");
+        }
+    }
+
+    @Intrinsic
+    private mut boolean setNonBlockingRaw(boolean nonBlocking);
+
+    @Intrinsic
+    private boolean registerRaw(&mut Poller poller, int token, int interest, boolean again);
+
+    @Intrinsic
+    private boolean deregisterRaw(&mut Poller poller);
+
     @Intrinsic
     private mut boolean connectRaw(String address);
+
+    @Intrinsic
+    private mut boolean startConnectRaw(String address);
+
+    @Intrinsic
+    private mut int finishConnectRaw();
+
+    @Intrinsic
+    private mut int tryAcceptRaw(&mut TcpListener listener);
+
+    @Intrinsic
+    private mut String? tryReadLineRaw();
+
+    @Intrinsic
+    private boolean atEndRaw();
+
+    @Intrinsic
+    private mut byte[]? tryReadRaw(int max);
+
+    @Intrinsic
+    private mut int tryWriteRaw(&byte[] bytes, int offset);
+
+    @Intrinsic
+    private mut void queueRaw(String text);
+
+    @Intrinsic
+    private mut void queueBytesRaw(&byte[] bytes);
+
+    @Intrinsic
+    private mut int flushRaw();
+
+    @Intrinsic
+    private long queuedRaw();
 
     @Intrinsic
     private mut boolean acceptRaw(&mut TcpListener listener);

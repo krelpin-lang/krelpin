@@ -1,0 +1,267 @@
+import std.io.IOException;
+import std.net.Datagram;
+import std.net.Event;
+import std.net.Interest;
+import std.net.Poller;
+import std.net.TcpListener;
+import std.net.TcpStream;
+import std.net.UdpSocket;
+import std.sync.AtomicBool;
+import std.sync.AtomicInt;
+import std.sync.AtomicLong;
+import std.util.HashMap;
+import std.util.Map;
+
+class Main {
+    const int LISTENER = 0;
+    static AtomicInt CORRECT = new AtomicInt(0);
+    static AtomicBool START_READING = new AtomicBool(false);
+    static AtomicLong RECEIVED = new AtomicLong(0);
+
+    // Two connections from one thread, used in an interleaved order, so the
+    // server has to serve both at once.
+    static void clients(int port) {
+        try {
+            TcpStream a = TcpStream.connect("127.0.0.1:$port");
+            TcpStream b = TcpStream.connect("127.0.0.1:$port");
+            b.write("from b\n");
+            a.write("from a\npart");
+            if (b.readLine() == "FROM B") {
+                Main.CORRECT.increment();
+            }
+            if (a.readLine() == "FROM A") {
+                Main.CORRECT.increment();
+            }
+            a.write("ial line\n");
+            if (a.readLine() == "PARTIAL LINE") {
+                Main.CORRECT.increment();
+            }
+            b.write("no newline at the end");
+        } catch (IOException e) {
+            Console.println("client failed: ${e.getMessage()}");
+        }
+    }
+
+    static void echoServer() throws IOException {
+        Poller poller = Poller.create();
+        TcpListener listener = TcpListener.bind("127.0.0.1:0");
+        listener.setNonBlocking(true);
+        listener.register(&mut poller, Main.LISTENER, Interest.READABLE);
+        Console.println("nothing to accept yet: ${listener.tryAccept() == null}");
+        try {
+            listener.accept();
+        } catch (IOException e) {
+            Console.println(e.getMessage());
+        }
+
+        int port = listener.localAddr().port;
+        Thread thread = new Thread(() -> Main.clients(port));
+        thread.start();
+
+        Map<int, TcpStream> streams = new HashMap<>();
+        int next = 1;
+        int accepted = 0;
+        int lines = 0;
+        int closed = 0;
+        while (closed < 2) {
+            for (Event event : poller.poll(5000)) {
+                if (event.token == Main.LISTENER) {
+                    TcpStream? stream = listener.tryAccept();
+                    while (stream != null) {
+                        stream.register(&mut poller, next, Interest.READABLE);
+                        streams.put(next, stream);
+                        next++;
+                        accepted++;
+                        stream = listener.tryAccept();
+                    }
+                    continue;
+                }
+                TcpStream? stream = streams.remove(&event.token);
+                if (stream == null) {
+                    continue;
+                }
+                String? line = stream.tryReadLine();
+                while (line != null) {
+                    lines++;
+                    if (line == "no newline at the end") {
+                        Console.println("last line without a line ending arrived whole");
+                    }
+                    stream.queue(line.toUpperCase() + "\n");
+                    line = stream.tryReadLine();
+                }
+                if (stream.atEnd()) {
+                    // The client has gone, so the stream is dropped unflushed.
+                    closed++;
+                    continue;
+                }
+                if (!stream.flush()) {
+                    Console.println("a short reply didn't fit");
+                }
+                streams.put(event.token, stream);
+            }
+        }
+        thread.join();
+        Console.println("accepted $accepted, echoed $lines lines, ${Main.CORRECT.get()} replies right");
+    }
+
+    static void connectWithoutWaiting() throws IOException {
+        Poller poller = Poller.create();
+        TcpListener listener = TcpListener.bind("127.0.0.1:0");
+        int port = listener.localAddr().port;
+        TcpStream stream = TcpStream.startConnect("127.0.0.1:$port");
+        stream.register(&mut poller, 1, Interest.WRITABLE);
+        boolean connected = stream.finishConnect();
+        while (!connected) {
+            for (Event event : poller.poll(5000)) {
+                connected = stream.finishConnect();
+            }
+        }
+        TcpStream server = listener.accept();
+        boolean same = server.peerAddr().port == stream.localAddr().port;
+        Console.println("connected without waiting, peer port matches: $same");
+
+        // Nothing has been sent, so a read isn't ready; then data arrives.
+        stream.reregister(&mut poller, 1, Interest.READABLE);
+        Console.println("read before data is null: ${stream.tryRead(16) == null}");
+        Console.println("line before data is null: ${stream.tryReadLine() == null}, at end: ${stream.atEnd()}");
+        server.write("hi");
+        int got = -1;
+        while (got < 0) {
+            for (Event event : poller.poll(5000)) {
+                byte[]? bytes = stream.tryRead(16);
+                if (bytes != null) {
+                    got = bytes.length;
+                }
+            }
+        }
+        Console.println("read $got bytes");
+        {
+            TcpStream gone = server;
+        }
+        poller.poll(5000);
+        byte[]? end = stream.tryRead(16);
+        Console.println("read after close is empty: ${end != null && end.length == 0}, at end: ${stream.atEnd()}");
+        stream.deregister(&mut poller);
+        Console.println("deregistered: ${poller.poll(0).isEmpty()}");
+        try {
+            stream.deregister(&mut poller);
+        } catch (IOException e) {
+            Console.println("deregistering twice throws");
+        }
+
+        // Nothing listens on a port whose listener was dropped.
+        int closedPort = 0;
+        {
+            TcpListener temporary = TcpListener.bind("127.0.0.1:0");
+            closedPort = temporary.localAddr().port;
+        }
+        try {
+            TcpStream refused = TcpStream.startConnect("127.0.0.1:$closedPort");
+            refused.register(&mut poller, 2, Interest.WRITABLE);
+            boolean done = false;
+            while (!done) {
+                for (Event event : poller.poll(5000)) {
+                    done = refused.finishConnect();
+                }
+            }
+            Console.println("connected to a closed port?");
+        } catch (IOException e) {
+            String? message = e.getMessage();
+            Console.println("refused connection throws: ${message != null && message.contains("refused")}");
+        }
+    }
+
+    // Connects, waits until told to start, then reads everything.
+    static void drain(int port) {
+        try {
+            TcpStream reader = TcpStream.connect("127.0.0.1:$port");
+            while (!Main.START_READING.get()) {
+                Thread.sleep(1);
+            }
+            byte[] chunk = reader.read(65536);
+            while (chunk.length > 0) {
+                Main.RECEIVED.addAndGet(chunk.length);
+                chunk = reader.read(65536);
+            }
+        } catch (IOException e) {
+            Console.println("reader failed: ${e.getMessage()}");
+        }
+    }
+
+    static void queueAndFlush() throws IOException {
+        Poller poller = Poller.create();
+        TcpListener listener = TcpListener.bind("127.0.0.1:0");
+        int port = listener.localAddr().port;
+        Thread thread = new Thread(() -> Main.drain(port));
+        thread.start();
+        TcpStream writer = listener.accept();
+        writer.setNonBlocking(true);
+
+        // More than any socket buffer holds, so it can't all go at once.
+        int size = 32 * 1024 * 1024;
+        byte[] block = new byte[1024 * 1024];
+        for (int i = 0; i < 32; i++) {
+            writer.queueBytes(&block);
+        }
+        Console.println("queued ${writer.queued() == size}");
+        boolean done = writer.flush();
+        Console.println("first flush sent everything: $done");
+        Main.START_READING.set(true);
+        writer.register(&mut poller, 1, Interest.WRITABLE);
+        while (!done) {
+            for (Event event : poller.poll(5000)) {
+                done = writer.flush();
+            }
+        }
+        writer.shutdownWrite();
+        thread.join();
+        Console.println("reader got all of it: ${Main.RECEIVED.get() == size}, left: ${writer.queued()}");
+
+        int sent = writer.tryWrite(&block, block.length);
+        Console.println("tryWrite at the end sends $sent");
+        try {
+            writer.tryWrite(&block, block.length + 1);
+        } catch (IndexOutOfBoundsException e) {
+            Console.println(e.getMessage());
+        }
+    }
+
+    static void udp() throws IOException {
+        Poller poller = Poller.create();
+        UdpSocket receiver = UdpSocket.bind("127.0.0.1:0");
+        receiver.setNonBlocking(true);
+        receiver.register(&mut poller, 9, Interest.READABLE);
+        Console.println("no datagram yet: ${receiver.tryReceive(100) == null}");
+        Console.println("nothing ready: ${poller.poll(0).size()}");
+
+        UdpSocket sender = UdpSocket.bind("127.0.0.1:0");
+        sender.setNonBlocking(true);
+        byte[] data = "ping".bytes();
+        Console.println("sent at once: ${sender.trySend(&data, receiver.localAddr().toString())}");
+        boolean received = false;
+        while (!received) {
+            for (Event event : poller.poll(5000)) {
+                Console.println("token ${event.token} readable: ${event.readable}");
+                Datagram? message = receiver.tryReceive(100);
+                if (message != null) {
+                    boolean fromSender = message.sender.port == sender.localAddr().port;
+                    Console.println("got ${message.text()} from the sender: $fromSender");
+                    received = true;
+                }
+            }
+        }
+
+        try {
+            receiver.register(&mut poller, 9, 0);
+        } catch (IllegalArgumentException e) {
+            Console.println(e.getMessage());
+        }
+    }
+
+    static void main() throws IOException {
+        Main.echoServer();
+        Main.connectWithoutWaiting();
+        Main.queueAndFlush();
+        Main.udp();
+    }
+}

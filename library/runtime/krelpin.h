@@ -93,23 +93,47 @@ bool kr_utf8_valid(const char *bytes, int64_t len);
 void kr_net_close(void *handle);
 KrString *kr_net_local_addr(void **slot);
 bool kr_net_set_timeout(void **slot, int64_t millis, bool writing);
+bool kr_net_set_nonblocking(void **slot, bool on);
+int kr_net_fd(void *handle);
+bool kr_net_register(void **slot, void *poller, int32_t token, int32_t interest, bool again);
+bool kr_net_deregister(void **slot, void *poller);
 bool kr_tcp_listener_bind(void **slot, const KrString *address);
 bool kr_tcp_stream_connect(void **slot, const KrString *address);
 bool kr_tcp_stream_accept(void **slot, void *listener);
+int32_t kr_tcp_stream_try_accept(void **slot, void *listener);
+bool kr_tcp_stream_start_connect(void **slot, const KrString *address);
+int32_t kr_tcp_stream_finish_connect(void **slot);
 KrString *kr_tcp_stream_peer_addr(void **slot);
 bool kr_tcp_stream_set_no_delay(void **slot, bool on);
 KrString *kr_tcp_stream_read_line(void **slot);
+KrString *kr_tcp_stream_try_read_line(void **slot);
+bool kr_tcp_stream_at_end(void **slot);
 KrString *kr_tcp_stream_read_all(void **slot);
 KrArray *kr_tcp_stream_read(void **slot, int32_t max, const KrType *array_type);
+KrArray *kr_tcp_stream_try_read(void **slot, int32_t max, const KrType *array_type);
 bool kr_tcp_stream_write(void **slot, const KrString *text);
 bool kr_tcp_stream_write_bytes(void **slot, const KrArray *bytes);
+int32_t kr_tcp_stream_try_write(void **slot, const KrArray *bytes, int32_t offset);
+void kr_tcp_stream_queue_text(void **slot, const KrString *text);
+void kr_tcp_stream_queue_bytes(void **slot, const KrArray *bytes);
+int32_t kr_tcp_stream_flush(void **slot);
+int64_t kr_tcp_stream_queued(void **slot);
 bool kr_tcp_stream_shutdown_write(void **slot);
 bool kr_udp_bind(void **slot, const KrString *address);
 bool kr_udp_send_to(void **slot, const KrArray *bytes, const KrString *address);
+int32_t kr_udp_try_send_to(void **slot, const KrArray *bytes, const KrString *address);
 KrArray *kr_udp_receive(void **slot, int32_t max, const KrType *array_type);
+KrArray *kr_udp_try_receive(void **slot, int32_t max, const KrType *array_type);
 KrString *kr_udp_last_sender(void **slot);
 KrArray *kr_string_bytes(const KrString *string, const KrType *array_type);
 KrString *kr_string_from_utf8(const KrArray *bytes);
+
+/* Readiness polling for non-blocking sockets; see poll.c. */
+bool kr_poller_create(void **slot);
+void kr_poller_close(void *handle);
+int32_t kr_poller_poll(void **slot, int64_t millis);
+int32_t kr_poller_token(void **slot, int32_t index);
+int32_t kr_poller_flags(void **slot, int32_t index);
 
 /* The error that `Files.lastError` describes, shared by files and sockets.
  * Each `kr_io_fail*` records an error and returns false. */
@@ -118,6 +142,7 @@ bool kr_io_fail_errno(void);
 bool kr_io_fail_resolve(int error);
 bool kr_io_fail_bad_address(void);
 bool kr_io_fail_not_utf8(void);
+bool kr_io_fail_would_block(void);
 void kr_io_clear_error(void);
 
 /* `strtod` and `snprintf` in the "C" locale, whatever the host has set. */

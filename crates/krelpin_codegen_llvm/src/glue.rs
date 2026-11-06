@@ -418,6 +418,10 @@ impl FnCx<'_, '_, '_> {
             let handle = self.native_addr(object, ty, 0);
             let handle = self.assign(format!("load ptr, ptr {handle}"));
             self.runtime("void", "kr_net_close", &format!("ptr {handle}"));
+        } else if items.is(def, LangItem::Poller) {
+            let handle = self.native_addr(object, ty, 0);
+            let handle = self.assign(format!("load ptr, ptr {handle}"));
+            self.runtime("void", "kr_poller_close", &format!("ptr {handle}"));
         } else if items.is(def, LangItem::StringBuilder) {
             let builder = self.native_addr(object, ty, 0);
             self.runtime("void", "kr_builder_free", &format!("ptr {builder}"));

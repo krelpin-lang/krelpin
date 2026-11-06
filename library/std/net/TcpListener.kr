@@ -8,7 +8,8 @@ import std.io.IOException;
  *
  * Each call to `accept` blocks until a client connects and returns the
  * connection as a `TcpStream`. To serve several clients at once, handle
- * each connection on its own `Thread`.
+ * each connection on its own `Thread`, or make the listener non-blocking
+ * and wait for clients with a `Poller` (see there).
  *
  * ```
  * TcpListener listener = TcpListener.bind("127.0.0.1:8080");
@@ -64,6 +65,23 @@ final class TcpListener {
         return TcpStream.accept(this);
     }
 
+    /**
+     * Returns the next client if one is waiting, or `null` at once if none
+     * is. Meant for a non-blocking listener that a `Poller` reported
+     * readable; a blocking listener waits for a client instead.
+     *
+     * The connection is non-blocking, ready to be registered with a
+     * `Poller`.
+     *
+     * # Throws
+     *
+     * `IOException` if accepting fails, for example because the process is
+     * out of descriptors.
+     */
+    mut TcpStream? tryAccept() throws IOException {
+        return TcpStream.tryAccept(this);
+    }
+
     /** Returns the address the listener is bound to. */
     SocketAddr localAddr() throws IOException {
         String? address = this.localAddrRaw();
@@ -86,6 +104,74 @@ final class TcpListener {
             throw new IOException("couldn't set the timeout: ${Files.lastError()}");
         }
     }
+
+
+    /**
+     * Makes the listener non-blocking (`true`) or blocking again. A
+     * non-blocking listener is meant to be driven by a `Poller`; its blocking
+     * methods throw an `IOException` instead of waiting when it isn't ready.
+     */
+    mut void setNonBlocking(boolean nonBlocking) throws IOException {
+        if (!this.setNonBlockingRaw(nonBlocking)) {
+            throw new IOException("couldn't change the blocking mode: ${Files.lastError()}");
+        }
+    }
+
+    /**
+     * Asks `poller` to report this listener under `token` when it is ready for
+     * `interest`, a combination of the `Interest` constants.
+     *
+     * # Throws
+     *
+     * `IllegalArgumentException` if `interest` asks for nothing.
+     * `IOException` if the system refuses. On Linux that includes a listener
+     * already registered with `poller`; use `reregister` to change it.
+     */
+    void register(&mut Poller poller, int token, int interest) throws IOException {
+        Poller.checkInterest(interest);
+        if (!this.registerRaw(poller, token, interest, false)) {
+            throw new IOException("couldn't register with the poller: ${Files.lastError()}");
+        }
+    }
+
+    /**
+     * Changes the token and interest of a listener registered with `poller`.
+     *
+     * # Throws
+     *
+     * `IllegalArgumentException` if `interest` asks for nothing.
+     * `IOException` if the system refuses. On Linux that includes a listener
+     * that isn't registered with `poller`.
+     */
+    void reregister(&mut Poller poller, int token, int interest) throws IOException {
+        Poller.checkInterest(interest);
+        if (!this.registerRaw(poller, token, interest, true)) {
+            throw new IOException("couldn't register with the poller: ${Files.lastError()}");
+        }
+    }
+
+    /**
+     * Stops `poller` from reporting this listener. Dropping the listener does the
+     * same.
+     *
+     * # Throws
+     *
+     * `IOException` if the listener isn't registered with `poller`.
+     */
+    void deregister(&mut Poller poller) throws IOException {
+        if (!this.deregisterRaw(poller)) {
+            throw new IOException("couldn't deregister from the poller: ${Files.lastError()}");
+        }
+    }
+
+    @Intrinsic
+    private mut boolean setNonBlockingRaw(boolean nonBlocking);
+
+    @Intrinsic
+    private boolean registerRaw(&mut Poller poller, int token, int interest, boolean again);
+
+    @Intrinsic
+    private boolean deregisterRaw(&mut Poller poller);
 
     @Intrinsic
     private mut boolean bindRaw(String address);

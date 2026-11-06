@@ -51,6 +51,7 @@ lang_items! {
     TcpListener: "std.net.TcpListener",
     TcpStream: "std.net.TcpStream",
     UdpSocket: "std.net.UdpSocket",
+    Poller: "std.net.Poller",
     ArrayList: "std.util.ArrayList",
     HashMap: "std.util.HashMap",
     HashSet: "std.util.HashSet",

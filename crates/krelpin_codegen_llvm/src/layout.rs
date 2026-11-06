@@ -24,12 +24,13 @@ pub(crate) enum PtrKind {
     Null,
 }
 
-/// The socket classes of `std.net`, which keep their socket in a native slot.
+/// The classes of `std.net` that keep a socket or a poller in a native slot.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub(crate) enum NetClass {
     Listener,
     Stream,
     Udp,
+    Poller,
 }
 
 #[derive(Clone, Debug)]
@@ -337,6 +338,8 @@ impl Cx<'_, '_> {
             Some(NetClass::Stream)
         } else if items.is(def, LangItem::UdpSocket) {
             Some(NetClass::Udp)
+        } else if items.is(def, LangItem::Poller) {
+            Some(NetClass::Poller)
         } else {
             None
         }
@@ -363,6 +366,7 @@ impl Cx<'_, '_> {
             || items.is(def, LangItem::TcpListener)
             || items.is(def, LangItem::TcpStream)
             || items.is(def, LangItem::UdpSocket)
+            || items.is(def, LangItem::Poller)
             || items.is(def, LangItem::Mutex)
             || items.is(def, LangItem::MutexGuard)
         {

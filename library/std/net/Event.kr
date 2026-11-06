@@ -1,0 +1,11 @@
+package std.net;
+
+/**
+ * A socket that `Poller.poll` found ready, named by the token it was
+ * registered with.
+ *
+ * `closed` and `error` come with `readable` or `writable`, so a handler that
+ * reads on `readable` will see the end of the stream or the error from the
+ * read itself.
+ */
+record Event(int token, boolean readable, boolean writable, boolean closed, boolean error) {}

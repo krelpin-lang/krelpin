@@ -1,0 +1,23 @@
+nothing to accept yet: true
+couldn't accept a connection: the socket is non-blocking and isn't ready; wait for it with a `Poller`
+last line without a line ending arrived whole
+accepted 2, echoed 4 lines, 3 replies right
+connected without waiting, peer port matches: true
+read before data is null: true
+line before data is null: true, at end: false
+read 2 bytes
+read after close is empty: true, at end: true
+deregistered: true
+deregistering twice throws
+refused connection throws: true
+queued true
+first flush sent everything: false
+reader got all of it: true, left: 0
+tryWrite at the end sends 0
+tryWrite: offset 1048577 is outside 0..1048576
+no datagram yet: true
+nothing ready: 0
+sent at once: true
+token 9 readable: true
+got ping from the sender: true
+0 is not a combination of `Interest` constants
