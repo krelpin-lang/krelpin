@@ -1,0 +1,55 @@
+error: the accessor `celsius` must return `double`, not `String`
+  --> tests/ui/typeck/record_accessor_errors.kr:13:5
+   |
+13 |     String celsius() {
+   |     ^^^^^^
+   |
+   = note: `celsius()` replaces the accessor of the component `celsius`, so it must look like it: `double celsius()`
+   = help: return `double`, the type of the component
+
+error: the accessor `count` can't be `static`
+  --> tests/ui/typeck/record_accessor_errors.kr:19:16
+   |
+19 |     static int count() {
+   |                ^^^^^
+   |
+   = note: `count()` replaces the accessor of the component `count`, so it must look like it: `int count()`
+   = help: remove `static`; an accessor reads the record it is called on
+
+error: the accessor `count` must be visible wherever the record is
+  --> tests/ui/typeck/record_accessor_errors.kr:25:5
+   |
+25 |     private int count() {
+   |     ^^^^^^^
+   |
+   = note: `count()` replaces the accessor of the component `count`, so it must look like it: `int count()`
+   = help: remove the visibility modifier
+
+error: the accessor `count` can't have type parameters
+  --> tests/ui/typeck/record_accessor_errors.kr:31:6
+   |
+31 |     <T> int count() {
+   |      ^
+   |
+   = note: `count()` replaces the accessor of the component `count`, so it must look like it: `int count()`
+
+error: the accessor `count` can't throw
+  --> tests/ui/typeck/record_accessor_errors.kr:37:24
+   |
+37 |     int count() throws IOException {
+   |                        ^^^^^^^^^^^
+   |
+   = note: `count()` replaces the accessor of the component `count`, so it must look like it: `int count()`
+   = help: reading a component never fails; check values in the constructor
+
+error: the accessor `names` must return `&List<String>`, not `List<String>`
+  --> tests/ui/typeck/record_accessor_errors.kr:44:5
+   |
+44 |     List<String> names() {
+   |     ^^^^^^^^^^^^
+   |
+   = note: `names()` replaces the accessor of the component `names`, so it must look like it: `&List<String> names()`
+   = help: return `&List<String>`: a `List<String>` can't be copied, so the accessor lends it out
+
+error: aborting due to 6 previous errors
+

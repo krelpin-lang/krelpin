@@ -574,14 +574,7 @@ impl<'a> Tcx<'a> {
                     continue;
                 }
                 let field = &sig.fields[name];
-                let ret = if self.is_copy(&field.ty) {
-                    field.ty.clone()
-                } else {
-                    Ty::Ref {
-                        mutable: false,
-                        ty: Box::new(field.ty.clone()),
-                    }
-                };
+                let ret = self.accessor_ty(&field.ty);
                 // What the accessor returns may borrow from the record.
                 let borrows = RetBorrows {
                     sources: Vec::new(),
@@ -598,6 +591,19 @@ impl<'a> Tcx<'a> {
                     .entry(accessor.name.name)
                     .or_default()
                     .push(accessor);
+            }
+        }
+    }
+
+    /// What the accessor of a component of type `component` returns: a
+    /// copy if the component can be copied, else a reference to it.
+    pub(crate) fn accessor_ty(&self, component: &Ty) -> Ty {
+        if self.is_copy(component) {
+            component.clone()
+        } else {
+            Ty::Ref {
+                mutable: false,
+                ty: Box::new(component.clone()),
             }
         }
     }

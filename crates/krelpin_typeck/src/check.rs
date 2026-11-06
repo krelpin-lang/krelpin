@@ -177,6 +177,7 @@ fn check_member<'a, 'tcx>(tcx: &'a Tcx<'tcx>, owner: DefId, member: &Member) -> 
                 fcx.in_async = true;
                 fcx.check_async_method(method, span);
             }
+            fcx.check_record_accessor(member, method, &ret);
             if let Some(body) = &method.body {
                 let diverges = fcx.check_block(body);
                 if !diverges {

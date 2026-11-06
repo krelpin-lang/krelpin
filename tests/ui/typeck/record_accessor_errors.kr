@@ -1,0 +1,63 @@
+import std.io.IOException;
+import std.util.ArrayList;
+import std.util.List;
+
+record Temperature(double celsius) {
+    // Fine: the same shape as the generated accessor.
+    double celsius() {
+        return (double) Math.round(this.celsius * 10.0) / 10.0;
+    }
+}
+
+record WrongType(double celsius) {
+    String celsius() {
+        return "warm";
+    }
+}
+
+record Static(int count) {
+    static int count() {
+        return 0;
+    }
+}
+
+record Hidden(int count) {
+    private int count() {
+        return this.count;
+    }
+}
+
+record Generic(int count) {
+    <T> int count() {
+        return this.count;
+    }
+}
+
+record Throwing(int count) {
+    int count() throws IOException {
+        return this.count;
+    }
+}
+
+record Copied(List<String> names) {
+    // `List` can't be copied, so the accessor has to lend it.
+    List<String> names() {
+        return new ArrayList<>();
+    }
+}
+
+record Lent(List<String> names) {
+    // Fine.
+    &List<String> names() {
+        return &this.names;
+    }
+
+    // Fine: an overload with parameters isn't the accessor.
+    String names(int index) {
+        return this.names.get(index);
+    }
+}
+
+class Main {
+    static void main() {}
+}
