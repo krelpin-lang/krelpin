@@ -257,6 +257,7 @@ impl Printer<'_, '_> {
                 )
             }
             TerminatorKind::Return => "return;".to_owned(),
+            TerminatorKind::Suspend { resume } => format!("suspend -> {resume:?};"),
             TerminatorKind::Unreachable => "unreachable;".to_owned(),
             TerminatorKind::Call {
                 callee,

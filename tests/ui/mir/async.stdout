@@ -1,0 +1,46 @@
+fn Main.twice(_1: int) -> Poll<int> {
+    let _2: &mut Context;
+    let _3: int;
+    let _4: Unit;
+    let _5: YieldNow;
+    let _6: &mut YieldNow;
+    let _7: &mut Context;
+    let _8: Poll<Unit>;
+    let _9: int;
+    debug n => _1;
+
+    bb0: {
+        _5 = Runtime::yieldNow() -> [return: bb1, unwind continue];
+    }
+
+    bb1: {
+        _6 = &mut _5;
+        _7 = &mut (*_2);
+        _8 = Future::poll(move _6, move _7) -> [return: bb2, unwind continue];
+    }
+
+    bb2: {
+        _9 = discriminant(_8);
+        switchInt(move _9) -> [0: bb3, otherwise: bb4];
+    }
+
+    bb3: {
+        _4 = copy (_8 as Ready).value;
+        _3 = Mul(copy _1, const 2);
+        _0 = Poll::Ready(move _3);
+        return;
+    }
+
+    bb4: {
+        _0 = Poll::Pending;
+        suspend -> bb1;
+    }
+}
+
+fn Main.main() -> void {
+
+    bb0: {
+        return;
+    }
+}
+

@@ -1,0 +1,7 @@
+package std.task;
+
+/**
+ * The value of an `async void` method, which has nothing to return:
+ * calling one gives a `Future<Unit>`.
+ */
+record Unit() {}

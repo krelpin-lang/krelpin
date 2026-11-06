@@ -215,6 +215,7 @@ impl FnCtxt<'_, '_> {
                 to
             }
             ExprKind::With { base, fields } => self.check_with(base, fields),
+            ExprKind::Await(operand) => self.check_await(operand, expr.span),
             ExprKind::Lambda { .. } | ExprKind::MethodRef { .. } => {
                 // Reached only where nothing says which interface the closure
                 // implements; everywhere else goes through `check_closure`.

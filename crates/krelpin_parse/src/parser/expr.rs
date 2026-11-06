@@ -173,6 +173,11 @@ impl Parser<'_> {
             ));
         }
 
+        if self.eat_keyword_noexpect(kw::Await) {
+            let expr = self.parse_unary()?;
+            return Ok(self.mk_expr(lo, ExprKind::Await(Box::new(expr))));
+        }
+
         if self.break_and_eat(TokenKind::And) {
             let mutable = self.eat_keyword_noexpect(kw::Mut);
             let expr = self.parse_unary()?;

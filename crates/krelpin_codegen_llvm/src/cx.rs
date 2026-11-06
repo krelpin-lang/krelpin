@@ -52,6 +52,10 @@ pub(crate) struct Cx<'a, 'tcx> {
     pub closure_types: HashMap<usize, String>,
     pub closure_drops: HashSet<usize>,
     pub message_fn: Option<usize>,
+    pub async_frames: Vec<crate::asyncness::AsyncFrame>,
+    pub async_frame_ids: HashMap<crate::asyncness::AsyncFrame, usize>,
+    pub frame_types: HashMap<usize, String>,
+    pub frame_drops: HashSet<usize>,
 }
 
 impl<'a, 'tcx> Cx<'a, 'tcx> {
@@ -101,6 +105,10 @@ impl<'a, 'tcx> Cx<'a, 'tcx> {
             closure_types: HashMap::new(),
             closure_drops: HashSet::new(),
             message_fn: None,
+            async_frames: Vec::new(),
+            async_frame_ids: HashMap::new(),
+            frame_types: HashMap::new(),
+            frame_drops: HashSet::new(),
         }
     }
 
@@ -160,6 +168,10 @@ impl<'a, 'tcx> Cx<'a, 'tcx> {
                     self.tcx.sig(*owner).name.name,
                     self.display(self_ty)
                 )
+            }
+            Instance::AsyncPoll { body, .. } => {
+                let body = self.mir.body(*body);
+                format!("{}.{}$poll", self.tcx.sig(body.owner).name.name, body.name)
             }
             Instance::Thunk(_) => "thunk".to_owned(),
         };

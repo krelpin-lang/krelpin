@@ -170,7 +170,10 @@ pub(crate) fn statement_accesses(kind: &StatementKind) -> Vec<(Place, Access)> {
 pub(crate) fn terminator_accesses(kind: &TerminatorKind) -> Vec<(Place, Access)> {
     let mut out = Vec::new();
     match kind {
-        TerminatorKind::Goto { .. } | TerminatorKind::Return | TerminatorKind::Unreachable => {}
+        TerminatorKind::Goto { .. }
+        | TerminatorKind::Suspend { .. }
+        | TerminatorKind::Return
+        | TerminatorKind::Unreachable => {}
         TerminatorKind::SwitchInt { discr, .. } => operand_access(discr, &mut out),
         TerminatorKind::Call { args, dest, .. } => {
             for arg in args {

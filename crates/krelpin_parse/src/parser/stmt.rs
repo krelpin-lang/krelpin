@@ -132,6 +132,7 @@ impl Parser<'_> {
                 | ExprKind::MethodCall { .. }
                 | ExprKind::Call { .. }
                 | ExprKind::New { .. }
+                | ExprKind::Await(_)
                 | ExprKind::Unary {
                     op: UnOp::PreInc | UnOp::PreDec | UnOp::PostInc | UnOp::PostDec,
                     ..
@@ -145,8 +146,8 @@ impl Parser<'_> {
             Diagnostic::error("expression is not a statement")
                 .with_span(expr.span)
                 .with_help(
-                    "only assignments, increments, method calls and object creation \
-                     can be used as statements",
+                    "only assignments, increments, method calls, object creation \
+                     and `await` can be used as statements",
                 ),
         );
     }

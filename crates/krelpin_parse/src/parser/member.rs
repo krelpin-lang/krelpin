@@ -4,7 +4,7 @@ use krelpin_ast::ast::{
 };
 use krelpin_ast::token::TokenKind;
 use krelpin_errors::Diagnostic;
-use krelpin_span::kw;
+use krelpin_span::{Span, kw};
 
 use super::{PResult, Parser};
 
@@ -74,6 +74,7 @@ impl Parser<'_> {
 
     pub(crate) fn parse_method(
         &mut self,
+        asyncness: Option<Span>,
         generics: Generics,
         ret: FnRetTy,
         name: Ident,
@@ -91,6 +92,7 @@ impl Parser<'_> {
         };
 
         Ok(Method {
+            asyncness,
             generics,
             ret,
             name,

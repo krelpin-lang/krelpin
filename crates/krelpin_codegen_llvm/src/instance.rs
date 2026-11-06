@@ -21,6 +21,11 @@ pub(crate) enum Instance {
         self_ty: Ty,
     },
     Thunk(Thunk),
+    /// The `poll` of the future of an `async` body; see `asyncness.rs`.
+    AsyncPoll {
+        body: BodyId,
+        args: Vec<Ty>,
+    },
 }
 
 #[derive(Clone, Debug, PartialEq, Eq, Hash)]

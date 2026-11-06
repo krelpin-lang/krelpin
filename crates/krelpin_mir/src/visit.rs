@@ -17,7 +17,10 @@ pub fn for_each_local_mut(blocks: &mut [BasicBlockData], f: &mut impl FnMut(&mut
             }
         }
         match &mut block.terminator.kind {
-            TerminatorKind::Goto { .. } | TerminatorKind::Return | TerminatorKind::Unreachable => {}
+            TerminatorKind::Goto { .. }
+            | TerminatorKind::Suspend { .. }
+            | TerminatorKind::Return
+            | TerminatorKind::Unreachable => {}
             TerminatorKind::SwitchInt { discr, .. } => operand_locals(discr, f),
             TerminatorKind::Call { args, dest, .. } => {
                 for arg in args {
@@ -126,7 +129,10 @@ pub fn rvalue_locals_of(rvalue: &Rvalue, f: &mut (impl FnMut(Local) + ?Sized)) {
 
 pub fn terminator_input_locals_of(kind: &TerminatorKind, f: &mut (impl FnMut(Local) + ?Sized)) {
     match kind {
-        TerminatorKind::Goto { .. } | TerminatorKind::Return | TerminatorKind::Unreachable => {}
+        TerminatorKind::Goto { .. }
+        | TerminatorKind::Suspend { .. }
+        | TerminatorKind::Return
+        | TerminatorKind::Unreachable => {}
         TerminatorKind::SwitchInt { discr, .. } => operand_locals_of(discr, f),
         TerminatorKind::Call { args, .. } => {
             for arg in args {

@@ -798,7 +798,9 @@ impl<'a> Resolver<'a> {
                 }
                 self.resolve_exprs(elems);
             }
-            ExprKind::Unary { expr, .. } | ExprKind::Borrow { expr, .. } => {
+            ExprKind::Unary { expr, .. }
+            | ExprKind::Borrow { expr, .. }
+            | ExprKind::Await(expr) => {
                 self.resolve_expr(expr);
             }
             ExprKind::Binary { lhs, rhs, .. } | ExprKind::Assign { lhs, rhs, .. } => {

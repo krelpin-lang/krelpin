@@ -62,6 +62,9 @@ impl<'h> Builder<'_, 'h, '_> {
                 catches,
                 finally,
             } => self.lower_try(body, catches, finally.as_ref(), span),
+            StmtKind::Return(value) if self.asyncness.is_some() => {
+                self.async_return(value.as_ref(), span);
+            }
             StmtKind::Return(value) => {
                 if let Some(value) = value {
                     self.expr_into(Place::local(Local::RETURN), value);

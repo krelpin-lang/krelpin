@@ -9,7 +9,11 @@ use crate::rtti::ClosureKind;
 impl Cx<'_, '_> {
     pub(crate) fn emit_instance(&mut self, id: usize, instance: &Instance) -> String {
         match instance {
-            Instance::Body { body, args } => self.emit_body(id, *body, args),
+            Instance::Body { body, args } if self.mir.body(*body).asyncness.is_some() => {
+                self.emit_async_start(id, *body, args)
+            }
+            Instance::Body { body, args } => self.emit_body(id, *body, args, false),
+            Instance::AsyncPoll { body, args } => self.emit_body(id, *body, args, true),
             Instance::Builtin {
                 owner,
                 name,

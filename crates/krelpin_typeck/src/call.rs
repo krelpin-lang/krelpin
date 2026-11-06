@@ -164,8 +164,12 @@ impl FnCtxt<'_, '_> {
                 subst: chosen.subst.clone(),
             },
         );
-        for thrown in &chosen.method.throws {
-            self.raise(thrown.subst(&chosen.subst), name.span);
+        // An `async` method throws when its future is awaited, not when the
+        // call makes the future.
+        if chosen.method.output.is_none() {
+            for thrown in &chosen.method.throws {
+                self.raise(thrown.subst(&chosen.subst), name.span);
+            }
         }
         for (index, arg) in args.iter().enumerate() {
             if is_closure(arg) && !probed.contains(&index) {

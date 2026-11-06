@@ -164,6 +164,28 @@ final class TcpListener {
         }
     }
 
+    /**
+     * Waits for the next client without blocking the thread, inside a
+     * `std.task.Runtime`. Makes the listener non-blocking.
+     *
+     * # Throws
+     *
+     * `IOException` if accepting fails.
+     */
+    mut async TcpStream acceptAsync() throws IOException {
+        this.setNonBlocking(true);
+        while (true) {
+            TcpStream? client = this.tryAccept();
+            if (client != null) {
+                return client;
+            }
+            await new Readiness(this.fdRaw(), Interest.READABLE);
+        }
+    }
+
+    @Intrinsic
+    private int fdRaw();
+
     @Intrinsic
     private mut boolean setNonBlockingRaw(boolean nonBlocking);
 

@@ -116,7 +116,16 @@ impl LoweringCtxt<'_, '_> {
             .map(|param| self.declare(param.name.name, param.name.span))
             .collect();
 
+        let output = match &member.kind {
+            MemberKind::Method(method) if method.asyncness.is_some() => Some(match &ret {
+                Ty::Void => self.tcx.lang_ty(LangItem::Unit),
+                ty => ty.clone(),
+            }),
+            _ => None,
+        };
         let ret_sources = match &member.kind {
+            // An `async` method's future may hold anything it is given.
+            MemberKind::Method(method) if method.asyncness.is_some() => None,
             MemberKind::Method(method) => {
                 let class_sources = &self.tcx.sig(self.owner).borrow_params;
                 let borrows = self.tcx.ret_borrows(method, class_sources);
@@ -175,6 +184,7 @@ impl LoweringCtxt<'_, '_> {
             ret,
             ret_sources,
             param_storage,
+            output,
             value,
             span: member.span,
         })
@@ -632,6 +642,9 @@ impl LoweringCtxt<'_, '_> {
                 pat: Box::new(self.lower_pat(pat)),
             },
             ast::ExprKind::Cast { expr: operand, .. } => ExprKind::Cast {
+                expr: Box::new(self.lower_expr(operand)),
+            },
+            ast::ExprKind::Await(operand) => ExprKind::Await {
                 expr: Box::new(self.lower_expr(operand)),
             },
             ast::ExprKind::With { base, fields } => {

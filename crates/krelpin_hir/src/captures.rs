@@ -202,9 +202,9 @@ impl CaptureFinder {
                 self.expr(operand, false);
                 self.pat(pat);
             }
-            ExprKind::Cast { expr: operand } | ExprKind::Deref { expr: operand, .. } => {
-                self.expr(operand, false)
-            }
+            ExprKind::Cast { expr: operand }
+            | ExprKind::Await { expr: operand }
+            | ExprKind::Deref { expr: operand, .. } => self.expr(operand, false),
             ExprKind::Switch { scrutinee, arms } => {
                 self.expr(scrutinee, false);
                 self.arms(arms);

@@ -1,0 +1,112 @@
+import std.io.IOException;
+import std.net.Datagram;
+import std.net.TcpListener;
+import std.net.TcpStream;
+import std.net.UdpSocket;
+import std.sync.AtomicInt;
+import std.task.Runtime;
+
+class Main {
+    static AtomicInt served = new AtomicInt(0);
+    static AtomicInt talked = new AtomicInt(0);
+
+    // Accepts `clients` connections and serves each in a task of its own.
+    static async void serve(TcpListener listener, int clients) throws IOException {
+        for (int i = 0; i < clients; i++) {
+            TcpStream client = await listener.acceptAsync();
+            Runtime.spawn(Main.echo(client));
+        }
+    }
+
+    static async void echo(TcpStream client) throws IOException {
+        String? line = await client.readLineAsync();
+        while (line != null) {
+            await client.writeAsync("echo: $line\n");
+            line = await client.readLineAsync();
+        }
+        Main.served.addAndGet(1);
+    }
+
+    static async String talk(String address, int id) throws IOException {
+        TcpStream stream = await TcpStream.connectAsync(address);
+        String answers = "";
+        for (int i = 0; i < 3; i++) {
+            await stream.writeAsync("client $id says $i\n");
+            String? answer = await stream.readLineAsync();
+            answers = "$answers|$answer";
+            await Runtime.sleep(1);
+        }
+        return answers;
+    }
+
+    static async void talker(String address, int id) throws IOException {
+        String answers = await Main.talk(address, id);
+        String expected =
+            "|echo: client $id says 0|echo: client $id says 1|echo: client $id says 2";
+        if (answers.equals(expected)) {
+            Main.talked.addAndGet(1);
+        } else {
+            Console.println("client $id got $answers");
+        }
+    }
+
+    // Reads until the peer closes the connection.
+    static async void sink(TcpListener listener) throws IOException {
+        TcpStream client = await listener.acceptAsync();
+        long total = 0;
+        byte[] chunk = await client.readAsync(65536);
+        while (chunk.length > 0) {
+            total += chunk.length;
+            chunk = await client.readAsync(65536);
+        }
+        Console.println("the sink got $total bytes");
+    }
+
+    static async void run() throws IOException {
+        TcpListener listener = TcpListener.bind("127.0.0.1:0");
+        String address = "${listener.localAddr()}";
+        Runtime.spawn(Main.serve(listener, 3));
+        Runtime.spawn(Main.talker(address, 1));
+        Runtime.spawn(Main.talker(address, 2));
+        Console.println("client 3 got ${await Main.talk(address, 3)}");
+        while (Main.served.get() < 3) {
+            await Runtime.sleep(1);
+        }
+        Console.println("other clients: ${Main.talked.get()}, served: ${Main.served.get()}");
+
+        // More than the socket buffers hold, so writing has to wait.
+        TcpListener bulk = TcpListener.bind("127.0.0.1:0");
+        String bulkAddress = "${bulk.localAddr()}";
+        Runtime.spawn(Main.sink(bulk));
+        TcpStream sender = await TcpStream.connectAsync(bulkAddress);
+        byte[] big = new byte[4000000];
+        await sender.writeBytesAsync(&big);
+        sender.shutdownWrite();
+        await Runtime.sleep(200);
+
+        UdpSocket a = UdpSocket.bind("127.0.0.1:0");
+        UdpSocket b = UdpSocket.bind("127.0.0.1:0");
+        String bAddress = "${b.localAddr()}";
+        Runtime.spawn(Main.reply(b));
+        byte[] ping = "ping".bytes();
+        await a.sendAsync(&ping, bAddress);
+        Datagram answer = await a.receiveAsync(100);
+        Console.println("udp answer: ${String.fromUtf8(&answer.data)}");
+
+        try {
+            await TcpStream.connectAsync("127.0.0.1:1");
+        } catch (IOException e) {
+            Console.println("connecting to a closed port fails");
+        }
+    }
+
+    static async void reply(UdpSocket socket) throws IOException {
+        Datagram message = await socket.receiveAsync(100);
+        byte[] pong = "pong to ${String.fromUtf8(&message.data)}".bytes();
+        await socket.sendAsync(&pong, "${message.sender}");
+    }
+
+    static void main() throws Exception {
+        Runtime.blockOn(Main.run());
+    }
+}

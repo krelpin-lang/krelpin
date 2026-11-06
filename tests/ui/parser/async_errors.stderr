@@ -1,0 +1,26 @@
+error: `async` cannot be used on fields
+ --> tests/ui/parser/async_errors.kr:2:5
+  |
+2 |     async int count;
+  |     ^^^^^
+  |
+  = help: `async` is only allowed on methods
+
+error: `async` cannot be used on constructors
+ --> tests/ui/parser/async_errors.kr:4:5
+  |
+4 |     async Main() {}
+  |     ^^^^^
+  |
+  = help: `async` is only allowed on methods
+
+error: `async` cannot be used on types
+ --> tests/ui/parser/async_errors.kr:9:1
+  |
+9 | async class Other {}
+  | ^^^^^
+  |
+  = help: `async` is only allowed on methods
+
+error: aborting due to 3 previous errors
+

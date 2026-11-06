@@ -32,6 +32,8 @@ macro_rules! keywords {
 keywords! {
     reserved {
         Abstract: "abstract",
+        Async: "async",
+        Await: "await",
         Boolean: "boolean",
         Break: "break",
         Byte: "byte",

@@ -1,0 +1,10 @@
+import std.task.Runtime;
+
+class Main {
+    static async int twice(int n) {
+        await Runtime.yieldNow();
+        return n * 2;
+    }
+
+    static void main() {}
+}

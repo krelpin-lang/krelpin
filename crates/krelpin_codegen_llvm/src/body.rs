@@ -22,6 +22,11 @@ struct BodyCx<'f, 'c, 'a, 'tcx> {
     closure: Option<usize>,
     instance: usize,
     uses_resume: bool,
+    /// In the poll function of an `async` body: where the frame's state is.
+    state: Option<String>,
+    /// The state each `suspend` stores, by block.
+    suspends: std::collections::HashMap<usize, (u32, BasicBlock)>,
+    block: usize,
 }
 
 impl<'a, 'tcx> Cx<'a, 'tcx> {
@@ -30,7 +35,17 @@ impl<'a, 'tcx> Cx<'a, 'tcx> {
         self.subst_of(&names, args)
     }
 
-    pub(crate) fn emit_body(&mut self, id: usize, body_id: BodyId, args: &[Ty]) -> String {
+    /// Emits a body as a function. With `poll`, the body belongs to an
+    /// `async` method and becomes its future's `poll`: its locals live in the
+    /// frame that `%a0` points to, and it continues where the frame's state
+    /// says.
+    pub(crate) fn emit_body(
+        &mut self,
+        id: usize,
+        body_id: BodyId,
+        args: &[Ty],
+        poll: bool,
+    ) -> String {
         let mir: &'a krelpin_mir::Mir = self.mir;
         let body = mir.body(body_id);
         let subst = self.body_subst(body_id, args);
@@ -62,16 +77,52 @@ impl<'a, 'tcx> Cx<'a, 'tcx> {
         let static_id = self.instance_static(id);
         let previous = std::mem::replace(&mut self.current_static, static_id);
         let name = self.fn_name(id);
+        let frame = poll.then(|| {
+            let index = self.async_frame(body_id, args);
+            self.frame_type(index)
+        });
+        let cx_local = body.arg_count + 1;
         let mut fx = FnCx::new(self, subst, ret.clone());
         let mut params = Vec::new();
         let mut slots = Vec::new();
+        let mut state = None;
+        if let Some(frame_ty) = &frame {
+            params.push("ptr %a0".to_owned());
+            params.push("ptr %a1".to_owned());
+            fx.allocas.push_str("  %frame = load ptr, ptr %a0\n");
+            fx.allocas.push_str(&format!(
+                "  %state = getelementptr inbounds {frame_ty}, ptr %frame, i32 0, i32 1\n"
+            ));
+            state = Some("%state".to_owned());
+        }
         for (index, ty) in locals.iter().enumerate() {
+            if let Some(frame_ty) = &frame
+                && index != 0
+            {
+                let slot = if index == cx_local {
+                    let slot = fx.alloca(ty);
+                    fx.allocas
+                        .push_str(&format!("  store ptr %a1, ptr {slot}\n"));
+                    slot
+                } else if *ty == Ty::Void {
+                    String::new()
+                } else {
+                    let slot = format!("%fs{index}");
+                    fx.allocas.push_str(&format!(
+                        "  {slot} = getelementptr inbounds {frame_ty}, ptr %frame, i32 0, i32 {}\n",
+                        Cx::frame_field(index)
+                    ));
+                    slot
+                };
+                slots.push(slot);
+                continue;
+            }
             let slot = if *ty == Ty::Void {
                 String::new()
             } else {
                 fx.alloca(ty)
             };
-            if (1..=body.arg_count).contains(&index) {
+            if frame.is_none() && (1..=body.arg_count).contains(&index) {
                 let llty = fx.ll(ty);
                 params.push(format!("{llty} %a{index}"));
                 fx.allocas
@@ -87,8 +138,35 @@ impl<'a, 'tcx> Cx<'a, 'tcx> {
             closure,
             instance: id,
             uses_resume: false,
+            state,
+            suspends: Default::default(),
+            block: 0,
         };
+        let mut entry = "  br label %bb0\n".to_owned();
+        if poll {
+            let mut cases = vec!["i32 0, label %bb0".to_owned()];
+            for (index, block) in body.blocks.iter().enumerate() {
+                if let TerminatorKind::Suspend { resume } = block.terminator.kind {
+                    let k = cx.suspends.len() as u32 + 1;
+                    cx.suspends.insert(index, (k, resume));
+                    cases.push(format!("i32 {k}, label %bb{}", resume.index()));
+                }
+            }
+            entry = format!(
+                "  %state.now = load i32, ptr %state\n  store i32 -1, ptr %state\n  switch i32 %state.now, label %finished [ {} ]\n",
+                cases.join(" ")
+            );
+            cx.fx.start("finished");
+            cx.uses_resume = true;
+            cx.fx.throw_new(
+                LangItem::IllegalStateException,
+                "a future was polled after it finished",
+                "resume",
+            );
+            cx.fx.line("unreachable");
+        }
         for (index, block) in body.blocks.iter().enumerate() {
+            cx.block = index;
             cx.fx.start(&format!("bb{index}"));
             for statement in &block.statements {
                 cx.statement(&statement.kind);
@@ -105,7 +183,7 @@ impl<'a, 'tcx> Cx<'a, 'tcx> {
         fx.finish_fail();
         let llret = fx.cx.llty(&ret);
         let text = format!(
-            "define internal {llret} {name}({}) {{\nallocas:\n{}  br label %bb0\n{}}}\n",
+            "define internal {llret} {name}({}) {{\nallocas:\n{}{entry}{}}}\n",
             params.join(", "),
             fx.allocas,
             fx.out
@@ -1024,6 +1102,16 @@ impl<'f, 'c, 'a, 'tcx> BodyCx<'f, 'c, 'a, 'tcx> {
                 }
             }
             TerminatorKind::Unreachable => self.fx.line("unreachable"),
+            TerminatorKind::Suspend { .. } => {
+                let (k, _) = self.suspends[&self.block];
+                let state = self.state.clone().expect("only `async` bodies suspend");
+                self.fx.line(format!("store i32 {k}, ptr {state}"));
+                let ret = self.locals[0].clone();
+                let slot = self.slots[0].clone();
+                let value = self.fx.load(&ret, &slot);
+                let ll = self.fx.ll(&ret);
+                self.fx.line(format!("ret {ll} {value}"));
+            }
             TerminatorKind::Throw { value, unwind } => {
                 let value = self.operand_owned(value);
                 let throwable = self.fx.cx.lang_ty(LangItem::Throwable);
@@ -1256,6 +1344,20 @@ impl Cx<'_, '_> {
                     .map(|index| mir.locals[index].ty.subst(&subst))
                     .collect()
             }
+            Instance::AsyncPoll { body, args } => {
+                let index = self.async_frame(*body, args);
+                let future = self.frame_future(index);
+                let subst = self.body_subst(*body, args);
+                let mir = self.mir.body(*body);
+                let cx = mir.locals[mir.arg_count + 1].ty.subst(&subst);
+                vec![
+                    Ty::Ref {
+                        mutable: true,
+                        ty: Box::new(future),
+                    },
+                    cx,
+                ]
+            }
             Instance::Builtin {
                 owner,
                 name,
@@ -1283,7 +1385,11 @@ impl Cx<'_, '_> {
 
     pub(crate) fn instance_ret(&mut self, instance: &Instance) -> Ty {
         match instance {
-            Instance::Body { body, args } => {
+            Instance::Body { body, args } if self.mir.body(*body).asyncness.is_some() => {
+                let index = self.async_frame(*body, args);
+                self.frame_future(index)
+            }
+            Instance::Body { body, args } | Instance::AsyncPoll { body, args } => {
                 let subst = self.body_subst(*body, args);
                 self.mir.body(*body).locals[0].ty.subst(&subst)
             }

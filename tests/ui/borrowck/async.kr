@@ -1,0 +1,54 @@
+import std.task.Future;
+import std.task.Runtime;
+
+class Main {
+    static async int length(&String text) {
+        await Runtime.yieldNow();
+        return text.length();
+    }
+
+    static async void show(&String text) {
+        await Runtime.yieldNow();
+        Console.println(text);
+    }
+
+    static Future<int> escapes() {
+        String text = "local";
+        return Main.length(&text);
+    }
+
+    static async void spawnsBorrowed() {
+        String text = "local";
+        Runtime.spawn(Main.show(&text));
+    }
+
+    static async void spawnsOwned(String text) {
+        Runtime.spawn(Main.show(&text));
+    }
+
+    static async void heldAcrossAwait() {
+        String text = "a";
+        &String view = &text;
+        await Runtime.yieldNow();
+        text = "b";
+        Console.println(view);
+    }
+
+    static async void releasedBeforeAwait() {
+        String text = "a";
+        &mut String view = &mut text;
+        await Runtime.yieldNow();
+        Console.println(view);
+        text = "b";
+        Console.println(text);
+    }
+
+    static void futureHoldsLoan() {
+        String text = "a";
+        Future<int> future = Main.length(&text);
+        text = "b";
+        Console.println(future);
+    }
+
+    static void main() {}
+}

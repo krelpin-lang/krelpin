@@ -1,0 +1,39 @@
+package std.net;
+
+import std.io.Files;
+import std.io.IOException;
+import std.task.Context;
+import std.task.Future;
+import std.task.Poll;
+import std.task.Reactor;
+import std.task.Unit;
+
+/**
+ * A future that is ready once a socket may be ready for an `Interest`.
+ * The `...Async` methods of the sockets await one whenever their
+ * non-blocking `try...` call would have to wait, then try again; the
+ * readiness is only a hint, so a future may wake to find nothing there.
+ */
+final class Readiness implements Future<Unit> {
+    private int fd;
+    private int interest;
+    private boolean waiting = false;
+
+    Readiness(int fd, int interest) {
+        this.fd = fd;
+        this.interest = interest;
+    }
+
+    mut Poll<Unit> poll(&mut Context cx) throws IOException {
+        if (this.waiting) {
+            return Poll.Ready(new Unit());
+        }
+        if (!Reactor.waitFd(this.fd, this.interest, cx.waker().task)) {
+            throw new IOException(
+                "couldn't wait for the socket: ${Files.lastError()} (is a Runtime running?)"
+            );
+        }
+        this.waiting = true;
+        return Poll.Pending;
+    }
+}

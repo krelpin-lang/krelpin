@@ -45,6 +45,9 @@ pub struct Body {
     pub ret: Ty,
     pub ret_sources: Option<Vec<ReturnSource>>,
     pub param_storage: Vec<Storage>,
+    /// For an `async` method, the type its future produces: `ret`, or
+    /// `Unit` when `ret` is `void`.
+    pub output: Option<Ty>,
     pub value: BodyValue,
     pub span: Span,
 }
@@ -262,6 +265,10 @@ pub enum ExprKind {
         pat: Box<Pat>,
     },
     Cast {
+        expr: Box<Expr>,
+    },
+    /// Waits for the future `expr`; the expression's type is its value.
+    Await {
         expr: Box<Expr>,
     },
     Deref {

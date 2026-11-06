@@ -287,6 +287,9 @@ pub struct Constructor {
 
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct Method {
+    /// The `async` keyword: calling the method returns a `Future` of its
+    /// return type, and its body may `await`.
+    pub asyncness: Option<Span>,
     pub generics: Generics,
     pub ret: FnRetTy,
     pub name: Ident,
@@ -593,6 +596,7 @@ pub enum ExprKind {
         ty: Ty,
         expr: Box<Expr>,
     },
+    Await(Box<Expr>),
     Lambda {
         moves: bool,
         params: Vec<LambdaParam>,

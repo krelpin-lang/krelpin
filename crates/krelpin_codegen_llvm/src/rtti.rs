@@ -16,6 +16,8 @@ pub(crate) enum RtKey {
     Box(Ty),
     Array(Ty),
     Closure(usize),
+    /// The future of an `async` body, by its index in `Cx::async_frames`.
+    Async(usize),
     String,
 }
 
@@ -66,7 +68,7 @@ impl Cx<'_, '_> {
         };
         let concrete = matches!(
             key,
-            RtKey::Box(_) | RtKey::Array(_) | RtKey::Closure(_) | RtKey::String
+            RtKey::Box(_) | RtKey::Array(_) | RtKey::Closure(_) | RtKey::Async(_) | RtKey::String
         );
         self.rt.push(RtInfo {
             key: key.clone(),
@@ -128,6 +130,7 @@ impl Cx<'_, '_> {
             RtKey::Class(ty) | RtKey::Interface(ty) | RtKey::Box(ty) => ty.clone(),
             RtKey::String => self.tcx.string_ty(),
             RtKey::Closure(index) => self.closures[*index].iface.clone(),
+            RtKey::Async(index) => self.frame_future(*index),
             RtKey::Array(_) => return Vec::new(),
         };
         let Some((def, args)) = self.adt_of(&ty) else {
@@ -135,7 +138,7 @@ impl Cx<'_, '_> {
         };
         let subst = self.tcx.subst_for(def, &args);
         let mut out = Vec::new();
-        if matches!(key, RtKey::Closure(_)) {
+        if matches!(key, RtKey::Closure(_) | RtKey::Async(_)) {
             out.push(ty.clone());
         }
         for (parent, parent_subst) in self.tcx.supertypes(def) {
@@ -198,6 +201,7 @@ impl Cx<'_, '_> {
             }
             RtKey::String => self.tcx.string_ty(),
             RtKey::Closure(index) => self.closures[*index].iface.clone(),
+            RtKey::Async(index) => self.frame_future(*index),
         }
     }
 
@@ -232,8 +236,18 @@ impl Cx<'_, '_> {
                 return Some(self.fn_name(id));
             }
         }
+        if let RtKey::Async(index) = &key
+            && self.is_future_poll(&selector)
+        {
+            let frame = self.async_frames[*index].clone();
+            let id = self.instance(Instance::AsyncPoll {
+                body: frame.body,
+                args: frame.args,
+            });
+            return Some(self.fn_name(id));
+        }
         let lookup_ty = match &key {
-            RtKey::Array(_) | RtKey::Closure(_) => object.clone(),
+            RtKey::Array(_) | RtKey::Closure(_) | RtKey::Async(_) => object.clone(),
             _ => ty.clone(),
         };
         let resolved = self.find_impl(&lookup_ty, &selector)?;
@@ -303,6 +317,7 @@ impl Cx<'_, '_> {
         let name = match &key {
             RtKey::Box(ty) => self.box_name(ty),
             RtKey::Closure(_) => format!("{}$lambda", self.display(&ty)),
+            RtKey::Async(index) => self.frame_name(*index),
             RtKey::Array(ty) => self.display(ty),
             _ => self.display(&ty),
         };
@@ -355,6 +370,10 @@ impl Cx<'_, '_> {
             RtKey::Closure(index) => {
                 let size = self.closure_size(*index);
                 (KIND_CLOSURE, size, self.drop_closure_fn(*index))
+            }
+            RtKey::Async(index) => {
+                let size = self.frame_size(*index);
+                (KIND_CLOSURE, size, self.drop_frame_fn(*index))
             }
         };
         let mut vtable: Vec<String> = Vec::new();

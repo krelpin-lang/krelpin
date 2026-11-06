@@ -85,12 +85,18 @@ pub struct MethodSig {
     pub borrows: RetBorrows,
     pub storage: Vec<Storage>,
     pub member: Option<u32>,
+    /// For an `async` method, the type its body returns; `ret` is then the
+    /// `Future` of it that a call gives. `async void` methods produce `Unit`.
+    pub output: Option<Ty>,
 }
 
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
 pub struct Storage {
     pub whole: bool,
     pub contents: bool,
+    /// A static method keeps the argument with no object to keep it in,
+    /// so it may outlive the caller: it must not borrow anything.
+    pub detached: bool,
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -151,6 +157,29 @@ impl<'a> Tcx<'a> {
         self.lang_items
             .get(item)
             .map_or(Ty::Unknown, |def| self.def_ty(def, Vec::new()))
+    }
+
+    /// `Future<output>`, the type a call to an `async` method has.
+    pub fn future_of(&self, output: Ty) -> Ty {
+        self.lang_items
+            .get(LangItem::Future)
+            .map_or(Ty::Unknown, |def| self.def_ty(def, vec![output]))
+    }
+
+    /// `Poll<output>`, what the poll of an `async` body returns.
+    pub fn poll_of(&self, output: Ty) -> Ty {
+        self.lang_items
+            .get(LangItem::Poll)
+            .map_or(Ty::Unknown, |def| self.def_ty(def, vec![output]))
+    }
+
+    /// The `T` of a type that is or implements `Future<T>`.
+    pub fn future_output(&self, ty: &Ty) -> Option<Ty> {
+        let future = self.lang_items.get(LangItem::Future)?;
+        let Ty::Adt { def, args, .. } = ty else {
+            return None;
+        };
+        self.upcast(*def, args, future)?.into_iter().next()
     }
 
     pub fn is_lang_ty(&self, ty: &Ty, item: LangItem) -> bool {
@@ -288,12 +317,7 @@ impl<'a> Tcx<'a> {
             })
     }
 
-    pub(crate) fn methods_named(
-        &self,
-        def: DefId,
-        args: &[Ty],
-        name: Symbol,
-    ) -> Vec<(MethodSig, Subst)> {
+    pub fn methods_named(&self, def: DefId, args: &[Ty], name: Symbol) -> Vec<(MethodSig, Subst)> {
         let mut out = Vec::new();
         self.find_methods(def, args, name, &mut out);
         if !out.is_empty() || self.sig(def).kind != AdtKind::Interface {
@@ -627,12 +651,31 @@ impl<'a> Tcx<'a> {
         owner: DefId,
         class_sources: &[Symbol],
     ) -> MethodSig {
-        let ret = match &method.ret {
+        let declared = match &method.ret {
             FnRetTy::Void(_) => Ty::Void,
             FnRetTy::Ty(ty) => self.lower_ty(ty),
         };
-        let borrows = self.ret_borrows(method, class_sources);
-        let storage = self.param_storage(&method.params, &method.keeps);
+        let (ret, output, borrows) = if method.asyncness.is_some() {
+            let output = match declared {
+                Ty::Void => self.lang_ty(LangItem::Unit),
+                ty => ty,
+            };
+            // The future holds every argument until it finishes, so it
+            // borrows whatever they borrow.
+            let borrows = RetBorrows {
+                sources: Vec::new(),
+                elided: true,
+            };
+            (self.future_of(output.clone()), Some(output), borrows)
+        } else {
+            (declared, None, self.ret_borrows(method, class_sources))
+        };
+        let mut storage = self.param_storage(&method.params, &method.keeps);
+        if method.receiver.is_none() {
+            for (storage, param) in storage.iter_mut().zip(&method.params) {
+                storage.detached = method.keeps.iter().any(|kept| kept.name == param.name.name);
+            }
+        }
         let is_abstract = member.inheritance.abstract_kw.is_some()
             || (method.body.is_none() && !is_intrinsic(&member.annotations));
         MethodSig {
@@ -651,6 +694,7 @@ impl<'a> Tcx<'a> {
             borrows,
             storage,
             member: None,
+            output,
         }
     }
 
@@ -663,10 +707,12 @@ impl<'a> Tcx<'a> {
                     TyKind::Ref { ty, .. } => Storage {
                         whole: kept,
                         contents: kept || self.mentions_storable(ty),
+                        detached: false,
                     },
                     _ => Storage {
                         whole: kept || self.mentions_storable(&param.ty),
                         contents: false,
+                        detached: false,
                     },
                 }
             })
@@ -788,6 +834,7 @@ impl<'a> Tcx<'a> {
             borrows: RetBorrows::default(),
             storage: self.param_storage(&ctor.params, &ctor.keeps),
             member: None,
+            output: None,
         }
     }
 
@@ -860,5 +907,6 @@ fn synthesized_method(
         borrows: RetBorrows::default(),
         storage: Vec::new(),
         member: None,
+        output: None,
     }
 }

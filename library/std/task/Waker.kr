@@ -1,0 +1,15 @@
+package std.task;
+
+/**
+ * Makes the runtime poll a task again. A future that returns
+ * `Poll.Pending` keeps the waker from `Context.waker()` and calls `wake`
+ * once it can make progress.
+ *
+ * A waker only works on the thread whose runtime runs the task.
+ */
+record Waker(int task) {
+    /** Schedules the task to be polled again. Waking it twice polls it once. */
+    void wake() {
+        Reactor.wake(this.task);
+    }
+}

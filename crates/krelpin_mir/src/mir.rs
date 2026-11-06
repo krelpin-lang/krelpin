@@ -47,7 +47,19 @@ pub struct Body {
     pub arg_storage: Vec<Storage>,
     pub captures: Vec<CaptureInfo>,
     pub blocks: Vec<BasicBlockData>,
+    /// Set when this is the body of an `async` method. The body is then
+    /// the `poll` of the method's future: it returns `Poll<output>`, and
+    /// `Suspend` leaves it until the next poll.
+    pub asyncness: Option<AsyncBody>,
     pub span: Span,
+}
+
+#[derive(Clone, Debug)]
+pub struct AsyncBody {
+    /// The `&mut Context` the future is polled with. It is the local right
+    /// after the arguments, and isn't one of them.
+    pub cx: Local,
+    pub output: Ty,
 }
 
 impl Body {
@@ -275,6 +287,12 @@ pub enum TerminatorKind {
     },
     Return,
     Unreachable,
+    /// Returns `Poll.Pending` (already in the return place) from the poll
+    /// of an `async` body, keeping every local. The next poll continues at
+    /// `resume`.
+    Suspend {
+        resume: BasicBlock,
+    },
     Call {
         callee: Box<Callee>,
         dispatch: Dispatch,
@@ -301,7 +319,9 @@ impl TerminatorKind {
             Unwind::Handler(block) => Some(*block),
         };
         match self {
-            TerminatorKind::Goto { target } => vec![*target],
+            TerminatorKind::Goto { target } | TerminatorKind::Suspend { resume: target } => {
+                vec![*target]
+            }
             TerminatorKind::SwitchInt {
                 targets, otherwise, ..
             } => targets
@@ -334,7 +354,9 @@ impl TerminatorKind {
             }
         }
         match self {
-            TerminatorKind::Goto { target } => vec![target],
+            TerminatorKind::Goto { target } | TerminatorKind::Suspend { resume: target } => {
+                vec![target]
+            }
             TerminatorKind::SwitchInt {
                 targets, otherwise, ..
             } => targets

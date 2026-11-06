@@ -1,0 +1,7 @@
+package std.task;
+
+/** What `Future.poll` returns: the value, or `Pending` if it isn't ready yet. */
+enum Poll<T> {
+    Ready(T value),
+    Pending
+}

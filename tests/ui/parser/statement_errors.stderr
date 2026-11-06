@@ -10,7 +10,7 @@ error: expression is not a statement
 4 |         count + 1;
   |         ^^^^^^^^^
   |
-  = help: only assignments, increments, method calls and object creation can be used as statements
+  = help: only assignments, increments, method calls, object creation and `await` can be used as statements
 
 error: switch cases must use `->`
  --> tests/ui/parser/statement_errors.kr:6:19

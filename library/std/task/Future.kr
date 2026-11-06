@@ -1,0 +1,42 @@
+package std.task;
+
+/**
+ * A value that will be ready later, like the result of an `async` method.
+ *
+ * Calling an `async` method doesn't run it; it returns a `Future`, and the
+ * method runs as the future is polled. `await` polls a future until it is
+ * ready and gives its value:
+ *
+ * ```
+ * async String greeting(String name) {
+ *     await Runtime.sleep(10);
+ *     return "hello, $name";
+ * }
+ *
+ * async void run() {
+ *     String text = await greeting("Ada"); // "hello, Ada"
+ * }
+ * ```
+ *
+ * A future does nothing until something polls it: `await` inside another
+ * `async` method, `Runtime.blockOn`, or `Runtime.spawn`. Dropping a future
+ * before it is ready cancels it.
+ *
+ * # Writing a future by hand
+ *
+ * `poll` returns `Poll.Ready` with the value once there is one. Until then
+ * it returns `Poll.Pending`, after arranging for `cx.waker()` to be woken
+ * when it should be polled again; a future that returns `Pending` without
+ * that is never polled again.
+ */
+interface Future<T> {
+    /**
+     * Makes as much progress as possible without waiting, and returns the
+     * value if it is ready.
+     *
+     * # Throws
+     *
+     * Whatever the computation throws. `await` passes it on.
+     */
+    mut Poll<T> poll(&mut Context cx) throws Exception;
+}

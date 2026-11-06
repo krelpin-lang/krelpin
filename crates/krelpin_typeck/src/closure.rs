@@ -250,6 +250,7 @@ impl FnCtxt<'_, '_> {
 
         let ret = sig.map_or(Ty::Unknown, |sig| sig.ret.clone());
         let outer_ret = std::mem::replace(&mut self.ret, ret.clone());
+        let outer_async = std::mem::replace(&mut self.in_async, false);
         let outer_yields = std::mem::take(&mut self.yields);
         let outer_exceptions =
             std::mem::replace(&mut self.exceptions, ExceptionScope::for_lambda(sig));
@@ -263,6 +264,7 @@ impl FnCtxt<'_, '_> {
             LambdaBody::Block(block) => self.check_lambda_block(block, &ret),
         }
         self.ret = outer_ret;
+        self.in_async = outer_async;
         self.yields = outer_yields;
         self.exceptions = outer_exceptions;
     }
@@ -284,6 +286,7 @@ impl FnCtxt<'_, '_> {
             self.locals.insert(param.name.span, ty);
         }
         let outer_ret = std::mem::replace(&mut self.ret, Ty::Unknown);
+        let outer_async = std::mem::replace(&mut self.in_async, false);
         let outer_yields = std::mem::take(&mut self.yields);
         let probe = FnSig {
             ret: Ty::Unknown,
@@ -305,6 +308,7 @@ impl FnCtxt<'_, '_> {
             }
         };
         self.ret = outer_ret;
+        self.in_async = outer_async;
         self.yields = outer_yields;
         self.exceptions = outer_exceptions;
         ty

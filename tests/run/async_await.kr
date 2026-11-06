@@ -1,0 +1,183 @@
+import std.task.Context;
+import std.task.Future;
+import std.task.Poll;
+import std.task.Runtime;
+import std.task.Unit;
+import std.util.ArrayList;
+import std.util.List;
+
+class Bad extends Exception {
+    Bad(String message) { super(message); }
+}
+
+class Counter {
+    private int count = 0;
+    private List<String> log = new ArrayList<>();
+
+    mut async int bump(String why) {
+        await Runtime.yieldNow();
+        this.count++;
+        this.log.add(why);
+        return this.count;
+    }
+
+    String describe() {
+        return "${this.count} ${this.log}";
+    }
+}
+
+interface Source {
+    Future<String> fetch(int n);
+}
+
+class Slow implements Source {
+    Future<String> fetch(int n) {
+        return Slow.make(n);
+    }
+
+    static async String make(int n) {
+        await Runtime.sleep(n);
+        return "slept $n";
+    }
+}
+
+class Never implements Future<int> {
+    Never() {}
+    mut Poll<int> poll(&mut Context cx) {
+        return Poll.Pending;
+    }
+}
+
+class Main {
+    static async <T> T identity(T value) {
+        await Runtime.yieldNow();
+        return value;
+    }
+
+    static async int thrower() throws Bad {
+        await Runtime.yieldNow();
+        throw new Bad("from inside");
+    }
+
+    static async String catches() {
+        String result = "none";
+        try {
+            int x = await Main.thrower();
+            result = "got $x";
+        } catch (Bad e) {
+            result = "caught ${e.getMessage()}";
+        } finally {
+            Console.println("finally ran");
+        }
+        await Runtime.yieldNow();
+        return result;
+    }
+
+    static async String earlyReturn(int n) {
+        try {
+            if (n > 0) {
+                await Runtime.yieldNow();
+                return "positive";
+            }
+        } finally {
+            Console.println("leaving earlyReturn($n)");
+        }
+        return "not positive";
+    }
+
+    static async void nested() throws Exception {
+        Runtime.blockOn(Main.identity(1));
+    }
+
+    static async void worker(String name, int rounds) {
+        for (int i = 0; i < rounds; i++) {
+            await Runtime.sleep(10 + i * 20);
+            Console.println("$name round $i");
+        }
+    }
+
+    static async void spawner() {
+        Runtime.spawn(Main.worker("first", 3));
+        await Runtime.sleep(5);
+        Runtime.spawn(Main.worker("second", 2));
+        await Runtime.sleep(120);
+        Console.println("spawner done");
+    }
+
+    static async void forever() {
+        String text = "dropped with the runtime";
+        while (true) {
+            await Runtime.sleep(1000);
+            Console.println(text);
+        }
+    }
+
+    static async void leavesOneRunning() {
+        Runtime.spawn(Main.forever());
+        await Runtime.yieldNow();
+    }
+
+    static async String keepsLocals() {
+        List<String> names = new ArrayList<>();
+        names.add("a");
+        &List<String> view = &names;
+        int before = view.size();
+        await Runtime.yieldNow();
+        names.add("b");
+        String first = names.get(0);
+        int len = await Main.borrowed(&first);
+        return "$names $before $len";
+    }
+
+    static async int borrowed(&String text) {
+        await Runtime.yieldNow();
+        return text.length() + 10;
+    }
+
+    static async void counting(&mut Counter counter) {
+        await counter.bump("one");
+        await counter.bump("two");
+    }
+
+    static void main() throws Exception {
+        Console.println(Runtime.blockOn(Main.identity("generic")));
+        Console.println(Runtime.blockOn(Main.identity(42)));
+        Console.println(Runtime.blockOn(Main.catches()));
+        Console.println(Runtime.blockOn(Main.earlyReturn(1)));
+        Console.println(Runtime.blockOn(Main.earlyReturn(0)));
+        Counter counter = new Counter();
+        Runtime.blockOn(Main.counting(&mut counter));
+        Console.println(counter.describe());
+        Console.println(Runtime.blockOn(Main.keepsLocals()));
+        Runtime.blockOn(Main.spawner());
+        Runtime.blockOn(Main.leavesOneRunning());
+        Future<int> neverPolled = Main.thrower();
+        Source source = new Slow();
+        Console.println(Runtime.blockOn(source.fetch(3)));
+
+        Future<int> f = Main.identity(7);
+        Context cx = new Context(0);
+        Console.println(f.poll(&mut cx));
+        Console.println(f.poll(&mut cx));
+        try {
+            f.poll(&mut cx);
+        } catch (IllegalStateException e) {
+            Console.println("again: ${e.getMessage()}");
+        }
+        try {
+            Runtime.blockOn(new Never());
+        } catch (IllegalStateException e) {
+            Console.println("never: ${e.getMessage()}");
+        }
+        try {
+            Runtime.blockOn(Main.nested());
+        } catch (IllegalStateException e) {
+            Console.println("nested: ${e.getMessage()}");
+        }
+        try {
+            Runtime.spawn(Main.identity(new Unit()));
+        } catch (IllegalStateException e) {
+            Console.println("spawn: ${e.getMessage()}");
+        }
+    }
+}

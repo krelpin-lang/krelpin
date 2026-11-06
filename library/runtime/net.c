@@ -85,6 +85,7 @@ void kr_net_close(void *handle) {
         return;
     }
     if (socket->fd >= 0) {
+        kr_task_forget_fd(socket->fd);
         close(socket->fd);
     }
     kr_free(socket->in.data);

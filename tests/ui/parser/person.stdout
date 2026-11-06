@@ -300,6 +300,7 @@ CompilationUnit {
                             },
                             kind: Method(
                                 Method {
+                                    asyncness: None,
                                     generics: Generics {
                                         params: [],
                                         span: 0..0,
@@ -376,6 +377,7 @@ CompilationUnit {
                             },
                             kind: Method(
                                 Method {
+                                    asyncness: None,
                                     generics: Generics {
                                         params: [],
                                         span: 0..0,
@@ -457,6 +459,7 @@ CompilationUnit {
                             },
                             kind: Method(
                                 Method {
+                                    asyncness: None,
                                     generics: Generics {
                                         params: [],
                                         span: 0..0,
@@ -569,6 +572,7 @@ CompilationUnit {
                             },
                             kind: Method(
                                 Method {
+                                    asyncness: None,
                                     generics: Generics {
                                         params: [],
                                         span: 0..0,

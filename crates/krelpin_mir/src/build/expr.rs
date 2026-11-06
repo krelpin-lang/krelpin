@@ -55,6 +55,7 @@ impl<'h> Builder<'_, 'h, '_> {
                 self.goto(join, span);
                 self.current = join;
             }
+            ExprKind::Await { expr: future } => self.lower_await(dest, future, span),
             ExprKind::Static { owner, name } => match self.variant_index(*owner, *name) {
                 Some(index) => self.assign(
                     dest,

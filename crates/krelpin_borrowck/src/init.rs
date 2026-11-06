@@ -74,7 +74,8 @@ impl MoveData {
         MoveData {
             moves,
             at,
-            arg_count: body.arg_count,
+            // The `Context` of an `async` body comes in like an argument.
+            arg_count: body.arg_count + usize::from(body.asyncness.is_some()),
             local_count: body.locals.len(),
         }
     }

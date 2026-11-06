@@ -1,0 +1,9 @@
+class Main {
+    async int count;
+
+    async Main() {}
+
+    static void main() {}
+}
+
+async class Other {}

@@ -170,6 +170,7 @@ CompilationUnit {
                             },
                             kind: Method(
                                 Method {
+                                    asyncness: None,
                                     generics: Generics {
                                         params: [
                                             GenericParam {

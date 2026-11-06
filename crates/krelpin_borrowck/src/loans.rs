@@ -124,7 +124,7 @@ impl<'a, 'tcx> LoanData<'a, 'tcx> {
         }
     }
 
-    fn operand_loans(&self, state: &Holdings, operand: &Operand) -> BitSet {
+    pub(crate) fn operand_loans(&self, state: &Holdings, operand: &Operand) -> BitSet {
         match operand_place(operand) {
             Some(place) => self.place_loans(state, place),
             None => BitSet::new(self.loans.len()),
@@ -452,6 +452,7 @@ impl LoanData<'_, '_> {
                     .unwrap_or(Storage {
                         whole: true,
                         contents: true,
+                        detached: false,
                     }),
             ),
         };

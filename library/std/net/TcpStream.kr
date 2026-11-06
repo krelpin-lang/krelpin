@@ -480,6 +480,105 @@ final class TcpStream {
         }
     }
 
+    /**
+     * Connects to `address` without blocking the thread, inside a
+     * `std.task.Runtime`. The stream is non-blocking, ready for the other
+     * `...Async` methods.
+     *
+     * # Throws
+     *
+     * `IOException` if the address is malformed or can't be resolved, or
+     * the connection fails.
+     */
+    static async TcpStream connectAsync(String address) throws IOException {
+        TcpStream stream = TcpStream.startConnect(address);
+        while (!stream.finishConnect()) {
+            await new Readiness(stream.fdRaw(), Interest.WRITABLE);
+        }
+        return stream;
+    }
+
+    /**
+     * Returns the next line like `readLine`, waiting for it without
+     * blocking the thread, inside a `std.task.Runtime`: `null` once the
+     * peer has closed the connection. Makes the stream non-blocking.
+     *
+     * # Throws
+     *
+     * `IOException` if reading fails, or the line isn't valid UTF-8.
+     */
+    mut async String? readLineAsync() throws IOException {
+        this.setNonBlocking(true);
+        while (true) {
+            String? line = this.tryReadLine();
+            if (line != null || this.atEnd()) {
+                return line;
+            }
+            await new Readiness(this.fdRaw(), Interest.READABLE);
+        }
+    }
+
+    /**
+     * Returns up to `max` bytes like `read`, waiting for them without
+     * blocking the thread, inside a `std.task.Runtime`: an empty array once
+     * the peer has closed the connection. Makes the stream non-blocking.
+     *
+     * # Throws
+     *
+     * `IllegalArgumentException` if `max` isn't positive.
+     * `IOException` if reading fails.
+     */
+    mut async byte[] readAsync(int max) throws IOException {
+        this.setNonBlocking(true);
+        while (true) {
+            byte[]? bytes = this.tryRead(max);
+            if (bytes != null) {
+                return bytes;
+            }
+            await new Readiness(this.fdRaw(), Interest.READABLE);
+        }
+    }
+
+    /**
+     * Sends `text` as UTF-8, all of it, without blocking the thread,
+     * inside a `std.task.Runtime`. Bytes queued with `queue` go first.
+     * Makes the stream non-blocking.
+     *
+     * # Throws
+     *
+     * `IOException` if sending fails or the peer has closed the connection.
+     */
+    mut async void writeAsync(String text) throws IOException {
+        this.setNonBlocking(true);
+        this.queue(text);
+        await this.flushAsync();
+    }
+
+    /** Sends all of `bytes` like `writeAsync`. */
+    mut async void writeBytesAsync(&byte[] bytes) throws IOException {
+        this.setNonBlocking(true);
+        this.queueBytes(bytes);
+        await this.flushAsync();
+    }
+
+    /**
+     * Sends every queued byte without blocking the thread, inside a
+     * `std.task.Runtime`. Makes the stream non-blocking.
+     *
+     * # Throws
+     *
+     * `IOException` if sending fails or the peer has closed the connection.
+     */
+    mut async void flushAsync() throws IOException {
+        this.setNonBlocking(true);
+        while (!this.flush()) {
+            await new Readiness(this.fdRaw(), Interest.WRITABLE);
+        }
+    }
+
+    @Intrinsic
+    private int fdRaw();
+
     @Intrinsic
     private mut boolean setNonBlockingRaw(boolean nonBlocking);
 

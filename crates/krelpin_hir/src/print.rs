@@ -461,6 +461,11 @@ impl Printer<'_, '_> {
                 self.pat(pat);
                 self.out.push(')');
             }
+            ExprKind::Await { expr: operand } => {
+                self.out.push_str("(await ");
+                self.expr(operand);
+                self.out.push(')');
+            }
             ExprKind::Cast { expr: operand } => {
                 self.out.push('(');
                 self.expr(operand);

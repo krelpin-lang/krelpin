@@ -1,0 +1,18 @@
+package std.task;
+
+/**
+ * What a future is polled with: it tells the future which task is polling
+ * it, so the future can arrange to wake that task up later.
+ */
+final class Context {
+    private int task;
+
+    Context(int task) {
+        this.task = task;
+    }
+
+    /** Returns a waker that makes the runtime poll this task again. */
+    Waker waker() {
+        return new Waker(this.task);
+    }
+}

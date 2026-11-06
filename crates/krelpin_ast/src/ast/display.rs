@@ -124,6 +124,7 @@ impl fmt::Display for Expr {
             ExprKind::Ternary { cond, then, els } => write!(f, "({cond} ? {then} : {els})"),
             ExprKind::InstanceOf { expr, pat } => write!(f, "({expr} instanceof {pat})"),
             ExprKind::Cast { ty, expr } => write!(f, "(({ty}) {expr})"),
+            ExprKind::Await(expr) => write!(f, "(await {expr})"),
             ExprKind::Lambda {
                 moves,
                 params,

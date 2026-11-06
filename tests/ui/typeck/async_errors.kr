@@ -1,0 +1,44 @@
+import std.io.IOException;
+import std.task.Future;
+import std.task.Runtime;
+import std.task.Unit;
+
+abstract class Service {
+    abstract async String fetch();
+}
+
+class Main {
+    static async &String pick(&String a, &String b) borrows a {
+        return a;
+    }
+
+    static int notAsync() {
+        await Runtime.yieldNow();
+        return 1;
+    }
+
+    static async void notAFuture(String? text) {
+        int number = await 5;
+        await text;
+    }
+
+    static async void inLambda() {
+        Runnable task = () -> {
+            await Runtime.yieldNow();
+        };
+    }
+
+    static async void fails() throws IOException {
+        throw new IOException("no");
+    }
+
+    static async void unhandled() {
+        await Main.fails();
+    }
+
+    static void callingIsFine() {
+        Future<Unit> future = Main.fails();
+    }
+
+    static void main() {}
+}

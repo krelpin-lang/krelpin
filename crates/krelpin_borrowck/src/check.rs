@@ -109,6 +109,25 @@ impl<'a, 'tcx> Checker<'a, 'tcx> {
             self.check_access(location, span, &place, access, init, held);
         }
         match kind {
+            TerminatorKind::Call { callee, args, .. } => {
+                let has_receiver = args.len() > callee.method.params.len();
+                for (index, arg) in args.iter().enumerate().skip(usize::from(has_receiver)) {
+                    let param = index - usize::from(has_receiver);
+                    let detached = callee
+                        .method
+                        .storage
+                        .get(param)
+                        .is_some_and(|storage| storage.detached);
+                    if !detached {
+                        continue;
+                    }
+                    let loans = self.loans.operand_loans(held, arg);
+                    if let Some(loan) = loans.iter().next() {
+                        self.report_detached(loan, callee.method.name.name, span);
+                        break;
+                    }
+                }
+            }
             TerminatorKind::Return => {
                 let mut escaping = held[Local::RETURN.index()].clone();
                 for arg in self.body.args() {
@@ -669,6 +688,22 @@ impl<'a, 'tcx> Checker<'a, 'tcx> {
                 )
         };
         self.emit(loan.span, diagnostic);
+    }
+
+    fn report_detached(&mut self, loan: usize, method: krelpin_span::Symbol, span: Span) {
+        let loan = &self.loans.loans[loan];
+        let name = self.tys.describe(&loan.place);
+        let diagnostic = Diagnostic::error(format!(
+            "`{method}` keeps its argument after this method ends, but the argument borrows `{name}`"
+        ))
+        .with_span(span)
+        .with_label(format!("`{method}` keeps the argument here"))
+        .with_secondary(loan.span, format!("`{name}` is borrowed here"))
+        .with_note(format!(
+            "`{method}` is static and keeps its argument, so the argument may outlive everything the caller owns"
+        ))
+        .with_help("give the argument its own values instead of references");
+        self.emit(span, diagnostic);
     }
 
     fn report_escape(&mut self, loan: usize, span: Span, how: &str) {

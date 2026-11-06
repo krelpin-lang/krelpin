@@ -1,3 +1,4 @@
+mod asyncness;
 mod expr;
 mod matches;
 mod stmt;
@@ -8,12 +9,12 @@ use krelpin_ast::ast::ReceiverKind;
 use krelpin_hir::{self as hir, BodyKind, BodyValue, ClosureBody, LocalId};
 use krelpin_span::def_id::DefId;
 use krelpin_span::{Span, Symbol};
-use krelpin_typeck::{Storage, Tcx, Ty};
+use krelpin_typeck::{LangItem, Storage, Tcx, Ty};
 
 use crate::mir::{
-    BasicBlock, BasicBlockData, Body, BodyId, BodySource, CaptureInfo, CaptureMode, Local,
-    LocalDecl, Mir, Place, PlaceElem, ReturnSource, Rvalue, Statement, StatementKind, Terminator,
-    TerminatorKind, Unwind,
+    AsyncBody, BasicBlock, BasicBlockData, Body, BodyId, BodySource, CaptureInfo, CaptureMode,
+    Local, LocalDecl, Mir, Place, PlaceElem, ReturnSource, Rvalue, Statement, StatementKind,
+    Terminator, TerminatorKind, Unwind,
 };
 use crate::visit::for_each_local_mut;
 
@@ -91,6 +92,17 @@ struct Builder<'a, 'h, 'tcx> {
     vars: HashMap<LocalId, Place>,
     scopes: Vec<Scope<'h>>,
     closures: usize,
+    asyncness: Option<AsyncState>,
+}
+
+/// What building the poll of an `async` body needs.
+#[derive(Clone)]
+struct AsyncState {
+    body: AsyncBody,
+    /// `Poll<output>`, the return type.
+    poll: Ty,
+    /// Where `return` puts its value before wrapping it in `Poll.Ready`.
+    value: Local,
 }
 
 impl<'a, 'h, 'tcx> Builder<'a, 'h, 'tcx> {
@@ -107,6 +119,7 @@ impl<'a, 'h, 'tcx> Builder<'a, 'h, 'tcx> {
             vars: HashMap::new(),
             scopes: Vec::new(),
             closures: 0,
+            asyncness: None,
         };
         builder.push_local(None, ret, hir.span);
         builder.current = builder.new_block();
@@ -114,11 +127,32 @@ impl<'a, 'h, 'tcx> Builder<'a, 'h, 'tcx> {
     }
 
     fn build_item(cx: &'a mut MirCtxt<'h, 'tcx>, body: &'h hir::Body) {
-        let mut builder = Builder::new(cx, body, body.ret.clone());
+        let poll = body
+            .output
+            .as_ref()
+            .map(|output| cx.tcx.poll_of(output.clone()));
+        let ret = poll.clone().unwrap_or_else(|| body.ret.clone());
+        let mut builder = Builder::new(cx, body, ret);
         for &local in body.this.iter().chain(&body.params) {
             builder.declare_arg(local);
         }
         let arg_count = builder.locals.len() - 1;
+        if let (Some(output), Some(poll)) = (&body.output, poll) {
+            let context = Ty::Ref {
+                mutable: true,
+                ty: Box::new(builder.tcx().lang_ty(LangItem::Context)),
+            };
+            let cx = builder.push_local(None, context, body.span);
+            let value = builder.temp(output, body.span);
+            builder.asyncness = Some(AsyncState {
+                body: AsyncBody {
+                    cx,
+                    output: output.clone(),
+                },
+                poll,
+                value,
+            });
+        }
         let ret_sources = body.ret_sources.as_ref().map(|sources| {
             sources
                 .iter()
@@ -215,6 +249,9 @@ impl<'a, 'h, 'tcx> Builder<'a, 'h, 'tcx> {
         ret_sources: Option<Vec<ReturnSource>>,
         arg_storage: Vec<Storage>,
     ) -> BodyId {
+        if self.hir.ret == Ty::Void && self.asyncness.is_some() {
+            self.async_return(None, self.hir.span);
+        }
         let fallthrough = if self.ret == Ty::Void {
             TerminatorKind::Return
         } else {
@@ -222,7 +259,9 @@ impl<'a, 'h, 'tcx> Builder<'a, 'h, 'tcx> {
         };
         self.terminate(fallthrough, self.hir.span);
         let mut blocks = simplify(self.blocks);
-        let locals = remove_unused_locals(self.locals, arg_count, &mut blocks);
+        // The context of an `async` body comes right after the arguments.
+        let kept = arg_count + usize::from(self.asyncness.is_some());
+        let locals = remove_unused_locals(self.locals, kept, &mut blocks);
         let member = match source {
             BodySource::Closure { .. } => None,
             _ => Some(self.hir.member),
@@ -238,6 +277,7 @@ impl<'a, 'h, 'tcx> Builder<'a, 'h, 'tcx> {
             arg_storage,
             captures,
             blocks,
+            asyncness: self.asyncness.map(|state| state.body),
             span: self.hir.span,
         };
         self.cx.bodies[self.id.index()] = Some(body);

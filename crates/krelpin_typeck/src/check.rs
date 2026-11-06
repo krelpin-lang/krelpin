@@ -30,6 +30,9 @@ pub(crate) struct FnCtxt<'a, 'tcx> {
     /// The `this(...)` or `super(...)` call that starts the constructor
     /// being checked, the only place such a call may appear.
     pub(crate) delegation: Option<Span>,
+    /// Whether this is the body of an `async` method, where `await` is
+    /// allowed. Lambdas inside it aren't.
+    pub(crate) in_async: bool,
 }
 
 impl Tcx<'_> {
@@ -167,6 +170,10 @@ fn check_member<'a, 'tcx>(tcx: &'a Tcx<'tcx>, owner: DefId, member: &Member) -> 
             };
             fcx.exceptions = ExceptionScope::declared(tcx.lower_tys(&method.throws));
             fcx.declare_params(&method.params);
+            if let Some(span) = method.asyncness {
+                fcx.in_async = true;
+                fcx.check_async_method(method, span);
+            }
             if let Some(body) = &method.body {
                 let diverges = fcx.check_block(body);
                 if !diverges {
@@ -262,6 +269,7 @@ impl<'a, 'tcx> FnCtxt<'a, 'tcx> {
             exceptions: ExceptionScope::default(),
             results: TypeckResults::default(),
             delegation: None,
+            in_async: false,
         }
     }
 

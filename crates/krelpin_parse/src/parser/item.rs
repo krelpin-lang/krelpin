@@ -40,6 +40,7 @@ struct Modifiers {
     storage: FieldStorage,
     inheritance: Inheritance,
     receiver: Option<ReceiverModifier>,
+    asyncness: Option<Span>,
 }
 
 #[derive(Clone, Copy)]
@@ -216,6 +217,7 @@ impl Parser<'_> {
         lo: Span,
     ) -> PResult<Item> {
         self.reject_receiver(modifiers.receiver, "types");
+        self.reject_async(modifiers, "types");
         self.bump();
 
         if container != Container::Class {
@@ -263,6 +265,7 @@ impl Parser<'_> {
         self.reject_storage(modifiers.storage, "macros");
         self.reject_inheritance(modifiers.inheritance, "macros");
         self.reject_receiver(modifiers.receiver, "macros");
+        self.reject_async(modifiers, "macros");
         if let Some(span) = modifiers.vis.span() {
             self.error(span, "macros cannot have a visibility modifier");
         }
@@ -605,6 +608,7 @@ impl Parser<'_> {
             storage: FieldStorage::Instance,
             inheritance: Inheritance::default(),
             receiver: None,
+            asyncness: None,
         };
 
         loop {
@@ -652,6 +656,13 @@ impl Parser<'_> {
                         self.error(span, format!("duplicate `{symbol}` modifier"));
                     } else {
                         *slot = Some(span);
+                    }
+                }
+                kw::Async => {
+                    if modifiers.asyncness.is_some() {
+                        self.error(span, "duplicate `async` modifier");
+                    } else {
+                        modifiers.asyncness = Some(span);
                     }
                 }
                 kw::Move if !self.move_is_modifier() => return modifiers,
@@ -721,6 +732,16 @@ impl Parser<'_> {
                 .with_span(receiver.span)
                 .with_help("`mut` and `move` are only allowed on methods"),
         );
+    }
+
+    fn reject_async(&self, modifiers: &Modifiers, what: &str) {
+        if let Some(span) = modifiers.asyncness {
+            self.emit(
+                Diagnostic::error(format!("`async` cannot be used on {what}"))
+                    .with_span(span)
+                    .with_help("`async` is only allowed on methods"),
+            );
+        }
     }
 
     fn method_receiver(&self, modifiers: &Modifiers, name: Ident) -> Option<Receiver> {
@@ -796,7 +817,7 @@ impl Parser<'_> {
             let name = self.parse_ident()?;
             let receiver = self.method_receiver(modifiers, name);
             return self
-                .parse_method(generics, ret, name, receiver)
+                .parse_method(modifiers.asyncness, generics, ret, name, receiver)
                 .map(MemberKind::Method);
         }
 
@@ -809,6 +830,7 @@ impl Parser<'_> {
         if let Some(name) = compact {
             self.reject_storage(storage, "constructors");
             self.reject_receiver(modifiers.receiver, "constructors");
+            self.reject_async(modifiers, "constructors");
             let body = self.parse_block()?;
             return Ok(MemberKind::Constructor(Constructor {
                 compact: true,
@@ -830,6 +852,7 @@ impl Parser<'_> {
             }
             self.reject_storage(storage, "constructors");
             self.reject_receiver(modifiers.receiver, "constructors");
+            self.reject_async(modifiers, "constructors");
             return self.parse_constructor().map(MemberKind::Constructor);
         }
 
@@ -839,7 +862,13 @@ impl Parser<'_> {
         if self.check(TokenKind::OpenParen) {
             let receiver = self.method_receiver(modifiers, name);
             return self
-                .parse_method(Generics::default(), ret, name, receiver)
+                .parse_method(
+                    modifiers.asyncness,
+                    Generics::default(),
+                    ret,
+                    name,
+                    receiver,
+                )
                 .map(MemberKind::Method);
         }
 
@@ -850,6 +879,7 @@ impl Parser<'_> {
             }
         };
         self.reject_receiver(modifiers.receiver, "fields");
+        self.reject_async(modifiers, "fields");
         self.parse_field(storage, ty, name).map(MemberKind::Field)
     }
 

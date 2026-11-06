@@ -1,0 +1,133 @@
+package std.task;
+
+/**
+ * Runs `async` code on the current thread.
+ *
+ * `blockOn` polls a future until it is ready. While every task waits, the
+ * thread sleeps until a socket is ready or a timer runs out, so one thread
+ * can serve many connections:
+ *
+ * ```
+ * class Server {
+ *     static async void serve(TcpListener listener) throws IOException {
+ *         while (true) {
+ *             TcpStream client = await listener.acceptAsync();
+ *             Runtime.spawn(Server.echo(client));
+ *         }
+ *     }
+ *
+ *     static async void echo(TcpStream client) throws IOException {
+ *         String? line = await client.readLineAsync();
+ *         while (line != null) {
+ *             await client.writeAsync("$line\n");
+ *             line = await client.readLineAsync();
+ *         }
+ *     }
+ *
+ *     static void main() throws Exception {
+ *         Runtime.blockOn(Server.serve(TcpListener.bind("127.0.0.1:8080")));
+ *     }
+ * }
+ * ```
+ *
+ * All tasks run on the thread that called `blockOn`, one at a time; a task
+ * only gives way to others at an `await` that has to wait.
+ */
+final class Runtime {
+    private Runtime() {}
+
+    /**
+     * Runs `future` and the tasks it spawns until `future` is ready, and
+     * returns its value. Spawned tasks that haven't finished by then are
+     * dropped.
+     *
+     * # Throws
+     *
+     * What `future` or a spawned task throws. `IllegalStateException` if
+     * a runtime is running on this thread already, or if every task waits
+     * for something that can never happen.
+     */
+    static <T> T blockOn(Future<T> future) throws Exception {
+        if (!Reactor.enter()) {
+            throw new IllegalStateException("a runtime is running on this thread already");
+        }
+        try {
+            return Runtime.drive(future);
+        } finally {
+            Reactor.exit();
+        }
+    }
+
+    private static <T> T drive(Future<T> future) throws Exception {
+        Context main = new Context(0);
+        Reactor.wake(0);
+        while (true) {
+            int task = Reactor.nextWoken();
+            while (task != -1) {
+                if (task == 0) {
+                    Poll<T> poll = future.poll(&mut main);
+                    switch (poll) {
+                        case Ready(T value) -> {
+                            return value;
+                        }
+                        case Pending -> {}
+                    }
+                } else {
+                    Runtime.run(task);
+                }
+                task = Reactor.nextWoken();
+            }
+            if (!Reactor.turn()) {
+                throw new IllegalStateException("every task is waiting for something that can't happen");
+            }
+        }
+    }
+
+    private static void run(int task) throws Exception {
+        Future<Unit>? taken = Reactor.take(task);
+        if (taken == null) {
+            return;
+        }
+        Future<Unit> future = taken;
+        Context cx = new Context(task);
+        Poll<Unit> poll = Poll.Pending;
+        try {
+            poll = future.poll(&mut cx);
+        } catch (Exception e) {
+            Reactor.finish(task);
+            throw e;
+        }
+        switch (poll) {
+            case Ready(Unit unit) -> Reactor.finish(task);
+            case Pending -> Reactor.put(task, future);
+        }
+    }
+
+    /**
+     * Runs `future` as a task of its own, next to the one that spawns it.
+     * The task runs until it finishes or the runtime stops. The future
+     * must own what it uses, because it can outlive the caller.
+     *
+     * # Throws
+     *
+     * `IllegalStateException` if no runtime is running on this thread.
+     */
+    static void spawn(Future<Unit> future) keeps future {
+        if (Reactor.spawn(future) < 0) {
+            throw new IllegalStateException("spawn needs a running runtime; use Runtime.blockOn");
+        }
+    }
+
+    /** A future that is ready after `millis` milliseconds. */
+    static Sleep sleep(long millis) {
+        return new Sleep(Reactor.now() + millis);
+    }
+
+    /**
+     * A future that gives way once: it lets the other woken tasks run, then
+     * is ready.
+     */
+    static YieldNow yieldNow() {
+        return new YieldNow();
+    }
+}
