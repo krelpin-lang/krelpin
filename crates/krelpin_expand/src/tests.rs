@@ -29,6 +29,7 @@ fn expand_with(src: &str, cfg: &crate::CfgSet) -> Expanded {
         cfg,
         proc_macro: None,
         externs: &[],
+        first_user: 0,
     };
     crate::expand_crate(&mut units, &source_map, &dcx, &options);
     Expanded {
@@ -156,6 +157,7 @@ fn expand_proc_macro(src: &str) -> Expanded {
         cfg: &crate::CfgSet::default(),
         proc_macro: Some("demo"),
         externs: &[],
+        first_user: 0,
     };
     crate::expand_crate(&mut units, &source_map, &dcx, &options);
     Expanded {

@@ -1,0 +1,14 @@
+import util.Counter;
+import greet.Greeter;
+import greet.fmt.Shout;
+
+class Main {
+    static void main(String[] args) {
+        Counter counter = new Counter();
+        counter.bump();
+        counter.bump();
+        Console.println("count ${counter.value()}, ${args.length} arguments");
+        Console.println(Greeter.hello("krelp"));
+        Console.println(Shout.loud("hi"));
+    }
+}

@@ -16,35 +16,39 @@ pub(crate) fn define_macros(
     source_map: &SourceMap,
     dcx: &DiagCtxt,
     proc_macro: Option<&str>,
+    first_user: usize,
 ) {
-    let user_units = units
-        .iter()
-        .filter(|unit| !PackagePath::of_unit(unit).is_std())
-        .count();
-    let mut seen = 0;
     let mut defs: Vec<MacroDef> = Vec::new();
-    let mut root = None;
+    // The server goes into the file that defines the macros, or the last one.
+    let mut root = (first_user < units.len()).then(|| units.len() - 1);
+    let mut defining: Option<usize> = None;
     for (index, unit) in units.iter_mut().enumerate() {
         if PackagePath::of_unit(unit).is_std() {
             continue;
         }
-        seen += 1;
         let macros = std::mem::take(&mut unit.macros);
-        if proc_macro.is_none() {
+        if proc_macro.is_none() || index < first_user {
             for def in &macros {
                 reject_definition(def, dcx);
             }
             continue;
         }
-        if seen < user_units {
+        if macros.is_empty() {
+            continue;
+        }
+        if defining.is_some() {
             for def in &macros {
                 dcx.emit(
-                    Diagnostic::error("macros must be defined in the root of a `proc-macro` crate")
-                        .with_span(def.name.span),
+                    Diagnostic::error(
+                        "the macros of a `proc-macro` crate must be defined in one file",
+                    )
+                    .with_span(def.name.span)
+                    .with_help("move this macro to the file that defines the others"),
                 );
             }
             continue;
         }
+        defining = Some(index);
         root = Some(index);
         defs = macros;
     }

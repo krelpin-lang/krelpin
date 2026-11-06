@@ -28,6 +28,9 @@ pub struct ExpandOptions<'a> {
     pub cfg: &'a CfgSet,
     pub proc_macro: Option<&'a str>,
     pub externs: &'a [ProcMacroCrate],
+    /// The index of the first unit of the crate being built; the units
+    /// before it are the standard library and the source libraries.
+    pub first_user: usize,
 }
 
 pub fn expand(units: &mut [CompilationUnit], source_map: &SourceMap, dcx: &DiagCtxt) {
@@ -35,6 +38,7 @@ pub fn expand(units: &mut [CompilationUnit], source_map: &SourceMap, dcx: &DiagC
         cfg: &CfgSet::default(),
         proc_macro: None,
         externs: &[],
+        first_user: 0,
     };
     expand_crate(units, source_map, dcx, &options);
 }
@@ -70,7 +74,13 @@ pub fn expand_crate(
             cx.reject_macros(&mut def.annotations, "macros");
         }
     }
-    server::define_macros(units, source_map, dcx, options.proc_macro);
+    server::define_macros(
+        units,
+        source_map,
+        dcx,
+        options.proc_macro,
+        options.first_user,
+    );
 }
 
 pub(crate) struct Invocation {

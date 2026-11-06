@@ -1,0 +1,18 @@
+package util;
+
+/** Counts upwards from zero. */
+class Counter {
+    private int count;
+
+    Counter() {
+        this.count = 0;
+    }
+
+    mut void bump() {
+        this.count++;
+    }
+
+    int value() {
+        return this.count;
+    }
+}

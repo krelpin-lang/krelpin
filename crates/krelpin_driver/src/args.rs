@@ -1,5 +1,5 @@
 use clap::{Parser, ValueEnum};
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 
 #[derive(Clone, Debug)]
 pub struct Spec<T> {
@@ -30,9 +30,18 @@ pub struct Args {
     #[arg(
         value_name = "INPUT",
         required_unless_present_any = ["print", "explain"],
-        help = "Source file to compile"
+        help = "Source file to compile, or a source directory whose \
+                subdirectories are its packages"
     )]
     pub input: Option<PathBuf>,
+
+    #[arg(
+        long = "dep",
+        value_name = "NAME=DIR",
+        help = "Compile the source library NAME from the directory DIR, \
+                whose files belong to the package NAME and its subpackages"
+    )]
+    pub deps: Vec<String>,
 
     #[arg(
         long,
@@ -260,9 +269,18 @@ impl Args {
         if let Some(name) = &self.crate_name {
             return name.clone();
         }
-        self.input
-            .as_ref()
-            .and_then(|p| p.file_stem())
+        let Some(input) = &self.input else {
+            return "main".into();
+        };
+        // A source directory named `src` is named after the project around it.
+        let input = match input.canonicalize() {
+            Ok(dir) if dir.is_dir() && dir.file_name().is_some_and(|name| name == "src") => {
+                dir.parent().map(Path::to_path_buf).unwrap_or(dir)
+            }
+            _ => input.clone(),
+        };
+        input
+            .file_stem()
             .map(|s| s.to_string_lossy().replace('-', "_"))
             .unwrap_or_else(|| "main".into())
     }

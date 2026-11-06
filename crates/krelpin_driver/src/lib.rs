@@ -1,6 +1,7 @@
 mod args;
 mod config;
 mod session;
+mod sources;
 
 use std::fs;
 use std::path::{Path, PathBuf};
@@ -15,6 +16,7 @@ use krelpin_sysroot::Sysroot;
 pub use crate::args::{Args, CrateType, Edition, Emit, LintLevel, PrintKind, Spec};
 pub use crate::config::Config;
 pub use crate::session::Session;
+pub use crate::sources::Dep;
 
 pub fn main() -> ExitCode {
     let args = Args::parse();
@@ -63,17 +65,6 @@ pub fn run(args: &Args, sess: &Session) {
         return;
     };
 
-    let file = match sess.source_map.load_file(input) {
-        Ok(file) => file,
-        Err(error) => {
-            sess.dcx.emit(Diagnostic::error(format!(
-                "couldn't read `{}`: {error}",
-                input.display()
-            )));
-            return;
-        }
-    };
-
     if args.verbose {
         eprintln!(
             "compiling `{}` for {} (opt-level={}, debuginfo={})",
@@ -84,29 +75,44 @@ pub fn run(args: &Args, sess: &Session) {
         );
     }
 
+    let crate_name = args.crate_name();
+    let root = sources::Root {
+        path: input,
+        package: config.builds_library().then_some(crate_name.as_str()),
+    };
     let timer = Timer::new(config.time_passes);
     let emits = args.emits();
-    let tokens = timer.time("lexing", || krelpin_parse::lexer::lex(&file, &sess.dcx));
+    let Some(lexed) = timer.time("lexing", || sources::lex(&root, sess)) else {
+        return;
+    };
     if sess.dcx.has_errors() {
         return;
     }
 
     for emit in emits.iter().filter(|emit| emit.kind == Emit::Tokens) {
-        write_output(sess, emit.path.as_deref(), &render_tokens(sess, &tokens));
+        let rendered: String = lexed
+            .tokens
+            .iter()
+            .map(|tokens| render_tokens(sess, tokens))
+            .collect();
+        write_output(sess, emit.path.as_deref(), &rendered);
     }
     if emits.iter().all(|emit| emit.kind == Emit::Tokens) {
         return;
     }
 
-    let unit = timer.time("parsing", || {
-        krelpin_parse::parser::parse(tokens, &sess.dcx)
-    });
+    let user_files = lexed.files.clone();
+    let user_units = timer.time("parsing", || sources::parse(lexed, &root, &sess.dcx));
     if sess.dcx.has_errors() {
         return;
     }
 
     for emit in emits.iter().filter(|emit| emit.kind == Emit::Ast) {
-        write_output(sess, emit.path.as_deref(), &format!("{unit:#?}\n"));
+        let rendered: String = user_units
+            .iter()
+            .map(|unit| format!("{unit:#?}\n"))
+            .collect();
+        write_output(sess, emit.path.as_deref(), &rendered);
     }
     let needs_analysis = |kind: Emit| !matches!(kind, Emit::Tokens | Emit::Ast);
     if !emits.iter().any(|emit| needs_analysis(emit.kind)) {
@@ -119,20 +125,34 @@ pub fn run(args: &Args, sess: &Session) {
     let mut units = timer.time("loading the standard library", || {
         sysroot.load_std(&sess.source_map, &sess.dcx)
     });
+    let mut dep_units = timer.time("loading libraries", || {
+        config
+            .deps
+            .iter()
+            .flat_map(|dep| sources::load_dep(dep, sess))
+            .collect::<Vec<_>>()
+    });
     if sess.dcx.has_errors() {
         return;
     }
-    units.push(unit);
+    // A library's own files are checked to be in its packages as they load.
+    sources::check_namespaces(&user_units, &config.deps, &sess.dcx);
+    if sess.dcx.has_errors() {
+        return;
+    }
+    units.append(&mut dep_units);
+    let first_user = units.len();
+    units.extend(user_units);
     let externs = timer.time("loading macro crates", || load_externs(&config, sess));
     if sess.dcx.has_errors() {
         return;
     }
-    let crate_name = args.crate_name();
     timer.time("expansion", || {
         let options = krelpin_expand::ExpandOptions {
             cfg: &config.cfg,
             proc_macro: config.proc_macro().then_some(crate_name.as_str()),
             externs: &externs,
+            first_user,
         };
         krelpin_expand::expand_crate(&mut units, &sess.source_map, &sess.dcx, &options)
     });
@@ -157,12 +177,12 @@ pub fn run(args: &Args, sess: &Session) {
     let hir = timer.time("HIR lowering", || {
         krelpin_hir::lower(&units, &resolved, &typeck.tcx, &typeck.results)
     });
-    let user_unit = units.len() - 1;
+    let is_user_unit = |unit: usize| unit >= first_user;
     for emit in emits.iter().filter(|emit| emit.kind == Emit::Hir) {
         let bodies = hir
             .bodies
             .iter()
-            .filter(|body| resolved.items.def(body.owner).unit == user_unit);
+            .filter(|body| is_user_unit(resolved.items.def(body.owner).unit));
         let rendered = krelpin_hir::print(bodies, &typeck.tcx);
         write_output(sess, emit.path.as_deref(), &rendered);
     }
@@ -172,7 +192,7 @@ pub fn run(args: &Args, sess: &Session) {
     for emit in emits.iter().filter(|emit| emit.kind == Emit::Mir) {
         let bodies = all_bodies
             .clone()
-            .filter(|&id| resolved.items.def(mir.body(id).owner).unit == user_unit);
+            .filter(|&id| is_user_unit(resolved.items.def(mir.body(id).owner).unit));
         let rendered = krelpin_mir::print(&mir, bodies, &typeck.tcx);
         write_output(sess, emit.path.as_deref(), &rendered);
     }
@@ -186,25 +206,32 @@ pub fn run(args: &Args, sess: &Session) {
     for emit in emits.iter().filter(|emit| emit.kind == Emit::DepInfo) {
         let path = output_path(args, &config, emit, None);
         let mut sources = sysroot.std_sources().unwrap_or_default();
+        for dep in &config.deps {
+            sources.extend(krelpin_sysroot::source_files(&dep.dir).unwrap_or_default());
+        }
         sources.extend(config.externs.iter().map(|(_, path)| path.clone()));
         let outputs: Vec<PathBuf> = emits
             .iter()
             .filter(|other| !matches!(other.kind, Emit::DepInfo | Emit::Metadata))
             .flat_map(|other| artifact_paths(args, &config, other))
             .collect();
-        write_output(sess, Some(&path), &dep_info(&outputs, input, &sources));
+        write_output(
+            sess,
+            Some(&path),
+            &dep_info(&outputs, &user_files, &sources),
+        );
     }
 
     let wants_code = |kind: Emit| matches!(kind, Emit::Ir | Emit::Asm | Emit::Obj | Emit::Link);
     if !emits.iter().any(|emit| wants_code(emit.kind)) {
         return;
     }
-    let is_user = |def| resolved.items.def(def).unit == user_unit;
+    let is_user = |def| is_user_unit(resolved.items.def(def).unit);
     let mut builds: Vec<(Option<CrateType>, krelpin_codegen_llvm::Entry)> = Vec::new();
     if args.test {
         let mut tests = Vec::new();
         for (type_def, item) in resolved.items.items(&units) {
-            if resolved.items.def(type_def.def).unit != user_unit {
+            if !is_user_unit(resolved.items.def(type_def.def).unit) {
                 continue;
             }
             for (index, member) in members(item).iter().enumerate() {
@@ -437,8 +464,11 @@ fn artifact_paths(args: &Args, config: &Config, emit: &Spec<Emit>) -> Vec<PathBu
         .collect()
 }
 
-fn dep_info(outputs: &[PathBuf], input: &Path, sources: &[PathBuf]) -> String {
-    let mut files: Vec<String> = vec![input.display().to_string()];
+fn dep_info(outputs: &[PathBuf], inputs: &[PathBuf], sources: &[PathBuf]) -> String {
+    let mut files: Vec<String> = inputs
+        .iter()
+        .map(|path| path.display().to_string())
+        .collect();
     files.extend(sources.iter().map(|path| path.display().to_string()));
     let mut text = String::new();
     for output in outputs {

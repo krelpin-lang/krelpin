@@ -1,0 +1,8 @@
+package greet.fmt;
+
+/** Turns text into shouting. */
+final class Shout {
+    static String loud(String text) {
+        return text.toUpperCase() + "!";
+    }
+}

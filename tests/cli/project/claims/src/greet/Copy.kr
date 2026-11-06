@@ -1,0 +1,3 @@
+package greet;
+
+class Copy {}

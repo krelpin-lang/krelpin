@@ -1,0 +1,17 @@
+package greet;
+
+import greet.fmt.Shout;
+
+/** Builds greetings. */
+final class Greeter {
+    static String hello(String name) {
+        return "hello, $name";
+    }
+
+    @Test
+    static void greetsLoudly() {
+        if (Shout.loud(Greeter.hello("you")) != "HELLO, YOU!") {
+            throw new IllegalStateException("the greeting is not loud");
+        }
+    }
+}

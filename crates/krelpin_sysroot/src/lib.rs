@@ -80,10 +80,7 @@ impl Sysroot {
     }
 
     pub fn std_sources(&self) -> io::Result<Vec<PathBuf>> {
-        let mut files = Vec::new();
-        collect_sources(&self.std_dir(), &mut files)?;
-        files.sort();
-        Ok(files)
+        source_files(&self.std_dir())
     }
 
     pub fn load_std(&self, source_map: &SourceMap, dcx: &DiagCtxt) -> Vec<CompilationUnit> {
@@ -112,6 +109,14 @@ impl Sysroot {
             })
             .collect()
     }
+}
+
+/// Returns the Krelpin source files under `dir`, recursively, sorted by path.
+pub fn source_files(dir: &Path) -> io::Result<Vec<PathBuf>> {
+    let mut files = Vec::new();
+    collect_sources(dir, &mut files)?;
+    files.sort();
+    Ok(files)
 }
 
 fn collect_sources(dir: &Path, files: &mut Vec<PathBuf>) -> io::Result<()> {

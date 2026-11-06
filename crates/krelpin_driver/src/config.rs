@@ -6,6 +6,7 @@ use krelpin_errors::{Diagnostic, LintLevels};
 use krelpin_expand::CfgSet;
 
 use crate::args::{Args, CrateType, Edition, LintLevel};
+use crate::sources::Dep;
 
 pub struct Config {
     pub target: Target,
@@ -20,6 +21,7 @@ pub struct Config {
     pub libraries: Vec<String>,
     pub crate_types: Vec<CrateType>,
     pub externs: Vec<(String, PathBuf)>,
+    pub deps: Vec<Dep>,
     pub time_passes: bool,
     pub keep_temps: Option<PathBuf>,
 }
@@ -51,6 +53,7 @@ impl Config {
             libraries: Vec::new(),
             crate_types: dedup(&args.crate_type),
             externs: Vec::new(),
+            deps: Vec::new(),
             time_passes: false,
             keep_temps: None,
         };
@@ -93,6 +96,18 @@ impl Config {
                 Err(message) => errors.push(Diagnostic::error(message)),
             }
         }
+        for spec in &args.deps {
+            match Dep::parse(spec) {
+                Ok(dep) if config.deps.iter().any(|other| other.name == dep.name) => {
+                    errors.push(Diagnostic::error(format!(
+                        "the library `{}` is passed to `--dep` more than once",
+                        dep.name
+                    )));
+                }
+                Ok(dep) => config.deps.push(dep),
+                Err(message) => errors.push(Diagnostic::error(message)),
+            }
+        }
         if proc_macro && config.crate_types.len() > 1 {
             errors.push(
                 Diagnostic::error("`proc-macro` cannot be combined with other crate types")
@@ -128,6 +143,13 @@ impl Config {
         args.test
             || self.crate_types.contains(&CrateType::Bin)
             || self.crate_types.contains(&CrateType::ProcMacro)
+    }
+
+    /// Returns whether the crate is a library, whose packages are under its name.
+    pub fn builds_library(&self) -> bool {
+        self.crate_types
+            .iter()
+            .any(|crate_type| !matches!(crate_type, CrateType::Bin | CrateType::ProcMacro))
     }
 
     pub fn proc_macro(&self) -> bool {

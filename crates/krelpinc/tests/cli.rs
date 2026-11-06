@@ -208,6 +208,108 @@ fn builds_programs_tests_and_libraries() {
     let _ = fs::remove_dir_all(dir);
 }
 
+#[test]
+fn builds_source_directories_with_libraries() {
+    if !has_clang() {
+        return;
+    }
+    let dir = scratch("project");
+    let dir_arg = dir.display().to_string();
+    let greet = "greet=tests/cli/project/greet/src";
+    let program = krelpinc(&[
+        "tests/cli/project/app/src",
+        "--dep",
+        greet,
+        "--out-dir",
+        &dir_arg,
+    ]);
+    assert!(program.status.success(), "{}", stderr(&program));
+    // A directory called `src` is named after the project around it.
+    let run = Command::new(dir.join("app"))
+        .args(["one", "two"])
+        .output()
+        .expect("program runs");
+    assert_eq!(stdout(&run), "count 2, 2 arguments\nhello, krelp\nHI!\n");
+
+    let tests = krelpinc(&[
+        "tests/cli/project/greet/src",
+        "--crate-type",
+        "lib",
+        "--test",
+        "-o",
+        &format!("{dir_arg}/greet-tests"),
+    ]);
+    assert!(tests.status.success(), "{}", stderr(&tests));
+    let run = Command::new(dir.join("greet-tests"))
+        .output()
+        .expect("tests run");
+    assert!(
+        stdout(&run).contains("test Greeter.greetsLoudly ... ok"),
+        "{}",
+        stdout(&run)
+    );
+
+    let unlinked = krelpinc(&["tests/cli/project/app/src", "--emit=metadata"]);
+    assert!(
+        stderr(&unlinked).contains("there is no package `greet`"),
+        "{}",
+        stderr(&unlinked)
+    );
+    let _ = fs::remove_dir_all(dir);
+}
+
+#[test]
+fn checks_the_packages_of_source_directories() {
+    let misplaced = krelpinc(&["tests/cli/project/misplaced/src", "--emit=metadata"]);
+    assert!(!misplaced.status.success());
+    let text = stderr(&misplaced);
+    assert!(
+        text.contains("error: `tools/Tool.kr` must be in the package `tools`"),
+        "{text}"
+    );
+    assert!(
+        text.contains(
+            "help: declare `package tools;`, or move the file to the directory of `util`"
+        ),
+        "{text}"
+    );
+
+    let claims = krelpinc(&[
+        "tests/cli/project/claims/src",
+        "--dep",
+        "greet=tests/cli/project/greet/src",
+        "--emit=metadata",
+    ]);
+    let text = stderr(&claims);
+    assert!(
+        text.contains("error: the package `greet` belongs to the library `greet`"),
+        "{text}"
+    );
+
+    // A library's files are under its name, so its root can't be a program's.
+    let as_library = krelpinc(&[
+        "tests/cli/project/app/src",
+        "--crate-type",
+        "lib",
+        "--emit=metadata",
+    ]);
+    let text = stderr(&as_library);
+    assert!(
+        text.contains("error: `Main.kr` must be in the package `app`"),
+        "{text}"
+    );
+
+    for (spec, message) in [
+        ("greet", "`--dep greet` needs the form `NAME=DIR`"),
+        ("std=library/std", "`std` is the standard library"),
+        ("my-lib=tests", "`my-lib` is not a valid library name"),
+        ("greet=tests/cli/features.kr", "must be a source directory"),
+    ] {
+        let output = krelpinc(&[SOURCE, "--dep", spec, "--emit=metadata"]);
+        assert!(stderr(&output).contains(message), "{}", stderr(&output));
+    }
+}
+
 fn build_macro_crate(name: &str, dir: &Path) {
     let source = format!("tests/cli/macros/{name}.kr");
     let built = krelpinc(&[
