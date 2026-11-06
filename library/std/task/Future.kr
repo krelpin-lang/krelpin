@@ -1,42 +1,66 @@
 package std.task;
 
 /**
- * A value that will be ready later, like the result of an `async` method.
+ * A computation that finishes later.
  *
- * Calling an `async` method doesn't run it; it returns a `Future`, and the
- * method runs as the future is polled. `await` polls a future until it is
- * ready and gives its value:
+ * Calling an `async` method returns a `Future` of its result without
+ * running any of the method. The method runs as the future is polled, and
+ * stops at each `await` whose future isn't ready yet:
  *
  * ```
- * async String greeting(String name) {
- *     await Runtime.sleep(10);
- *     return "hello, $name";
- * }
- *
- * async void run() {
- *     String text = await greeting("Ada"); // "hello, Ada"
+ * async int total(&List<String> words) {
+ *     int sum = 0;
+ *     for (String word : words) {
+ *         sum += await lengthOf(word);
+ *     }
+ *     return sum;
  * }
  * ```
  *
- * A future does nothing until something polls it: `await` inside another
- * `async` method, `Runtime.blockOn`, or `Runtime.spawn`. Dropping a future
- * before it is ready cancels it.
+ * The standard library defines what a future is, not how futures are run.
+ * An executor, which comes from a library, polls them: it calls `poll` and,
+ * when the result is `Poll.Pending`, waits until the future's `Waker` is
+ * woken before polling it again.
  *
- * # Writing a future by hand
+ * # Borrowing
  *
- * `poll` returns `Poll.Ready` with the value once there is one. Until then
- * it returns `Poll.Pending`, after arranging for `cx.waker()` to be woken
- * when it should be polled again; a future that returns `Pending` without
- * that is never polled again.
+ * The future of an `async` method holds its arguments, so it borrows
+ * whatever they borrow, for as long as the future exists:
+ *
+ * ```
+ * String text = "hello";
+ * Future<int> future = lengthOf(&text);
+ * text = "bye"; // error: `text` is borrowed by `future`
+ * ```
+ *
+ * # Exceptions
+ *
+ * Calling an `async` method doesn't throw. Its exceptions come out of
+ * `poll`, and so out of the `await` of its future.
+ *
+ * # Cancelling
+ *
+ * Dropping a future that isn't finished cancels it: it is never polled
+ * again, and the values it holds are dropped.
+ *
+ * # Implementing `Future`
+ *
+ * `poll` makes as much progress as it can without blocking. It returns
+ * `Poll.Ready` with the value once there is one, and `Poll.Pending`
+ * otherwise. Before returning `Poll.Pending`, it arranges for
+ * `cx.waker()` to be woken once polling again can make progress; a future
+ * that doesn't is never polled again.
  */
 interface Future<T> {
     /**
-     * Makes as much progress as possible without waiting, and returns the
-     * value if it is ready.
+     * Makes progress without blocking, and returns the value if it is
+     * ready. A future must not be polled again after it returned
+     * `Poll.Ready`; the future of an `async` method throws an
+     * `IllegalStateException` if it is.
      *
      * # Throws
      *
-     * Whatever the computation throws. `await` passes it on.
+     * Whatever the computation throws.
      */
     mut Poll<T> poll(&mut Context cx) throws Exception;
 }

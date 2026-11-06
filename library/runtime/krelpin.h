@@ -135,23 +135,6 @@ int32_t kr_poller_poll(void **slot, int64_t millis);
 int32_t kr_poller_token(void **slot, int32_t index);
 int32_t kr_poller_flags(void **slot, int32_t index);
 
-/* The reactor of `std.task.Runtime`, one per thread (task.c). */
-bool kr_task_enter(void);
-void kr_task_exit(void);
-int64_t kr_task_now(void);
-void kr_task_wake(int32_t task);
-int32_t kr_task_next_woken(void);
-void kr_task_sleep_until(int64_t deadline, int32_t task);
-bool kr_task_turn(void);
-bool kr_task_wait_fd(int fd, int32_t interest, int32_t task);
-void kr_task_forget_fd(int fd);
-int32_t kr_task_spawn(void *future);
-void *kr_task_take(int32_t task);
-void kr_task_put(int32_t task, void *future);
-void kr_task_finish(int32_t task);
-int32_t kr_task_live(void);
-int32_t kr_net_fd_of(void **slot);
-
 /* The error that `Files.lastError` describes, shared by files and sockets.
  * Each `kr_io_fail*` records an error and returns false. */
 bool kr_io_fail(int error);

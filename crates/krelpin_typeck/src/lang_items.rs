@@ -57,7 +57,6 @@ lang_items! {
     Poll: "std.task.Poll",
     Context: "std.task.Context",
     Unit: "std.task.Unit",
-    Reactor: "std.task.Reactor",
     ArrayList: "std.util.ArrayList",
     HashMap: "std.util.HashMap",
     HashSet: "std.util.HashSet",

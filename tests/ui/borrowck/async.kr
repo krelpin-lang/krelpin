@@ -1,14 +1,29 @@
+import std.task.Context;
 import std.task.Future;
-import std.task.Runtime;
+import std.task.Poll;
+import std.task.Unit;
+
+class Ready implements Future<Unit> {
+    Ready() {}
+
+    mut Poll<Unit> poll(&mut Context cx) {
+        return Poll.Ready(new Unit());
+    }
+}
+
+class Tasks {
+    // Keeps `task` with no object to keep it in, like an executor's spawn.
+    static void detach(Future<Unit> task) keeps task {}
+}
 
 class Main {
     static async int length(&String text) {
-        await Runtime.yieldNow();
+        await new Ready();
         return text.length();
     }
 
     static async void show(&String text) {
-        await Runtime.yieldNow();
+        await new Ready();
         Console.println(text);
     }
 
@@ -19,17 +34,17 @@ class Main {
 
     static async void spawnsBorrowed() {
         String text = "local";
-        Runtime.spawn(Main.show(&text));
+        Tasks.detach(Main.show(&text));
     }
 
     static async void spawnsOwned(String text) {
-        Runtime.spawn(Main.show(&text));
+        Tasks.detach(Main.show(&text));
     }
 
     static async void heldAcrossAwait() {
         String text = "a";
         &String view = &text;
-        await Runtime.yieldNow();
+        await new Ready();
         text = "b";
         Console.println(view);
     }
@@ -37,7 +52,7 @@ class Main {
     static async void releasedBeforeAwait() {
         String text = "a";
         &mut String view = &mut text;
-        await Runtime.yieldNow();
+        await new Ready();
         Console.println(view);
         text = "b";
         Console.println(text);

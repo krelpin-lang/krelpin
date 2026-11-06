@@ -1,51 +1,51 @@
 error: cannot let a reference to `text` escape the method
-  --> tests/ui/borrowck/async.kr:17:28
+  --> tests/ui/borrowck/async.kr:32:28
    |
-17 |         return Main.length(&text);
+32 |         return Main.length(&text);
    |         -------------------------- the reference is returned here
    |                            ^^^^^ `text` is borrowed here
    |
    = note: `text` stops existing when the method ends
 
-error: `spawn` keeps its argument after this method ends, but the argument borrows `text`
-  --> tests/ui/borrowck/async.kr:22:9
+error: `detach` keeps its argument after this method ends, but the argument borrows `text`
+  --> tests/ui/borrowck/async.kr:37:9
    |
-22 |         Runtime.spawn(Main.show(&text));
-   |         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ `spawn` keeps the argument here
-   |                                 ----- `text` is borrowed here
+37 |         Tasks.detach(Main.show(&text));
+   |         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ `detach` keeps the argument here
+   |                                ----- `text` is borrowed here
    |
-   = note: `spawn` is static and keeps its argument, so the argument may outlive everything the caller owns
+   = note: `detach` is static and keeps its argument, so the argument may outlive everything the caller owns
    = help: give the argument its own values instead of references
 
-error: `spawn` keeps its argument after this method ends, but the argument borrows `text`
-  --> tests/ui/borrowck/async.kr:26:9
+error: `detach` keeps its argument after this method ends, but the argument borrows `text`
+  --> tests/ui/borrowck/async.kr:41:9
    |
-26 |         Runtime.spawn(Main.show(&text));
-   |         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ `spawn` keeps the argument here
-   |                                 ----- `text` is borrowed here
+41 |         Tasks.detach(Main.show(&text));
+   |         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ `detach` keeps the argument here
+   |                                ----- `text` is borrowed here
    |
-   = note: `spawn` is static and keeps its argument, so the argument may outlive everything the caller owns
+   = note: `detach` is static and keeps its argument, so the argument may outlive everything the caller owns
    = help: give the argument its own values instead of references
 
 error: cannot assign to `text` because it is borrowed
-  --> tests/ui/borrowck/async.kr:33:9
+  --> tests/ui/borrowck/async.kr:48:9
    |
-31 |         &String view = &text;
+46 |         &String view = &text;
    |                        ----- shared borrow of `text` happens here
 ...
-33 |         text = "b";
+48 |         text = "b";
    |         ^^^^^^^^^^ `text` is assigned here while it is borrowed
-34 |         Console.println(view);
+49 |         Console.println(view);
    |         --------------------- the borrow is used later here
 
 error: cannot assign to `text` because it is borrowed
-  --> tests/ui/borrowck/async.kr:49:9
+  --> tests/ui/borrowck/async.kr:64:9
    |
-48 |         Future<int> future = Main.length(&text);
+63 |         Future<int> future = Main.length(&text);
    |                                          ----- shared borrow of `text` happens here
-49 |         text = "b";
+64 |         text = "b";
    |         ^^^^^^^^^^ `text` is assigned here while it is borrowed
-50 |         Console.println(future);
+65 |         Console.println(future);
    |         ----------------------- the borrow is used later here
 
 error: aborting due to 5 previous errors

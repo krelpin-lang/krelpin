@@ -1,15 +1,20 @@
 package std.task;
 
 /**
- * Makes the runtime poll a task again. A future that returns
- * `Poll.Pending` keeps the waker from `Context.waker()` and calls `wake`
- * once it can make progress.
+ * Tells an executor to poll a task again.
  *
- * A waker only works on the thread whose runtime runs the task.
+ * Executors implement this interface, and futures use it: a future that
+ * returns `Poll.Pending` keeps the waker from `Context.waker()`, and calls
+ * `wake` when the thing it waits for has happened, for example from a
+ * timer or when a socket becomes ready.
  */
-record Waker(int task) {
-    /** Schedules the task to be polled again. Waking it twice polls it once. */
-    void wake() {
-        Reactor.wake(this.task);
-    }
+interface Waker {
+    /**
+     * Schedules the task to be polled again. Waking a task that is already
+     * scheduled doesn't poll it twice.
+     */
+    void wake();
+
+    /** Returns a waker for the same task. */
+    Waker copy();
 }

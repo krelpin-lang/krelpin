@@ -213,45 +213,6 @@ final class UdpSocket {
         }
     }
 
-    /**
-     * Sends `data` as one message to `address` without blocking the
-     * thread, inside a `std.task.Runtime`. Makes the socket non-blocking.
-     *
-     * # Throws
-     *
-     * `IOException` if the address can't be resolved, the message is too
-     * large, or sending fails.
-     */
-    mut async void sendAsync(&byte[] data, String address) throws IOException {
-        this.setNonBlocking(true);
-        while (!this.trySend(data, address)) {
-            await new Readiness(this.fdRaw(), Interest.WRITABLE);
-        }
-    }
-
-    /**
-     * Waits for the next message like `receive`, without blocking the
-     * thread, inside a `std.task.Runtime`. Makes the socket non-blocking.
-     *
-     * # Throws
-     *
-     * `IllegalArgumentException` unless `max` is from 1 to 65536.
-     * `IOException` if receiving fails.
-     */
-    mut async Datagram receiveAsync(int max) throws IOException {
-        this.setNonBlocking(true);
-        while (true) {
-            Datagram? message = this.tryReceive(max);
-            if (message != null) {
-                return message;
-            }
-            await new Readiness(this.fdRaw(), Interest.READABLE);
-        }
-    }
-
-    @Intrinsic
-    private int fdRaw();
-
     @Intrinsic
     private mut boolean setNonBlockingRaw(boolean nonBlocking);
 

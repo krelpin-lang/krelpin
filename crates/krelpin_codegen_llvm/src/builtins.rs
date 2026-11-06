@@ -133,9 +133,6 @@ impl FnCx<'_, '_, '_> {
         if items.is(owner, LangItem::Thread) {
             return self.thread_builtin(name, builtin);
         }
-        if items.is(owner, LangItem::Reactor) {
-            return self.reactor_builtin(name, builtin);
-        }
         if items.is(owner, LangItem::MacroBridge) {
             return self.bridge_builtin(name);
         }
@@ -936,36 +933,6 @@ impl FnCx<'_, '_, '_> {
         }
     }
 
-    /// `std.task.Reactor`. `spawn` and `put` hand the future to the
-    /// runtime, which drops it when the task ends.
-    fn reactor_builtin(&mut self, name: &str, builtin: &Builtin) -> bool {
-        let (function, ret_ll) = match name {
-            "now" => ("kr_task_now", "i64"),
-            "sleepUntil" => ("kr_task_sleep_until", "void"),
-            "wake" => ("kr_task_wake", "void"),
-            "enter" => ("kr_task_enter", "i1"),
-            "exit" => ("kr_task_exit", "void"),
-            "nextWoken" => ("kr_task_next_woken", "i32"),
-            "turn" => ("kr_task_turn", "i1"),
-            "take" => ("kr_task_take", "ptr"),
-            "finish" => ("kr_task_finish", "void"),
-            "waitFd" => ("kr_task_wait_fd", "i1"),
-            "spawn" => {
-                let task = self.runtime("i32", "kr_task_spawn", "ptr %a0");
-                self.line(format!("ret i32 {task}"));
-                return true;
-            }
-            "put" => {
-                self.runtime("void", "kr_task_put", "i32 %a0, ptr %a1");
-                self.line("ret void");
-                return true;
-            }
-            _ => return false,
-        };
-        self.runtime_call(function, ret_ll, builtin, &[]);
-        true
-    }
-
     fn system_builtin(&mut self, name: &str, builtin: &Builtin) -> bool {
         match name {
             "exit" => {
@@ -1066,7 +1033,6 @@ impl FnCx<'_, '_, '_> {
             (_, "setNonBlockingRaw") => "kr_net_set_nonblocking",
             (_, "registerRaw") => "kr_net_register",
             (_, "deregisterRaw") => "kr_net_deregister",
-            (_, "fdRaw") => "kr_net_fd_of",
             (NetClass::Listener, "bindRaw") => "kr_tcp_listener_bind",
             (NetClass::Stream, "connectRaw") => "kr_tcp_stream_connect",
             (NetClass::Stream, "acceptRaw") => "kr_tcp_stream_accept",

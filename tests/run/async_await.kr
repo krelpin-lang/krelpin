@@ -1,10 +1,79 @@
+import std.sync.AtomicInt;
 import std.task.Context;
 import std.task.Future;
 import std.task.Poll;
-import std.task.Runtime;
 import std.task.Unit;
+import std.task.Waker;
 import std.util.ArrayList;
 import std.util.List;
+
+// A waker that counts how often it is woken.
+class CountingWaker implements Waker {
+    public static AtomicInt WOKEN = new AtomicInt(0);
+
+    CountingWaker() {}
+
+    void wake() {
+        CountingWaker.WOKEN.addAndGet(1);
+    }
+
+    Waker copy() {
+        return new CountingWaker();
+    }
+}
+
+// Pending once, then ready: gives other tasks a turn.
+class YieldOnce implements Future<Unit> {
+    private boolean yielded = false;
+
+    YieldOnce() {}
+
+    mut Poll<Unit> poll(&mut Context cx) {
+        if (this.yielded) {
+            return Poll.Ready(new Unit());
+        }
+        this.yielded = true;
+        cx.waker().wake();
+        return Poll.Pending;
+    }
+}
+
+class Never implements Future<int> {
+    Never() {}
+
+    mut Poll<int> poll(&mut Context cx) {
+        return Poll.Pending;
+    }
+}
+
+// A minimal executor: polls one future until it is ready.
+class Executor {
+    static <T> T run(Future<T> future) throws Exception {
+        Context cx = new Context(new CountingWaker());
+        while (true) {
+            Poll<T> poll = future.poll(&mut cx);
+            switch (poll) {
+                case Ready(T value) -> {
+                    return value;
+                }
+                case Pending -> {}
+            }
+        }
+    }
+
+    // Polls the tasks in turn until every one is finished.
+    static void runAll(List<Future<Unit>> tasks) throws Exception {
+        Context cx = new Context(new CountingWaker());
+        while (!tasks.isEmpty()) {
+            Future<Unit> task = tasks.remove(0);
+            Poll<Unit> poll = task.poll(&mut cx);
+            switch (poll) {
+                case Ready(Unit unit) -> {}
+                case Pending -> tasks.add(task);
+            }
+        }
+    }
+}
 
 class Bad extends Exception {
     Bad(String message) { super(message); }
@@ -15,7 +84,7 @@ class Counter {
     private List<String> log = new ArrayList<>();
 
     mut async int bump(String why) {
-        await Runtime.yieldNow();
+        await new YieldOnce();
         this.count++;
         this.log.add(why);
         return this.count;
@@ -30,32 +99,25 @@ interface Source {
     Future<String> fetch(int n);
 }
 
-class Slow implements Source {
+class Doubler implements Source {
     Future<String> fetch(int n) {
-        return Slow.make(n);
+        return Doubler.make(n);
     }
 
     static async String make(int n) {
-        await Runtime.sleep(n);
-        return "slept $n";
-    }
-}
-
-class Never implements Future<int> {
-    Never() {}
-    mut Poll<int> poll(&mut Context cx) {
-        return Poll.Pending;
+        await new YieldOnce();
+        return "fetched ${n * 2}";
     }
 }
 
 class Main {
     static async <T> T identity(T value) {
-        await Runtime.yieldNow();
+        await new YieldOnce();
         return value;
     }
 
     static async int thrower() throws Bad {
-        await Runtime.yieldNow();
+        await new YieldOnce();
         throw new Bad("from inside");
     }
 
@@ -69,14 +131,14 @@ class Main {
         } finally {
             Console.println("finally ran");
         }
-        await Runtime.yieldNow();
+        await new YieldOnce();
         return result;
     }
 
     static async String earlyReturn(int n) {
         try {
             if (n > 0) {
-                await Runtime.yieldNow();
+                await new YieldOnce();
                 return "positive";
             }
         } finally {
@@ -85,99 +147,72 @@ class Main {
         return "not positive";
     }
 
-    static async void nested() throws Exception {
-        Runtime.blockOn(Main.identity(1));
-    }
-
-    static async void worker(String name, int rounds) {
-        for (int i = 0; i < rounds; i++) {
-            await Runtime.sleep(10 + i * 20);
-            Console.println("$name round $i");
-        }
-    }
-
-    static async void spawner() {
-        Runtime.spawn(Main.worker("first", 3));
-        await Runtime.sleep(5);
-        Runtime.spawn(Main.worker("second", 2));
-        await Runtime.sleep(120);
-        Console.println("spawner done");
-    }
-
-    static async void forever() {
-        String text = "dropped with the runtime";
-        while (true) {
-            await Runtime.sleep(1000);
-            Console.println(text);
-        }
-    }
-
-    static async void leavesOneRunning() {
-        Runtime.spawn(Main.forever());
-        await Runtime.yieldNow();
-    }
-
-    static async String keepsLocals() {
-        List<String> names = new ArrayList<>();
-        names.add("a");
-        &List<String> view = &names;
-        int before = view.size();
-        await Runtime.yieldNow();
-        names.add("b");
-        String first = names.get(0);
-        int len = await Main.borrowed(&first);
-        return "$names $before $len";
-    }
-
-    static async int borrowed(&String text) {
-        await Runtime.yieldNow();
-        return text.length() + 10;
-    }
-
     static async void counting(&mut Counter counter) {
         await counter.bump("one");
         await counter.bump("two");
     }
 
-    static void main() throws Exception {
-        Console.println(Runtime.blockOn(Main.identity("generic")));
-        Console.println(Runtime.blockOn(Main.identity(42)));
-        Console.println(Runtime.blockOn(Main.catches()));
-        Console.println(Runtime.blockOn(Main.earlyReturn(1)));
-        Console.println(Runtime.blockOn(Main.earlyReturn(0)));
-        Counter counter = new Counter();
-        Runtime.blockOn(Main.counting(&mut counter));
-        Console.println(counter.describe());
-        Console.println(Runtime.blockOn(Main.keepsLocals()));
-        Runtime.blockOn(Main.spawner());
-        Runtime.blockOn(Main.leavesOneRunning());
-        Future<int> neverPolled = Main.thrower();
-        Source source = new Slow();
-        Console.println(Runtime.blockOn(source.fetch(3)));
+    // Locals live across `await`, and references to them stay valid.
+    static async String keepsLocals() {
+        List<String> names = new ArrayList<>();
+        names.add("a");
+        &List<String> view = &names;
+        int before = view.size();
+        await new YieldOnce();
+        names.add("b");
+        String first = names.get(0);
+        int length = await Main.borrowed(&first);
+        return "$names $before $length";
+    }
 
-        Future<int> f = Main.identity(7);
-        Context cx = new Context(0);
-        Console.println(f.poll(&mut cx));
-        Console.println(f.poll(&mut cx));
-        try {
-            f.poll(&mut cx);
-        } catch (IllegalStateException e) {
-            Console.println("again: ${e.getMessage()}");
+    static async int borrowed(&String text) {
+        await new YieldOnce();
+        return text.length() + 10;
+    }
+
+    static async void worker(String name, int rounds) {
+        for (int i = 0; i < rounds; i++) {
+            Console.println("$name round $i");
+            await new YieldOnce();
         }
+    }
+
+    static void main() throws Exception {
+        Console.println(Executor.run(Main.identity("generic")));
+        Console.println(Executor.run(Main.identity(42)));
+        Console.println(Executor.run(Main.catches()));
+        Console.println(Executor.run(Main.earlyReturn(1)));
+        Console.println(Executor.run(Main.earlyReturn(0)));
+        Console.println(Executor.run(Main.keepsLocals()));
+
+        Counter counter = new Counter();
+        Executor.run(Main.counting(&mut counter));
+        Console.println(counter.describe());
+
+        Source source = new Doubler();
+        Console.println(Executor.run(source.fetch(21)));
+
+        List<Future<Unit>> tasks = new ArrayList<>();
+        tasks.add(Main.worker("first", 3));
+        tasks.add(Main.worker("second", 2));
+        Executor.runAll(tasks);
+
+        // Calling an `async` method runs nothing; dropping the future
+        // cancels it.
+        Future<int> neverPolled = Main.thrower();
+
+        Future<int> future = Main.identity(7);
+        Context cx = new Context(new CountingWaker());
+        Console.println(future.poll(&mut cx));
+        Console.println(future.poll(&mut cx));
         try {
-            Runtime.blockOn(new Never());
+            future.poll(&mut cx);
         } catch (IllegalStateException e) {
-            Console.println("never: ${e.getMessage()}");
+            Console.println("polled again: ${e.getMessage()}");
         }
-        try {
-            Runtime.blockOn(Main.nested());
-        } catch (IllegalStateException e) {
-            Console.println("nested: ${e.getMessage()}");
-        }
-        try {
-            Runtime.spawn(Main.identity(new Unit()));
-        } catch (IllegalStateException e) {
-            Console.println("spawn: ${e.getMessage()}");
-        }
+
+        Future<int> never = new Never();
+        Console.println(never.poll(&mut cx));
+        Console.println("woken ${CountingWaker.WOKEN.get()} times");
     }
 }

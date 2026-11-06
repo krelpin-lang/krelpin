@@ -1,7 +1,16 @@
 import std.io.IOException;
+import std.task.Context;
 import std.task.Future;
-import std.task.Runtime;
+import std.task.Poll;
 import std.task.Unit;
+
+class Ready implements Future<Unit> {
+    Ready() {}
+
+    mut Poll<Unit> poll(&mut Context cx) {
+        return Poll.Ready(new Unit());
+    }
+}
 
 abstract class Service {
     abstract async String fetch();
@@ -13,7 +22,7 @@ class Main {
     }
 
     static int notAsync() {
-        await Runtime.yieldNow();
+        await new Ready();
         return 1;
     }
 
@@ -24,7 +33,7 @@ class Main {
 
     static async void inLambda() {
         Runnable task = () -> {
-            await Runtime.yieldNow();
+            await new Ready();
         };
     }
 

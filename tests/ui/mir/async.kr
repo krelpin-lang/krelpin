@@ -1,8 +1,19 @@
-import std.task.Runtime;
+import std.task.Context;
+import std.task.Future;
+import std.task.Poll;
+import std.task.Unit;
+
+class Ready implements Future<Unit> {
+    Ready() {}
+
+    mut Poll<Unit> poll(&mut Context cx) {
+        return Poll.Ready(new Unit());
+    }
+}
 
 class Main {
     static async int twice(int n) {
-        await Runtime.yieldNow();
+        await new Ready();
         return n * 2;
     }
 

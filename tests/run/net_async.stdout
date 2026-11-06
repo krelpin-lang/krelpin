@@ -1,5 +1,0 @@
-client 3 got |echo: client 3 says 0|echo: client 3 says 1|echo: client 3 says 2
-other clients: 2, served: 3
-the sink got 4000000 bytes
-udp answer: pong to ping
-connecting to a closed port fails

@@ -1,55 +1,55 @@
 error: an `async` method needs a body
- --> tests/ui/typeck/async_errors.kr:7:14
-  |
-7 |     abstract async String fetch();
-  |              ^^^^^
-  |
-  = help: to declare one without a body, return a future instead: `Future<...> fetch(...)`
+  --> tests/ui/typeck/async_errors.kr:16:14
+   |
+16 |     abstract async String fetch();
+   |              ^^^^^
+   |
+   = help: to declare one without a body, return a future instead: `Future<...> fetch(...)`
 
 error: an `async` method can't name what it borrows
-  --> tests/ui/typeck/async_errors.kr:11:61
+  --> tests/ui/typeck/async_errors.kr:20:61
    |
-11 |     static async &String pick(&String a, &String b) borrows a {
+20 |     static async &String pick(&String a, &String b) borrows a {
    |                                                             ^
    |
    = note: its future holds every argument, so it borrows all of them
 
 error: `await` is only allowed inside an `async` method
-  --> tests/ui/typeck/async_errors.kr:16:9
+  --> tests/ui/typeck/async_errors.kr:25:9
    |
-16 |         await Runtime.yieldNow();
-   |         ^^^^^^^^^^^^^^^^^^^^^^^^
+25 |         await new Ready();
+   |         ^^^^^^^^^^^^^^^^^
    |
    = help: mark the method `async`; a lambda can't be `async`
 
 error: cannot `await` a value of type `int`
-  --> tests/ui/typeck/async_errors.kr:21:28
+  --> tests/ui/typeck/async_errors.kr:30:28
    |
-21 |         int number = await 5;
+30 |         int number = await 5;
    |                            ^
    |
    = note: only a `Future` can be awaited
 
 error: cannot `await` a value of type `String?`
-  --> tests/ui/typeck/async_errors.kr:22:15
+  --> tests/ui/typeck/async_errors.kr:31:15
    |
-22 |         await text;
+31 |         await text;
    |               ^^^^
    |
    = note: only a `Future` can be awaited
 
 error: `await` is only allowed inside an `async` method
-  --> tests/ui/typeck/async_errors.kr:27:13
+  --> tests/ui/typeck/async_errors.kr:36:13
    |
-27 |             await Runtime.yieldNow();
-   |             ^^^^^^^^^^^^^^^^^^^^^^^^
+36 |             await new Ready();
+   |             ^^^^^^^^^^^^^^^^^
    |
    = help: mark the method `async`; a lambda can't be `async`
 
 error: unreported exception `IOException`
-  --> tests/ui/typeck/async_errors.kr:36:9
+  --> tests/ui/typeck/async_errors.kr:45:9
    |
-36 |         await Main.fails();
+45 |         await Main.fails();
    |         ^^^^^^^^^^^^^^^^^^
    |
    = note: checked exceptions must be caught or declared with `throws`

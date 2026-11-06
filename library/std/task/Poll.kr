@@ -1,7 +1,12 @@
 package std.task;
 
-/** What `Future.poll` returns: the value, or `Pending` if it isn't ready yet. */
+/**
+ * The result of `Future.poll`: the value, or `Pending` if the future isn't
+ * finished yet.
+ */
 enum Poll<T> {
+    /** The future finished with `value`. */
     Ready(T value),
+    /** The future isn't finished; its waker is woken when it can go on. */
     Pending
 }
