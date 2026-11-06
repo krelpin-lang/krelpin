@@ -308,7 +308,7 @@ fn report_unknown_package(dcx: &DiagCtxt, segments: &[Ident]) {
         ))
         .with_span(first.span.to(last.span))
         .with_label("no such package")
-        .with_note("a program is made of the standard library and its own source file"),
+        .with_note("a crate can use the standard library, its own packages and the libraries passed with `--dep`"),
     );
 }
 
