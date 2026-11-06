@@ -108,6 +108,22 @@ final class Files {
     static boolean isDirectory(String path);
 
     /**
+     * Returns the canonical form of a path: absolute, with every symbolic
+     * link, {@code .} and {@code ..} resolved.
+     *
+     * @param path the path of an existing file or directory
+     * @return the canonical path
+     * @throws IOException if the path does not exist or cannot be resolved
+     */
+    static String canonicalPath(String path) throws IOException {
+        String? canonical = canonicalize(path);
+        if (canonical == null) {
+            throw failure("resolve", path);
+        }
+        return canonical;
+    }
+
+    /**
      * Returns the size of a file.
      *
      * @param path the path of the file
@@ -201,6 +217,9 @@ final class Files {
 
     @Intrinsic
     private static long sizeOf(String path);
+
+    @Intrinsic
+    private static String? canonicalize(String path);
 
     @Intrinsic
     private static boolean remove(String path);

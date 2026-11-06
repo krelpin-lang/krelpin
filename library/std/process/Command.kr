@@ -1,0 +1,192 @@
+package std.process;
+
+import std.io.Files;
+import std.io.IOException;
+import std.util.ArrayList;
+import std.util.List;
+
+/**
+ * A builder for running another program.
+ *
+ * <p>A command names a program, which is looked up on the {@code PATH}
+ * unless it contains a {@code /}, and collects its arguments, working
+ * directory and environment. {@link #status} runs the program with the
+ * standard streams of this process and returns its exit status;
+ * {@link #output} runs it and captures what it writes.
+ *
+ * <pre>{@code
+ * Command git = new Command("git");
+ * git.args("rev-parse", "HEAD");
+ * git.directory("vendor/tide");
+ * Output result = git.output();
+ * if (result.success()) {
+ *     Console.println("at ${result.stdout().trim()}");
+ * }
+ * }</pre>
+ *
+ * <p>The arguments are passed to the program as they are, without a shell:
+ * spaces, quotes and {@code *} have no special meaning.
+ *
+ * @see Output
+ */
+final class Command {
+    private String program;
+    private List<String> arguments;
+    private String? workingDirectory;
+    private List<String> environment;
+
+    /**
+     * Constructs a command that runs a program with no arguments.
+     *
+     * @param program the name of the program, or a path to it
+     */
+    Command(String program) {
+        this.program = program;
+        this.arguments = new ArrayList<>();
+        this.workingDirectory = null;
+        this.environment = new ArrayList<>();
+    }
+
+    /**
+     * Returns the program this command runs.
+     *
+     * @return the name or path of the program
+     */
+    String program() {
+        return this.program;
+    }
+
+    /**
+     * Adds an argument.
+     *
+     * @param value the argument to add
+     */
+    mut void arg(String value) {
+        this.arguments.add(value);
+    }
+
+    /**
+     * Adds several arguments, in order.
+     *
+     * @param values the arguments to add
+     */
+    mut void args(String... values) {
+        for (int i = 0; i < values.length; i++) {
+            this.arguments.add(values[i]);
+        }
+    }
+
+    /**
+     * Sets the working directory of the program. By default the program runs
+     * in the working directory of this process.
+     *
+     * @param path the directory to run the program in
+     */
+    mut void directory(String path) {
+        this.workingDirectory = path;
+    }
+
+    /**
+     * Sets an environment variable for the program. The program inherits the
+     * environment of this process, with the variables set here added or
+     * replaced.
+     *
+     * @param name the name of the variable
+     * @param value the value of the variable
+     * @throws IllegalArgumentException if {@code name} is empty or contains
+     *         {@code =}
+     */
+    mut void env(String name, String value) {
+        if (name.isEmpty() || name.contains("=")) {
+            throw new IllegalArgumentException("`$name` is not a valid environment variable name");
+        }
+        this.environment.add("$name=$value");
+    }
+
+    /**
+     * Runs the program and waits for it to finish. The program reads and
+     * writes the standard streams of this process.
+     *
+     * @return the exit status of the program; if a signal terminated it,
+     *         128 plus the number of the signal
+     * @throws IOException if the program cannot be started, for example
+     *         because it does not exist
+     */
+    int status() throws IOException {
+        String[] argv = this.argv();
+        String[] env = this.envArray();
+        int status = Command.runRaw(&argv, this.workingDirectory, &env, false);
+        if (status < 0) {
+            throw this.failure();
+        }
+        return status;
+    }
+
+    /**
+     * Runs the program, waits for it to finish and captures its standard
+     * output and standard error. The program's standard input is that of
+     * this process.
+     *
+     * @return the exit status and the captured output
+     * @throws IOException if the program cannot be started, or its output is
+     *         not valid UTF-8
+     */
+    Output output() throws IOException {
+        String[] argv = this.argv();
+        String[] env = this.envArray();
+        int status = Command.runRaw(&argv, this.workingDirectory, &env, true);
+        if (status < 0) {
+            throw this.failure();
+        }
+        return new Output(status, Command.capturedRaw(false), Command.capturedRaw(true));
+    }
+
+    /**
+     * Returns the command line, with the program and its arguments separated
+     * by spaces, for messages.
+     *
+     * @return the command line
+     */
+    String toString() {
+        StringBuilder text = new StringBuilder();
+        text.append(this.program);
+        for (&String argument : this.arguments) {
+            text.append(" ");
+            text.append(argument);
+        }
+        return text.toString();
+    }
+
+    private String[] argv() {
+        String[] argv = new String[this.arguments.size() + 1];
+        argv[0] = this.program;
+        for (int i = 0; i < this.arguments.size(); i++) {
+            argv[i + 1] = this.arguments.get(i);
+        }
+        return argv;
+    }
+
+    private String[] envArray() {
+        String[] env = new String[this.environment.size()];
+        for (int i = 0; i < this.environment.size(); i++) {
+            env[i] = this.environment.get(i);
+        }
+        return env;
+    }
+
+    private IOException failure() {
+        String? directory = this.workingDirectory;
+        if (directory != null && !Files.isDirectory(directory)) {
+            return new IOException(
+                "couldn't run `${this.program}`: the directory `$directory` does not exist"
+            );
+        }
+        return new IOException("couldn't run `${this.program}`: ${Files.lastError()}");
+    }
+
+    @Intrinsic
+    private static int runRaw(&String[] argv, String? directory, &String[] env, boolean capture);
+
+    @Intrinsic
+    private static String capturedRaw(boolean error);
+}

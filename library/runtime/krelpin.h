@@ -142,6 +142,7 @@ bool kr_io_fail_errno(void);
 bool kr_io_fail_resolve(int error);
 bool kr_io_fail_bad_address(void);
 bool kr_io_fail_not_utf8(void);
+bool kr_io_fail_nul(void);
 bool kr_io_fail_would_block(void);
 void kr_io_clear_error(void);
 
@@ -261,6 +262,13 @@ void kr_file_close(void *file);
 void kr_console_eprint(const KrString *string);
 _Noreturn void kr_system_exit(int32_t code);
 KrString *kr_system_env(const KrString *name);
+KrString *kr_system_working_directory(void);
+KrString *kr_io_canonical_path(const KrString *path);
+
+/* process.c: running other programs. */
+int32_t kr_process_run(const KrArray *argv, const KrString *directory, const KrArray *env,
+                       bool capture);
+KrString *kr_process_captured(bool error);
 int64_t kr_system_millis(void);
 int64_t kr_system_nanos(void);
 

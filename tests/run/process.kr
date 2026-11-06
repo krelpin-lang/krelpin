@@ -1,0 +1,60 @@
+import std.io.Files;
+import std.io.IOException;
+import std.process.Command;
+import std.process.Output;
+
+class Main {
+    static void main() throws IOException {
+        // Output written before a child runs comes before the child's.
+        Console.println("before the child");
+        Command echo = new Command("echo");
+        echo.args("from", "the child");
+        Console.println("status ${echo.status()}");
+
+        Command sh = new Command("sh");
+        sh.args("-c", "echo out; echo err >&2; echo \"\$GREETING\"; pwd; exit 3");
+        sh.env("GREETING", "merhaba");
+        sh.directory("/");
+        Output result = sh.output();
+        Console.println("status ${result.status()}, success ${result.success()}");
+        Console.println("stdout: ${result.stdout().replace("\n", "|")}");
+        Console.println("stderr: ${result.stderr().replace("\n", "|")}");
+        Console.println(sh.toString());
+
+        // Arguments go to the program as they are, without a shell.
+        Command printf = new Command("printf");
+        printf.args("[%s]", "a b", "*", "\$HOME");
+        Console.println(printf.output().stdout());
+
+        Command killed = new Command("sh");
+        killed.args("-c", "kill -9 \$\$");
+        Console.println("killed by SIGKILL: ${killed.status()}");
+
+        try {
+            new Command("krelpin-no-such-program").status();
+        } catch (IOException e) {
+            Console.println(e.getMessage());
+        }
+        Command elsewhere = new Command("ls");
+        elsewhere.directory("/krelpin/no/such/directory");
+        try {
+            elsewhere.output();
+        } catch (IOException e) {
+            Console.println(e.getMessage());
+        }
+        try {
+            new Command("ls").env("A=B", "c");
+        } catch (IllegalArgumentException e) {
+            Console.println(e.getMessage());
+        }
+
+        String cwd = System.workingDirectory();
+        Console.println("working directory is canonical: ${Files.canonicalPath(cwd) == Files.canonicalPath(".")}");
+        Console.println("canonical root: ${Files.canonicalPath("/..")}");
+        try {
+            Files.canonicalPath("/krelpin/no/such/file");
+        } catch (IOException e) {
+            Console.println(e.getMessage());
+        }
+    }
+}

@@ -156,6 +156,9 @@ impl FnCx<'_, '_, '_> {
         if items.is(owner, LangItem::Files) {
             return self.files_builtin(name, builtin);
         }
+        if items.is(owner, LangItem::Command) {
+            return self.process_builtin(name, builtin);
+        }
         if items.is(owner, LangItem::FileReader) || items.is(owner, LangItem::FileWriter) {
             return self.file_builtin(name, builtin);
         }
@@ -987,6 +990,9 @@ impl FnCx<'_, '_, '_> {
                 self.line("unreachable");
             }
             "env" => self.runtime_call("kr_system_env", "ptr", builtin, &[]),
+            "workingDirectory" => {
+                self.runtime_call("kr_system_working_directory", "ptr", builtin, &[])
+            }
             "currentTimeMillis" => self.runtime_call("kr_system_millis", "i64", builtin, &[]),
             "nanoTime" => self.runtime_call("kr_system_nanos", "i64", builtin, &[]),
             _ => return false,
@@ -1004,6 +1010,7 @@ impl FnCx<'_, '_, '_> {
             "isFile" => ("kr_io_is_file", "i1"),
             "isDirectory" => ("kr_io_is_directory", "i1"),
             "sizeOf" => ("kr_io_size", "i64"),
+            "canonicalize" => ("kr_io_canonical_path", "ptr"),
             "remove" => ("kr_io_remove", "i1"),
             "makeDirectories" => ("kr_io_create_directories", "i1"),
             "listDirectory" => {
@@ -1016,6 +1023,32 @@ impl FnCx<'_, '_, '_> {
             _ => return false,
         };
         self.runtime_call(function, ret_ll, builtin, &[]);
+        true
+    }
+
+    /// The private intrinsics of `std.process.Command`. The borrowed argument
+    /// and environment arrays are passed to the runtime as the arrays.
+    fn process_builtin(&mut self, name: &str, builtin: &Builtin) -> bool {
+        match name {
+            "runRaw" => {
+                let argv = self.assign("load ptr, ptr %a0");
+                let env = self.assign("load ptr, ptr %a2");
+                let status = self.runtime(
+                    "i32",
+                    "kr_process_run",
+                    &format!("ptr {argv}, ptr %a1, ptr {env}, i1 %a3"),
+                );
+                let directory = builtin.params[1].clone();
+                self.drop_value("%a1", &directory);
+                self.line(format!("ret i32 {status}"));
+            }
+            "capturedRaw" => {
+                let text = self.runtime("ptr", "kr_process_captured", "i1 %a0");
+                let ret = self.ret_ty.clone();
+                self.ret(&text, &ret);
+            }
+            _ => return false,
+        }
         true
     }
 

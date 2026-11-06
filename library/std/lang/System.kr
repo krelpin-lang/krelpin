@@ -35,6 +35,17 @@ final class System {
     static String? env(String name);
 
     /**
+     * Returns the working directory of this process.
+     *
+     * <p>Relative paths, such as those passed to {@link std.io.Files}, are
+     * resolved against this directory.
+     *
+     * @return the absolute path of the working directory
+     */
+    @Intrinsic
+    static String workingDirectory();
+
+    /**
      * Returns the current wall-clock time.
      *
      * <p>The wall clock can be adjusted while the program runs, so use

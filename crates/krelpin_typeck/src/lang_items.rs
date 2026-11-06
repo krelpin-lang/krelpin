@@ -47,6 +47,7 @@ lang_items! {
     StringBuilder: "std.lang.StringBuilder",
     System: "std.lang.System",
     Files: "std.io.Files",
+    Command: "std.process.Command",
     FileReader: "std.io.FileReader",
     FileWriter: "std.io.FileWriter",
     TcpListener: "std.net.TcpListener",

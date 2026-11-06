@@ -1,0 +1,15 @@
+before the child
+from the child
+status 0
+status 3, success false
+stdout: out|merhaba|/|
+stderr: err|
+sh -c echo out; echo err >&2; echo "$GREETING"; pwd; exit 3
+[a b][*][$HOME]
+killed by SIGKILL: 137
+couldn't run `krelpin-no-such-program`: No such file or directory
+couldn't run `ls`: the directory `/krelpin/no/such/directory` does not exist
+`A=B` is not a valid environment variable name
+working directory is canonical: true
+canonical root: /
+couldn't resolve `/krelpin/no/such/file`: No such file or directory

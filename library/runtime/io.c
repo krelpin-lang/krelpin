@@ -104,6 +104,10 @@ bool kr_io_fail_would_block(void) {
     return failed_with(ERROR_WOULD_BLOCK);
 }
 
+bool kr_io_fail_nul(void) {
+    return failed_with(ERROR_NUL_IN_PATH);
+}
+
 bool kr_io_fail_not_utf8(void) {
     return failed_with(ERROR_NOT_UTF8);
 }
@@ -372,6 +376,33 @@ KrString *kr_system_env(const KrString *name) {
         return NULL;
     }
     return kr_string_from_lossy(value, (int64_t)strlen(value));
+}
+
+KrString *kr_io_canonical_path(const KrString *path) {
+    char *name = c_path(path);
+    if (name == NULL) {
+        return NULL;
+    }
+    errno = 0;
+    char *resolved = realpath(name, NULL);
+    kr_free(name);
+    if (resolved == NULL) {
+        failed();
+        return NULL;
+    }
+    KrString *result = kr_string_from_lossy(resolved, (int64_t)strlen(resolved));
+    free(resolved);
+    return result;
+}
+
+KrString *kr_system_working_directory(void) {
+    char *cwd = getcwd(NULL, 0);
+    if (cwd == NULL) {
+        return kr_string_new(".", 1);
+    }
+    KrString *result = kr_string_from_lossy(cwd, (int64_t)strlen(cwd));
+    free(cwd);
+    return result;
 }
 
 int64_t kr_system_millis(void) {
