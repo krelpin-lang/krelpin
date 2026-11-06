@@ -726,12 +726,7 @@ impl<'a> Tcx<'a> {
         } else {
             (declared, None, self.ret_borrows(method, class_sources))
         };
-        let mut storage = self.param_storage(&method.params, &method.keeps);
-        if method.receiver.is_none() {
-            for (storage, param) in storage.iter_mut().zip(&method.params) {
-                storage.detached = method.keeps.iter().any(|kept| kept.name == param.name.name);
-            }
-        }
+        let storage = self.method_param_storage(method);
         let is_abstract = member.inheritance.abstract_kw.is_some()
             || (method.body.is_none() && !is_intrinsic(&member.annotations));
         MethodSig {
@@ -752,6 +747,18 @@ impl<'a> Tcx<'a> {
             member: None,
             output,
         }
+    }
+
+    /// Where a method may keep its arguments. A static method that keeps one
+    /// has no object to keep it in, so it keeps it forever: `detached`.
+    pub fn method_param_storage(&self, method: &Method) -> Vec<Storage> {
+        let mut storage = self.param_storage(&method.params, &method.keeps);
+        if method.receiver.is_none() {
+            for (storage, param) in storage.iter_mut().zip(&method.params) {
+                storage.detached = method.keeps.iter().any(|kept| kept.name == param.name.name);
+            }
+        }
+        storage
     }
 
     pub fn param_storage(&self, params: &[Param], keeps: &[Ident]) -> Vec<Storage> {

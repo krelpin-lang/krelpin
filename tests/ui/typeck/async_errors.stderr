@@ -55,5 +55,14 @@ error: unreported exception `IOException`
    = note: checked exceptions must be caught or declared with `throws`
    = help: catch it with `try`, or add `throws IOException` to the method
 
-error: aborting due to 7 previous errors
+error: `fetch` must be `async` because `Base.fetch` is
+  --> tests/ui/typeck/async_errors.kr:75:20
+   |
+75 |     Future<String> fetch() {
+   |                    ^^^^^
+   |
+   = note: `await` relies on the `throws` of `Base.fetch`, which a future returned any other way doesn't follow
+   = help: make the override `async`
+
+error: aborting due to 8 previous errors
 

@@ -188,7 +188,11 @@ impl<'h> Builder<'_, 'h, '_> {
             ExprKind::Switch { scrutinee, arms } => {
                 self.lower_switch(scrutinee, arms, Some(dest), span);
             }
-            ExprKind::With { base, fields } => self.lower_with(dest, base, fields, span),
+            ExprKind::With {
+                base,
+                fields,
+                callee,
+            } => self.lower_with(dest, base, fields, callee.as_deref(), span),
             ExprKind::Equals {
                 callee,
                 lhs,
@@ -906,7 +910,14 @@ impl<'h> Builder<'_, 'h, '_> {
         self.call(callee, Dispatch::Static, operands, None, span);
     }
 
-    fn lower_with(&mut self, dest: Place, base: &'h Expr, fields: &'h [WithField], span: Span) {
+    fn lower_with(
+        &mut self,
+        dest: Place,
+        base: &'h Expr,
+        fields: &'h [WithField],
+        ctor: Option<&'h Callee>,
+        span: Span,
+    ) {
         let record = base.ty.strip_refs().clone();
         let Ty::Adt { def, args, .. } = &record else {
             unreachable!("`with` on the non-record type `{record}`");
@@ -937,6 +948,21 @@ impl<'h> Builder<'_, 'h, '_> {
                 }
             };
             operands.push(operand);
+        }
+        if let Some(ctor) = ctor {
+            let object = self.temp(&record, span);
+            self.assign(Place::local(object), Rvalue::New(record.clone()), span);
+            let this = self.receiver_operand(
+                Place::local(object),
+                &record,
+                Some(ReceiverKind::RefMut),
+                span,
+            );
+            let mut args = vec![this];
+            args.extend(operands);
+            self.call(ctor, Dispatch::Static, args, None, span);
+            self.assign(dest, Rvalue::Use(Operand::Move(Place::local(object))), span);
+            return;
         }
         self.assign(
             dest,

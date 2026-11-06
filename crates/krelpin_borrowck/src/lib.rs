@@ -1,6 +1,7 @@
 mod bitset;
 mod check;
 mod dataflow;
+mod forwarded;
 mod init;
 mod liveness;
 mod loans;

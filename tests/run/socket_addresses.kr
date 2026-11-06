@@ -33,5 +33,14 @@ class Main {
         Main.parse("[::1]:8080");
         Main.parse("10.0.0.1:65535");
         Main.parse("host.example:80");
+
+        // `with` runs the same checks as the constructor.
+        SocketAddr base = SocketAddr.parse("10.0.0.1:80");
+        Console.println(base with { port = 8080 });
+        try {
+            Console.println(base with { port = 99999 });
+        } catch (IllegalArgumentException e) {
+            Console.println("rejected: ${e.getMessage()}");
+        }
     }
 }

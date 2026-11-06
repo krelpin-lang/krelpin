@@ -179,7 +179,7 @@ impl CaptureFinder {
                 self.expr(lhs, false);
                 self.expr(rhs, false);
             }
-            ExprKind::With { base, fields } => {
+            ExprKind::With { base, fields, .. } => {
                 self.expr(base, false);
                 for field in fields {
                     self.expr(&field.value, false);

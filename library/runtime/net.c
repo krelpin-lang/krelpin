@@ -60,6 +60,10 @@ typedef struct {
     bool eof;
     /* Bytes received but not handed out yet, kept by `readLine`. */
     Buffer in;
+    /* How many bytes at the front of `in` are known to hold no newline, so
+     * a line that arrives in many pieces is searched once, not once per
+     * piece. Reset whenever bytes are taken from `in`. */
+    int64_t searched;
     /* Bytes queued by `kr_tcp_stream_queue_*` and not sent yet. */
     Buffer out;
     /* The sender of the last datagram a UDP socket received. */
@@ -485,6 +489,7 @@ static KrString *take_line(Socket *socket, int64_t searched, bool *found) {
         kr_io_fail_not_utf8();
     }
     socket->in.start += consumed;
+    socket->searched = 0;
     return line;
 }
 
@@ -496,6 +501,7 @@ static KrString *take_rest(Socket *socket) {
     }
     const char *from = socket->in.data + socket->in.start;
     socket->in.start = socket->in.len;
+    socket->searched = 0;
     if (!kr_utf8_valid(from, len)) {
         kr_io_fail_not_utf8();
         return NULL;
@@ -508,10 +514,9 @@ static KrString *take_rest(Socket *socket) {
  * read. */
 static KrString *read_line(Socket *socket) {
     kr_io_clear_error();
-    int64_t searched = 0;
     for (;;) {
         bool found;
-        KrString *line = take_line(socket, searched, &found);
+        KrString *line = take_line(socket, socket->searched, &found);
         if (found) {
             return line;
         }
@@ -519,7 +524,7 @@ static KrString *read_line(Socket *socket) {
             /* The last line may have no line ending. */
             return take_rest(socket);
         }
-        searched = buffered(socket);
+        socket->searched = buffered(socket);
         reserve(&socket->in, READ_CHUNK);
         int64_t got = receive(socket, socket->in.data + socket->in.len, READ_CHUNK);
         if (got < 0) {
@@ -567,6 +572,7 @@ KrString *kr_tcp_stream_read_all(void **slot) {
     const char *from = socket->in.data + socket->in.start;
     int64_t len = buffered(socket);
     socket->in.start = socket->in.len;
+    socket->searched = 0;
     if (!kr_utf8_valid(from, len)) {
         kr_io_fail_not_utf8();
         return NULL;
@@ -591,6 +597,7 @@ KrArray *kr_tcp_stream_read(void **slot, int32_t max, const KrType *array_type) 
         int64_t len = buffered(socket) < max ? buffered(socket) : max;
         KrArray *bytes = new_bytes(socket->in.data + socket->in.start, len, array_type);
         socket->in.start += len;
+        socket->searched = 0;
         return bytes;
     }
     if (socket->eof) {

@@ -41,6 +41,36 @@ class Main {
         Tasks.detach(Main.show(&text));
     }
 
+    // Passing a parameter on to be kept forever needs `keeps` here too,
+    // or callers could hand in something borrowed.
+    static void relay(Future<Unit> task) {
+        Tasks.detach(task);
+    }
+
+    static void relayLater(Future<Unit> task) {
+        Future<Unit> moved = task;
+        Tasks.detach(moved);
+    }
+
+    static void relayKept(Future<Unit> task) keeps task {
+        Tasks.detach(task);
+    }
+
+    static void startsRelay() {
+        String text = "local";
+        Main.relayKept(Main.show(&text));
+    }
+
+    // Owned values that borrow nothing are fine.
+    static void relayOwned(String text) {
+        Tasks.detach(Main.own(text));
+    }
+
+    static async void own(String text) {
+        await new Ready();
+        Console.println(text);
+    }
+
     static async void heldAcrossAwait() {
         String text = "a";
         &String view = &text;

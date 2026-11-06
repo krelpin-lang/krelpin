@@ -147,7 +147,7 @@ impl LoweringCtxt<'_, '_> {
             _ => None,
         };
         let param_storage = match &member.kind {
-            MemberKind::Method(method) => self.tcx.param_storage(member_params, &method.keeps),
+            MemberKind::Method(method) => self.tcx.method_param_storage(method),
             MemberKind::Constructor(ctor) => self.tcx.param_storage(member_params, &ctor.keeps),
             MemberKind::Field(_) | MemberKind::Type(_) => Vec::new(),
         };
@@ -670,6 +670,7 @@ impl LoweringCtxt<'_, '_> {
                 ExprKind::With {
                     base: Box::new(base),
                     fields,
+                    callee: self.callee(expr.span),
                 }
             }
             ast::ExprKind::Lambda {

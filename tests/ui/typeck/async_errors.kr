@@ -51,3 +51,33 @@ class Main {
 
     static void main() {}
 }
+
+class Failing implements Future<String> {
+    Failing() {}
+
+    mut Poll<String> poll(&mut Context cx) throws IOException {
+        throw new IOException("failed");
+    }
+}
+
+class Base {
+    async String fetch() {
+        return "base";
+    }
+
+    Future<String> load() {
+        return new Failing();
+    }
+}
+
+class Sub extends Base {
+    // Error: `await base.fetch()` relies on `Base.fetch` throwing nothing.
+    Future<String> fetch() {
+        return new Failing();
+    }
+
+    // Fine: callers of `load` already expect anything from `poll`.
+    async String load() throws IOException {
+        return "sub";
+    }
+}

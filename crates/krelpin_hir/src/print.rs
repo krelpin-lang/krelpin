@@ -480,7 +480,7 @@ impl Printer<'_, '_> {
                 self.out.push(')');
             }
             ExprKind::Switch { scrutinee, arms } => self.switch(scrutinee, arms),
-            ExprKind::With { base, fields } => {
+            ExprKind::With { base, fields, .. } => {
                 self.expr(base);
                 self.out.push_str(" with { ");
                 for (index, field) in fields.iter().enumerate() {

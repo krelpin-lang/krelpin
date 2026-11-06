@@ -214,7 +214,7 @@ impl FnCtxt<'_, '_> {
                 self.check_cast(&from, &to, expr.span);
                 to
             }
-            ExprKind::With { base, fields } => self.check_with(base, fields),
+            ExprKind::With { base, fields } => self.check_with(base, fields, expr.span),
             ExprKind::Await(operand) => self.check_await(operand, expr.span),
             ExprKind::Lambda { .. } | ExprKind::MethodRef { .. } => {
                 // Reached only where nothing says which interface the closure
@@ -270,7 +270,7 @@ impl FnCtxt<'_, '_> {
         }
     }
 
-    fn check_with(&mut self, base: &Expr, fields: &[FieldInit]) -> Ty {
+    fn check_with(&mut self, base: &Expr, fields: &[FieldInit], span: Span) -> Ty {
         let base_ty = self.check_expr(base);
         let ty = base_ty.strip_refs().clone();
         let record_ty = match &ty {
@@ -315,6 +315,34 @@ impl FnCtxt<'_, '_> {
             }
             seen.push(name.name);
             self.check_expr_coerce(&field.value, &expected);
+        }
+        // A record with a compact constructor checks every value it is
+        // made of, so `with` runs it too.
+        if let Some((def, args)) = &record_ty {
+            let ctor = self
+                .tcx
+                .sig(*def)
+                .ctors
+                .iter()
+                .find(|ctor| ctor.member.is_some())
+                .cloned();
+            if let Some(ctor) = ctor {
+                let subst = self.tcx.subst_for(*def, args);
+                let sig = crate::closure::instantiate(&ctor, &subst);
+                for thrown in &sig.throws {
+                    self.raise(thrown.clone(), span);
+                }
+                self.results.callees.insert(
+                    span,
+                    crate::Callee {
+                        method: ctor,
+                        params: sig.params,
+                        ret: sig.ret,
+                        packs_varargs: false,
+                        subst,
+                    },
+                );
+            }
         }
         ty
     }

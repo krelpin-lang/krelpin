@@ -282,6 +282,8 @@ pub enum ExprKind {
     With {
         base: Box<Expr>,
         fields: Vec<WithField>,
+        /// The record's compact constructor, which checks the new copy.
+        callee: Option<Box<Callee>>,
     },
     Equals {
         callee: Box<Callee>,

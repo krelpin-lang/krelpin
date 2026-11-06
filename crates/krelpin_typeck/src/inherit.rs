@@ -167,10 +167,33 @@ impl Tcx<'_> {
             );
         }
 
+        // Callers of an `async` method rely on its `throws` for what
+        // `await` raises, so an override must be `async` too. An `async`
+        // override of a method that returns a future is fine: callers of
+        // that method already expect any exception from `poll`, and an
+        // `async` method throws nothing when it is called.
+        if theirs.output.is_some() && method.output.is_none() {
+            self.dcx.emit(
+                Diagnostic::error(format!(
+                    "`{}` must be `async` because `{owner}.{}` is",
+                    name.name, name.name
+                ))
+                .with_span(name.span)
+                .with_note(format!(
+                    "`await` relies on the `throws` of `{owner}.{}`, which a future returned \
+                     any other way doesn't follow",
+                    name.name
+                ))
+                .with_help("make the override `async`"),
+            );
+            return;
+        }
+        let checks_throws = method.output.is_none() || theirs.output.is_some();
+
         let env = ParamEnv::default()
             .with_generics(&self.sig(method.owner).generics)
             .with_generics(&method.generics);
-        for thrown in &method.throws {
+        for thrown in method.throws.iter().filter(|_| checks_throws) {
             let allowed = theirs_sig
                 .throws
                 .iter()

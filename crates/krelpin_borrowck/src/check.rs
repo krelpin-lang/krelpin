@@ -10,6 +10,7 @@ use krelpin_typeck::Ty;
 
 use crate::bitset::BitSet;
 use crate::dataflow::{Forward, Location, solve};
+use crate::forwarded::Forwarded;
 use crate::init::{MoveData, MoveKind, MoveOut};
 use crate::liveness::Liveness;
 use crate::loans::{Holdings, LoanData, LoanOrigin};
@@ -22,6 +23,7 @@ pub(crate) struct Checker<'a, 'tcx> {
     tys: &'a PlaceTys<'a, 'tcx>,
     moves: MoveData,
     loans: LoanData<'a, 'tcx>,
+    forwarded: Forwarded,
     liveness: Liveness,
     dcx: &'a DiagCtxt,
     reported: HashSet<(Span, String)>,
@@ -35,6 +37,7 @@ impl<'a, 'tcx> Checker<'a, 'tcx> {
             tys,
             moves: MoveData::collect(body),
             loans: LoanData::collect(body, tys),
+            forwarded: Forwarded::compute(body, tys),
             liveness: Liveness::compute(body),
             dcx,
             reported: HashSet::new(),
@@ -124,6 +127,14 @@ impl<'a, 'tcx> Checker<'a, 'tcx> {
                     let loans = self.loans.operand_loans(held, arg);
                     if let Some(loan) = loans.iter().next() {
                         self.report_detached(loan, callee.method.name.name, span);
+                        break;
+                    }
+                    let forwarded = operand_place(arg)
+                        .and_then(base_local)
+                        .and_then(|local| self.forwarded.source(local))
+                        .filter(|&param| !self.is_detached_param(param));
+                    if let Some(param) = forwarded {
+                        self.report_forwarded(param, callee.method.name.name, span);
                         break;
                     }
                 }
@@ -688,6 +699,39 @@ impl<'a, 'tcx> Checker<'a, 'tcx> {
                 )
         };
         self.emit(loan.span, diagnostic);
+    }
+
+    /// Whether the body's own signature keeps `param` forever, so its
+    /// callers already check that it borrows nothing.
+    fn is_detached_param(&self, param: Local) -> bool {
+        self.body
+            .arg_storage
+            .get(param.index() - 1)
+            .is_some_and(|storage| storage.detached)
+    }
+
+    fn report_forwarded(&mut self, param: Local, method: krelpin_span::Symbol, span: Span) {
+        let decl = self.body.local(param);
+        let name = decl
+            .name
+            .map_or_else(|| "argument".to_owned(), |name| name.to_string());
+        let diagnostic = Diagnostic::error(format!(
+            "`{method}` keeps `{name}` after `{}` ends, but `{name}` may borrow from the caller",
+            self.body.name
+        ))
+        .with_span(span)
+        .with_label(format!("`{method}` keeps `{name}` here"))
+        .with_secondary(decl.span, format!("`{name}` comes from the caller"))
+        .with_note(format!(
+            "the caller's checks don't know that `{}` passes `{name}` on to be kept",
+            self.body.name
+        ))
+        .with_help(format!(
+            "make `{}` static and write `keeps {name}` after its parameters, so its callers \
+             can't pass anything borrowed",
+            self.body.name
+        ));
+        self.emit(span, diagnostic);
     }
 
     fn report_detached(&mut self, loan: usize, method: krelpin_span::Symbol, span: Span) {
