@@ -1,0 +1,50 @@
+enum Poll<T> { Ready(T value), Pending }
+
+interface Source<T> {
+    mut Poll<T> next();
+}
+
+class Countdown implements Source<String> {
+    private int left = 2;
+
+    mut Poll<String> next() {
+        if (this.left == 0) {
+            return Poll.Ready("done");
+        }
+        this.left--;
+        return Poll.Pending;
+    }
+}
+
+class Main {
+    static <T> T drive(Source<T> source) {
+        int waits = 0;
+        while (true) {
+            Poll<T> poll = source.next();
+            switch (poll) {
+                case Ready(T value) -> {
+                    Console.println("ready after $waits waits");
+                    return value;
+                }
+                case Pending -> waits++;
+            }
+        }
+    }
+
+    static Poll<int>? maybe(int n) {
+        return n == 0 ? null : n == 1 ? Poll.Pending : Poll.Ready(n);
+    }
+
+    static void main() {
+        Console.println(Main.drive(new Countdown()));
+
+        // A unit variant takes its type arguments from where it is used.
+        Poll<String> local = Poll.Pending;
+        Console.println(local);
+        local = Poll.Ready("now");
+        Console.println(local);
+        for (int i = 0; i < 3; i++) {
+            Console.println(Main.maybe(i));
+        }
+    }
+}

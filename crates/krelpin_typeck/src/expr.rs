@@ -59,7 +59,35 @@ impl FnCtxt<'_, '_> {
                 self.results.expr_types.insert(expr.span, actual.clone());
                 actual
             }
+            // Each branch is checked against the expected type, so it reaches
+            // values like `Poll.Pending` inside them.
+            ExprKind::Ternary { cond, then, els } if !expected.references_unknown() => {
+                self.check_expr_coerce(cond, &Ty::BOOLEAN);
+                let (when_true, when_false) = self.null_checks(cond);
+                let then_ty =
+                    self.with_narrowing(&when_true, |fcx| fcx.check_expr_coerce(then, expected));
+                let els_ty =
+                    self.with_narrowing(&when_false, |fcx| fcx.check_expr_coerce(els, expected));
+                let actual =
+                    self.common_or_error(&then_ty, &els_ty, expr.span, "the branches of `?`");
+                self.results.expr_types.insert(expr.span, actual.clone());
+                actual
+            }
             _ => self.check_expr(expr),
+        };
+        // A value like `Poll.Pending` names no type arguments; it takes them
+        // from the type it is used as.
+        let actual = match (&actual, expected.non_null()) {
+            (Ty::Adt { def, .. }, Ty::Adt { def: wanted, .. })
+                if def == wanted
+                    && actual.references_unknown()
+                    && !expected.references_unknown() =>
+            {
+                let inferred = expected.non_null().clone();
+                self.results.expr_types.insert(expr.span, inferred.clone());
+                inferred
+            }
+            _ => actual,
         };
         self.require_assignable(expr, &actual, expected);
         actual
