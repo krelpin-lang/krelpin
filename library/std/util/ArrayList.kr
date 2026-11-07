@@ -58,7 +58,7 @@ class ArrayList<T> implements List<T> {
      * @return an iterator that borrows this list
      */
     Iterator<T> iterator() {
-        return new ArrayListIterator<>(this);
+        return new Values<>(this);
     }
 
     /**
@@ -80,5 +80,28 @@ class ArrayList<T> implements List<T> {
         }
         text.append("]");
         return text.toString();
+    }
+
+    private static final class Values<T> borrows src implements Iterator<T> {
+        private &ArrayList<T> list;
+        private int next;
+
+        Values(&ArrayList<T> list) keeps list {
+            this.list = list;
+            this.next = 0;
+        }
+
+        boolean hasNext() {
+            return this.next < this.list.size();
+        }
+
+        mut &T next() borrows src {
+            int index = this.next;
+            if (index >= this.list.size()) {
+                throw new IllegalStateException("the iterator has no more elements");
+            }
+            this.next = index + 1;
+            return this.list.get(index);
+        }
     }
 }
