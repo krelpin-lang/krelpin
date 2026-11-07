@@ -23,7 +23,7 @@ package std.primitive;
  * nan.isNaN()       // true
  * }</pre>
  */
-final class Double implements Comparable<double>, Hashable<double> {
+final class Double implements Comparable<double>, Hashable<double>, Cloneable<double> {
     /** The smallest positive value of a {@code double}. */
     public const double MIN_VALUE = 4.9e-324;
 
@@ -146,5 +146,9 @@ final class Double implements Comparable<double>, Hashable<double> {
      */
     String format(String spec) {
         return Format.decimal(this, spec);
+    }
+
+    double clone() {
+        return this;
     }
 }

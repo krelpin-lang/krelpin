@@ -50,7 +50,10 @@ impl FnCtxt<'_, '_> {
             ),
             Some(ReceiverKind::Ref) => {}
         }
-        if let Visibility::Private(span) | Visibility::Protected(span) = member.vis {
+        if let Visibility::Private(span)
+        | Visibility::Protected(span)
+        | Visibility::Internal(span) = member.vis
+        {
             self.emit(
                 accessor("must be visible wherever the record is".to_owned())
                     .with_span(span)

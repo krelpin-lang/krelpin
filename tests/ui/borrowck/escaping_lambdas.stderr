@@ -1,0 +1,36 @@
+error: a returned lambda borrows `local`, which belongs to this method
+  --> tests/ui/borrowck/escaping_lambdas.kr:22:27
+   |
+22 |         return new Holder(() -> Console.println(local.get(0)));
+   |         ------------------------------------------------------- the lambda is returned here
+   |                           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ `local` is borrowed by the lambda here
+   |
+   = note: `local` stops existing when the method ends
+   = help: use a `move` lambda to give it its own copy
+
+error: a returned lambda borrows `local`, which belongs to this method
+  --> tests/ui/borrowck/escaping_lambdas.kr:28:36
+   |
+28 |         Thread thread = new Thread(() -> Console.println(local.size()));
+   |                                    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ `local` is borrowed by the lambda here
+...
+30 |         return thread;
+   |         -------------- the lambda is returned here
+   |
+   = note: `local` stops existing when the method ends
+   = help: use a `move` lambda to give it its own copy
+
+error: cannot borrow `counter` as mutable more than once at a time
+  --> tests/ui/borrowck/escaping_lambdas.kr:36:36
+   |
+35 |         Thread first = new Thread(() -> counter[0] = counter[0] + 1);
+   |                                   --------------------------------- `counter` is borrowed by a lambda here
+36 |         Thread second = new Thread(() -> counter[0] = counter[0] + 1);
+   |                                    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ second mutable borrow happens here
+37 |         first.start();
+   |         ------------- the borrow is used later here
+   |
+   = help: use a `move` lambda to give it its own copy
+
+error: aborting due to 3 previous errors
+

@@ -1,4 +1,4 @@
-use krelpin_ast::ast::{self, Item, ItemKind, Member, MemberKind, TyKind};
+use krelpin_ast::ast::{self, FieldStorage, Item, ItemKind, Member, MemberKind, TyKind};
 use krelpin_errors::Diagnostic;
 use krelpin_resolve::Res;
 use krelpin_span::Span;
@@ -47,6 +47,31 @@ impl Tcx<'_> {
         }
         for member in members {
             self.check_member_wf(&env, member);
+        }
+        self.check_static_fields(def);
+    }
+
+    fn check_static_fields(&self, def: DefId) {
+        let sig = self.sig(def);
+        let mut fields: Vec<_> = sig
+            .fields
+            .values()
+            .filter(|field| field.owner == def && matches!(field.storage, FieldStorage::Static(_)))
+            .collect();
+        fields.sort_by_key(|field| field.name.span.lo);
+        for field in fields {
+            if !self.may_hold_refs(&field.ty) {
+                continue;
+            }
+            self.dcx.emit(
+                Diagnostic::error(format!(
+                    "the `static` field `{}` has type `{}`, which may hold references",
+                    field.name.name, field.ty
+                ))
+                .with_span(field.name.span)
+                .with_note("a `static` field lives as long as the program, longer than anything it could borrow")
+                .with_help("keep it in a local or an instance field, or store plain data instead of lambdas"),
+            );
         }
     }
 
@@ -209,7 +234,7 @@ impl Tcx<'_> {
     ) {
         for bound in &param.bounds {
             let bound = bound.subst(subst);
-            if !self.is_assignable(env, arg, &bound) {
+            if !self.satisfies_bound(env, arg, &bound) {
                 self.dcx.emit(
                     Diagnostic::error(format!(
                         "type `{arg}` does not satisfy the bound of `{}`",

@@ -1,5 +1,7 @@
 package std.util;
 
+import std.function.BiConsumer;
+
 /**
  * An object that maps keys to values, in which each key appears at most
  * once.
@@ -93,6 +95,66 @@ interface Map<K, V> {
     boolean containsKey(&K key);
 
     /** Removes all entries from this map. */
+    mut boolean putIfAbsent(K key, V value) {
+        if (this.containsKey(&key)) {
+            return false;
+        }
+        this.put(key, value);
+        return true;
+    }
+
+    boolean containsValue(&V value) where V extends Equatable<V> {
+        for (&V candidate : this.values()) {
+            if (candidate.equals(value)) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    void forEach(BiConsumer<&K, &V> action) {
+        for (&K key : this.keySet()) {
+            (&V)? value = this.get(key);
+            if (value != null) {
+                action.accept(key, value);
+            }
+        }
+    }
+
+    Map<K, V> clone() where K extends Cloneable<K> & Hashable<K>, V extends Cloneable<V> {
+        Map<K, V> copy = new HashMap<>();
+        for (&K key : this.keySet()) {
+            (&V)? value = this.get(key);
+            if (value != null) {
+                copy.put(key.clone(), value.clone());
+            }
+        }
+        return copy;
+    }
+
+    boolean equals(&Map<K, V> other) where V extends Equatable<V> {
+        if (this.size() != other.size()) {
+            return false;
+        }
+        for (&K key : this.keySet()) {
+            (&V)? mine = this.get(key);
+            (&V)? theirs = other.get(key);
+            if (mine == null || theirs == null || !mine.equals(theirs)) {
+                return false;
+            }
+        }
+        return true;
+    }
+
+    int hashCode() where K extends Hashable<K>, V extends Hashable<V> {
+        int hash = 0;
+        for (&K key : this.keySet()) {
+            (&V)? value = this.get(key);
+            hash = hash + (key.hashCode() ^ (value != null ? value.hashCode() : 0));
+        }
+        return hash;
+    }
+
     mut void clear();
 
     /**

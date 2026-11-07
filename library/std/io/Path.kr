@@ -1,5 +1,8 @@
 package std.io;
 
+import std.util.ArrayList;
+import std.util.List;
+
 /**
  * Static methods for manipulating paths written as strings, with
  * {@code /} as the separator.
@@ -45,6 +48,7 @@ final class Path {
      *         path if it contains none
      */
     static String fileName(String path) {
+        path = trimEnd(path);
         int slash = path.lastIndexOf("/");
         return slash < 0 ? path : path.substring(slash + 1);
     }
@@ -58,6 +62,7 @@ final class Path {
      *         under the root
      */
     static String parent(String path) {
+        path = trimEnd(path);
         int slash = path.lastIndexOf("/");
         if (slash < 0) {
             return "";
@@ -79,5 +84,74 @@ final class Path {
         String name = fileName(path);
         int dot = name.lastIndexOf(".");
         return dot <= 0 ? "" : name.substring(dot + 1);
+    }
+
+    static boolean isAbsolute(String path) {
+        return path.startsWith("/");
+    }
+
+    static String normalize(String path) {
+        boolean absolute = isAbsolute(path);
+        List<String> parts = new ArrayList<>();
+        for (String part : path.split("/")) {
+            if (part.isEmpty() || part.equals(&".")) {
+                continue;
+            }
+            if (part.equals(&"..")) {
+                (&String)? last = parts.last();
+                if (last != null && !last.equals(&"..")) {
+                    parts.remove(parts.size() - 1);
+                    continue;
+                }
+                if (absolute) {
+                    continue;
+                }
+            }
+            parts.add(part);
+        }
+        String joined = String.join("/", &parts);
+        if (absolute) {
+            return "/$joined";
+        }
+        return joined.isEmpty() ? "." : joined;
+    }
+
+    static String relativize(String base, String path) {
+        if (isAbsolute(base) != isAbsolute(path)) {
+            throw new IllegalArgumentException("`$path` and `$base` must both be absolute or both relative");
+        }
+        String[] from = segments(normalize(base));
+        String[] to = segments(normalize(path));
+        int common = 0;
+        while (common < from.length && common < to.length && from[common].equals(&to[common])) {
+            common++;
+        }
+        List<String> parts = new ArrayList<>();
+        for (int i = common; i < from.length; i++) {
+            if (from[i].equals(&"..")) {
+                throw new IllegalArgumentException("can't find `$path` from `$base`, which leaves its starting directory");
+            }
+            parts.add("..");
+        }
+        for (int i = common; i < to.length; i++) {
+            parts.add(to[i]);
+        }
+        String joined = String.join("/", &parts);
+        return joined.isEmpty() ? "." : joined;
+    }
+
+    private static String[] segments(String normalized) {
+        String relative = normalized.startsWith("/") ? normalized.substring(1) : normalized;
+        if (relative.isEmpty() || relative.equals(&".")) {
+            return new String[0];
+        }
+        return relative.split("/");
+    }
+
+    private static String trimEnd(String path) {
+        while (path.length() > 1 && path.endsWith("/")) {
+            path = path.substring(0, path.length() - 1);
+        }
+        return path;
     }
 }

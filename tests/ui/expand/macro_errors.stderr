@@ -4,45 +4,11 @@ error: cannot find macro `Builder` in this scope
 5 | @Builder
   |  ^^^^^^^ not found in this scope
 
-error: `@Derive` cannot be used on members
- --> tests/ui/expand/macro_errors.kr:7:5
+error: cannot find macro `Derive` in this scope
+ --> tests/ui/expand/macro_errors.kr:8:2
   |
-7 |     @Derive(Equatable)
-  |     ^^^^^^^^^^^^^^^^^^
-  |
-  = help: `@Derive` can only be used on classes, records and enums
-
-error: records are already `Equatable` when their components are
-  --> tests/ui/expand/macro_errors.kr:13:1
-   |
-13 | @Derive(Equatable, Comparable)
-   | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-   |
-   = help: remove it from `@Derive`; only `Comparable` needs to be derived
-
-error: enums without data are already `Equatable`
-  --> tests/ui/expand/macro_errors.kr:16:1
-   |
-16 | @Derive(Equatable)
-   | ^^^^^^^^^^^^^^^^^^
-   |
-   = note: enums without data are always `Equatable` and `Hashable`
-
-error: `@Derive` cannot be used on interfaces
-  --> tests/ui/expand/macro_errors.kr:22:1
-   |
-22 | @Derive(Equatable)
-   | ^^^^^^^^^^^^^^^^^^
-   |
-   = help: `@Derive` can only be used on classes, records and enums
-
-error: `Comparable` cannot be derived because `text` may be null
-  --> tests/ui/expand/macro_errors.kr:25:1
-   |
-25 | @Derive(Comparable)
-   | ^^^^^^^^^^^^^^^^^^^
-   |
-   = help: implement `compareTo` yourself to decide where null values go
+8 | @Derive(Equatable)
+  |  ^^^^^^ not found in this scope
 
 error: only the standard library can declare macros without a body
  --> tests/ui/expand/macro_errors.kr:3:7
@@ -52,5 +18,5 @@ error: only the standard library can declare macros without a body
   |
   = help: write `macro Name(TokenStream args, TokenStream item) { ... }`
 
-error: aborting due to 7 previous errors
+error: aborting due to 3 previous errors
 

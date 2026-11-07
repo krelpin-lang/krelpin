@@ -1,7 +1,7 @@
 use std::collections::hash_map::Entry;
 use std::collections::{HashMap, HashSet};
 
-use krelpin_ast::ast::{CompilationUnit, Import, MacroDef, Path, is_intrinsic};
+use krelpin_ast::ast::{CompilationUnit, Import, MacroDef, Path};
 use krelpin_ast::package::PackagePath;
 use krelpin_errors::{DiagCtxt, Diagnostic};
 use krelpin_span::{Span, Symbol};
@@ -9,41 +9,7 @@ use krelpin_span::{Span, Symbol};
 use crate::proc_macro::ProcMacroCrate;
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
-pub enum BuiltinMacro {
-    Derive,
-}
-
-impl BuiltinMacro {
-    const ALL: &[BuiltinMacro] = &[BuiltinMacro::Derive];
-
-    pub fn name(self) -> &'static str {
-        match self {
-            BuiltinMacro::Derive => "Derive",
-        }
-    }
-
-    pub fn path(self) -> String {
-        format!("std.lang.{}", self.name())
-    }
-
-    pub fn usage(self) -> &'static str {
-        match self {
-            BuiltinMacro::Derive => "`@Derive` can only be used on classes, records and enums",
-        }
-    }
-
-    fn lookup(package: &PackagePath, name: Symbol) -> Option<BuiltinMacro> {
-        let path = format!("{package}.{name}");
-        Self::ALL
-            .iter()
-            .copied()
-            .find(|builtin| builtin.path() == path)
-    }
-}
-
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub(crate) enum MacroKind {
-    Builtin(BuiltinMacro),
     Extern {
         krate: usize,
         index: usize,
@@ -57,7 +23,6 @@ pub(crate) enum MacroKind {
 impl MacroKind {
     pub(crate) fn name(self) -> Symbol {
         match self {
-            MacroKind::Builtin(builtin) => Symbol::intern(builtin.name()),
             MacroKind::Extern { name, .. } | MacroKind::Local { name } => name,
         }
     }
@@ -113,22 +78,12 @@ impl MacroTable {
     fn add(&mut self, package: &PackagePath, def: &MacroDef, proc_macro: bool, dcx: &DiagCtxt) {
         let name = def.name;
         let kind = if package.is_std() {
-            match BuiltinMacro::lookup(package, name.name) {
-                Some(builtin) if is_intrinsic(&def.annotations) && def.body.is_none() => {
-                    MacroKind::Builtin(builtin)
-                }
-                _ => {
-                    dcx.emit(
-                        Diagnostic::error(format!(
-                            "unknown intrinsic macro `{package}.{}`",
-                            name.name
-                        ))
-                        .with_span(name.span)
-                        .with_note("the compiler provides the macros of the standard library"),
-                    );
-                    return;
-                }
-            }
+            dcx.emit(
+                Diagnostic::error(format!("unknown intrinsic macro `{package}.{}`", name.name))
+                    .with_span(name.span)
+                    .with_note("the standard library defines no macros"),
+            );
+            return;
         } else if !proc_macro || def.body.is_none() {
             return;
         } else {

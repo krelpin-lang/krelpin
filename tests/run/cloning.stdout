@@ -1,0 +1,10 @@
+[cli] [cli] [cli, tool] krelp true
+https://x 1
+true
+Pair[first=1, second=2]
+Limits[max=5, base=Package[name=krelp, tags=[cli], note=null], sizes=[3]]
+Limits[max=null, base=null, sizes=[]]
+2 1 36
+1 2 7 text
+2 1
+1 0 [[1]]

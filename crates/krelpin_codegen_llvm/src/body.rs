@@ -628,6 +628,7 @@ impl<'f, 'c, 'a, 'tcx> BodyCx<'f, 'c, 'a, 'tcx> {
             Rvalue::Binary(op, lhs, rhs) => self.binary(*op, lhs, rhs, dest),
             Rvalue::Unary(op, operand) => {
                 let (value, owned) = self.operand_read(operand);
+                let value = self.unwrap_narrowed(value);
                 let ll = self.fx.ll(&value.ty);
                 let v = match op {
                     UnaryOp::Not => self.fx.assign(format!("xor i1 {}, true", value.v)),
@@ -775,6 +776,15 @@ impl<'f, 'c, 'a, 'tcx> BodyCx<'f, 'c, 'a, 'tcx> {
         }
     }
 
+    fn unwrap_narrowed(&mut self, value: Val) -> Val {
+        if !matches!(self.fx.cx.shape(&value.ty), Shape::NullableValue(_)) {
+            return value;
+        }
+        let ty = value.ty.non_null().clone();
+        let v = self.fx.convert(&value.v, &value.ty, &ty);
+        Val { ty, v }
+    }
+
     fn binary(&mut self, op: BinOp, lhs: &Operand, rhs: &Operand, dest: &Ty) -> Val {
         let (a, a_owned) = self.operand_read(lhs);
         let (b, b_owned) = self.operand_read(rhs);
@@ -797,6 +807,11 @@ impl<'f, 'c, 'a, 'tcx> BodyCx<'f, 'c, 'a, 'tcx> {
             self.release(&b, b_owned);
             return Val { ty: string, v };
         }
+        let (a, b) = if matches!(op, BinOp::Eq | BinOp::Ne) {
+            (a, b)
+        } else {
+            (self.unwrap_narrowed(a), self.unwrap_narrowed(b))
+        };
         let operand_ty = if a.ty == Ty::Null {
             b.ty.clone()
         } else {

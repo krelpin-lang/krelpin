@@ -989,6 +989,22 @@ impl<'c, 'a, 'tcx> FnCx<'c, 'a, 'tcx> {
         )
     }
 
+    pub(crate) fn call_clone(&mut self, a: &str, ty: &Ty) -> String {
+        let reference = Ty::Ref {
+            mutable: false,
+            ty: Box::new(ty.clone()),
+        };
+        let selector = Selector {
+            owner: ty.clone(),
+            name: krelpin_span::Symbol::intern("clone"),
+            params: Vec::new(),
+            method_args: Vec::new(),
+            receiver: ReceiverKind::Ref,
+            ret: ty.clone(),
+        };
+        self.dispatch(&selector, &reference, a, &[])
+    }
+
     pub(crate) fn call_hash(&mut self, a: &str, ty: &Ty) -> String {
         if let Ty::Ref { ty: inner, .. } = ty {
             let inner = inner.as_ref().clone();
@@ -1089,6 +1105,13 @@ pub(crate) fn runtime_signature(name: &str) -> &'static str {
         "kr_io_size" => "declare i64 @kr_io_size(ptr)",
         "kr_io_remove" => "declare i1 @kr_io_remove(ptr)",
         "kr_io_create_directories" => "declare i1 @kr_io_create_directories(ptr)",
+        "kr_io_create_directory" => "declare i1 @kr_io_create_directory(ptr)",
+        "kr_io_is_symlink" => "declare i1 @kr_io_is_symlink(ptr)",
+        "kr_io_rename" => "declare i1 @kr_io_rename(ptr, ptr)",
+        "kr_io_copy" => "declare i1 @kr_io_copy(ptr, ptr)",
+        "kr_io_read_bytes" => "declare ptr @kr_io_read_bytes(ptr, ptr)",
+        "kr_io_write_bytes" => "declare i1 @kr_io_write_bytes(ptr, ptr, i1)",
+        "kr_system_os_name" => "declare ptr @kr_system_os_name()",
         "kr_io_list" => "declare ptr @kr_io_list(ptr, ptr)",
         "kr_file_open" => "declare ptr @kr_file_open(ptr, i32)",
         "kr_net_close" => "declare void @kr_net_close(ptr)",

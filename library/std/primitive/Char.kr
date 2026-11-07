@@ -16,7 +16,7 @@ package std.primitive;
  * 'ç'.toUpperCase()   // 'Ç'
  * }</pre>
  */
-final class Char implements Comparable<char>, Hashable<char> {
+final class Char implements Comparable<char>, Hashable<char>, Cloneable<char> {
     /** The minimum value of a {@code char}, {@code U+0000}. */
     public const char MIN_VALUE = '\u{0}';
 
@@ -152,5 +152,31 @@ final class Char implements Comparable<char>, Hashable<char> {
      */
     String format(String spec) {
         return Format.text("" + this, spec);
+    }
+
+    int digit(int radix) {
+        if (radix < 2 || radix > 36) {
+            throw new IllegalArgumentException("radix $radix is not between 2 and 36");
+        }
+        int value = -1;
+        if (this >= '0' && this <= '9') {
+            value = (int) this - (int) '0';
+        } else if (this >= 'a' && this <= 'z') {
+            value = (int) this - (int) 'a' + 10;
+        } else if (this >= 'A' && this <= 'Z') {
+            value = (int) this - (int) 'A' + 10;
+        }
+        return value < radix ? value : -1;
+    }
+
+    static char forDigit(int digit, int radix) {
+        if (radix < 2 || radix > 36 || digit < 0 || digit >= radix) {
+            throw new IllegalArgumentException("$digit is not a digit in radix $radix");
+        }
+        return digit < 10 ? (char) ((int) '0' + digit) : (char) ((int) 'a' + digit - 10);
+    }
+
+    char clone() {
+        return this;
     }
 }

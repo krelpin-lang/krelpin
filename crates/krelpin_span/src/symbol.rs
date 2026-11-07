@@ -91,6 +91,7 @@ keywords! {
     }
     contextual {
         Borrows: "borrows",
+        Internal: "internal",
         Keeps: "keeps",
         Move: "move",
     }

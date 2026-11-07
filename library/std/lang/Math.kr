@@ -26,7 +26,7 @@ final class Math {
     /**
      * Returns the absolute value of an {@code int}.
      *
-     * <p>{@code Math.abs(Int.MIN_VALUE)} is {@code Int.MIN_VALUE}, because
+     * <p>{@code Math.abs(int.MIN_VALUE)} is {@code int.MIN_VALUE}, because
      * its positive value cannot be represented as an {@code int}.
      *
      * @param value the value
@@ -39,7 +39,7 @@ final class Math {
     /**
      * Returns the absolute value of a {@code long}.
      *
-     * <p>{@code Math.abs(Long.MIN_VALUE)} is {@code Long.MIN_VALUE}, because
+     * <p>{@code Math.abs(long.MIN_VALUE)} is {@code long.MIN_VALUE}, because
      * its positive value cannot be represented as a {@code long}.
      *
      * @param value the value
@@ -360,7 +360,7 @@ final class Math {
      *
      * @param value the value to round
      * @return the nearest {@code long}; 0 if {@code value} is NaN, and
-     *         {@code Long.MIN_VALUE} or {@code Long.MAX_VALUE} if it is
+     *         {@code long.MIN_VALUE} or {@code long.MAX_VALUE} if it is
      *         outside the range of {@code long}
      */
     @Intrinsic
@@ -467,4 +467,62 @@ final class Math {
      */
     @Intrinsic
     static double random();
+
+    static int addExact(int a, int b) {
+        int result = a + b;
+        if (((a ^ result) & (b ^ result)) < 0) {
+            throw new ArithmeticException("`int` overflow in $a + $b");
+        }
+        return result;
+    }
+
+    static long addExact(long a, long b) {
+        long result = a + b;
+        if (((a ^ result) & (b ^ result)) < 0) {
+            throw new ArithmeticException("`long` overflow in $a + $b");
+        }
+        return result;
+    }
+
+    static int subtractExact(int a, int b) {
+        int result = a - b;
+        if (((a ^ b) & (a ^ result)) < 0) {
+            throw new ArithmeticException("`int` overflow in $a - $b");
+        }
+        return result;
+    }
+
+    static long subtractExact(long a, long b) {
+        long result = a - b;
+        if (((a ^ b) & (a ^ result)) < 0) {
+            throw new ArithmeticException("`long` overflow in $a - $b");
+        }
+        return result;
+    }
+
+    static int multiplyExact(int a, int b) {
+        long result = (long) a * (long) b;
+        if (result < int.MIN_VALUE || result > int.MAX_VALUE) {
+            throw new ArithmeticException("`int` overflow in $a * $b");
+        }
+        return (int) result;
+    }
+
+    static long multiplyExact(long a, long b) {
+        long result = a * b;
+        if ((a != 0 && result / a != b) || (a == -1 && b == long.MIN_VALUE)) {
+            throw new ArithmeticException("`long` overflow in $a * $b");
+        }
+        return result;
+    }
+
+    static int floorMod(int value, int divisor) {
+        int rest = value % divisor;
+        return rest != 0 && ((rest ^ divisor) < 0) ? rest + divisor : rest;
+    }
+
+    static long floorMod(long value, long divisor) {
+        long rest = value % divisor;
+        return rest != 0 && ((rest ^ divisor) < 0) ? rest + divisor : rest;
+    }
 }

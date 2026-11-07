@@ -14,7 +14,7 @@ package std.primitive;
  * <p>Arithmetic on {@code long} wraps around on overflow:
  * {@code long.MAX_VALUE + 1} is {@code long.MIN_VALUE}.
  */
-final class Long implements Comparable<long>, Hashable<long> {
+final class Long implements Comparable<long>, Hashable<long>, Cloneable<long> {
     /** The minimum value of a {@code long}, -2<sup>63</sup>. */
     public const long MIN_VALUE = -9223372036854775808L;
 
@@ -93,5 +93,59 @@ final class Long implements Comparable<long>, Hashable<long> {
      */
     String format(String spec) {
         return Format.integer(this, spec);
+    }
+
+    static long parse(String text, int radix) {
+        if (radix < 2 || radix > 36) {
+            throw new IllegalArgumentException("radix $radix is not between 2 and 36");
+        }
+        char[] chars = text.chars();
+        int start = 0;
+        boolean negative = false;
+        if (chars.length > 0 && (chars[0] == '-' || chars[0] == '+')) {
+            negative = chars[0] == '-';
+            start = 1;
+        }
+        if (start == chars.length) {
+            throw new NumberFormatException("`$text` is not a number in radix $radix");
+        }
+        long limit = negative ? long.MIN_VALUE : -long.MAX_VALUE;
+        long result = 0;
+        for (int index = start; index < chars.length; index++) {
+            int digit = chars[index].digit(radix);
+            if (digit < 0) {
+                throw new NumberFormatException("`$text` is not a number in radix $radix");
+            }
+            if (result < (limit + digit) / radix) {
+                throw new NumberFormatException("`$text` does not fit in a `long`");
+            }
+            result = result * radix - digit;
+        }
+        return negative ? result : -result;
+    }
+
+    static String toString(long value, int radix) {
+        if (radix < 2 || radix > 36) {
+            throw new IllegalArgumentException("radix $radix is not between 2 and 36");
+        }
+        if (value == 0) {
+            return "0";
+        }
+        StringBuilder digits = new StringBuilder();
+        long rest = value;
+        while (rest != 0) {
+            int digit = (int) (rest % radix);
+            digits.append("${Char.forDigit(digit < 0 ? -digit : digit, radix)}");
+            rest = rest / radix;
+        }
+        if (value < 0) {
+            digits.append("-");
+        }
+        digits.reverse();
+        return digits.toString();
+    }
+
+    long clone() {
+        return this;
     }
 }

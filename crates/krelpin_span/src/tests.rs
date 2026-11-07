@@ -119,14 +119,14 @@ fn source_files_can_be_added_from_many_threads() {
 #[test]
 fn expansion_files_point_back_to_their_call_site() {
     let source_map = SourceMap::new();
-    let user = source_map.new_source_file("a.kr", "@Derive(Equatable) class A {}".to_owned());
+    let user = source_map.new_source_file("a.kr", "@Builder(Equatable) class A {}".to_owned());
     let call_site = Span::new(user.start_pos, user.start_pos + 18);
     let generated = source_map.new_expansion_file(
-        "<@Derive on A>",
+        "<@Builder on A>",
         "boolean equals(&A other) {}".to_owned(),
         Expansion {
             call_site,
-            macro_name: "Derive".to_owned(),
+            macro_name: "Builder".to_owned(),
         },
     );
     let inside = Span::new(generated.start_pos + 8, generated.start_pos + 14);

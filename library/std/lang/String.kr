@@ -1,5 +1,8 @@
 package std.lang;
 
+import std.util.ArrayList;
+import std.util.List;
+
 /**
  * An immutable sequence of Unicode characters, encoded as UTF-8.
  *
@@ -23,7 +26,7 @@ package std.lang;
  * @see StringBuilder
  * @see Format
  */
-final class String implements Comparable<String>, Hashable<String> {
+final class String implements Comparable<String>, Hashable<String>, Cloneable<String> {
     /**
      * Returns the length of this string.
      *
@@ -393,6 +396,47 @@ final class String implements Comparable<String>, Hashable<String> {
     @Intrinsic
     static String join(String separator, String... parts);
 
+    static String join(String separator, &List<String> parts) {
+        StringBuilder text = new StringBuilder();
+        for (int index = 0; index < parts.size(); index++) {
+            if (index > 0) {
+                text.append(separator);
+            }
+            text.append(parts.get(index));
+        }
+        return text.toString();
+    }
+
+    int indexOf(char c) {
+        return this.indexOf("$c");
+    }
+
+    boolean contains(char c) {
+        return this.indexOf(c) >= 0;
+    }
+
+    String[] split(String separator, int limit) {
+        if (limit <= 0 || separator.isEmpty()) {
+            return this.split(separator);
+        }
+        List<String> parts = new ArrayList<>();
+        int from = 0;
+        while (parts.size() < limit - 1) {
+            int at = this.indexOf(separator, from);
+            if (at < 0) {
+                break;
+            }
+            parts.add(this.substring(from, at));
+            from = at + separator.length();
+        }
+        parts.add(this.substring(from));
+        String[] result = new String[parts.size()];
+        for (int index = parts.size() - 1; index >= 0; index--) {
+            result[index] = parts.remove(index);
+        }
+        return result;
+    }
+
     /**
      * Returns the string representation of a value, as produced by string
      * concatenation.
@@ -402,4 +446,8 @@ final class String implements Comparable<String>, Hashable<String> {
      */
     @Intrinsic
     static String valueOf(Object? value);
+
+    String clone() {
+        return this;
+    }
 }

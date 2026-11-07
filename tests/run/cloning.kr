@@ -1,0 +1,82 @@
+import std.util.ArrayList;
+import std.util.HashMap;
+import std.util.HashSet;
+import std.util.List;
+import std.util.Map;
+import std.util.Set;
+
+record Package(String name, List<String> tags, String? note);
+
+enum Source {
+    Path(String dir),
+    Git(String url, List<String> refs),
+    Registry,
+}
+
+record Pair<T extends Cloneable<T>>(T first, T second);
+
+record Limits(int? max, Package? base, List<int> sizes);
+
+class Main {
+    static <T extends Cloneable<T>> T erased(&T value) {
+        &Cloneable<T> view = value;
+        return view.clone();
+    }
+
+    static void main() {
+        List<String> tags = new ArrayList<>();
+        tags.add("cli");
+        Package original = new Package("krelp", tags, null);
+        Package copy = original.clone();
+        List<String> more = copy.tags().clone();
+        more.add("tool");
+        Console.println("${original.tags()} ${copy.tags()} $more ${copy.name()} ${copy.note() == null}");
+
+        List<String> refs = new ArrayList<>();
+        refs.add("main");
+        Source git = Source.Git("https://x", refs);
+        Source again = git.clone();
+        if (again instanceof Source.Git(String url, List<String> copiedRefs)) {
+            Console.println("$url ${copiedRefs.size()}");
+        }
+        Source registry = Source.Registry.clone();
+        Console.println(registry instanceof Source.Registry);
+
+        Pair<int> numbers = new Pair<>(1, 2);
+        Console.println(numbers.clone());
+
+        List<int> sizes = new ArrayList<>();
+        sizes.add(3);
+        Limits limits = new Limits(5, original.clone(), sizes);
+        Limits copiedLimits = limits.clone();
+        Console.println(copiedLimits);
+        Limits empty = new Limits(null, null, new ArrayList<>());
+        Console.println(empty.clone());
+
+        Map<String, int> ages = new HashMap<>();
+        ages.put("ada", 36);
+        Map<String, int> copied = ages.clone();
+        ages.put("bob", 41);
+        Console.println("${ages.size()} ${copied.size()} ${copied.get(&"ada")}");
+
+        Set<String> names = new HashSet<>();
+        names.add("ada");
+        Set<String> others = names.clone();
+        others.add("bob");
+        Console.println("${names.size()} ${others.size()} ${7.clone()} ${"text".clone()}");
+
+        Map<String, List<String>> groups = new HashMap<>();
+        List<String> odd = new ArrayList<>();
+        odd.add("one");
+        groups.put("odd", odd);
+        Map<String, List<String>> grouped = groups.clone();
+        groups.getMut(&"odd")?.add("three");
+        Console.println("${groups.get(&"odd")?.size()} ${grouped.get(&"odd")?.size()}");
+
+        List<List<int>> nested = new ArrayList<>();
+        nested.add(new ArrayList<>());
+        List<List<int>> deep = nested.clone();
+        nested.getMut(0).add(1);
+        Console.println("${nested.get(0).size()} ${deep.get(0).size()} ${Main.erased(&nested)}");
+    }
+}

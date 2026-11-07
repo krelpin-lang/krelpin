@@ -1,5 +1,4 @@
 mod cfg;
-mod derive;
 mod invoke;
 mod item;
 mod proc_macro;
@@ -18,7 +17,6 @@ use krelpin_span::{SourceMap, Span};
 
 pub use crate::cfg::{CfgSet, WELL_KNOWN};
 pub use crate::proc_macro::{CallError, ProcMacroCrate, WireKind, WireToken};
-pub use crate::table::BuiltinMacro;
 use crate::table::{MacroKind, MacroScope, MacroTable};
 
 const BUILTIN_ATTRIBUTES: &[&str] = &["Intrinsic", "Test"];
@@ -90,12 +88,7 @@ pub(crate) struct Invocation {
 
 impl Invocation {
     fn usage(&self) -> &'static str {
-        match self.kind {
-            MacroKind::Builtin(builtin) => builtin.usage(),
-            MacroKind::Extern { .. } | MacroKind::Local { .. } => {
-                "macros can be used on classes, records, enums, interfaces and their members"
-            }
-        }
+        "macros can be used on classes, records, enums, interfaces and their members"
     }
 }
 
@@ -133,11 +126,6 @@ impl ExpandCtxt<'_> {
     }
 
     fn expand_in_place(&self, item: &mut Item, depth: usize) {
-        for invocation in self.take_invocations(&mut item.annotations) {
-            if let MacroKind::Builtin(BuiltinMacro::Derive) = invocation.kind {
-                self.expand_derive(item, &invocation);
-            }
-        }
         let owner = item.name;
         let (container, members): (Container, &mut Vec<Member>) = match &mut item.kind {
             ItemKind::Class(class) => (Container::Class, &mut class.members),
@@ -213,7 +201,6 @@ impl ExpandCtxt<'_> {
                 continue;
             }
             match self.scope.resolve(&annotation.path) {
-                Some(MacroKind::Builtin(_)) => index += 1,
                 Some(kind @ MacroKind::Extern { .. }) => {
                     found = Some(Invocation {
                         kind,

@@ -1,0 +1,87 @@
+package std.time;
+
+record Duration(long nanos) implements Comparable<Duration> {
+    public const long NANOS_PER_MILLI = 1000000L;
+
+    public const long NANOS_PER_SECOND = 1000000000L;
+
+    static Duration ofNanos(long nanos) {
+        return new Duration(nanos);
+    }
+
+    static Duration ofMillis(long millis) {
+        return new Duration(Math.multiplyExact(millis, Duration.NANOS_PER_MILLI));
+    }
+
+    static Duration ofSeconds(long seconds) {
+        return new Duration(Math.multiplyExact(seconds, Duration.NANOS_PER_SECOND));
+    }
+
+    static Duration zero() {
+        return new Duration(0L);
+    }
+
+    long toMillis() {
+        return this.nanos / Duration.NANOS_PER_MILLI;
+    }
+
+    long toSeconds() {
+        return this.nanos / Duration.NANOS_PER_SECOND;
+    }
+
+    double toSecondsDouble() {
+        return (double) this.nanos / (double) Duration.NANOS_PER_SECOND;
+    }
+
+    boolean isZero() {
+        return this.nanos == 0L;
+    }
+
+    boolean isNegative() {
+        return this.nanos < 0L;
+    }
+
+    Duration plus(Duration other) {
+        return new Duration(Math.addExact(this.nanos, other.nanos()));
+    }
+
+    Duration minus(Duration other) {
+        return new Duration(Math.subtractExact(this.nanos, other.nanos()));
+    }
+
+    Duration multipliedBy(long factor) {
+        return new Duration(Math.multiplyExact(this.nanos, factor));
+    }
+
+    String toString() {
+        long magnitude = Math.abs(this.nanos);
+        String sign = this.nanos < 0L ? "-" : "";
+        if (magnitude < 1000L) {
+            return "$sign${magnitude}ns";
+        }
+        if (magnitude < Duration.NANOS_PER_MILLI) {
+            return "$sign${Duration.scaled(magnitude, 1000L)}µs";
+        }
+        if (magnitude < Duration.NANOS_PER_SECOND) {
+            return "$sign${Duration.scaled(magnitude, Duration.NANOS_PER_MILLI)}ms";
+        }
+        return "$sign${Duration.scaled(magnitude, Duration.NANOS_PER_SECOND)}s";
+    }
+
+    private static String scaled(long value, long unit) {
+        long whole = value / unit;
+        long hundredths = value % unit * 100L / unit;
+        if (hundredths == 0L) {
+            return "$whole";
+        }
+        String fraction = hundredths < 10L ? "0$hundredths" : "$hundredths";
+        if (fraction.endsWith("0")) {
+            fraction = fraction.substring(0, 1);
+        }
+        return "$whole.$fraction";
+    }
+
+    int compareTo(&Duration other) {
+        return this.nanos.compareTo(&other.nanos());
+    }
+}

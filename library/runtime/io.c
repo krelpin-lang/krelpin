@@ -416,3 +416,157 @@ int64_t kr_system_nanos(void) {
     clock_gettime(CLOCK_MONOTONIC, &now);
     return (int64_t)now.tv_sec * 1000000000 + now.tv_nsec;
 }
+
+bool kr_io_is_symlink(const KrString *path) {
+    char *name = c_path(path);
+    if (name == NULL) {
+        return false;
+    }
+    struct stat info;
+    int result = lstat(name, &info);
+    kr_free(name);
+    return result == 0 && S_ISLNK(info.st_mode);
+}
+
+bool kr_io_create_directory(const KrString *path) {
+    char *name = c_path(path);
+    if (name == NULL) {
+        return false;
+    }
+    errno = 0;
+    int result = mkdir(name, 0777);
+    kr_free(name);
+    return result == 0 || failed();
+}
+
+bool kr_io_rename(const KrString *from, const KrString *to) {
+    char *source = c_path(from);
+    if (source == NULL) {
+        return false;
+    }
+    char *target = c_path(to);
+    if (target == NULL) {
+        kr_free(source);
+        return false;
+    }
+    errno = 0;
+    int result = rename(source, target);
+    kr_free(source);
+    kr_free(target);
+    return result == 0 || failed();
+}
+
+static FILE *open_raw(const KrString *path, const char *mode) {
+    char *name = c_path(path);
+    if (name == NULL) {
+        return NULL;
+    }
+    errno = 0;
+    FILE *file = fopen(name, mode);
+    kr_free(name);
+    if (file == NULL) {
+        failed();
+    }
+    return file;
+}
+
+bool kr_io_copy(const KrString *from, const KrString *to) {
+    FILE *source = open_raw(from, "rb");
+    if (source == NULL) {
+        return false;
+    }
+    FILE *target = open_raw(to, "wb");
+    if (target == NULL) {
+        fclose(source);
+        return false;
+    }
+    char buffer[65536];
+    bool ok = true;
+    errno = 0;
+    for (;;) {
+        size_t count = fread(buffer, 1, sizeof buffer, source);
+        if (count > 0 && fwrite(buffer, 1, count, target) != count) {
+            ok = failed();
+            break;
+        }
+        if (count < sizeof buffer) {
+            if (ferror(source)) {
+                ok = failed();
+            }
+            break;
+        }
+    }
+    fclose(source);
+    if (fclose(target) != 0 && ok) {
+        ok = failed();
+    }
+    return ok;
+}
+
+KrArray *kr_io_read_bytes(const KrString *path, const KrType *array_type) {
+    FILE *file = open_raw(path, "rb");
+    if (file == NULL) {
+        return NULL;
+    }
+    int64_t cap = 4096;
+    int64_t len = 0;
+    char *data = kr_alloc(cap);
+    errno = 0;
+    for (;;) {
+        if (len == cap) {
+            cap *= 2;
+            data = kr_realloc(data, cap);
+        }
+        size_t count = fread(data + len, 1, (size_t)(cap - len), file);
+        len += (int64_t)count;
+        if (count == 0) {
+            break;
+        }
+    }
+    bool error = ferror(file) != 0;
+    fclose(file);
+    if (error) {
+        kr_free(data);
+        failed();
+        return NULL;
+    }
+    KrArray *array = kr_alloc((int64_t)sizeof(KrArray) + len);
+    array->type = array_type;
+    array->len = len;
+    if (len > 0) {
+        memcpy(array->data, data, (size_t)len);
+    }
+    kr_free(data);
+    return array;
+}
+
+bool kr_io_write_bytes(const KrString *path, const KrArray *bytes, bool append) {
+    FILE *file = open_raw(path, append ? "ab" : "wb");
+    if (file == NULL) {
+        return false;
+    }
+    errno = 0;
+    bool ok = bytes->len == 0 || fwrite(bytes->data, 1, (size_t)bytes->len, file) == (size_t)bytes->len;
+    if (!ok) {
+        failed();
+    }
+    if (fclose(file) != 0 && ok) {
+        ok = failed();
+    }
+    return ok;
+}
+
+KrString *kr_system_os_name(void) {
+#if defined(__APPLE__)
+    const char *name = "macos";
+#elif defined(__linux__)
+    const char *name = "linux";
+#elif defined(_WIN32)
+    const char *name = "windows";
+#elif defined(__FreeBSD__)
+    const char *name = "freebsd";
+#else
+    const char *name = "unknown";
+#endif
+    return kr_string_new(name, (int64_t)strlen(name));
+}

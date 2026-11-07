@@ -116,7 +116,7 @@ final class Poller {
      * @throws IllegalArgumentException if {@code interest} is not a non-empty
      *         combination of {@link Interest} constants
      */
-    static void checkInterest(int interest) {
+    internal static void checkInterest(int interest) {
         if (interest <= 0 || interest > (Interest.READABLE | Interest.WRITABLE)) {
             throw new IllegalArgumentException("$interest is not a combination of `Interest` constants");
         }

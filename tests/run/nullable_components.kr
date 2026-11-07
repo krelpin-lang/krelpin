@@ -1,0 +1,16 @@
+import std.util.HashSet;
+import std.util.Set;
+record R(String? a, int? b);
+record Box(R? inner);
+class Main {
+    static void main() {
+        R x = new R(null, 1);
+        Console.println("${x == new R(null, 1)} ${x == new R("a", 1)} ${x == new R(null, null)} ${new R("a", null) == new R("a", null)}");
+        Console.println("${x.hashCode() == new R(null, 1).hashCode()} ${new Box(x) == new Box(new R(null, 1))} ${new Box(null) == new Box(x)}");
+        Set<R> set = new HashSet<>();
+        set.add(new R("k", 2));
+        set.add(new R("k", 2));
+        set.add(new R(null, 2));
+        Console.println(set.size());
+    }
+}

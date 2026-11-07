@@ -25,6 +25,8 @@ pub(crate) struct FnCtxt<'a, 'tcx> {
     pub(crate) yields: Vec<Vec<Ty>>,
     pub(crate) inferred_returns: Vec<Vec<Ty>>,
     pub(crate) call_expectations: HashMap<Span, Ty>,
+    pub(crate) deferrable: std::collections::HashSet<Span>,
+    pub(crate) pending_calls: HashMap<Span, crate::call::PendingCall>,
     pub(crate) exceptions: ExceptionScope,
     pub(crate) results: TypeckResults,
     /// The `this(...)` or `super(...)` call that starts the constructor
@@ -96,7 +98,8 @@ pub(crate) fn check_units(tcx: &Tcx<'_>, units: &[CompilationUnit]) -> TypeckRes
         };
 
         for member in members {
-            let fcx = check_member(tcx, owner, member);
+            let mut fcx = check_member(tcx, owner, member);
+            fcx.report_pending_calls();
             results.extend(fcx.results);
             results.local_types.extend(fcx.locals);
         }
@@ -270,6 +273,8 @@ impl<'a, 'tcx> FnCtxt<'a, 'tcx> {
             yields: Vec::new(),
             inferred_returns: Vec::new(),
             call_expectations: HashMap::new(),
+            deferrable: std::collections::HashSet::new(),
+            pending_calls: HashMap::new(),
             exceptions: ExceptionScope::default(),
             results: TypeckResults::default(),
             delegation: None,

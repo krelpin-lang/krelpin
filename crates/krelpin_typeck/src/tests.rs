@@ -1483,7 +1483,7 @@ fn enum_variants_carry_data() {
 }
 
 #[test]
-fn only_enums_without_data_are_hashable() {
+fn only_enums_without_data_are_ordered() {
     let src = |code: &str| {
         format!(
             "enum Color {{ RED, GREEN }}\n\
@@ -1495,9 +1495,12 @@ fn only_enums_without_data_are_hashable() {
         "Color[] all = Color.values(); boolean same = Color.RED == Color.GREEN; \
          HashSet<Color> colors = new HashSet<>();",
     ));
+    ok(&src(
+        "boolean same = Shape.Empty == Shape.Empty; int order = Color.RED.compareTo(&Color.GREEN);",
+    ));
     assert_eq!(
-        errors(&src("boolean same = Shape.Empty == Shape.Empty;")),
-        ["values of type `Shape` cannot be compared with `==`"]
+        errors(&src("int order = Shape.Empty.compareTo(&Shape.Empty);")),
+        ["no method named `compareTo` found for `Shape`"]
     );
     assert_eq!(
         errors(&src("Shape[] all = Shape.values();")),
@@ -1655,32 +1658,24 @@ fn unreachable_patterns_are_reported() {
 }
 
 #[test]
-fn derived_equality_and_hashing() {
-    ok("@Derive(Equatable, Hashable)\n\
-        class Point {\n\
-        \x20   int x;\n\
-        \x20   String? label;\n\
-        \x20   Point(int x) { this.x = x; }\n\
-        }\n\
-        @Derive(Equatable, Hashable)\n\
+fn enums_with_data_are_compared_by_value() {
+    ok("record Point(int x, String? label);\n\
         enum Shape { Circle(Point center, double radius), Empty }\n\
         class Main {\n\
         \x20   boolean run() {\n\
         \x20       HashMap<Shape, String> names = new HashMap<>();\n\
-        \x20       names.put(Shape.Circle(new Point(1), 2.0), \"circle\");\n\
-        \x20       return new Point(1) == new Point(2) && Shape.Empty == Shape.Empty;\n\
+        \x20       names.put(Shape.Circle(new Point(1, null), 2.0), \"circle\");\n\
+        \x20       Shape copy = Shape.Empty.clone();\n\
+        \x20       return Shape.Empty == copy;\n\
         \x20   }\n\
         }");
     assert_eq!(
         errors(
             "class Handle {}\n\
-             @Derive(Equatable) class Account { Handle handle = new Handle(); }"
+             enum Slot { Held(Handle handle), Free }\n\
+             class Main { boolean run() { return Slot.Free == Slot.Free; } }"
         ),
-        ["values of type `Handle` cannot be compared with `==`"]
-    );
-    assert_eq!(
-        errors("@Derive(Equatable) enum Tree<T> { Leaf(T value), Empty }"),
-        ["values of type `T` cannot be compared with `==`"]
+        ["values of type `Slot` cannot be compared with `==`"]
     );
 }
 
@@ -1688,13 +1683,13 @@ fn derived_equality_and_hashing() {
 fn records_are_built_from_their_components() {
     let src = |code: &str| {
         format!(
-            "@Derive(Comparable)\n\
-             record Version(int major, String tag);\n\
+            "record Version(int major, String tag);\n\
              class Main {{ void run() {{ {code} }} }}"
         )
     };
-    ok(&src("Version a = new Version(1, \"beta\"); \
-         int order = a.compareTo(&new Version(2, \"rc\")); boolean same = a == a;"));
+    ok(&src(
+        "Version a = new Version(1, \"beta\"); boolean same = a == a;",
+    ));
     assert_eq!(
         errors(&src("Version a = new Version(1);")),
         ["this constructor takes 2 arguments but 1 argument was supplied"]
@@ -1702,10 +1697,6 @@ fn records_are_built_from_their_components() {
     assert_eq!(
         errors(&src("Version a = new Version(\"beta\", 1);")),
         ["mismatched types", "mismatched types"]
-    );
-    assert_eq!(
-        errors("class Handle {}\n@Derive(Comparable) record Holder(Handle handle);"),
-        ["no method named `compareTo` found for `Handle`"]
     );
 }
 

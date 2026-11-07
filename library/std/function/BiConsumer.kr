@@ -1,0 +1,5 @@
+package std.function;
+
+interface BiConsumer<A, B> {
+    mut void accept(A first, B second);
+}

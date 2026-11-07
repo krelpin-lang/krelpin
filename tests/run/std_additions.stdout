@@ -1,0 +1,36 @@
+[ada, bob, cyd, dee]
+cyd
+true
+1 true false
+3
+[30, 30, 30, 30]
+[ada, cyd, dee]
+[bob, cyd]
+ada + bob + cyd + dee
+true
+false
+36 true false
+77
+2 key value=more
+3
+4 false
+x
+255 -5 1295
+ff -1010 -8000000000000000
+7 15 -1 b
+`80000000` does not fit in an `int`
+`12x` is not a number in radix 10
+15
+`int` overflow in 2147483647 + 1
+`long` overflow in 9223372036854775807 * 2
+2 -2 -2
+b a true
+a/c/d / .. .
+../c/d . ..
+true
+5 -1 7
+false 5 false
+exists
+false
+true
+true

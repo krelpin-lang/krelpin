@@ -1,5 +1,6 @@
 package std.util;
 
+import std.function.Function;
 import std.function.Predicate;
 
 /**
@@ -172,6 +173,113 @@ interface List<T> extends Iterable<T> {
      * @param b the index of the second element
      * @throws IndexOutOfBoundsException if either index is out of range
      */
+    mut void addAll(List<T> values) {
+        values.reverse();
+        while (!values.isEmpty()) {
+            this.add(values.remove(values.size() - 1));
+        }
+    }
+
+    (&T)? find(Predicate<&T> filter) {
+        for (int index = 0; index < this.size(); index++) {
+            &T value = this.get(index);
+            if (filter.test(value)) {
+                return value;
+            }
+        }
+        return null;
+    }
+
+    int findIndex(Predicate<&T> filter) {
+        for (int index = 0; index < this.size(); index++) {
+            if (filter.test(this.get(index))) {
+                return index;
+            }
+        }
+        return -1;
+    }
+
+    boolean any(Predicate<&T> filter) {
+        return this.findIndex(filter) >= 0;
+    }
+
+    boolean all(Predicate<&T> filter) {
+        for (int index = 0; index < this.size(); index++) {
+            if (!filter.test(this.get(index))) {
+                return false;
+            }
+        }
+        return true;
+    }
+
+    int count(Predicate<&T> filter) {
+        int matches = 0;
+        for (int index = 0; index < this.size(); index++) {
+            if (filter.test(this.get(index))) {
+                matches++;
+            }
+        }
+        return matches;
+    }
+
+    <R> List<R> map(Function<&T, R> mapper) {
+        List<R> mapped = new ArrayList<>();
+        for (int index = 0; index < this.size(); index++) {
+            mapped.add(mapper.apply(this.get(index)));
+        }
+        return mapped;
+    }
+
+    List<&T> filter(Predicate<&T> filter) {
+        List<&T> kept = new ArrayList<>();
+        for (int index = 0; index < this.size(); index++) {
+            &T value = this.get(index);
+            if (filter.test(value)) {
+                kept.add(value);
+            }
+        }
+        return kept;
+    }
+
+    List<&T> subList(int begin, int end) {
+        if (begin < 0 || end > this.size() || begin > end) {
+            throw new IndexOutOfBoundsException("range $begin..$end is out of bounds for size ${this.size()}");
+        }
+        List<&T> slice = new ArrayList<>();
+        for (int index = begin; index < end; index++) {
+            slice.add(this.get(index));
+        }
+        return slice;
+    }
+
+    List<T> clone() where T extends Cloneable<T> {
+        List<T> copy = new ArrayList<>();
+        for (int index = 0; index < this.size(); index++) {
+            copy.add(this.get(index).clone());
+        }
+        return copy;
+    }
+
+    boolean equals(&List<T> other) where T extends Equatable<T> {
+        if (this.size() != other.size()) {
+            return false;
+        }
+        for (int index = 0; index < this.size(); index++) {
+            if (!this.get(index).equals(other.get(index))) {
+                return false;
+            }
+        }
+        return true;
+    }
+
+    int hashCode() where T extends Hashable<T> {
+        int hash = 1;
+        for (int index = 0; index < this.size(); index++) {
+            hash = hash * 31 + this.get(index).hashCode();
+        }
+        return hash;
+    }
+
     mut void swap(int a, int b);
 
     /** Reverses the order of the elements in this list. */

@@ -291,6 +291,11 @@ impl<'a> Tcx<'a> {
         }
     }
 
+    pub fn same_library(&self, a: DefId, b: DefId) -> bool {
+        let package = |def: DefId| &self.items.defs[def.index()].package;
+        package(a).same_library(package(b))
+    }
+
     pub fn is_subclass(&self, sub: DefId, sup: DefId) -> bool {
         if sub == sup {
             return true;
@@ -612,7 +617,12 @@ impl<'a> Tcx<'a> {
         loop {
             let mut changed = false;
             for def in (0..self.types.len()).map(DefId::from_index) {
-                for item in [LangItem::Equatable, LangItem::Hashable] {
+                for item in [
+                    LangItem::Equatable,
+                    LangItem::Hashable,
+                    LangItem::Cloneable,
+                    LangItem::Comparable,
+                ] {
                     changed |= self.add_record_interface(def, item);
                 }
             }
@@ -629,20 +639,40 @@ impl<'a> Tcx<'a> {
         };
         let method_name = match item {
             LangItem::Equatable => "equals",
+            LangItem::Cloneable => "clone",
+            LangItem::Comparable => "compareTo",
             _ => "hashCode",
         };
         let already_implemented = sig.methods.contains_key(&Symbol::intern(method_name))
             || sig.interfaces.iter().any(
                 |parent| matches!(parent, Ty::Adt { def: parent, .. } if *parent == interface),
             );
-        if sig.kind != AdtKind::Record || already_implemented {
+        let unit_enum = sig.kind == AdtKind::Enum
+            && sig.variants.iter().all(|variant| variant.fields.is_empty());
+        let applies = match item {
+            LangItem::Comparable => unit_enum,
+            _ => matches!(sig.kind, AdtKind::Record | AdtKind::Enum),
+        };
+        if !applies || already_implemented {
             return false;
         }
         let env = ParamEnv::default().with_generics(&sig.generics);
-        let every_component = sig.components.iter().all(|name| {
-            let ty = sig.fields[name].ty.clone();
+        let components: Vec<Ty> = match sig.kind {
+            AdtKind::Enum => sig
+                .variants
+                .iter()
+                .flat_map(|variant| variant.fields.iter().map(|field| field.ty.clone()))
+                .collect(),
+            _ => sig
+                .components
+                .iter()
+                .map(|name| sig.fields[name].ty.clone())
+                .collect(),
+        };
+        let every_component = components.into_iter().all(|ty| {
+            let ty = ty.non_null().clone();
             let bound = self.def_ty(interface, vec![ty.clone()]);
-            ty.references_unknown() || self.is_assignable(&env, &ty, &bound)
+            ty.references_unknown() || self.satisfies_bound(&env, &ty, &bound)
         });
         if !every_component {
             return false;
@@ -652,13 +682,25 @@ impl<'a> Tcx<'a> {
         let span = sig.name.span;
         let name = Ident::new(Symbol::intern(method_name), span);
         let method = match item {
-            LangItem::Equatable => MethodSig {
+            LangItem::Equatable | LangItem::Comparable => MethodSig {
                 params: vec![Ty::Ref {
                     mutable: false,
                     ty: Box::new(self_ty.clone()),
                 }],
-                ..synthesized_method(name, def, Some(ReceiverKind::Ref), Ty::BOOLEAN)
+                ..synthesized_method(
+                    name,
+                    def,
+                    Some(ReceiverKind::Ref),
+                    if item == LangItem::Equatable {
+                        Ty::BOOLEAN
+                    } else {
+                        Ty::INT
+                    },
+                )
             },
+            LangItem::Cloneable => {
+                synthesized_method(name, def, Some(ReceiverKind::Ref), self_ty.clone())
+            }
             _ => synthesized_method(name, def, Some(ReceiverKind::Ref), Ty::INT),
         };
         let interface_ty = self.def_ty(interface, vec![self_ty]);
@@ -669,6 +711,70 @@ impl<'a> Tcx<'a> {
             .or_default()
             .push(method);
         true
+    }
+
+    pub(crate) fn satisfies_bound(&self, env: &ParamEnv, arg: &Ty, bound: &Ty) -> bool {
+        if self.is_assignable(env, arg, bound) {
+            return true;
+        }
+        let Ty::Adt { def, args, .. } = bound else {
+            return false;
+        };
+        [LangItem::Equatable, LangItem::Hashable, LangItem::Cloneable]
+            .into_iter()
+            .find(|item| self.lang_items.get(*item) == Some(*def))
+            .is_some_and(|item| {
+                args.first() == Some(arg) && self.has_structural_method(env, arg, item)
+            })
+    }
+
+    fn has_structural_method(&self, env: &ParamEnv, ty: &Ty, item: LangItem) -> bool {
+        let Ty::Adt { def, args, .. } = ty else {
+            return false;
+        };
+        let borrowed = Ty::Ref {
+            mutable: false,
+            ty: Box::new(ty.clone()),
+        };
+        let (name, params, ret) = match item {
+            LangItem::Equatable => ("equals", vec![borrowed], Ty::BOOLEAN),
+            LangItem::Hashable => {
+                if !self.has_structural_method(env, ty, LangItem::Equatable)
+                    && !self.is_assignable(env, ty, &self.def_ty_of(LangItem::Equatable, ty))
+                {
+                    return false;
+                }
+                ("hashCode", Vec::new(), Ty::INT)
+            }
+            LangItem::Cloneable => ("clone", Vec::new(), ty.clone()),
+            _ => return false,
+        };
+        self.methods_named(*def, args, Symbol::intern(name))
+            .iter()
+            .any(|(method, subst)| {
+                method.receiver == Some(ReceiverKind::Ref)
+                    && method
+                        .params
+                        .iter()
+                        .map(|param| param.subst(subst))
+                        .eq(params.iter().cloned())
+                    && method.ret.subst(subst) == ret
+                    && method.where_bounds.iter().all(|param| {
+                        subst.get(&param.name).is_some_and(|arg| {
+                            param
+                                .bounds
+                                .iter()
+                                .all(|bound| self.satisfies_bound(env, arg, &bound.subst(subst)))
+                        })
+                    })
+            })
+    }
+
+    pub(crate) fn def_ty_of(&self, item: LangItem, arg: &Ty) -> Ty {
+        match self.lang_items.get(item) {
+            Some(def) => self.def_ty(def, vec![arg.clone()]),
+            None => Ty::Unknown,
+        }
     }
 
     fn synthesize_unit_enum_members(&self, sig: &mut TypeSig, def: DefId, self_ty: Ty) {

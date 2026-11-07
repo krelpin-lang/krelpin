@@ -1,4 +1,6 @@
-use krelpin_ast::ast::{Block, Expr, ExprKind, Ident, LambdaBody, LambdaParam, ReceiverKind};
+use krelpin_ast::ast::{
+    Block, Expr, ExprKind, FieldStorage, Ident, LambdaBody, LambdaParam, ReceiverKind,
+};
 use krelpin_errors::Diagnostic;
 use krelpin_span::def_id::DefId;
 use krelpin_span::{Span, Symbol, kw};
@@ -29,6 +31,53 @@ impl Tcx<'_> {
         match self.abstract_methods(*def, args).as_slice() {
             [(method, sig)] if method.generics.is_empty() => Some(sig.clone()),
             _ => None,
+        }
+    }
+
+    pub fn may_hold_refs(&self, ty: &Ty) -> bool {
+        self.may_hold_refs_inner(ty, &mut Vec::new())
+    }
+
+    fn may_hold_refs_inner(&self, ty: &Ty, visiting: &mut Vec<DefId>) -> bool {
+        match ty {
+            Ty::Ref { .. } | Ty::Param(_) => true,
+            Ty::Primitive(_) | Ty::Null | Ty::Void | Ty::Unknown => false,
+            Ty::Nullable(inner) | Ty::Array(inner) => self.may_hold_refs_inner(inner, visiting),
+            Ty::Adt { def, args, .. } => {
+                if args
+                    .iter()
+                    .any(|arg| self.may_hold_refs_inner(arg, visiting))
+                {
+                    return true;
+                }
+                if visiting.contains(def) || self.is_string(ty) {
+                    return false;
+                }
+                let sig = self.sig(*def);
+                if !sig.borrow_params.is_empty() {
+                    return true;
+                }
+                if sig.kind == AdtKind::Interface {
+                    return self.fn_receiver(ty).is_some();
+                }
+                let subst = self.subst_for(*def, args);
+                visiting.push(*def);
+                let holds = sig
+                    .fields
+                    .values()
+                    .filter(|field| field.storage == FieldStorage::Instance)
+                    .map(|field| field.ty.subst(&subst))
+                    .chain(
+                        sig.variants
+                            .iter()
+                            .flat_map(|variant| &variant.fields)
+                            .map(|field| field.ty.subst(&subst)),
+                    )
+                    .chain(sig.superclass.iter().map(|ty| ty.subst(&subst)))
+                    .any(|field| self.may_hold_refs_inner(&field, visiting));
+                visiting.pop();
+                holds
+            }
         }
     }
 
@@ -175,6 +224,11 @@ impl FnCtxt<'_, '_> {
             .map(|arg| {
                 if is_closure(arg) || self.is_diamond(arg) {
                     Ty::Unknown
+                } else if let ExprKind::MethodCall { name, .. } = &arg.kind {
+                    self.deferrable.insert(name.span);
+                    let ty = self.check_expr(arg);
+                    self.deferrable.remove(&name.span);
+                    ty
                 } else {
                     self.check_expr(arg)
                 }

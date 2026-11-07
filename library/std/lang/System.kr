@@ -72,4 +72,11 @@ final class System {
      */
     @Intrinsic
     static long nanoTime();
+
+    @Intrinsic
+    static String osName();
+
+    static String? homeDirectory() {
+        return env("HOME");
+    }
 }

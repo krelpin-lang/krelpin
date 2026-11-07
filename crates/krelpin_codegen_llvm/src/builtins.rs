@@ -114,7 +114,7 @@ impl FnCx<'_, '_, '_> {
         if items.is(owner, LangItem::Enum)
             || (kind == AdtKind::Enum && builtin.receiver.is_some())
             || (kind == AdtKind::Enum && name == "values")
-            || (kind == AdtKind::Record && matches!(name, "equals" | "hashCode"))
+            || (kind == AdtKind::Record && matches!(name, "equals" | "hashCode" | "clone"))
             || (kind == AdtKind::Record
                 && builtin.receiver.is_some()
                 && self
@@ -413,28 +413,110 @@ impl FnCx<'_, '_, '_> {
                 true
             }
             (Shape::Enum(def, args), "equals") => {
-                let enum_ll = self.ll(&ty);
-                let a = self.assign(format!(
-                    "getelementptr inbounds {enum_ll}, ptr %a0, i32 0, i32 0"
-                ));
-                let b = self.assign(format!(
-                    "getelementptr inbounds {enum_ll}, ptr %a1, i32 0, i32 0"
-                ));
-                let a = self.assign(format!("load i32, ptr {a}"));
-                let b = self.assign(format!("load i32, ptr {b}"));
+                let (a, b) = (self.enum_tag(&ty, "%a0"), self.enum_tag(&ty, "%a1"));
                 let same = self.assign(format!("icmp eq i32 {a}, {b}"));
-                let _ = args;
-                let _ = def;
-                self.ret(&same, &Ty::BOOLEAN);
+                let result = self.alloca_ll("i1");
+                self.line(format!("store i1 false, ptr {result}"));
+                let fields = self.label("fields");
+                let done = self.label("compared");
+                self.line(format!("br i1 {same}, label %{fields}, label %{done}"));
+                self.start(&fields);
+                self.each_variant(
+                    &ty,
+                    def,
+                    &args,
+                    &a,
+                    &done,
+                    |fx, variant_ll, variant_fields| {
+                        let mut equal = "true".to_owned();
+                        for (position, (_, field_ty)) in variant_fields.iter().enumerate() {
+                            let left = fx.variant_field(&ty, variant_ll, "%a0", position, field_ty);
+                            let right =
+                                fx.variant_field(&ty, variant_ll, "%a1", position, field_ty);
+                            let field_equal = fx.field_equals(&left, &right, field_ty);
+                            equal = fx.assign(format!("and i1 {equal}, {field_equal}"));
+                        }
+                        fx.line(format!("store i1 {equal}, ptr {result}"));
+                    },
+                );
+                self.start(&done);
+                let value = self.assign(format!("load i1, ptr {result}"));
+                self.ret(&value, &Ty::BOOLEAN);
                 true
             }
-            (Shape::Enum(..), "hashCode") => {
-                let enum_ll = self.ll(&ty);
-                let a = self.assign(format!(
-                    "getelementptr inbounds {enum_ll}, ptr %a0, i32 0, i32 0"
-                ));
-                let a = self.assign(format!("load i32, ptr {a}"));
-                self.ret(&a, &Ty::INT);
+            (Shape::Enum(def, args), "hashCode") => {
+                let tag = self.enum_tag(&ty, "%a0");
+                let result = self.alloca_ll("i32");
+                self.line(format!("store i32 {tag}, ptr {result}"));
+                let done = self.label("hashed");
+                self.each_variant(
+                    &ty,
+                    def,
+                    &args,
+                    &tag,
+                    &done,
+                    |fx, variant_ll, variant_fields| {
+                        let mut hash = tag.clone();
+                        for (position, (_, field_ty)) in variant_fields.iter().enumerate() {
+                            let field =
+                                fx.variant_field(&ty, variant_ll, "%a0", position, field_ty);
+                            let field_hash = fx.field_hash(&field, field_ty);
+                            let scaled = fx.assign(format!("mul i32 {hash}, 31"));
+                            hash = fx.assign(format!("add i32 {scaled}, {field_hash}"));
+                        }
+                        fx.line(format!("store i32 {hash}, ptr {result}"));
+                    },
+                );
+                self.start(&done);
+                let value = self.assign(format!("load i32, ptr {result}"));
+                self.ret(&value, &Ty::INT);
+                true
+            }
+            (Shape::Enum(..), "compareTo") => {
+                let (a, b) = (self.enum_tag(&ty, "%a0"), self.enum_tag(&ty, "%a1"));
+                let less = self.assign(format!("icmp slt i32 {a}, {b}"));
+                let greater = self.assign(format!("icmp sgt i32 {a}, {b}"));
+                let low = self.assign(format!("select i1 {less}, i32 -1, i32 0"));
+                let order = self.assign(format!("select i1 {greater}, i32 1, i32 {low}"));
+                self.ret(&order, &Ty::INT);
+                true
+            }
+            (Shape::Enum(def, args), "clone") => {
+                let tag = self.enum_tag(&ty, "%a0");
+                let slot = self.alloca(&ty);
+                let done = self.label("cloned");
+                self.each_variant(
+                    &ty,
+                    def,
+                    &args,
+                    &tag,
+                    &done,
+                    |fx, variant_ll, variant_fields| {
+                        let tag_address = fx.assign(format!(
+                            "getelementptr inbounds {variant_ll}, ptr {slot}, i32 0, i32 0"
+                        ));
+                        fx.line(format!("store i32 {tag}, ptr {tag_address}"));
+                        for (position, (_, field_ty)) in variant_fields.iter().enumerate() {
+                            let source =
+                                fx.variant_field(&ty, variant_ll, "%a0", position, field_ty);
+                            let value = fx.field_clone(&source, field_ty);
+                            let address = fx.assign(format!(
+                                "getelementptr inbounds {variant_ll}, ptr {slot}, i32 0, i32 {}",
+                                position + 1
+                            ));
+                            if fx.cx.is_indirect(&ty, field_ty) {
+                                let cell = fx.wrap_indirect(&ty, field_ty, &value);
+                                fx.line(format!("store ptr {cell}, ptr {address}"));
+                            } else {
+                                fx.store(field_ty, &value, &address);
+                            }
+                        }
+                    },
+                );
+                self.start(&done);
+                let value = self.load(&ty, &slot);
+                self.zero(&ty, &slot);
+                self.ret(&value, &ty);
                 true
             }
             (Shape::Record(def, args), "equals") => {
@@ -454,6 +536,25 @@ impl FnCx<'_, '_, '_> {
                     result = self.assign(format!("and i1 {result}, {equal}"));
                 }
                 self.ret(&result, &Ty::BOOLEAN);
+                true
+            }
+            (Shape::Record(def, args), "clone") => {
+                let record_ll = self.ll(&ty);
+                let fields = self.cx.record_fields(def, &args);
+                let mut current = "zeroinitializer".to_owned();
+                for (index, (_, field_ty)) in fields.iter().enumerate() {
+                    let address = self.assign(format!(
+                        "getelementptr inbounds {record_ll}, ptr %a0, i32 0, i32 {index}"
+                    ));
+                    let address = self.indirect_slot(&ty, field_ty, address);
+                    let value = self.field_clone(&address, field_ty);
+                    let value = self.wrap_indirect(&ty, field_ty, &value);
+                    let field_ll = self.cx.field_llty(&ty, field_ty);
+                    current = self.assign(format!(
+                        "insertvalue {record_ll} {current}, {field_ll} {value}, {index}"
+                    ));
+                }
+                self.ret(&current, &ty);
                 true
             }
             (Shape::Record(def, args), "hashCode") => {
@@ -476,7 +577,45 @@ impl FnCx<'_, '_, '_> {
         }
     }
 
+    fn nullable_parts(&mut self, address: &str, ty: &Ty) -> (String, String) {
+        if matches!(self.cx.shape(ty), Shape::NullableValue(_)) {
+            let ll = self.ll(ty);
+            let flag_address = self.assign(format!(
+                "getelementptr inbounds {ll}, ptr {address}, i32 0, i32 0"
+            ));
+            let flag = self.assign(format!("load i1, ptr {flag_address}"));
+            let payload = self.assign(format!(
+                "getelementptr inbounds {ll}, ptr {address}, i32 0, i32 1"
+            ));
+            (flag, payload)
+        } else {
+            let pointer = self.assign(format!("load ptr, ptr {address}"));
+            let flag = self.assign(format!("icmp ne ptr {pointer}, null"));
+            (flag, address.to_owned())
+        }
+    }
+
     fn field_equals(&mut self, a: &str, b: &str, ty: &Ty) -> String {
+        if let Ty::Nullable(inner) = ty
+            && !matches!(inner.as_ref(), Ty::Ref { .. })
+        {
+            let inner = inner.as_ref().clone();
+            let (a_present, a_payload) = self.nullable_parts(a, ty);
+            let (b_present, b_payload) = self.nullable_parts(b, ty);
+            let result = self.alloca_ll("i1");
+            let both = self.assign(format!("and i1 {a_present}, {b_present}"));
+            let same_presence = self.assign(format!("icmp eq i1 {a_present}, {b_present}"));
+            self.line(format!("store i1 {same_presence}, ptr {result}"));
+            let compare = self.label("present");
+            let done = self.label("compared");
+            self.line(format!("br i1 {both}, label %{compare}, label %{done}"));
+            self.start(&compare);
+            let equal = self.field_equals(&a_payload, &b_payload, &inner);
+            self.line(format!("store i1 {equal}, ptr {result}"));
+            self.line(format!("br label %{done}"));
+            self.start(&done);
+            return self.assign(format!("load i1, ptr {result}"));
+        }
         match self.cx.shape(ty) {
             Shape::Prim(PrimitiveTy::Float | PrimitiveTy::Double) => {
                 let ll = self.ll(ty);
@@ -494,7 +633,105 @@ impl FnCx<'_, '_, '_> {
         }
     }
 
+    fn enum_tag(&mut self, ty: &Ty, value: &str) -> String {
+        let enum_ll = self.ll(ty);
+        let address = self.assign(format!(
+            "getelementptr inbounds {enum_ll}, ptr {value}, i32 0, i32 0"
+        ));
+        self.assign(format!("load i32, ptr {address}"))
+    }
+
+    fn variant_field(
+        &mut self,
+        ty: &Ty,
+        variant_ll: &str,
+        value: &str,
+        position: usize,
+        field_ty: &Ty,
+    ) -> String {
+        let address = self.assign(format!(
+            "getelementptr inbounds {variant_ll}, ptr {value}, i32 0, i32 {}",
+            position + 1
+        ));
+        self.indirect_slot(ty, field_ty, address)
+    }
+
+    fn each_variant(
+        &mut self,
+        ty: &Ty,
+        def: DefId,
+        args: &[Ty],
+        tag: &str,
+        done: &str,
+        mut body: impl FnMut(&mut Self, &str, &[(Symbol, Ty)]),
+    ) {
+        let _ = ty;
+        let count = self.cx.tcx.sig(def).variants.len();
+        let labels: Vec<String> = (0..count).map(|_| self.label("variant")).collect();
+        let cases: Vec<String> = labels
+            .iter()
+            .enumerate()
+            .map(|(index, label)| format!("i32 {index}, label %{label}"))
+            .collect();
+        self.line(format!(
+            "switch i32 {tag}, label %{done} [ {} ]",
+            cases.join(" ")
+        ));
+        for (index, label) in labels.iter().enumerate() {
+            self.start(label);
+            let variant_ll = self.cx.variant_type(def, args, index);
+            let fields = self.cx.variant_fields(def, args, index);
+            body(self, &variant_ll, &fields);
+            self.line(format!("br label %{done}"));
+        }
+    }
+
+    fn field_clone(&mut self, address: &str, ty: &Ty) -> String {
+        match (self.cx.shape(ty), ty) {
+            (Shape::Prim(_), _) => self.load(ty, address),
+            (_, Ty::Ref { .. }) => self.load(ty, address),
+            (_, Ty::Nullable(inner)) => {
+                let inner = inner.as_ref().clone();
+                let ll = self.ll(ty);
+                let result = self.alloca_ll(&ll);
+                let present = self.label("present");
+                let absent = self.label("absent");
+                let done = self.label("cloned");
+                let (flag, payload) = self.nullable_parts(address, ty);
+                self.line(format!("br i1 {flag}, label %{present}, label %{absent}"));
+                self.start(&present);
+                let cloned = self.field_clone(&payload, &inner);
+                let wrapped = self.convert(&cloned, &inner, ty);
+                self.line(format!("store {ll} {wrapped}, ptr {result}"));
+                self.line(format!("br label %{done}"));
+                self.start(&absent);
+                self.line(format!("store {ll} zeroinitializer, ptr {result}"));
+                self.line(format!("br label %{done}"));
+                self.start(&done);
+                self.assign(format!("load {ll}, ptr {result}"))
+            }
+            _ => self.call_clone(address, ty),
+        }
+    }
+
     fn field_hash(&mut self, a: &str, ty: &Ty) -> String {
+        if let Ty::Nullable(inner) = ty
+            && !matches!(inner.as_ref(), Ty::Ref { .. })
+        {
+            let inner = inner.as_ref().clone();
+            let (present, payload) = self.nullable_parts(a, ty);
+            let result = self.alloca_ll("i32");
+            self.line(format!("store i32 0, ptr {result}"));
+            let hash = self.label("present");
+            let done = self.label("hashed");
+            self.line(format!("br i1 {present}, label %{hash}, label %{done}"));
+            self.start(&hash);
+            let value = self.field_hash(&payload, &inner);
+            self.line(format!("store i32 {value}, ptr {result}"));
+            self.line(format!("br label %{done}"));
+            self.start(&done);
+            return self.assign(format!("load i32, ptr {result}"));
+        }
         match self.cx.shape(ty) {
             Shape::Prim(primitive) => {
                 let value = self.load(ty, a);
@@ -995,6 +1232,7 @@ impl FnCx<'_, '_, '_> {
             }
             "currentTimeMillis" => self.runtime_call("kr_system_millis", "i64", builtin, &[]),
             "nanoTime" => self.runtime_call("kr_system_nanos", "i64", builtin, &[]),
+            "osName" => self.runtime_call("kr_system_os_name", "ptr", builtin, &[]),
             _ => return false,
         }
         true
@@ -1013,6 +1251,35 @@ impl FnCx<'_, '_, '_> {
             "canonicalize" => ("kr_io_canonical_path", "ptr"),
             "remove" => ("kr_io_remove", "i1"),
             "makeDirectories" => ("kr_io_create_directories", "i1"),
+            "makeDirectory" => ("kr_io_create_directory", "i1"),
+            "isSymlink" => ("kr_io_is_symlink", "i1"),
+            "renameFile" => ("kr_io_rename", "i1"),
+            "copyFile" => ("kr_io_copy", "i1"),
+            "writeBytesRaw" => {
+                let bytes = self.assign("load ptr, ptr %a1");
+                let written = self.runtime(
+                    "i1",
+                    "kr_io_write_bytes",
+                    &format!("ptr %a0, ptr {bytes}, i1 %a2"),
+                );
+                let string = self.cx.tcx.string_ty();
+                self.drop_value("%a0", &string);
+                let ret = self.ret_ty.clone();
+                self.ret(&written, &ret);
+                return true;
+            }
+            "readBytesRaw" => {
+                let array = Ty::Array(Box::new(Ty::Primitive(PrimitiveTy::Byte)));
+                let descriptor = self.cx.rt_global(RtKey::Array(array.clone()));
+                self.cx.drop_array_fn(&array);
+                self.runtime_call(
+                    "kr_io_read_bytes",
+                    "ptr",
+                    builtin,
+                    &[format!("ptr {descriptor}")],
+                );
+                return true;
+            }
             "listDirectory" => {
                 let array = Ty::Array(Box::new(self.cx.tcx.string_ty()));
                 let descriptor = self.cx.rt_global(RtKey::Array(array.clone()));

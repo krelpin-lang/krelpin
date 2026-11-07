@@ -61,7 +61,7 @@ final class TcpStream {
      * @return the connection to the client
      * @throws IOException if accepting fails or times out
      */
-    static TcpStream accept(&mut TcpListener listener) throws IOException {
+    internal static TcpStream accept(&mut TcpListener listener) throws IOException {
         TcpStream stream = new TcpStream();
         if (!stream.acceptRaw(listener)) {
             throw new IOException("couldn't accept a connection: ${Files.lastError()}");
@@ -128,7 +128,7 @@ final class TcpStream {
      *         waiting
      * @throws IOException if accepting fails
      */
-    static TcpStream? tryAccept(&mut TcpListener listener) throws IOException {
+    internal static TcpStream? tryAccept(&mut TcpListener listener) throws IOException {
         TcpStream stream = new TcpStream();
         int status = stream.tryAcceptRaw(listener);
         if (status < 0) {

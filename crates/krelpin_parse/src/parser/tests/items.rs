@@ -499,10 +499,10 @@ fn where_clauses() {
 
 #[test]
 fn macro_declarations() {
-    let unit = parse_ok("@Intrinsic\nmacro Derive;\nclass A {}");
+    let unit = parse_ok("@Intrinsic\nmacro Builder;\nclass A {}");
     assert_eq!(unit.items.len(), 1);
     assert_eq!(unit.macros.len(), 1);
-    assert_eq!(unit.macros[0].name.name.as_str(), "Derive");
+    assert_eq!(unit.macros[0].name.name.as_str(), "Builder");
     assert!(unit.macros[0].body.is_none());
     let unit =
         parse_ok("macro Builder(TokenStream args, TokenStream item) { return item; }\nclass A {}");
@@ -551,7 +551,7 @@ fn annotated_declarations_capture_their_tokens() {
 
 #[test]
 fn annotation_arguments_keep_their_tokens() {
-    let unit = parse_ok("@Derive(Equatable, Hashable) class A {}");
+    let unit = parse_ok("@Builder(Equatable, Hashable) class A {}");
     let args = unit.items[0].annotations[0]
         .args
         .as_ref()
@@ -561,7 +561,7 @@ fn annotation_arguments_keep_their_tokens() {
 
 #[test]
 fn annotation_arguments_touch_the_name() {
-    let members = members("class A { @Intrinsic\n    (&String)? f(); @Derive(Equatable) int x; }");
+    let members = members("class A { @Intrinsic\n    (&String)? f(); @Builder(Equatable) int x; }");
     assert_eq!(members[0].annotations[0].args, None);
     assert!(members[1].annotations[0].args.is_some());
 }

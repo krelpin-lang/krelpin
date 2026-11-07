@@ -1,7 +1,5 @@
 package std.lang;
 
-/**
- * A marker interface for classes whose objects can be copied field by
- * field.
- */
-interface Cloneable {}
+interface Cloneable<T> {
+    T clone();
+}

@@ -14,7 +14,7 @@ package std.primitive;
  * <p>Arithmetic on {@code int} wraps around on overflow:
  * {@code int.MAX_VALUE + 1} is {@code int.MIN_VALUE}.
  */
-final class Int implements Comparable<int>, Hashable<int> {
+final class Int implements Comparable<int>, Hashable<int>, Cloneable<int> {
     /** The minimum value of an {@code int}, -2<sup>31</sup>. */
     public const int MIN_VALUE = -2147483648;
 
@@ -89,5 +89,30 @@ final class Int implements Comparable<int>, Hashable<int> {
      */
     String format(String spec) {
         return Format.integer(this, spec);
+    }
+
+    static int parse(String text, int radix) {
+        long value = 0;
+        try {
+            value = Long.parse(text, radix);
+        } catch (NumberFormatException error) {
+            String? message = error.getMessage();
+            if (message != null && message.contains("fit")) {
+                throw new NumberFormatException("`$text` does not fit in an `int`");
+            }
+            throw error;
+        }
+        if (value < int.MIN_VALUE || value > int.MAX_VALUE) {
+            throw new NumberFormatException("`$text` does not fit in an `int`");
+        }
+        return (int) value;
+    }
+
+    String toString(int radix) {
+        return Long.toString((long) this, radix);
+    }
+
+    int clone() {
+        return this;
     }
 }

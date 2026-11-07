@@ -20,6 +20,10 @@ impl PackagePath {
             .collect()
     }
 
+    pub fn same_library(&self, other: &PackagePath) -> bool {
+        self.0.first() == other.0.first()
+    }
+
     pub fn is_std(&self) -> bool {
         self.0.first().is_some_and(|name| name.as_str() == "std")
     }

@@ -14,7 +14,7 @@ package std.primitive;
  * <p>Arithmetic on {@code byte} wraps around on overflow:
  * {@code byte.MAX_VALUE + 1} is {@code byte.MIN_VALUE}.
  */
-final class Byte implements Comparable<byte>, Hashable<byte> {
+final class Byte implements Comparable<byte>, Hashable<byte>, Cloneable<byte> {
     /** The minimum value of a {@code byte}, -2<sup>7</sup>. */
     public const byte MIN_VALUE = -128;
 
@@ -89,5 +89,9 @@ final class Byte implements Comparable<byte>, Hashable<byte> {
      */
     String format(String spec) {
         return Format.integer(this, spec);
+    }
+
+    byte clone() {
+        return this;
     }
 }

@@ -1,0 +1,35 @@
+package std.time;
+
+record Instant(long nanos) implements Comparable<Instant> {
+    static Instant now() {
+        return new Instant(System.nanoTime());
+    }
+
+    Duration elapsed() {
+        return new Duration(System.nanoTime() - this.nanos);
+    }
+
+    Duration durationSince(Instant earlier) {
+        return new Duration(this.nanos - earlier.nanos());
+    }
+
+    Instant plus(Duration duration) {
+        return new Instant(this.nanos + duration.nanos());
+    }
+
+    Instant minus(Duration duration) {
+        return new Instant(this.nanos - duration.nanos());
+    }
+
+    boolean isBefore(Instant other) {
+        return this.nanos < other.nanos();
+    }
+
+    boolean isAfter(Instant other) {
+        return this.nanos > other.nanos();
+    }
+
+    int compareTo(&Instant other) {
+        return this.nanos.compareTo(&other.nanos());
+    }
+}

@@ -1,0 +1,20 @@
+error: the `static` field `TASKS` has type `Mutex<List<Runnable>>`, which may hold references
+ --> tests/ui/typeck/static_field_errors.kr:8:34
+  |
+8 |     static Mutex<List<Runnable>> TASKS = new Mutex<>(new ArrayList<>());
+  |                                  ^^^^^
+  |
+  = note: a `static` field lives as long as the program, longer than anything it could borrow
+  = help: keep it in a local or an instance field, or store plain data instead of lambdas
+
+error: the `static` field `HOOK` has type `Runnable`, which may hold references
+ --> tests/ui/typeck/static_field_errors.kr:9:21
+  |
+9 |     static Runnable HOOK = () -> Console.println("hook");
+  |                     ^^^^
+  |
+  = note: a `static` field lives as long as the program, longer than anything it could borrow
+  = help: keep it in a local or an instance field, or store plain data instead of lambdas
+
+error: aborting due to 2 previous errors
+

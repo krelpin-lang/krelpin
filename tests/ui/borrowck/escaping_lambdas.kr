@@ -1,0 +1,66 @@
+package shop;
+
+import std.util.ArrayList;
+import std.util.List;
+
+class Holder {
+    private Runnable task;
+
+    Holder(Runnable task) {
+        this.task = task;
+    }
+
+    mut void go() {
+        this.task.run();
+    }
+}
+
+class Main {
+    static Holder stored() {
+        List<String> local = new ArrayList<>();
+        local.add("hello");
+        return new Holder(() -> Console.println(local.get(0)));
+    }
+
+    static Thread threaded() {
+        List<String> local = new ArrayList<>();
+        local.add("hello");
+        Thread thread = new Thread(() -> Console.println(local.size()));
+        thread.start();
+        return thread;
+    }
+
+    static int raced() {
+        int[] counter = {0};
+        Thread first = new Thread(() -> counter[0] = counter[0] + 1);
+        Thread second = new Thread(() -> counter[0] = counter[0] + 1);
+        first.start();
+        second.start();
+        first.join();
+        second.join();
+        return counter[0];
+    }
+
+    static int shared() {
+        List<String> names = new ArrayList<>();
+        names.add("a");
+        Thread first = new Thread(() -> Console.println(names.size()));
+        Thread second = new Thread(() -> Console.println(names.size()));
+        first.start();
+        second.start();
+        first.join();
+        second.join();
+        return names.size();
+    }
+
+    static Holder owned() {
+        List<String> local = new ArrayList<>();
+        local.add("hello");
+        return new Holder(move () -> Console.println(local.get(0)));
+    }
+
+    static void main() {
+        Holder holder = Main.owned();
+        holder.go();
+    }
+}

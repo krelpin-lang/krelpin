@@ -205,6 +205,19 @@ impl Cx<'_, '_> {
         }
     }
 
+    fn implements_structurally(&self, ty: &Ty, selector: &Selector) -> bool {
+        let Ty::Adt { def, args, .. } = &selector.owner else {
+            return false;
+        };
+        let structural = [LangItem::Equatable, LangItem::Hashable, LangItem::Cloneable]
+            .into_iter()
+            .any(|item| self.tcx.lang_items.get(item) == Some(*def));
+        structural
+            && args
+                .first()
+                .is_some_and(|target| self.is_subtype(ty, target))
+    }
+
     fn vtable_entry(&mut self, rt: usize, selector_id: usize) -> Option<String> {
         let selector = self.selectors[selector_id].clone();
         let key = self.rt[rt].key.clone();
@@ -212,7 +225,10 @@ impl Cx<'_, '_> {
         let object = self.lang_ty(LangItem::Object);
         let applies = match &key {
             RtKey::Array(_) => selector.owner == object,
-            _ => self.is_subtype(&ty, &selector.owner),
+            _ => {
+                self.is_subtype(&ty, &selector.owner)
+                    || self.implements_structurally(&ty, &selector)
+            }
         };
         if !applies {
             return None;
@@ -250,7 +266,14 @@ impl Cx<'_, '_> {
             RtKey::Array(_) | RtKey::Closure(_) | RtKey::Async(_) => object.clone(),
             _ => ty.clone(),
         };
-        let resolved = self.find_impl(&lookup_ty, &selector)?;
+        let resolved = match &key {
+            RtKey::Closure(index) => {
+                let iface = self.closures[*index].iface.clone();
+                self.find_impl(&iface, &selector)
+                    .or_else(|| self.find_impl(&lookup_ty, &selector))?
+            }
+            _ => self.find_impl(&lookup_ty, &selector)?,
+        };
         let target = self.resolved_instance(&resolved, &ty);
         let impl_receiver = self
             .receiver_kind(&resolved.method)

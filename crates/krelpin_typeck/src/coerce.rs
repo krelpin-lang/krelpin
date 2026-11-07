@@ -88,6 +88,7 @@ impl Tcx<'_> {
     pub fn common_ty(&self, env: &ParamEnv, a: &Ty, b: &Ty) -> Option<Ty> {
         match (a, b) {
             (Ty::Null, other) | (other, Ty::Null) => Some(other.clone().nullable()),
+            (Ty::Primitive(a), Ty::Primitive(b)) if a == b => Some(Ty::Primitive(*a)),
             (Ty::Primitive(a), Ty::Primitive(b))
                 if *a != PrimitiveTy::Boolean && *b != PrimitiveTy::Boolean =>
             {

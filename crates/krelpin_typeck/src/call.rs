@@ -18,6 +18,14 @@ impl Phase {
     const ALL: [Phase; 2] = [Phase::Fixed, Phase::Variadic];
 }
 
+pub(crate) struct PendingCall {
+    candidate: Candidate,
+    probed: Vec<usize>,
+    phase: Phase,
+    name: Ident,
+    what: String,
+}
+
 #[derive(Clone)]
 struct Candidate {
     method: MethodSig,
@@ -61,6 +69,79 @@ impl FnCtxt<'_, '_> {
     }
 
     pub(crate) fn call(
+        &mut self,
+        candidates: Vec<(MethodSig, Subst)>,
+        args: &[Expr],
+        arg_tys: &[Ty],
+        name: Ident,
+        what: &str,
+    ) -> Ty {
+        let ty = self.call_inner(candidates, args, arg_tys, name, what);
+        for arg in args {
+            self.finish_pending(arg, &Ty::Unknown);
+        }
+        ty
+    }
+
+    pub(crate) fn report_pending_calls(&mut self) {
+        let pending: Vec<PendingCall> = self.pending_calls.drain().map(|(_, call)| call).collect();
+        for call in pending {
+            self.report_unresolved(&call.candidate, call.name);
+        }
+    }
+
+    fn finish_pending(&mut self, arg: &Expr, expected: &Ty) {
+        let ExprKind::MethodCall { name, args, .. } = &arg.kind else {
+            return;
+        };
+        let Some(pending) = self.pending_calls.remove(&name.span) else {
+            return;
+        };
+        let mut candidate = pending.candidate;
+        self.infer_from_expectation(&mut candidate, Some(expected));
+        let (mut resolved, mut probed) =
+            self.infer_from_lambdas(&candidate, args, pending.phase, &pending.probed);
+        probed.extend(pending.probed);
+        self.infer_from_expectation(&mut resolved, Some(expected));
+        self.report_unresolved(&resolved, pending.name);
+        let ty = self.finish_call(
+            &resolved,
+            args,
+            &probed,
+            pending.phase,
+            pending.name,
+            &pending.what,
+        );
+        self.results.expr_types.insert(arg.span, ty);
+    }
+
+    fn report_unresolved(&self, resolved: &Candidate, name: Ident) {
+        let unresolved: Vec<String> = resolved
+            .method
+            .generics
+            .iter()
+            .filter(|param| resolved.subst.get(&param.name).is_none_or(Ty::is_unknown))
+            .map(|param| format!("`{}`", param.name))
+            .collect();
+        if unresolved.is_empty() {
+            return;
+        }
+        self.emit(
+            Diagnostic::error(format!(
+                "cannot infer {} of `{}`",
+                if unresolved.len() == 1 {
+                    format!("the type argument {}", unresolved[0])
+                } else {
+                    format!("the type arguments {}", unresolved.join(", "))
+                },
+                name.name
+            ))
+            .with_span(name.span)
+            .with_help("give the result a declared type, like `List<String> items = ...`"),
+        );
+    }
+
+    fn call_inner(
         &mut self,
         candidates: Vec<(MethodSig, Subst)>,
         args: &[Expr],
@@ -122,36 +203,53 @@ impl FnCtxt<'_, '_> {
             }
             return Ty::Unknown;
         };
-        let (mut resolved, probed) = self.infer_from_lambdas(chosen, args, phase);
         let expected = self.call_expectations.remove(&name.span);
+        let mut expecting = chosen.clone();
+        self.infer_from_expectation(&mut expecting, expected.as_ref());
+        let (mut resolved, probed) = self.infer_from_lambdas(&expecting, args, phase, &[]);
         self.infer_from_expectation(&mut resolved, expected.as_ref());
         let unknown_arg = arg_tys
             .iter()
             .zip(args)
             .any(|(ty, arg)| !is_closure(arg) && !self.is_diamond(arg) && ty.references_unknown());
-        let unresolved: Vec<String> = resolved
+        let unresolved = resolved
             .method
             .generics
             .iter()
-            .filter(|param| resolved.subst.get(&param.name).is_none_or(Ty::is_unknown))
-            .map(|param| format!("`{}`", param.name))
-            .collect();
-        if !unresolved.is_empty() && !unknown_arg {
-            self.emit(
-                Diagnostic::error(format!(
-                    "cannot infer {} of `{}`",
-                    if unresolved.len() == 1 {
-                        format!("the type argument {}", unresolved[0])
-                    } else {
-                        format!("the type arguments {}", unresolved.join(", "))
-                    },
-                    name.name
-                ))
-                .with_span(name.span)
-                .with_help("give the result a declared type, like `List<String> items = ...`"),
+            .any(|param| resolved.subst.get(&param.name).is_none_or(Ty::is_unknown));
+        if unresolved && self.deferrable.remove(&name.span) {
+            let ret = resolved.ret.clone();
+            self.pending_calls.insert(
+                name.span,
+                PendingCall {
+                    candidate: resolved,
+                    probed,
+                    phase,
+                    name,
+                    what: what.to_owned(),
+                },
             );
+            return ret;
         }
-        let chosen = &resolved;
+        for (index, arg) in args.iter().enumerate() {
+            let param = resolved.param(index, phase);
+            self.finish_pending(arg, &param);
+        }
+        if !unknown_arg {
+            self.report_unresolved(&resolved, name);
+        }
+        self.finish_call(&resolved, args, &probed, phase, name, what)
+    }
+
+    fn finish_call(
+        &mut self,
+        chosen: &Candidate,
+        args: &[Expr],
+        probed: &[usize],
+        phase: Phase,
+        name: Ident,
+        what: &str,
+    ) -> Ty {
         self.check_call_bounds(chosen, name);
         self.check_vis(chosen.method.vis, chosen.method.owner, false, what, name);
         self.results.callees.insert(
@@ -164,8 +262,6 @@ impl FnCtxt<'_, '_> {
                 subst: chosen.subst.clone(),
             },
         );
-        // An `async` method throws when its future is awaited, not when the
-        // call makes the future.
         if chosen.method.output.is_none() {
             for thrown in &chosen.method.throws {
                 self.raise(thrown.subst(&chosen.subst), name.span);
@@ -224,6 +320,7 @@ impl FnCtxt<'_, '_> {
         chosen: &Candidate,
         args: &[Expr],
         phase: Phase,
+        skip: &[usize],
     ) -> (Candidate, Vec<usize>) {
         let mut candidate = chosen.clone();
         let mut probed = Vec::new();
@@ -240,6 +337,9 @@ impl FnCtxt<'_, '_> {
             let vars = unresolved(&candidate);
             if vars.is_empty() {
                 break;
+            }
+            if skip.contains(&index) {
+                continue;
             }
             let ExprKind::Lambda { params, body, .. } = &arg.kind else {
                 continue;

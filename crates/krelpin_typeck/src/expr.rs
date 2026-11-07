@@ -583,6 +583,12 @@ impl FnCtxt<'_, '_> {
                 }
                 "protected"
             }
+            Visibility::Internal(_) => {
+                if self.tcx.same_library(self.owner, owner) {
+                    return;
+                }
+                "internal"
+            }
         };
         if self.owner == owner {
             return;
@@ -1073,6 +1079,12 @@ impl FnCtxt<'_, '_> {
     }
 
     fn check_equality(&self, l: &Ty, r: &Ty, op: BinOp, span: Span) {
+        if matches!(
+            (l, r),
+            (Ty::Null, Ty::Nullable(_)) | (Ty::Nullable(_), Ty::Null)
+        ) {
+            return;
+        }
         let compatible = match (l.non_null(), r.non_null()) {
             (Ty::Null, Ty::Primitive(_)) | (Ty::Primitive(_), Ty::Null) => false,
             (Ty::Null, _) | (_, Ty::Null) => return,
@@ -1120,7 +1132,14 @@ impl FnCtxt<'_, '_> {
     fn is_equatable(&self, ty: &Ty) -> bool {
         match ty {
             Ty::Primitive(_) | Ty::Unknown => true,
-            ty => self.is_assignable(ty, &self.tcx.lang_ty(LangItem::Equatable)),
+            ty => {
+                self.is_assignable(ty, &self.tcx.lang_ty(LangItem::Equatable))
+                    || self.tcx.satisfies_bound(
+                        &self.param_env,
+                        ty,
+                        &self.tcx.def_ty_of(LangItem::Equatable, ty),
+                    )
+            }
         }
     }
 

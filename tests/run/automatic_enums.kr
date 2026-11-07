@@ -1,0 +1,74 @@
+import std.util.ArrayList;
+import std.util.Comparator;
+import std.util.HashMap;
+import std.util.HashSet;
+import std.util.List;
+import std.util.Map;
+import std.util.Set;
+
+enum Shape {
+    Circle(double radius),
+    Rect(int width, int height),
+    Named(String name, List<String> tags),
+    Empty,
+}
+
+enum Level {
+    Low,
+    Mid,
+    High,
+}
+
+record Person(String name, int age);
+
+class Main {
+    static void main() {
+        Shape a = Shape.Rect(2, 3);
+        Shape b = Shape.Rect(2, 3);
+        Shape c = Shape.Rect(3, 2);
+        Console.println("${a == b} ${a == c} ${a == Shape.Empty} ${Shape.Empty == Shape.Empty}");
+        Console.println("${a.hashCode() == b.hashCode()} ${Shape.Circle(1.5) == Shape.Circle(1.5)}");
+
+        List<String> tags = new ArrayList<>();
+        tags.add("x");
+        Shape named = Shape.Named("box", tags);
+        Shape copy = named.clone();
+        if (copy instanceof Shape.Named(String name, List<String> copied)) {
+            Console.println("$name $copied");
+        }
+
+        Set<Shape> shapes = new HashSet<>();
+        shapes.add(Shape.Rect(1, 1));
+        shapes.add(Shape.Rect(1, 1));
+        shapes.add(Shape.Empty);
+        Console.println(shapes.size());
+
+        Map<Level, String> labels = new HashMap<>();
+        labels.put(Level.High, "!");
+        Console.println("${Level.Low.compareTo(&Level.High)} ${Level.High.compareTo(&Level.Mid)} ${Level.Mid.compareTo(&Level.Mid)} ${labels.get(&Level.High)}");
+        List<Level> levels = new ArrayList<>();
+        levels.add(Level.High);
+        levels.add(Level.Low);
+        levels.add(Level.Mid);
+        levels.sort();
+        Console.println("$levels ${Level.Mid.clone()}");
+
+        List<Person> people = new ArrayList<>();
+        people.add(new Person("cyd", 30));
+        people.add(new Person("ada", 30));
+        people.add(new Person("bob", 25));
+        Comparator<Person> byAge = Comparator.comparing(person -> person.age());
+        people.sort(byAge.thenComparing(person -> person.name()));
+        Console.println("${people.map(person -> person.name())}");
+        people.sort(Comparator.comparing(person -> person.name()));
+        Console.println("${people.map(person -> person.name())}");
+        Comparator<Person> byName = Comparator.comparing(person -> person.name());
+        people.sort(byName.reversed());
+        Console.println("${people.map(person -> person.name())}");
+        List<String> names = new ArrayList<>();
+        names.add("b");
+        names.add("a");
+        names.sort(Comparator.naturalOrder());
+        Console.println("$names");
+    }
+}

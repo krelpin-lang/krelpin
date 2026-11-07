@@ -188,7 +188,85 @@ final class Files {
      * @param path the path the operation was applied to
      * @return the exception to throw
      */
-    static IOException failure(String action, String path) {
+    static byte[] readBytes(String path) throws IOException {
+        byte[]? bytes = readBytesRaw(path);
+        if (bytes == null) {
+            throw failure("read", path);
+        }
+        return bytes;
+    }
+
+    static void writeBytes(String path, &byte[] bytes) throws IOException {
+        if (!writeBytesRaw(path, bytes, false)) {
+            throw failure("write", path);
+        }
+    }
+
+    static void appendBytes(String path, &byte[] bytes) throws IOException {
+        if (!writeBytesRaw(path, bytes, true)) {
+            throw failure("append to", path);
+        }
+    }
+
+    @Intrinsic
+    static boolean isSymlink(String path);
+
+    static void createDirectory(String path) throws IOException {
+        if (!makeDirectory(path)) {
+            throw failure("create the directory", path);
+        }
+    }
+
+    static void copy(String from, String to) throws IOException {
+        if (!copyFile(from, to)) {
+            throw new IOException("couldn't copy `$from` to `$to`: ${lastError()}");
+        }
+    }
+
+    static void move(String from, String to) throws IOException {
+        if (!renameFile(from, to)) {
+            throw new IOException("couldn't move `$from` to `$to`: ${lastError()}");
+        }
+    }
+
+    static void deleteRecursively(String path) throws IOException {
+        if (isDirectory(path) && !isSymlink(path)) {
+            for (String name : list(path)) {
+                deleteRecursively(Path.join(path, name));
+            }
+        }
+        delete(path);
+    }
+
+    static String tempDirectory() {
+        String? configured = System.env("TMPDIR");
+        if (configured == null || configured.isEmpty()) {
+            return "/tmp";
+        }
+        String trimmed = configured;
+        while (trimmed.length() > 1 && trimmed.endsWith("/")) {
+            trimmed = trimmed.substring(0, trimmed.length() - 1);
+        }
+        return trimmed;
+    }
+
+    static String createTempDirectory(String prefix) throws IOException {
+        String base = tempDirectory();
+        long seed = System.nanoTime();
+        for (int attempt = 0; attempt < 100; attempt++) {
+            long tag = Math.abs(seed + attempt * 7919L);
+            String candidate = Path.join(base, "$prefix$tag");
+            if (makeDirectory(candidate)) {
+                return candidate;
+            }
+            if (!exists(candidate)) {
+                throw failure("create the directory", candidate);
+            }
+        }
+        throw new IOException("couldn't create a temporary directory in `$base`");
+    }
+
+    internal static IOException failure(String action, String path) {
         return new IOException("couldn't $action `$path`: ${lastError()}");
     }
 
@@ -199,7 +277,7 @@ final class Files {
      * @return the system's description of the last error
      */
     @Intrinsic
-    static String lastError();
+    internal static String lastError();
 
     /**
      * Returns whether the last file operation on the current thread failed.
@@ -207,7 +285,7 @@ final class Files {
      * @return {@code true} if the last operation failed
      */
     @Intrinsic
-    static boolean lastFailed();
+    internal static boolean lastFailed();
 
     @Intrinsic
     private static String? readFile(String path);
@@ -229,4 +307,19 @@ final class Files {
 
     @Intrinsic
     private static String[]? listDirectory(String path);
+
+    @Intrinsic
+    private static boolean makeDirectory(String path);
+
+    @Intrinsic
+    private static boolean renameFile(String from, String to);
+
+    @Intrinsic
+    private static boolean copyFile(String from, String to);
+
+    @Intrinsic
+    private static byte[]? readBytesRaw(String path);
+
+    @Intrinsic
+    private static boolean writeBytesRaw(String path, &byte[] bytes, boolean append);
 }

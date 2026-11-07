@@ -1,0 +1,22 @@
+interface Op {
+    mut int run(int x);
+
+    int describe() {
+        return 7;
+    }
+
+    move Op twice() {
+        Op inner = this;
+        return move x -> inner.run(inner.run(x));
+    }
+}
+
+class Main {
+    static void main() {
+        Op triple = x -> x * 3;
+        Console.println(triple.describe());
+        Op twice = triple.twice();
+        Console.println(twice.run(1));
+        Console.println(twice.describe());
+    }
+}

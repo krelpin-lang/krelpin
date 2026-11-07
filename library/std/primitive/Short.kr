@@ -14,7 +14,7 @@ package std.primitive;
  * <p>Arithmetic on {@code short} wraps around on overflow:
  * {@code short.MAX_VALUE + 1} is {@code short.MIN_VALUE}.
  */
-final class Short implements Comparable<short>, Hashable<short> {
+final class Short implements Comparable<short>, Hashable<short>, Cloneable<short> {
     /** The minimum value of a {@code short}, -2<sup>15</sup>. */
     public const short MIN_VALUE = -32768;
 
@@ -89,5 +89,9 @@ final class Short implements Comparable<short>, Hashable<short> {
      */
     String format(String spec) {
         return Format.integer(this, spec);
+    }
+
+    short clone() {
+        return this;
     }
 }

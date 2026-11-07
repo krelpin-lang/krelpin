@@ -5,7 +5,7 @@ package std.primitive;
  *
  * <p>For ordering, {@code false} sorts before {@code true}.
  */
-final class Boolean implements Comparable<boolean>, Hashable<boolean> {
+final class Boolean implements Comparable<boolean>, Hashable<boolean>, Cloneable<boolean> {
     private Boolean() {}
 
     /**
@@ -72,5 +72,9 @@ final class Boolean implements Comparable<boolean>, Hashable<boolean> {
      */
     String format(String spec) {
         return Format.text("" + this, spec);
+    }
+
+    boolean clone() {
+        return this;
     }
 }

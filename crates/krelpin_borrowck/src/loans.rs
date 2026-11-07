@@ -458,18 +458,27 @@ impl LoanData<'_, '_> {
         };
         let storage = match (has_receiver, index) {
             (true, 0) => None,
-            _ => Some(
-                callee
+            _ => {
+                let param = index - usize::from(has_receiver);
+                let mut storage = callee
                     .method
                     .storage
-                    .get(index - usize::from(has_receiver))
+                    .get(param)
                     .copied()
                     .unwrap_or(Storage {
                         whole: true,
                         contents: true,
                         detached: false,
-                    }),
-            ),
+                    });
+                match callee.method.params.get(param) {
+                    Some(Ty::Ref { ty, .. }) => {
+                        storage.contents |= self.tys.may_hold_refs(ty);
+                    }
+                    Some(ty) => storage.whole |= self.tys.may_hold_refs(ty),
+                    None => {}
+                }
+                Some(storage)
+            }
         };
         let held = self.operand_loans(state, &args[index]);
         let contents = match declared {

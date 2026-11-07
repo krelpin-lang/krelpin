@@ -1,0 +1,32 @@
+import std.util.HashMap;
+import std.util.Map;
+
+class Main {
+    static int? maybe(int n) {
+        return n == 0 ? null : n;
+    }
+
+    static void main() {
+        int? a = maybe(4);
+        int? none = maybe(0);
+        Console.println(a != null);
+        Console.println(a == null);
+        Console.println(none == null);
+        Console.println(null != none);
+        Console.println(a == 4);
+        Console.println(none == 4);
+        if (a != null) {
+            Console.println(a + 1);
+            Console.println(a * a);
+            Console.println(a < 10);
+            Console.println(-a);
+        }
+        Map<String, double> prices = new HashMap<>();
+        prices.put("tea", 2.5);
+        double? tea = prices.get(&"tea");
+        double? coffee = prices.get(&"coffee");
+        if (tea != null && coffee == null) {
+            Console.println(tea * 2.0);
+        }
+    }
+}

@@ -56,5 +56,33 @@ interface Set<T> extends Iterable<T> {
     boolean contains(&T value);
 
     /** Removes all elements from this set. */
+    Set<T> clone() where T extends Cloneable<T> & Hashable<T> {
+        Set<T> copy = new HashSet<>();
+        for (&T value : this) {
+            copy.add(value.clone());
+        }
+        return copy;
+    }
+
+    boolean equals(&Set<T> other) {
+        if (this.size() != other.size()) {
+            return false;
+        }
+        for (&T value : this) {
+            if (!other.contains(value)) {
+                return false;
+            }
+        }
+        return true;
+    }
+
+    int hashCode() where T extends Hashable<T> {
+        int hash = 0;
+        for (&T value : this) {
+            hash = hash + value.hashCode();
+        }
+        return hash;
+    }
+
     mut void clear();
 }

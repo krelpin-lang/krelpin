@@ -356,7 +356,7 @@ fn describe_method(method: &MethodSig, fn_sig: &FnSig) -> String {
 fn visibility_rank(vis: Visibility) -> u8 {
     match vis {
         Visibility::Private(_) => 0,
-        Visibility::Protected(_) => 1,
+        Visibility::Protected(_) | Visibility::Internal(_) => 1,
         Visibility::Default | Visibility::Public(_) => 2,
     }
 }
@@ -365,6 +365,7 @@ fn describe_visibility(vis: Visibility) -> &'static str {
     match vis {
         Visibility::Private(_) => "private",
         Visibility::Protected(_) => "protected",
+        Visibility::Internal(_) => "internal",
         Visibility::Default | Visibility::Public(_) => "public",
     }
 }

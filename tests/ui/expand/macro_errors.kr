@@ -3,26 +3,7 @@ package shop;
 macro Builder;
 
 @Builder
-class Order {
-    @Derive(Equatable)
-    int total() {
-        return 0;
-    }
-}
+class Order {}
 
-@Derive(Equatable, Comparable)
+@Derive(Equatable)
 record Line(int quantity) {}
-
-@Derive(Equatable)
-enum Status {
-    Open,
-    Closed;
-}
-
-@Derive(Equatable)
-interface Named {}
-
-@Derive(Comparable)
-class Label {
-    String? text;
-}

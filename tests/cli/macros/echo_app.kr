@@ -4,7 +4,7 @@ import std.util.List;
 import std.util.Map;
 
 @Echo
-abstract class Shape<T extends Comparable<T>> implements Cloneable {
+abstract class Shape<T extends Comparable<T>> implements Cloneable<Shape<T>> {
     /** cached */
     protected List<Map<String, List<T>>>? cache = null;
     private Runnable hook = () -> {

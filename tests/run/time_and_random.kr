@@ -1,0 +1,44 @@
+import std.time.Duration;
+import std.time.Instant;
+import std.util.ArrayList;
+import std.util.List;
+import std.util.Random;
+
+class Main {
+    static void main() {
+        Duration second = Duration.ofSeconds(1L);
+        Duration half = Duration.ofMillis(500L);
+        Console.println("${second.plus(half)} ${half} ${Duration.ofNanos(1500L)} ${Duration.ofNanos(12L)} ${half.minus(second)}");
+        Console.println("${second.toMillis()} ${second.plus(half).toSecondsDouble()} ${half.compareTo(&second)} ${Duration.zero().isZero()}");
+
+        Instant start = Instant.now();
+        Thread.sleep(5L);
+        Duration waited = start.elapsed();
+        Console.println(waited.toMillis() >= 5L);
+        Instant later = start.plus(second);
+        Console.println("${later.isAfter(start)} ${later.durationSince(start)}");
+
+        Random first = new Random(42L);
+        Random second2 = new Random(42L);
+        boolean same = true;
+        for (int i = 0; i < 100; i++) {
+            same = same && first.nextLong() == second2.nextLong();
+        }
+        Console.println(same);
+        Random random = new Random(7L);
+        boolean inRange = true;
+        for (int i = 0; i < 1000; i++) {
+            int roll = random.nextInt(1, 7);
+            double unit = random.nextDouble();
+            inRange = inRange && roll >= 1 && roll <= 6 && unit >= 0.0 && unit < 1.0 && random.nextInt(3) < 3;
+        }
+        Console.println(inRange);
+        List<int> values = new ArrayList<>();
+        for (int i = 0; i < 10; i++) {
+            values.add(i);
+        }
+        random.shuffle(&mut values);
+        values.sort();
+        Console.println("$values");
+    }
+}
