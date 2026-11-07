@@ -1,7 +1,7 @@
 package std.net;
 
-import std.io.Files;
 import std.io.IOException;
+import std.io.OsError;
 
 /**
  * A TCP socket server, which listens for incoming connections.
@@ -49,7 +49,7 @@ final class TcpListener {
     static TcpListener bind(String address) throws IOException {
         TcpListener listener = new TcpListener();
         if (!listener.bindRaw(address)) {
-            throw new IOException("couldn't bind to `$address`: ${Files.lastError()}");
+            throw new IOException("couldn't bind to `$address`: ${OsError.message()}");
         }
         return listener;
     }
@@ -91,7 +91,7 @@ final class TcpListener {
     SocketAddr localAddr() throws IOException {
         String? address = this.localAddrRaw();
         if (address == null) {
-            throw new IOException("couldn't get the local address: ${Files.lastError()}");
+            throw new IOException("couldn't get the local address: ${OsError.message()}");
         }
         return SocketAddr.parse(address);
     }
@@ -106,7 +106,7 @@ final class TcpListener {
      */
     mut void setAcceptTimeout(long millis) throws IOException {
         if (!this.setTimeoutRaw(millis, false)) {
-            throw new IOException("couldn't set the timeout: ${Files.lastError()}");
+            throw new IOException("couldn't set the timeout: ${OsError.message()}");
         }
     }
 
@@ -124,7 +124,7 @@ final class TcpListener {
      */
     mut void setNonBlocking(boolean nonBlocking) throws IOException {
         if (!this.setNonBlockingRaw(nonBlocking)) {
-            throw new IOException("couldn't change the blocking mode: ${Files.lastError()}");
+            throw new IOException("couldn't change the blocking mode: ${OsError.message()}");
         }
     }
 
@@ -143,9 +143,9 @@ final class TcpListener {
      *         {@link #reregister} must be used for
      */
     void register(&mut Poller poller, int token, int interest) throws IOException {
-        Poller.checkInterest(interest);
+        Interest.check(interest);
         if (!this.registerRaw(poller, token, interest, false)) {
-            throw new IOException("couldn't register with the poller: ${Files.lastError()}");
+            throw new IOException("couldn't register with the poller: ${OsError.message()}");
         }
     }
 
@@ -163,9 +163,9 @@ final class TcpListener {
      *         listener that is not registered with {@code poller}
      */
     void reregister(&mut Poller poller, int token, int interest) throws IOException {
-        Poller.checkInterest(interest);
+        Interest.check(interest);
         if (!this.registerRaw(poller, token, interest, true)) {
-            throw new IOException("couldn't register with the poller: ${Files.lastError()}");
+            throw new IOException("couldn't register with the poller: ${OsError.message()}");
         }
     }
 
@@ -178,7 +178,7 @@ final class TcpListener {
      */
     void deregister(&mut Poller poller) throws IOException {
         if (!this.deregisterRaw(poller)) {
-            throw new IOException("couldn't deregister from the poller: ${Files.lastError()}");
+            throw new IOException("couldn't deregister from the poller: ${OsError.message()}");
         }
     }
 

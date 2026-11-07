@@ -180,14 +180,6 @@ final class Files {
         return names;
     }
 
-    /**
-     * Creates the exception for a failed file operation, with the reason
-     * given by {@link #lastError}.
-     *
-     * @param action the operation that failed, such as {@code "read"}
-     * @param path the path the operation was applied to
-     * @return the exception to throw
-     */
     static byte[] readBytes(String path) throws IOException {
         byte[]? bytes = readBytesRaw(path);
         if (bytes == null) {
@@ -219,13 +211,13 @@ final class Files {
 
     static void copy(String from, String to) throws IOException {
         if (!copyFile(from, to)) {
-            throw new IOException("couldn't copy `$from` to `$to`: ${lastError()}");
+            throw new IOException("couldn't copy `$from` to `$to`: ${OsError.message()}");
         }
     }
 
     static void move(String from, String to) throws IOException {
         if (!renameFile(from, to)) {
-            throw new IOException("couldn't move `$from` to `$to`: ${lastError()}");
+            throw new IOException("couldn't move `$from` to `$to`: ${OsError.message()}");
         }
     }
 
@@ -266,26 +258,9 @@ final class Files {
         throw new IOException("couldn't create a temporary directory in `$base`");
     }
 
-    internal static IOException failure(String action, String path) {
-        return new IOException("couldn't $action `$path`: ${lastError()}");
+    private static IOException failure(String action, String path) {
+        return new IOException("couldn't $action `$path`: ${OsError.message()}");
     }
-
-    /**
-     * Returns a description of why the last file operation on the current
-     * thread failed.
-     *
-     * @return the system's description of the last error
-     */
-    @Intrinsic
-    internal static String lastError();
-
-    /**
-     * Returns whether the last file operation on the current thread failed.
-     *
-     * @return {@code true} if the last operation failed
-     */
-    @Intrinsic
-    internal static boolean lastFailed();
 
     @Intrinsic
     private static String? readFile(String path);

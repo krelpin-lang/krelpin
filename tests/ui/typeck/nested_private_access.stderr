@@ -1,0 +1,26 @@
+error: field `count` of `Stock` is private
+  --> tests/ui/typeck/nested_private_access.kr:37:31
+   |
+37 |         Console.println(stock.count + Stock.limit());
+   |                               ^^^^^ private field
+
+error: method `limit` of `Stock` is private
+  --> tests/ui/typeck/nested_private_access.kr:37:45
+   |
+37 |         Console.println(stock.count + Stock.limit());
+   |                                             ^^^^^ private method
+
+error: field `amount` of `Entry` is private
+  --> tests/ui/typeck/nested_private_access.kr:39:31
+   |
+39 |         Console.println(entry.amount);
+   |                               ^^^^^^ private field
+
+error: method `slotCount` of `HashSet` is private
+  --> tests/ui/typeck/nested_private_access.kr:41:31
+   |
+41 |         Console.println(names.slotCount());
+   |                               ^^^^^^^^^ private method
+
+error: aborting due to 4 previous errors
+

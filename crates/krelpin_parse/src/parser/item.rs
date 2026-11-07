@@ -618,12 +618,10 @@ impl Parser<'_> {
             };
 
             match symbol {
-                kw::Internal if !self.internal_is_modifier() => return modifiers,
-                kw::Public | kw::Protected | kw::Internal | kw::Private => {
+                kw::Public | kw::Protected | kw::Private => {
                     let vis = match symbol {
                         kw::Public => Visibility::Public(span),
                         kw::Protected => Visibility::Protected(span),
-                        kw::Internal => Visibility::Internal(span),
                         _ => Visibility::Private(span),
                     };
                     if modifiers.vis == Visibility::Default {
@@ -687,13 +685,6 @@ impl Parser<'_> {
             }
             self.bump();
         }
-    }
-
-    fn internal_is_modifier(&self) -> bool {
-        matches!(
-            self.look_ahead(1),
-            TokenKind::Ident(_) | TokenKind::Lt | TokenKind::And | TokenKind::OpenParen
-        )
     }
 
     fn move_is_modifier(&self) -> bool {

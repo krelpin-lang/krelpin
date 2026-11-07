@@ -32,7 +32,7 @@ final class FileReader {
     static FileReader open(String path) throws IOException {
         FileReader reader = new FileReader();
         if (!reader.openRaw(path)) {
-            throw Files.failure("open", path);
+            throw new IOException("couldn't open `$path`: ${OsError.message()}");
         }
         return reader;
     }
@@ -46,8 +46,8 @@ final class FileReader {
      */
     mut String? readLine() throws IOException {
         String? line = this.readLineRaw();
-        if (line == null && Files.lastFailed()) {
-            throw new IOException("couldn't read a line: ${Files.lastError()}");
+        if (line == null && OsError.occurred()) {
+            throw new IOException("couldn't read a line: ${OsError.message()}");
         }
         return line;
     }
@@ -61,7 +61,7 @@ final class FileReader {
     mut String readAll() throws IOException {
         String? text = this.readAllRaw();
         if (text == null) {
-            throw new IOException("couldn't read the file: ${Files.lastError()}");
+            throw new IOException("couldn't read the file: ${OsError.message()}");
         }
         return text;
     }

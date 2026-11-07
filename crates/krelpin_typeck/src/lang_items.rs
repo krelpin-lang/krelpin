@@ -49,6 +49,7 @@ lang_items! {
     StringBuilder: "std.lang.StringBuilder",
     System: "std.lang.System",
     Files: "std.io.Files",
+    OsError: "std.io.OsError",
     Command: "std.process.Command",
     FileReader: "std.io.FileReader",
     FileWriter: "std.io.FileWriter",

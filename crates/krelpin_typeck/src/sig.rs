@@ -291,9 +291,11 @@ impl<'a> Tcx<'a> {
         }
     }
 
-    pub fn same_library(&self, a: DefId, b: DefId) -> bool {
-        let package = |def: DefId| &self.items.defs[def.index()].package;
-        package(a).same_library(package(b))
+    pub fn outermost(&self, mut def: DefId) -> DefId {
+        while let Some(parent) = self.items.defs[def.index()].parent {
+            def = parent;
+        }
+        def
     }
 
     pub fn is_subclass(&self, sub: DefId, sup: DefId) -> bool {

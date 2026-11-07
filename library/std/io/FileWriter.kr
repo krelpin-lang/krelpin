@@ -49,7 +49,7 @@ final class FileWriter {
      */
     mut void write(String text) throws IOException {
         if (!this.writeRaw(text)) {
-            throw new IOException("couldn't write: ${Files.lastError()}");
+            throw new IOException("couldn't write: ${OsError.message()}");
         }
     }
 
@@ -71,14 +71,14 @@ final class FileWriter {
      */
     mut void flush() throws IOException {
         if (!this.flushRaw()) {
-            throw new IOException("couldn't flush: ${Files.lastError()}");
+            throw new IOException("couldn't flush: ${OsError.message()}");
         }
     }
 
     private static FileWriter open(String path, boolean append) throws IOException {
         FileWriter writer = new FileWriter();
         if (!writer.openRaw(path, append)) {
-            throw Files.failure("open", path);
+            throw new IOException("couldn't open `$path`: ${OsError.message()}");
         }
         return writer;
     }

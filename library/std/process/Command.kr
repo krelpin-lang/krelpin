@@ -2,6 +2,7 @@ package std.process;
 
 import std.io.Files;
 import std.io.IOException;
+import std.io.OsError;
 import std.util.ArrayList;
 import std.util.List;
 
@@ -181,7 +182,7 @@ final class Command {
                 "couldn't run `${this.program}`: the directory `$directory` does not exist"
             );
         }
-        return new IOException("couldn't run `${this.program}`: ${Files.lastError()}");
+        return new IOException("couldn't run `${this.program}`: ${OsError.message()}");
     }
 
     @Intrinsic

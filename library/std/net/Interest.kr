@@ -24,4 +24,10 @@ final class Interest {
      * started with {@link TcpStream#startConnect} has completed or failed.
      */
     public const int WRITABLE = 2;
+
+    static void check(int interest) {
+        if (interest <= 0 || interest > (Interest.READABLE | Interest.WRITABLE)) {
+            throw new IllegalArgumentException("$interest is not a combination of `Interest` constants");
+        }
+    }
 }

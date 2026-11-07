@@ -583,14 +583,8 @@ impl FnCtxt<'_, '_> {
                 }
                 "protected"
             }
-            Visibility::Internal(_) => {
-                if self.tcx.same_library(self.owner, owner) {
-                    return;
-                }
-                "internal"
-            }
         };
-        if self.owner == owner {
+        if self.tcx.outermost(self.owner) == self.tcx.outermost(owner) {
             return;
         }
         let mut diagnostic = Diagnostic::error(format!(

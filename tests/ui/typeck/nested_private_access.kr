@@ -1,0 +1,43 @@
+package shop;
+
+import std.util.HashSet;
+
+class Stock {
+    private int count = 3;
+
+    private static int limit() {
+        return 10;
+    }
+
+    int total() {
+        Entry entry = new Entry(2);
+        return entry.amount + Entry.base();
+    }
+
+    static class Entry {
+        private int amount;
+
+        Entry(int amount) {
+            this.amount = amount;
+        }
+
+        private static int base() {
+            return 1;
+        }
+
+        int fill(&Stock stock) {
+            return stock.count + Stock.limit() + this.amount;
+        }
+    }
+}
+
+class Main {
+    static void main() {
+        Stock stock = new Stock();
+        Console.println(stock.count + Stock.limit());
+        Stock.Entry entry = new Stock.Entry(1);
+        Console.println(entry.amount);
+        HashSet<String> names = new HashSet<>();
+        Console.println(names.slotCount());
+    }
+}

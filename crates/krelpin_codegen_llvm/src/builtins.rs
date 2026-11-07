@@ -156,6 +156,15 @@ impl FnCx<'_, '_, '_> {
         if items.is(owner, LangItem::Files) {
             return self.files_builtin(name, builtin);
         }
+        if items.is(owner, LangItem::OsError) {
+            let (function, ret_ll) = match name {
+                "message" => ("kr_io_last_error", "ptr"),
+                "occurred" => ("kr_io_failed", "i1"),
+                _ => return false,
+            };
+            self.runtime_call(function, ret_ll, builtin, &[]);
+            return true;
+        }
         if items.is(owner, LangItem::Command) {
             return self.process_builtin(name, builtin);
         }
@@ -1240,8 +1249,6 @@ impl FnCx<'_, '_, '_> {
 
     fn files_builtin(&mut self, name: &str, builtin: &Builtin) -> bool {
         let (function, ret_ll) = match name {
-            "lastError" => ("kr_io_last_error", "ptr"),
-            "lastFailed" => ("kr_io_failed", "i1"),
             "readFile" => ("kr_io_read_file", "ptr"),
             "writeFile" => ("kr_io_write_file", "i1"),
             "exists" => ("kr_io_exists", "i1"),

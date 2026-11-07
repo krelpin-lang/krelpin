@@ -1,0 +1,11 @@
+package std.io;
+
+final class OsError {
+    private OsError() {}
+
+    @Intrinsic
+    static String message();
+
+    @Intrinsic
+    static boolean occurred();
+}

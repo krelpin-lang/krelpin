@@ -117,7 +117,6 @@ pub enum Visibility {
     Default,
     Public(Span),
     Protected(Span),
-    Internal(Span),
     Private(Span),
 }
 
@@ -125,10 +124,9 @@ impl Visibility {
     pub fn span(self) -> Option<Span> {
         match self {
             Visibility::Default => None,
-            Visibility::Public(span)
-            | Visibility::Protected(span)
-            | Visibility::Internal(span)
-            | Visibility::Private(span) => Some(span),
+            Visibility::Public(span) | Visibility::Protected(span) | Visibility::Private(span) => {
+                Some(span)
+            }
         }
     }
 }

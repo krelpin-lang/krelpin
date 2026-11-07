@@ -35,7 +35,7 @@ class HashSet<T extends Hashable<T>> implements Set<T> {
      * @return an iterator that borrows this set
      */
     Iterator<T> iterator() {
-        return new HashSetIterator<>(this);
+        return new Values<>(this);
     }
 
     /**
@@ -61,22 +61,41 @@ class HashSet<T extends Hashable<T>> implements Set<T> {
         return text.toString();
     }
 
-    /**
-     * Returns the number of slots in the hash table. Used by
-     * {@link HashSetIterator}.
-     *
-     * @return the capacity of the table
-     */
     @Intrinsic
-    internal int slotCount();
+    private int slotCount();
 
-    /**
-     * Returns the element stored in a slot of the hash table. Used by
-     * {@link HashSetIterator}.
-     *
-     * @param index the index of the slot, less than {@link #slotCount}
-     * @return the element in the slot, or {@code null} if the slot is empty
-     */
     @Intrinsic
-    internal (&T)? slotAt(int index);
+    private (&T)? slotAt(int index);
+
+    private static final class Values<T extends Hashable<T>> borrows src implements Iterator<T> {
+        private &HashSet<T> set;
+        private int next;
+
+        Values(&HashSet<T> set) keeps set {
+            this.set = set;
+            this.next = 0;
+        }
+
+        boolean hasNext() {
+            int index = this.next;
+            int count = this.set.slotCount();
+            while (index < count && this.set.slotAt(index) == null) {
+                index++;
+            }
+            return index < count;
+        }
+
+        mut &T next() borrows src {
+            int count = this.set.slotCount();
+            while (this.next < count) {
+                int index = this.next;
+                this.next = index + 1;
+                (&T)? slot = this.set.slotAt(index);
+                if (slot != null) {
+                    return slot;
+                }
+            }
+            throw new IllegalStateException("the iterator has no more elements");
+        }
+    }
 }

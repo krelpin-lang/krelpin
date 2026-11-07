@@ -72,7 +72,7 @@ final class Attribute {
      * @throws MacroError if the annotation's opening parenthesis is never
      *         closed
      */
-    internal static int end(&TokenStream tokens, int at) {
+    static int end(&TokenStream tokens, int at) {
         if (at + 1 >= tokens.size() || !tokens.get(at).isPunct("@")
                 || !tokens.get(at + 1).isIdent() || tokens.get(at + 1).isIdent("interface")) {
             return -1;

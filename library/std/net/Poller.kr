@@ -1,7 +1,7 @@
 package std.net;
 
-import std.io.Files;
 import std.io.IOException;
+import std.io.OsError;
 import std.util.ArrayList;
 import std.util.List;
 
@@ -73,7 +73,7 @@ final class Poller {
     static Poller create() throws IOException {
         Poller poller = new Poller();
         if (!poller.createRaw()) {
-            throw new IOException("couldn't create a poller: ${Files.lastError()}");
+            throw new IOException("couldn't create a poller: ${OsError.message()}");
         }
         return poller;
     }
@@ -93,7 +93,7 @@ final class Poller {
     mut List<Event> poll(long timeoutMillis) throws IOException {
         int count = this.pollRaw(timeoutMillis);
         if (count < 0) {
-            throw new IOException("couldn't poll: ${Files.lastError()}");
+            throw new IOException("couldn't poll: ${OsError.message()}");
         }
         List<Event> events = new ArrayList<>();
         for (int i = 0; i < count; i++) {
@@ -107,19 +107,6 @@ final class Poller {
             ));
         }
         return events;
-    }
-
-    /**
-     * Validates an interest set.
-     *
-     * @param interest the interest to check
-     * @throws IllegalArgumentException if {@code interest} is not a non-empty
-     *         combination of {@link Interest} constants
-     */
-    internal static void checkInterest(int interest) {
-        if (interest <= 0 || interest > (Interest.READABLE | Interest.WRITABLE)) {
-            throw new IllegalArgumentException("$interest is not a combination of `Interest` constants");
-        }
     }
 
     @Intrinsic
