@@ -1,0 +1,294 @@
+package std.math;
+
+final class BigDecimal implements Comparable<BigDecimal>, Hashable<BigDecimal>, Cloneable<BigDecimal> {
+    private BigInteger unscaled;
+    private int scale;
+
+    BigDecimal(String text) {
+        char[] chars = text.chars();
+        int exponentAt = -1;
+        for (int index = 0; index < chars.length; index++) {
+            if (chars[index] == 'e' || chars[index] == 'E') {
+                exponentAt = index;
+            }
+        }
+        String mantissa = exponentAt < 0 ? text.substring(0) : text.substring(0, exponentAt);
+        int exponent = 0;
+        if (exponentAt >= 0) {
+            String digits = text.substring(exponentAt + 1);
+            if (digits.startsWith("+")) {
+                digits = digits.substring(1);
+            }
+            exponent = int.parse(digits);
+        }
+        int point = mantissa.indexOf(".");
+        int scale = 0;
+        String digits = mantissa;
+        if (point >= 0) {
+            scale = mantissa.length() - point - 1;
+            digits = mantissa.substring(0, point) + mantissa.substring(point + 1);
+        }
+        if (digits.isEmpty() || digits.equals(&"-") || digits.equals(&"+")) {
+            throw new NumberFormatException("`$text` is not a decimal number");
+        }
+        this.unscaled = new BigInteger(digits);
+        this.scale = scale - exponent;
+    }
+
+    BigDecimal(&BigInteger unscaled, int scale) {
+        this.unscaled = unscaled.clone();
+        this.scale = scale;
+    }
+
+    static BigDecimal valueOf(int value) {
+        return new BigDecimal(&BigInteger.valueOf(value), 0);
+    }
+
+    static BigDecimal valueOf(long value) {
+        return new BigDecimal(&BigInteger.valueOf(value), 0);
+    }
+
+    static BigDecimal valueOf(long unscaled, int scale) {
+        return new BigDecimal(&BigInteger.valueOf(unscaled), scale);
+    }
+
+    static BigDecimal valueOf(double value) {
+        return new BigDecimal("" + value);
+    }
+
+    static BigDecimal zero() {
+        return BigDecimal.valueOf(0);
+    }
+
+    static BigDecimal one() {
+        return BigDecimal.valueOf(1);
+    }
+
+    int scale() {
+        return this.scale;
+    }
+
+    BigInteger unscaledValue() {
+        return this.unscaled.clone();
+    }
+
+    int signum() {
+        return this.unscaled.signum();
+    }
+
+    int precision() {
+        if (this.unscaled.signum() == 0) {
+            return 1;
+        }
+        return this.unscaled.abs().toString().length();
+    }
+
+    BigDecimal negate() {
+        return new BigDecimal(&this.unscaled.negate(), this.scale);
+    }
+
+    BigDecimal abs() {
+        return new BigDecimal(&this.unscaled.abs(), this.scale);
+    }
+
+    BigDecimal add(&BigDecimal other) {
+        int scale = Math.max(this.scale, other.scale);
+        BigInteger sum = this.rescaled(scale).add(&other.rescaled(scale));
+        return new BigDecimal(&sum, scale);
+    }
+
+    BigDecimal subtract(&BigDecimal other) {
+        return this.add(&other.negate());
+    }
+
+    BigDecimal multiply(&BigDecimal other) {
+        return new BigDecimal(&this.unscaled.multiply(&other.unscaled), this.scale + other.scale);
+    }
+
+    BigDecimal divide(&BigDecimal divisor, int scale, RoundingMode rounding) {
+        if (divisor.signum() == 0) {
+            throw new ArithmeticException("division by zero");
+        }
+        int shift = scale - this.scale + divisor.scale;
+        BigInteger dividend = this.unscaled.clone();
+        BigInteger by = divisor.unscaled.clone();
+        if (shift >= 0) {
+            dividend = dividend.shiftDecimal(shift);
+        } else {
+            by = by.shiftDecimal(-shift);
+        }
+        return new BigDecimal(&BigDecimal.divideRounded(&dividend, &by, rounding), scale);
+    }
+
+    BigDecimal divide(&BigDecimal divisor, RoundingMode rounding) {
+        return this.divide(divisor, this.scale, rounding);
+    }
+
+    BigDecimal divide(&BigDecimal divisor) {
+        if (divisor.signum() == 0) {
+            throw new ArithmeticException("division by zero");
+        }
+        int preferred = this.scale - divisor.scale;
+        int limit = Math.max(preferred, 0) + divisor.precision() * 4 + this.precision() + 20;
+        for (int scale = Math.max(preferred, 0); scale <= limit; scale++) {
+            int shift = scale - this.scale + divisor.scale;
+            BigInteger dividend = this.unscaled.clone();
+            BigInteger by = divisor.unscaled.clone();
+            if (shift >= 0) {
+                dividend = dividend.shiftDecimal(shift);
+            } else {
+                by = by.shiftDecimal(-shift);
+            }
+            BigInteger[] parts = dividend.divideAndRemainder(&by);
+            if (parts[1].signum() == 0) {
+                BigDecimal exact = new BigDecimal(&parts[0], scale);
+                return exact.trimmedTo(preferred);
+            }
+        }
+        throw new ArithmeticException("non-terminating decimal expansion; give a scale and a rounding mode");
+    }
+
+    BigDecimal remainder(&BigDecimal divisor) {
+        BigDecimal quotient = this.divide(divisor, 0, RoundingMode.DOWN);
+        return this.subtract(&quotient.multiply(divisor));
+    }
+
+    BigDecimal pow(int exponent) {
+        if (exponent < 0) {
+            throw new ArithmeticException("negative exponent");
+        }
+        return new BigDecimal(&this.unscaled.pow(exponent), this.scale * exponent);
+    }
+
+    BigDecimal setScale(int scale, RoundingMode rounding) {
+        if (scale >= this.scale) {
+            return new BigDecimal(&this.rescaled(scale), scale);
+        }
+        BigInteger by = BigInteger.one().shiftDecimal(this.scale - scale);
+        return new BigDecimal(&BigDecimal.divideRounded(&this.unscaled, &by, rounding), scale);
+    }
+
+    BigDecimal setScale(int scale) {
+        return this.setScale(scale, RoundingMode.UNNECESSARY);
+    }
+
+    BigDecimal stripTrailingZeros() {
+        return this.trimmedTo(-2147483647);
+    }
+
+    BigDecimal movePointLeft(int places) {
+        return new BigDecimal(&this.unscaled, this.scale + places);
+    }
+
+    BigDecimal movePointRight(int places) {
+        return new BigDecimal(&this.unscaled, this.scale - places);
+    }
+
+    BigDecimal min(&BigDecimal other) {
+        return this.compareTo(other) <= 0 ? this.clone() : other.clone();
+    }
+
+    BigDecimal max(&BigDecimal other) {
+        return this.compareTo(other) >= 0 ? this.clone() : other.clone();
+    }
+
+    BigInteger toBigInteger() {
+        return this.setScale(0, RoundingMode.DOWN).unscaled.clone();
+    }
+
+    long longValue() {
+        return this.toBigInteger().longValue();
+    }
+
+    int intValue() {
+        return this.toBigInteger().intValue();
+    }
+
+    double doubleValue() {
+        return double.parse(this.toPlainString());
+    }
+
+    int compareTo(&BigDecimal other) {
+        int scale = Math.max(this.scale, other.scale);
+        return this.rescaled(scale).compareTo(&other.rescaled(scale));
+    }
+
+    boolean equals(&BigDecimal other) {
+        return this.scale == other.scale && this.unscaled.equals(&other.unscaled);
+    }
+
+    int hashCode() {
+        return 31 * this.unscaled.hashCode() + this.scale;
+    }
+
+    BigDecimal clone() {
+        return new BigDecimal(&this.unscaled, this.scale);
+    }
+
+    String toString() {
+        return this.toPlainString();
+    }
+
+    String toPlainString() {
+        String digits = this.unscaled.abs().toString();
+        String sign = this.unscaled.signum() < 0 ? "-" : "";
+        if (this.scale <= 0) {
+            if (this.unscaled.signum() == 0) {
+                return "0";
+            }
+            return sign + digits + "0".repeat(-this.scale);
+        }
+        if (digits.length() <= this.scale) {
+            digits = "0".repeat(this.scale - digits.length() + 1) + digits;
+        }
+        int point = digits.length() - this.scale;
+        return sign + digits.substring(0, point) + "." + digits.substring(point);
+    }
+
+    private BigInteger rescaled(int scale) {
+        return this.unscaled.shiftDecimal(scale - this.scale);
+    }
+
+    private BigDecimal trimmedTo(int preferred) {
+        BigInteger value = this.unscaled.clone();
+        int scale = this.scale;
+        BigInteger ten = BigInteger.ten();
+        while (scale > preferred && value.signum() != 0) {
+            BigInteger[] parts = value.divideAndRemainder(&ten);
+            if (parts[1].signum() != 0) {
+                break;
+            }
+            value = parts[0].clone();
+            scale--;
+        }
+        if (value.signum() == 0) {
+            scale = Math.max(preferred, 0);
+        }
+        return new BigDecimal(&value, scale);
+    }
+
+    private static BigInteger divideRounded(&BigInteger dividend, &BigInteger divisor, RoundingMode rounding) {
+        BigInteger[] parts = dividend.divideAndRemainder(divisor);
+        BigInteger quotient = parts[0].clone();
+        if (parts[1].signum() == 0) {
+            return quotient;
+        }
+        int sign = dividend.signum() * divisor.signum();
+        int half = parts[1].abs().shiftDecimal(0).add(&parts[1].abs()).compareTo(&divisor.abs());
+        boolean odd = quotient.abs().remainder(&BigInteger.valueOf(2)).signum() != 0;
+        boolean away = switch (rounding) {
+            case UP -> true;
+            case DOWN -> false;
+            case CEILING -> sign > 0;
+            case FLOOR -> sign < 0;
+            case HALF_UP -> half >= 0;
+            case HALF_DOWN -> half > 0;
+            case HALF_EVEN -> half > 0 || (half == 0 && odd);
+            case UNNECESSARY -> throw new ArithmeticException("rounding is necessary");
+        };
+        if (!away) {
+            return quotient;
+        }
+        return quotient.add(&BigInteger.valueOf(sign));
+    }
+}

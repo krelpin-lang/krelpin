@@ -1,0 +1,77 @@
+package std.util;
+
+class LinkedHashSet<T extends Hashable<T>> implements Set<T> {
+    LinkedHashSet() {}
+
+    @Intrinsic
+    int size();
+
+    @Intrinsic
+    mut boolean add(T value);
+
+    @Intrinsic
+    mut boolean remove(&T value);
+
+    @Intrinsic
+    boolean contains(&T value);
+
+    @Intrinsic
+    mut void clear();
+
+    Iterator<T> iterator() {
+        return new Values<>(this);
+    }
+
+    String toString() {
+        StringBuilder text = new StringBuilder();
+        text.append("[");
+        boolean first = true;
+        for (&T value : this) {
+            if (!first) {
+                text.append(", ");
+            }
+            first = false;
+            text.append("" + value);
+        }
+        text.append("]");
+        return text.toString();
+    }
+
+    @Intrinsic
+    private int slotCount();
+
+    @Intrinsic
+    private (&T)? slotAt(int index);
+
+    private static final class Values<T extends Hashable<T>> borrows src implements Iterator<T> {
+        private &LinkedHashSet<T> set;
+        private int next;
+
+        Values(&LinkedHashSet<T> set) keeps set {
+            this.set = set;
+            this.next = 0;
+        }
+
+        boolean hasNext() {
+            int index = this.next;
+            int count = this.set.slotCount();
+            while (index < count && this.set.slotAt(index) == null) {
+                index++;
+            }
+            return index < count;
+        }
+
+        mut &T next() borrows src {
+            int count = this.set.slotCount();
+            while (this.next < count) {
+                int index = this.next;
+                this.next = index + 1;
+                (&T)? slot = this.set.slotAt(index);
+                if (slot != null) {
+                    return slot;
+                }
+            }
+            throw new IllegalStateException("the iterator has no more elements");
+        }
+    }
+}

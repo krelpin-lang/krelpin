@@ -313,6 +313,12 @@ impl<'c, 'a, 'tcx> FnCx<'c, 'a, 'tcx> {
         if from == to {
             return value.to_owned();
         }
+        if let (Ty::Ref { ty: slot, .. }, Ty::Nullable(target)) = (from, to)
+            && let (Ty::Nullable(_), Ty::Ref { .. }) = (slot.as_ref(), target.as_ref())
+        {
+            let slot = slot.as_ref().clone();
+            return self.lend_nullable_slot(value, &slot);
+        }
         if let Some((from_inner, nullable)) = reference_of(from) {
             let from_inner = from_inner.clone();
             return match reference_of(to) {
@@ -382,6 +388,23 @@ impl<'c, 'a, 'tcx> FnCx<'c, 'a, 'tcx> {
             }
             _ => value.to_owned(),
         }
+    }
+
+    fn lend_nullable_slot(&mut self, pointer: &str, slot: &Ty) -> String {
+        if let Shape::NullableValue(_) = self.cx.shape(slot) {
+            let slot_ll = self.ll(slot);
+            let flag_at = self.assign(format!(
+                "getelementptr inbounds {slot_ll}, ptr {pointer}, i32 0, i32 0"
+            ));
+            let flag = self.assign(format!("load i1, ptr {flag_at}"));
+            let payload = self.assign(format!(
+                "getelementptr inbounds {slot_ll}, ptr {pointer}, i32 0, i32 1"
+            ));
+            return self.assign(format!("select i1 {flag}, ptr {payload}, ptr null"));
+        }
+        let value = self.assign(format!("load ptr, ptr {pointer}"));
+        let absent = self.assign(format!("icmp eq ptr {value}, null"));
+        self.assign(format!("select i1 {absent}, ptr null, ptr {pointer}"))
     }
 
     fn convert_nullable_reference(&mut self, pointer: &str, from: &Ty, to: &Ty) -> String {
@@ -1173,6 +1196,7 @@ pub(crate) fn runtime_signature(name: &str) -> &'static str {
         "kr_process_captured" => "declare ptr @kr_process_captured(i1 zeroext)",
         "kr_system_millis" => "declare i64 @kr_system_millis()",
         "kr_system_nanos" => "declare i64 @kr_system_nanos()",
+        "kr_system_epoch_nanos" => "declare i64 @kr_system_epoch_nanos()",
         "kr_builder_insert" => "declare i1 @kr_builder_insert(ptr, i32, ptr)",
         "kr_builder_truncate" => "declare i1 @kr_builder_truncate(ptr, i32)",
         "kr_builder_reverse" => "declare void @kr_builder_reverse(ptr)",

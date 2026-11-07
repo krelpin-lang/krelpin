@@ -140,7 +140,7 @@ impl Cx<'_, '_> {
         if let Some(name) = self.named_types.get(&key) {
             return name.clone();
         }
-        let name = format!("%\"rec.{}\"", self.display(&key));
+        let name = format!("%\"rec.{}\"", self.type_key(&key));
         self.named_types.insert(key.clone(), name.clone());
         let fields: Vec<String> = self
             .record_fields(def, args)
@@ -161,7 +161,7 @@ impl Cx<'_, '_> {
         if let Some(name) = self.named_types.get(&key) {
             return name.clone();
         }
-        let display = self.display(&key);
+        let display = self.type_key(&key);
         let name = format!("%\"enum.{display}\"");
         self.named_types.insert(key.clone(), name.clone());
         let variants = self.tcx.sig(def).variants.len();
@@ -194,7 +194,7 @@ impl Cx<'_, '_> {
             args: args.to_vec(),
         };
         self.enum_type(def, args);
-        format!("%\"enum.{}.v{index}\"", self.display(&key))
+        format!("%\"enum.{}.v{index}\"", self.type_key(&key))
     }
 
     pub(crate) fn size_align(&mut self, ty: &Ty) -> (u64, u64) {
@@ -356,7 +356,7 @@ impl Cx<'_, '_> {
         let items = &self.tcx.lang_items;
         if items.is(def, LangItem::ArrayList) {
             vec!["ptr", "i64", "i64"]
-        } else if items.is(def, LangItem::HashMap) || items.is(def, LangItem::HashSet) {
+        } else if items.is_table(def) {
             vec!["ptr", "i64", "i64", "i64", "ptr", "i64"]
         } else if items.is(def, LangItem::StringBuilder) {
             vec!["ptr", "i64", "i64", "i64"]
@@ -383,7 +383,7 @@ impl Cx<'_, '_> {
         let Ty::Adt { def, args, .. } = ty else {
             panic!("`{ty}` is not a class");
         };
-        let name = format!("%\"obj.{}\"", self.display(ty));
+        let name = format!("%\"obj.{}\"", self.type_key(ty));
         self.object_types.insert(ty.clone(), name.clone());
         let mut tys = vec!["ptr".to_owned()];
         for field in self.class_fields(*def, args) {
@@ -436,6 +436,16 @@ impl Cx<'_, '_> {
 
     pub(crate) fn display(&self, ty: &Ty) -> String {
         ty.to_string().replace('"', "'")
+    }
+
+    pub(crate) fn type_key(&self, ty: &Ty) -> String {
+        let mut defs = Vec::new();
+        collect_defs(ty, &mut defs);
+        let mut key = self.display(ty);
+        for def in defs {
+            key.push_str(&format!(".d{}", def.index()));
+        }
+        key
     }
 
     pub(crate) fn null_value(&mut self, ty: &Ty) -> String {
@@ -499,4 +509,17 @@ pub(crate) fn field_offsets(fields: &[(u64, u64)]) -> Vec<u64> {
         offset += size;
     }
     offsets
+}
+
+fn collect_defs(ty: &Ty, defs: &mut Vec<DefId>) {
+    match ty {
+        Ty::Adt { def, args, .. } => {
+            defs.push(*def);
+            for arg in args {
+                collect_defs(arg, defs);
+            }
+        }
+        Ty::Ref { ty, .. } | Ty::Nullable(ty) | Ty::Array(ty) => collect_defs(ty, defs),
+        Ty::Primitive(_) | Ty::Void | Ty::Null | Ty::Param(_) | Ty::Unknown => {}
+    }
 }

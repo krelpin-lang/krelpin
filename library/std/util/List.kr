@@ -1,5 +1,6 @@
 package std.util;
 
+import std.function.BiFunction;
 import std.function.Function;
 import std.function.Predicate;
 
@@ -220,6 +221,139 @@ interface List<T> extends Iterable<T> {
             }
         }
         return matches;
+    }
+
+    static <T> List<T> of() {
+        List<T> values = new ArrayList<>();
+        return values;
+    }
+
+    static <T> List<T> of(T a) {
+        List<T> values = new ArrayList<>();
+        values.add(a);
+        return values;
+    }
+
+    static <T> List<T> of(T a, T b) {
+        List<T> values = new ArrayList<>();
+        values.add(a);
+        values.add(b);
+        return values;
+    }
+
+    static <T> List<T> of(T a, T b, T c) {
+        List<T> values = new ArrayList<>();
+        values.add(a);
+        values.add(b);
+        values.add(c);
+        return values;
+    }
+
+    static <T> List<T> of(T a, T b, T c, T d) {
+        List<T> values = new ArrayList<>();
+        values.add(a);
+        values.add(b);
+        values.add(c);
+        values.add(d);
+        return values;
+    }
+
+    static <T> List<T> of(T a, T b, T c, T d, T e) {
+        List<T> values = new ArrayList<>();
+        values.add(a);
+        values.add(b);
+        values.add(c);
+        values.add(d);
+        values.add(e);
+        return values;
+    }
+
+    static <T> List<T> of(T a, T b, T c, T d, T e, T f) {
+        List<T> values = new ArrayList<>();
+        values.add(a);
+        values.add(b);
+        values.add(c);
+        values.add(d);
+        values.add(e);
+        values.add(f);
+        return values;
+    }
+
+    static <T> List<T> of(T a, T b, T c, T d, T e, T f, T g) {
+        List<T> values = new ArrayList<>();
+        values.add(a);
+        values.add(b);
+        values.add(c);
+        values.add(d);
+        values.add(e);
+        values.add(f);
+        values.add(g);
+        return values;
+    }
+
+    static <T> List<T> of(T a, T b, T c, T d, T e, T f, T g, T h) {
+        List<T> values = new ArrayList<>();
+        values.add(a);
+        values.add(b);
+        values.add(c);
+        values.add(d);
+        values.add(e);
+        values.add(f);
+        values.add(g);
+        values.add(h);
+        return values;
+    }
+
+    <R> R reduce(R initial, BiFunction<R, &T, R> combine) {
+        R result = initial;
+        for (int index = 0; index < this.size(); index++) {
+            result = combine.apply(result, this.get(index));
+        }
+        return result;
+    }
+
+    (&T)? max(Comparator<T> order) {
+        if (this.isEmpty()) {
+            return null;
+        }
+        &T best = this.get(0);
+        for (int index = 1; index < this.size(); index++) {
+            &T candidate = this.get(index);
+            if (order.compare(candidate, best) > 0) {
+                best = candidate;
+            }
+        }
+        return best;
+    }
+
+    (&T)? min(Comparator<T> order) {
+        if (this.isEmpty()) {
+            return null;
+        }
+        &T best = this.get(0);
+        for (int index = 1; index < this.size(); index++) {
+            &T candidate = this.get(index);
+            if (order.compare(candidate, best) < 0) {
+                best = candidate;
+            }
+        }
+        return best;
+    }
+
+    (&T)? max() where T extends Comparable<T> {
+        return this.max((a, b) -> a.compareTo(b));
+    }
+
+    (&T)? min() where T extends Comparable<T> {
+        return this.min((a, b) -> a.compareTo(b));
+    }
+
+    T[] toArray() where T extends Cloneable<T> {
+        T[] array = new T[this.size()];
+        for (int index = 0; index < this.size(); index++) {
+            array[index] = this.get(index).clone();
+        }
+        return array;
     }
 
     <R> List<R> map(Function<&T, R> mapper) {

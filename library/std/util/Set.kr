@@ -56,6 +56,87 @@ interface Set<T> extends Iterable<T> {
     boolean contains(&T value);
 
     /** Removes all elements from this set. */
+    static <T extends Hashable<T>> Set<T> of() {
+        Set<T> values = new LinkedHashSet<>();
+        return values;
+    }
+
+    static <T extends Hashable<T>> Set<T> of(T a) {
+        Set<T> values = new LinkedHashSet<>();
+        values.add(a);
+        return values;
+    }
+
+    static <T extends Hashable<T>> Set<T> of(T a, T b) {
+        Set<T> values = new LinkedHashSet<>();
+        values.add(a);
+        values.add(b);
+        return values;
+    }
+
+    static <T extends Hashable<T>> Set<T> of(T a, T b, T c) {
+        Set<T> values = new LinkedHashSet<>();
+        values.add(a);
+        values.add(b);
+        values.add(c);
+        return values;
+    }
+
+    static <T extends Hashable<T>> Set<T> of(T a, T b, T c, T d) {
+        Set<T> values = new LinkedHashSet<>();
+        values.add(a);
+        values.add(b);
+        values.add(c);
+        values.add(d);
+        return values;
+    }
+
+    static <T extends Hashable<T>> Set<T> of(T a, T b, T c, T d, T e) {
+        Set<T> values = new LinkedHashSet<>();
+        values.add(a);
+        values.add(b);
+        values.add(c);
+        values.add(d);
+        values.add(e);
+        return values;
+    }
+
+    static <T extends Hashable<T>> Set<T> of(T a, T b, T c, T d, T e, T f) {
+        Set<T> values = new LinkedHashSet<>();
+        values.add(a);
+        values.add(b);
+        values.add(c);
+        values.add(d);
+        values.add(e);
+        values.add(f);
+        return values;
+    }
+
+    static <T extends Hashable<T>> Set<T> of(T a, T b, T c, T d, T e, T f, T g) {
+        Set<T> values = new LinkedHashSet<>();
+        values.add(a);
+        values.add(b);
+        values.add(c);
+        values.add(d);
+        values.add(e);
+        values.add(f);
+        values.add(g);
+        return values;
+    }
+
+    static <T extends Hashable<T>> Set<T> of(T a, T b, T c, T d, T e, T f, T g, T h) {
+        Set<T> values = new LinkedHashSet<>();
+        values.add(a);
+        values.add(b);
+        values.add(c);
+        values.add(d);
+        values.add(e);
+        values.add(f);
+        values.add(g);
+        values.add(h);
+        return values;
+    }
+
     Set<T> clone() where T extends Cloneable<T> & Hashable<T> {
         Set<T> copy = new HashSet<>();
         for (&T value : this) {

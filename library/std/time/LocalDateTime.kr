@@ -1,0 +1,255 @@
+package std.time;
+
+import std.time.format.DateTimeFormatter;
+
+record LocalDateTime(LocalDate date, LocalTime time) implements Comparable<LocalDateTime> {
+    public static final LocalDateTime MIN = new LocalDateTime(LocalDate.MIN, LocalTime.MIN);
+
+    public static final LocalDateTime MAX = new LocalDateTime(LocalDate.MAX, LocalTime.MAX);
+
+    static LocalDateTime of(int year, int month, int dayOfMonth, int hour, int minute) {
+        return new LocalDateTime(LocalDate.of(year, month, dayOfMonth), LocalTime.of(hour, minute));
+    }
+
+    static LocalDateTime of(int year, int month, int dayOfMonth, int hour, int minute, int second) {
+        return new LocalDateTime(LocalDate.of(year, month, dayOfMonth), LocalTime.of(hour, minute, second));
+    }
+
+    static LocalDateTime of(int year, int month, int dayOfMonth, int hour, int minute, int second, int nano) {
+        return new LocalDateTime(LocalDate.of(year, month, dayOfMonth), LocalTime.of(hour, minute, second, nano));
+    }
+
+    static LocalDateTime of(LocalDate date, LocalTime time) {
+        return new LocalDateTime(date, time);
+    }
+
+    static LocalDateTime ofEpochSecond(long epochSecond, int nano, ZoneOffset offset) {
+        if (nano < 0 || nano > 999999999) {
+            throw new DateTimeException("Invalid value for NanoOfSecond (valid values 0 - 999999999): $nano");
+        }
+        long local = Math.addExact(epochSecond, (long) offset.totalSeconds());
+        long day = Math.floorDiv(local, 86400L);
+        long secondOfDay = Math.floorMod(local, 86400L);
+        return new LocalDateTime(LocalDate.ofEpochDay(day), LocalTime.ofNanoOfDay(secondOfDay * LocalTime.NANOS_PER_SECOND + (long) nano));
+    }
+
+    static LocalDateTime ofInstant(&Instant instant, &ZoneId zone) {
+        ZoneOffset offset = zone.rules().offset(instant);
+        return LocalDateTime.ofEpochSecond(instant.epochSecond(), instant.nano(), offset);
+    }
+
+    static LocalDateTime now() {
+        return LocalDateTime.now(&ZoneId.systemDefault());
+    }
+
+    static LocalDateTime now(&ZoneId zone) {
+        return LocalDateTime.ofInstant(&Instant.now(), zone);
+    }
+
+    static LocalDateTime parse(String text) {
+        return DateTimeFormatter.ISO_LOCAL_DATE_TIME.parse(text).toLocalDateTime();
+    }
+
+    static LocalDateTime parse(String text, &DateTimeFormatter formatter) {
+        return formatter.parse(text).toLocalDateTime();
+    }
+
+    int year() {
+        return this.date.year();
+    }
+
+    int monthValue() {
+        return this.date.monthValue();
+    }
+
+    Month month() {
+        return this.date.month();
+    }
+
+    int dayOfMonth() {
+        return this.date.dayOfMonth();
+    }
+
+    int dayOfYear() {
+        return this.date.dayOfYear();
+    }
+
+    DayOfWeek dayOfWeek() {
+        return this.date.dayOfWeek();
+    }
+
+    int hour() {
+        return this.time.hour();
+    }
+
+    int minute() {
+        return this.time.minute();
+    }
+
+    int second() {
+        return this.time.second();
+    }
+
+    int nano() {
+        return this.time.nano();
+    }
+
+    LocalDateTime plusYears(long years) {
+        return new LocalDateTime(this.date.plusYears(years), this.time);
+    }
+
+    LocalDateTime plusMonths(long months) {
+        return new LocalDateTime(this.date.plusMonths(months), this.time);
+    }
+
+    LocalDateTime plusWeeks(long weeks) {
+        return new LocalDateTime(this.date.plusWeeks(weeks), this.time);
+    }
+
+    LocalDateTime plusDays(long days) {
+        return new LocalDateTime(this.date.plusDays(days), this.time);
+    }
+
+    LocalDateTime plusHours(long hours) {
+        return this.plusSeconds(Math.multiplyExact(hours, 3600L), 0L);
+    }
+
+    LocalDateTime plusMinutes(long minutes) {
+        return this.plusSeconds(Math.multiplyExact(minutes, 60L), 0L);
+    }
+
+    LocalDateTime plusSeconds(long seconds) {
+        return this.plusSeconds(seconds, 0L);
+    }
+
+    LocalDateTime plusNanos(long nanos) {
+        return this.plusSeconds(Math.floorDiv(nanos, LocalTime.NANOS_PER_SECOND), Math.floorMod(nanos, LocalTime.NANOS_PER_SECOND));
+    }
+
+    LocalDateTime plus(Duration duration) {
+        return this.plusNanos(duration.nanos());
+    }
+
+    LocalDateTime plus(Period period) {
+        return new LocalDateTime(this.date.plus(period), this.time);
+    }
+
+    LocalDateTime minusYears(long years) {
+        return this.plusYears(-years);
+    }
+
+    LocalDateTime minusMonths(long months) {
+        return this.plusMonths(-months);
+    }
+
+    LocalDateTime minusWeeks(long weeks) {
+        return this.plusWeeks(-weeks);
+    }
+
+    LocalDateTime minusDays(long days) {
+        return this.plusDays(-days);
+    }
+
+    LocalDateTime minusHours(long hours) {
+        return this.plusHours(-hours);
+    }
+
+    LocalDateTime minusMinutes(long minutes) {
+        return this.plusMinutes(-minutes);
+    }
+
+    LocalDateTime minusSeconds(long seconds) {
+        return this.plusSeconds(-seconds);
+    }
+
+    LocalDateTime minusNanos(long nanos) {
+        return this.plusNanos(-nanos);
+    }
+
+    LocalDateTime minus(Duration duration) {
+        return this.plusNanos(-duration.nanos());
+    }
+
+    LocalDateTime minus(Period period) {
+        return new LocalDateTime(this.date.minus(period), this.time);
+    }
+
+    LocalDateTime withYear(int year) {
+        return new LocalDateTime(this.date.withYear(year), this.time);
+    }
+
+    LocalDateTime withMonth(int month) {
+        return new LocalDateTime(this.date.withMonth(month), this.time);
+    }
+
+    LocalDateTime withDayOfMonth(int dayOfMonth) {
+        return new LocalDateTime(this.date.withDayOfMonth(dayOfMonth), this.time);
+    }
+
+    LocalDateTime withHour(int hour) {
+        return new LocalDateTime(this.date, this.time.withHour(hour));
+    }
+
+    LocalDateTime withMinute(int minute) {
+        return new LocalDateTime(this.date, this.time.withMinute(minute));
+    }
+
+    LocalDateTime withSecond(int second) {
+        return new LocalDateTime(this.date, this.time.withSecond(second));
+    }
+
+    LocalDateTime withNano(int nano) {
+        return new LocalDateTime(this.date, this.time.withNano(nano));
+    }
+
+    ZonedDateTime atZone(&ZoneId zone) {
+        return ZonedDateTime.of(this, zone);
+    }
+
+    OffsetDateTime atOffset(ZoneOffset offset) {
+        return new OffsetDateTime(this, offset);
+    }
+
+    long toEpochSecond(ZoneOffset offset) {
+        return this.date.toEpochDay() * 86400L + (long) this.time.toSecondOfDay() - (long) offset.totalSeconds();
+    }
+
+    Instant toInstant(ZoneOffset offset) {
+        return Instant.ofEpochSecond(this.toEpochSecond(offset), (long) this.time.nano());
+    }
+
+    boolean isBefore(LocalDateTime other) {
+        return this.compareTo(&other) < 0;
+    }
+
+    boolean isAfter(LocalDateTime other) {
+        return this.compareTo(&other) > 0;
+    }
+
+    boolean isEqual(LocalDateTime other) {
+        return this.compareTo(&other) == 0;
+    }
+
+    int compareTo(&LocalDateTime other) {
+        int order = this.date.compareTo(&other.date());
+        return order != 0 ? order : this.time.compareTo(&other.time());
+    }
+
+    String format(&DateTimeFormatter formatter) {
+        return formatter.format(this);
+    }
+
+    String toString() {
+        return "${this.date}T${this.time}";
+    }
+
+    private LocalDateTime plusSeconds(long seconds, long nanos) {
+        if (seconds == 0L && nanos == 0L) {
+            return this;
+        }
+        long total = Math.addExact(this.time.toNanoOfDay(), Math.floorMod(seconds, 86400L) * LocalTime.NANOS_PER_SECOND + nanos);
+        long days = Math.floorDiv(seconds, 86400L) + Math.floorDiv(total, LocalTime.NANOS_PER_DAY);
+        LocalTime time = LocalTime.ofNanoOfDay(Math.floorMod(total, LocalTime.NANOS_PER_DAY));
+        return new LocalDateTime(this.date.plusDays(days), time);
+    }
+}

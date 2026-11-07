@@ -1,0 +1,32 @@
+error: `add` keeps `task` after `register` ends, but `task` may borrow from the caller
+  --> tests/ui/borrowck/kept_in_static.kr:19:9
+   |
+17 |     static void register(Runnable task) {
+   |                                   ---- `task` comes from the caller
+...
+19 |         guard.getMut().add(task);
+   |         ^^^^^^^^^^^^^^^^^^^^^^^^ `add` keeps `task` here
+   |
+   = note: the caller's checks don't know that `register` passes `task` on to be kept
+   = help: write `keeps task` after the parameters of `register`, so its callers can't pass anything borrowed
+
+error: `add` keeps its argument in a static field, but the argument borrows `names`
+  --> tests/ui/borrowck/kept_in_static.kr:25:9
+   |
+25 |         guard.getMut().add(() -> Console.println(names.size()));
+   |         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ `add` keeps the argument here
+   |                            ----------------------------------- `names` is borrowed here
+   |
+   = note: a `static` field lives as long as the program, longer than anything it could borrow
+   = help: use a `move` lambda, or give the argument its own values instead of references
+
+error: cannot borrow `Main.LATER` as mutable, because it is a static field
+  --> tests/ui/borrowck/kept_in_static.kr:28:9
+   |
+28 |         Main.LATER.run();
+   |         ^^^^^^^^^^^^^^^^
+   |
+   = note: a `static` field can be used from many threads at once
+
+error: aborting due to 3 previous errors
+

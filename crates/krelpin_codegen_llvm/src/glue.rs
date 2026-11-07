@@ -21,7 +21,7 @@ impl Cx<'_, '_> {
         if let Some(name) = self.glue.get(&('d', ty.clone())) {
             return name.clone();
         }
-        let name = format!("@\"drop.{}\"", self.display(ty));
+        let name = format!("@\"drop.{}\"", self.type_key(ty));
         self.glue.insert(('d', ty.clone()), name.clone());
         let llty = self.llty(ty);
         let mut fx = FnCx::new(self, Subst::new(), Ty::Void);
@@ -44,7 +44,7 @@ impl Cx<'_, '_> {
         if let Some(name) = self.glue.get(&('c', ty.clone())) {
             return name.clone();
         }
-        let name = format!("@\"copy.{}\"", self.display(ty));
+        let name = format!("@\"copy.{}\"", self.type_key(ty));
         self.glue.insert(('c', ty.clone()), name.clone());
         let llty = self.llty(ty);
         let mut fx = FnCx::new(self, Subst::new(), ty.clone());
@@ -62,7 +62,7 @@ impl Cx<'_, '_> {
         if let Some(name) = self.glue.get(&('o', ty.clone())) {
             return name.clone();
         }
-        let name = format!("@\"dropobj.{}\"", self.display(ty));
+        let name = format!("@\"dropobj.{}\"", self.type_key(ty));
         self.glue.insert(('o', ty.clone()), name.clone());
         let id = self.instance(Instance::Thunk(Thunk::DropObject(ty.clone())));
         let target = self.fn_name(id);
@@ -79,7 +79,7 @@ impl Cx<'_, '_> {
         if let Some(name) = self.glue.get(&('b', ty.clone())) {
             return name.clone();
         }
-        let name = format!("@\"dropbox.{}\"", self.display(ty));
+        let name = format!("@\"dropbox.{}\"", self.type_key(ty));
         self.glue.insert(('b', ty.clone()), name.clone());
         let box_ty = self.box_type(ty);
         let mut fx = FnCx::new(self, Subst::new(), Ty::Void);
@@ -105,7 +105,7 @@ impl Cx<'_, '_> {
         if let Some(name) = self.glue.get(&('a', array.clone())) {
             return name.clone();
         }
-        let name = format!("@\"droparray.{}\"", self.display(array));
+        let name = format!("@\"droparray.{}\"", self.type_key(array));
         self.glue.insert(('a', array.clone()), name.clone());
         let Ty::Array(elem) = array else {
             panic!("`{array}` is not an array");
@@ -394,8 +394,8 @@ impl FnCx<'_, '_, '_> {
             let data = self.native_addr(object, ty, 0);
             let data = self.assign(format!("load ptr, ptr {data}"));
             self.runtime("void", "kr_free", &format!("ptr {data}"));
-        } else if items.is(def, LangItem::HashMap) || items.is(def, LangItem::HashSet) {
-            let (key, value) = if items.is(def, LangItem::HashMap) {
+        } else if items.is_table(def) {
+            let (key, value) = if items.is_map_table(def) {
                 (args[0].clone(), args[1].clone())
             } else {
                 (args[0].clone(), Ty::Void)

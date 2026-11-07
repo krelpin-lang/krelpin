@@ -1,0 +1,124 @@
+package std.time;
+
+record ZoneOffset(int totalSeconds) implements Comparable<ZoneOffset> {
+    public const int MAX_SECONDS = 64800;
+
+    public static final ZoneOffset UTC = new ZoneOffset(0);
+
+    public static final ZoneOffset MIN = new ZoneOffset(-ZoneOffset.MAX_SECONDS);
+
+    public static final ZoneOffset MAX = new ZoneOffset(ZoneOffset.MAX_SECONDS);
+
+    ZoneOffset {
+        if (totalSeconds < -ZoneOffset.MAX_SECONDS || totalSeconds > ZoneOffset.MAX_SECONDS) {
+            throw new DateTimeException("Zone offset not in valid range: -18:00 to +18:00");
+        }
+    }
+
+    static ZoneOffset ofTotalSeconds(int totalSeconds) {
+        return new ZoneOffset(totalSeconds);
+    }
+
+    static ZoneOffset ofHours(int hours) {
+        return ZoneOffset.ofHoursMinutesSeconds(hours, 0, 0);
+    }
+
+    static ZoneOffset ofHoursMinutes(int hours, int minutes) {
+        return ZoneOffset.ofHoursMinutesSeconds(hours, minutes, 0);
+    }
+
+    static ZoneOffset ofHoursMinutesSeconds(int hours, int minutes, int seconds) {
+        if (hours < -18 || hours > 18) {
+            throw new DateTimeException("Zone offset hours not in valid range: value $hours is not in the range -18 to 18");
+        }
+        if (minutes < -59 || minutes > 59 || seconds < -59 || seconds > 59) {
+            throw new DateTimeException("Zone offset minutes and seconds not in valid range");
+        }
+        if ((hours > 0 && (minutes < 0 || seconds < 0)) || (hours < 0 && (minutes > 0 || seconds > 0)) || (minutes > 0 && seconds < 0) || (minutes < 0 && seconds > 0)) {
+            throw new DateTimeException("Zone offset hours, minutes and seconds must have the same sign");
+        }
+        return new ZoneOffset(hours * 3600 + minutes * 60 + seconds);
+    }
+
+    static ZoneOffset of(String id) {
+        if (id.equals(&"Z")) {
+            return ZoneOffset.UTC;
+        }
+        int length = id.length();
+        if (length < 2 || (id.charAt(0) != '+' && id.charAt(0) != '-')) {
+            throw new DateTimeException("Invalid ID for ZoneOffset, invalid format: $id");
+        }
+        int hours;
+        int minutes = 0;
+        int seconds = 0;
+        if (length == 2) {
+            hours = ZoneOffset.digits(&id, 1, 1);
+        } else if (length == 3) {
+            hours = ZoneOffset.digits(&id, 1, 2);
+        } else if (length == 5) {
+            hours = ZoneOffset.digits(&id, 1, 2);
+            minutes = ZoneOffset.digits(&id, 3, 2);
+        } else if (length == 6 && id.charAt(3) == ':') {
+            hours = ZoneOffset.digits(&id, 1, 2);
+            minutes = ZoneOffset.digits(&id, 4, 2);
+        } else if (length == 7) {
+            hours = ZoneOffset.digits(&id, 1, 2);
+            minutes = ZoneOffset.digits(&id, 3, 2);
+            seconds = ZoneOffset.digits(&id, 5, 2);
+        } else if (length == 9 && id.charAt(3) == ':' && id.charAt(6) == ':') {
+            hours = ZoneOffset.digits(&id, 1, 2);
+            minutes = ZoneOffset.digits(&id, 4, 2);
+            seconds = ZoneOffset.digits(&id, 7, 2);
+        } else {
+            hours = -1;
+        }
+        if (hours < 0 || minutes < 0 || seconds < 0) {
+            throw new DateTimeException("Invalid ID for ZoneOffset, invalid format: $id");
+        }
+        if (id.charAt(0) == '-') {
+            return ZoneOffset.ofHoursMinutesSeconds(-hours, -minutes, -seconds);
+        }
+        return ZoneOffset.ofHoursMinutesSeconds(hours, minutes, seconds);
+    }
+
+    String id() {
+        if (this.totalSeconds == 0) {
+            return "Z";
+        }
+        int magnitude = Math.abs(this.totalSeconds);
+        StringBuilder text = new StringBuilder();
+        text.append(this.totalSeconds < 0 ? "-" : "+");
+        text.append("${magnitude / 3600 + 100}".substring(1));
+        text.append(":");
+        text.append("${magnitude / 60 % 60 + 100}".substring(1));
+        if (magnitude % 60 != 0) {
+            text.append(":");
+            text.append("${magnitude % 60 + 100}".substring(1));
+        }
+        return text.toString();
+    }
+
+    ZoneRules rules() {
+        return ZoneRules.of(this);
+    }
+
+    int compareTo(&ZoneOffset other) {
+        return other.totalSeconds() - this.totalSeconds;
+    }
+
+    String toString() {
+        return this.id();
+    }
+
+    private static int digits(&String text, int start, int count) {
+        int value = 0;
+        for (int index = start; index < start + count; index++) {
+            char c = text.charAt(index);
+            if (c < '0' || c > '9') {
+                return -1;
+            }
+            value = value * 10 + ((int) c - (int) '0');
+        }
+        return value;
+    }
+}

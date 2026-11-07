@@ -56,6 +56,9 @@ final class System {
     @Intrinsic
     static long currentTimeMillis();
 
+    @Intrinsic
+    static long currentTimeNanos();
+
     /**
      * Returns the current value of a monotonic clock.
      *

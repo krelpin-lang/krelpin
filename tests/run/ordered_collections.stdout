@@ -1,0 +1,23 @@
+{zed=31, bob=41, amy=26}
+[zed, bob, amy]
+[c, a, b]
+[-1, 0, 1, 2, 3, 4, 5]
+5
+4
+-1
+0
+3
+6
+3
+2
+1
+0
+null
+Job[name=build, priority=2]
+Job[name=build, priority=2]
+1
+true
+true
+false
+[b, c]
+the deque is empty

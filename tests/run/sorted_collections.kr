@@ -1,0 +1,62 @@
+import std.util.*;
+
+class Main {
+    static void main() {
+        TreeMap<String, int> scores = new TreeMap<>();
+        String[] names = new String[]{"mia", "ada", "zoe", "bob", "kim", "eve", "dan"};
+        for (int i = 0; i < names.length; i++) {
+            scores.put(names[i], i * 10);
+        }
+        scores.put("ada", 99);
+        Console.println(&scores);
+        Console.println(scores.firstKey() + " " + scores.lastKey());
+        Console.println(scores.floorKey(&"c") + " " + scores.ceilingKey(&"c"));
+        Console.println(scores.lowerKey(&"ada") + " " + scores.higherKey(&"zoe"));
+        Console.println(scores.remove(&"kim"));
+        Console.println(scores.remove(&"nope"));
+        Console.println(&scores);
+        for (&String key : scores.keySet()) {
+            Console.print(key + " ");
+        }
+        Console.println("");
+        Console.println(scores.keySet().contains(&&"eve"));
+        Map.Entry<String, int>? first = scores.pollFirstEntry();
+        Console.println(first);
+        Console.println(scores.values());
+
+        TreeMap<int, int> big = new TreeMap<>();
+        Random random = new Random(7);
+        for (int i = 0; i < 2000; i++) {
+            big.put(random.nextInt(500), i);
+        }
+        int removed = 0;
+        for (int i = 0; i < 500; i += 3) {
+            if (big.remove(&i) != null) {
+                removed++;
+            }
+        }
+        int previous = -1;
+        boolean sorted = true;
+        for (&int key : big.keySet()) {
+            if (key <= previous) {
+                sorted = false;
+            }
+            previous = key;
+        }
+        Console.println(sorted + " " + (big.size() + removed));
+
+        TreeSet<int> set = new TreeSet<>();
+        set.add(5);
+        set.add(1);
+        set.add(9);
+        set.add(5);
+        Console.println(&set);
+        Console.println(set.first() + " " + set.last() + " " + set.ceiling(&6));
+        Console.println(set.pollFirst());
+        Console.println(set.contains(&9) + " " + set.size());
+        Set<String> words = new TreeSet<>();
+        words.add("pear");
+        words.add("apple");
+        Console.println(&words);
+    }
+}

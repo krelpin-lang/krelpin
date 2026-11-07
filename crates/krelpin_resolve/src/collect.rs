@@ -278,6 +278,9 @@ fn resolve_import(table: &ItemTable, import: &Import, dcx: &DiagCtxt) -> Option<
     let package = PackagePath::from_idents(package_segments);
 
     let Some(types) = table.packages.get(&package) else {
+        if let Some(def) = resolve_nested(table, &import.path.segments) {
+            return Some(Res::Item(def));
+        }
         report_unknown_package(dcx, package_segments);
         return None;
     };
@@ -295,6 +298,25 @@ fn resolve_import(table: &ItemTable, import: &Import, dcx: &DiagCtxt) -> Option<
             None
         }
     }
+}
+
+fn resolve_nested(table: &ItemTable, segments: &[Ident]) -> Option<DefId> {
+    for split in (1..segments.len().saturating_sub(1)).rev() {
+        let package = PackagePath::from_idents(&segments[..split]);
+        let Some(types) = table.packages.get(&package) else {
+            continue;
+        };
+        let mut def = *types.get(&segments[split].name)?;
+        for segment in &segments[split + 1..] {
+            def = table
+                .defs
+                .iter()
+                .find(|candidate| candidate.parent == Some(def) && candidate.name.name == segment.name)?
+                .def;
+        }
+        return Some(def);
+    }
+    None
 }
 
 fn report_unknown_package(dcx: &DiagCtxt, segments: &[Ident]) {

@@ -1,0 +1,484 @@
+package std.math;
+
+import std.util.ArrayList;
+import std.util.List;
+
+final class BigInteger implements Comparable<BigInteger>, Hashable<BigInteger>, Cloneable<BigInteger> {
+    private const long BASE = 1000000000L;
+
+    private int sign;
+    private int[] digits;
+
+    BigInteger(String text) {
+        this(text, 10);
+    }
+
+    BigInteger(String text, int radix) {
+        if (radix < 2 || radix > 36) {
+            throw new NumberFormatException("radix $radix is out of range");
+        }
+        char[] chars = text.chars();
+        int start = 0;
+        int sign = 1;
+        if (chars.length > 0 && (chars[0] == '-' || chars[0] == '+')) {
+            sign = chars[0] == '-' ? -1 : 1;
+            start = 1;
+        }
+        if (start >= chars.length) {
+            throw new NumberFormatException("`$text` is not a number");
+        }
+        int[] digits = new int[0];
+        for (int index = start; index < chars.length; index++) {
+            int digit = chars[index].digit(radix);
+            if (digit < 0) {
+                throw new NumberFormatException("`$text` is not a number in radix $radix");
+            }
+            digits = BigInteger.mulAddSmall(&digits, radix, digit);
+        }
+        this.digits = digits;
+        this.sign = this.digits.length == 0 ? 0 : sign;
+    }
+
+    private BigInteger(int sign, int[] digits) {
+        this.digits = digits;
+        this.sign = this.digits.length == 0 ? 0 : sign;
+    }
+
+    static BigInteger valueOf(long value) {
+        if (value == 0) {
+            return new BigInteger(0, new int[0]);
+        }
+        int sign = value < 0 ? -1 : 1;
+        List<int> parts = new ArrayList<>();
+        long rest = value;
+        while (rest != 0) {
+            long part = rest % BigInteger.BASE;
+            parts.add((int) (part < 0 ? -part : part));
+            rest = rest / BigInteger.BASE;
+        }
+        return new BigInteger(sign, BigInteger.toArray(&parts));
+    }
+
+    static BigInteger zero() {
+        return BigInteger.valueOf(0);
+    }
+
+    static BigInteger one() {
+        return BigInteger.valueOf(1);
+    }
+
+    static BigInteger ten() {
+        return BigInteger.valueOf(10);
+    }
+
+    int signum() {
+        return this.sign;
+    }
+
+    BigInteger negate() {
+        return new BigInteger(-this.sign, BigInteger.copy(&this.digits));
+    }
+
+    BigInteger abs() {
+        return new BigInteger(this.sign == 0 ? 0 : 1, BigInteger.copy(&this.digits));
+    }
+
+    BigInteger add(&BigInteger other) {
+        if (other.sign == 0) {
+            return this.clone();
+        }
+        if (this.sign == 0) {
+            return other.clone();
+        }
+        if (this.sign == other.sign) {
+            return new BigInteger(this.sign, BigInteger.addDigits(&this.digits, &other.digits));
+        }
+        int order = BigInteger.compareDigits(&this.digits, &other.digits);
+        if (order == 0) {
+            return BigInteger.zero();
+        }
+        if (order > 0) {
+            return new BigInteger(this.sign, BigInteger.subtractDigits(&this.digits, &other.digits));
+        }
+        return new BigInteger(other.sign, BigInteger.subtractDigits(&other.digits, &this.digits));
+    }
+
+    BigInteger subtract(&BigInteger other) {
+        return this.add(&other.negate());
+    }
+
+    BigInteger multiply(&BigInteger other) {
+        if (this.sign == 0 || other.sign == 0) {
+            return BigInteger.zero();
+        }
+        return new BigInteger(this.sign * other.sign, BigInteger.multiplyDigits(&this.digits, &other.digits));
+    }
+
+    BigInteger divide(&BigInteger other) {
+        BigInteger[] parts = this.divideAndRemainder(other);
+        return parts[0].clone();
+    }
+
+    BigInteger remainder(&BigInteger other) {
+        BigInteger[] parts = this.divideAndRemainder(other);
+        return parts[1].clone();
+    }
+
+    BigInteger mod(&BigInteger modulus) {
+        if (modulus.sign <= 0) {
+            throw new ArithmeticException("the modulus must be positive");
+        }
+        BigInteger rest = this.remainder(modulus);
+        if (rest.sign < 0) {
+            return rest.add(modulus);
+        }
+        return rest;
+    }
+
+    BigInteger[] divideAndRemainder(&BigInteger other) {
+        if (other.sign == 0) {
+            throw new ArithmeticException("division by zero");
+        }
+        BigInteger[] parts = new BigInteger[2];
+        if (BigInteger.compareDigits(&this.digits, &other.digits) < 0) {
+            parts[0] = BigInteger.zero();
+            parts[1] = this.clone();
+            return parts;
+        }
+        int[] rest = new int[0];
+        int[] quotient = new int[this.digits.length];
+        for (int index = this.digits.length - 1; index >= 0; index--) {
+            rest = BigInteger.mulAddSmall(&rest, (int) BigInteger.BASE, this.digits[index]);
+            int low = 0;
+            int high = (int) BigInteger.BASE - 1;
+            while (low < high) {
+                int middle = (int) (((long) low + (long) high + 1L) / 2L);
+                int[] product = BigInteger.mulAddSmall(&other.digits, middle, 0);
+                if (BigInteger.compareDigits(&product, &rest) <= 0) {
+                    low = middle;
+                } else {
+                    high = middle - 1;
+                }
+            }
+            quotient[index] = low;
+            if (low > 0) {
+                int[] product = BigInteger.mulAddSmall(&other.digits, low, 0);
+                rest = BigInteger.subtractDigits(&rest, &product);
+            }
+        }
+        parts[0] = new BigInteger(this.sign * other.sign, BigInteger.trim(&quotient));
+        parts[1] = new BigInteger(this.sign, rest);
+        return parts;
+    }
+
+    BigInteger pow(int exponent) {
+        if (exponent < 0) {
+            throw new ArithmeticException("negative exponent");
+        }
+        BigInteger result = BigInteger.one();
+        BigInteger base = this.clone();
+        int rest = exponent;
+        while (rest > 0) {
+            if ((rest & 1) == 1) {
+                result = result.multiply(&base);
+            }
+            rest = rest >> 1;
+            if (rest > 0) {
+                base = base.multiply(&base);
+            }
+        }
+        return result;
+    }
+
+    BigInteger modPow(&BigInteger exponent, &BigInteger modulus) {
+        if (exponent.sign < 0) {
+            throw new ArithmeticException("negative exponent");
+        }
+        BigInteger result = BigInteger.one().mod(modulus);
+        BigInteger base = this.mod(modulus);
+        BigInteger rest = exponent.clone();
+        BigInteger two = BigInteger.valueOf(2);
+        while (rest.sign > 0) {
+            if (rest.digits[0] % 2 == 1) {
+                result = result.multiply(&base).mod(modulus);
+            }
+            rest = rest.divide(&two);
+            if (rest.sign > 0) {
+                base = base.multiply(&base).mod(modulus);
+            }
+        }
+        return result;
+    }
+
+    BigInteger gcd(&BigInteger other) {
+        BigInteger a = this.abs();
+        BigInteger b = other.abs();
+        while (b.sign != 0) {
+            BigInteger next = a.remainder(&b);
+            a = b;
+            b = next;
+        }
+        return a;
+    }
+
+    BigInteger sqrt() {
+        if (this.sign < 0) {
+            throw new ArithmeticException("square root of a negative number");
+        }
+        if (this.sign == 0) {
+            return BigInteger.zero();
+        }
+        BigInteger two = BigInteger.valueOf(2);
+        BigInteger guess = BigInteger.one().shiftDecimal(this.toString().length() / 2 + 1);
+        while (true) {
+            BigInteger next = guess.add(&this.divide(&guess)).divide(&two);
+            if (next.compareTo(&guess) >= 0) {
+                return guess;
+            }
+            guess = next;
+        }
+    }
+
+    BigInteger min(&BigInteger other) {
+        return this.compareTo(other) <= 0 ? this.clone() : other.clone();
+    }
+
+    BigInteger max(&BigInteger other) {
+        return this.compareTo(other) >= 0 ? this.clone() : other.clone();
+    }
+
+    boolean isZero() {
+        return this.sign == 0;
+    }
+
+    long longValue() {
+        long value = 0;
+        for (int index = this.digits.length - 1; index >= 0; index--) {
+            value = value * BigInteger.BASE + (long) this.digits[index];
+        }
+        return this.sign < 0 ? -value : value;
+    }
+
+    long longValueExact() {
+        BigInteger limit = this.sign < 0 ? BigInteger.valueOf(long.MIN_VALUE) : BigInteger.valueOf(long.MAX_VALUE);
+        if (BigInteger.compareDigits(&this.digits, &limit.digits) > 0) {
+            throw new ArithmeticException("${this} doesn't fit in a long");
+        }
+        if (this.sign < 0 && BigInteger.compareDigits(&this.digits, &limit.digits) == 0) {
+            return long.MIN_VALUE;
+        }
+        return this.longValue();
+    }
+
+    int intValue() {
+        return (int) this.longValue();
+    }
+
+    int intValueExact() {
+        long value = this.longValueExact();
+        if (value < (long) int.MIN_VALUE || value > (long) int.MAX_VALUE) {
+            throw new ArithmeticException("${this} doesn't fit in an int");
+        }
+        return (int) value;
+    }
+
+    double doubleValue() {
+        return double.parse(this.toString());
+    }
+
+    int compareTo(&BigInteger other) {
+        if (this.sign != other.sign) {
+            return this.sign < other.sign ? -1 : 1;
+        }
+        int order = BigInteger.compareDigits(&this.digits, &other.digits);
+        return this.sign < 0 ? -order : order;
+    }
+
+    boolean equals(&BigInteger other) {
+        return this.compareTo(other) == 0;
+    }
+
+    int hashCode() {
+        int hash = this.sign;
+        for (int index = 0; index < this.digits.length; index++) {
+            hash = hash * 31 + this.digits[index];
+        }
+        return hash;
+    }
+
+    BigInteger clone() {
+        return new BigInteger(this.sign, BigInteger.copy(&this.digits));
+    }
+
+    String toString() {
+        if (this.sign == 0) {
+            return "0";
+        }
+        StringBuilder text = new StringBuilder();
+        if (this.sign < 0) {
+            text.append("-");
+        }
+        int top = this.digits.length - 1;
+        text.append("" + this.digits[top]);
+        for (int index = top - 1; index >= 0; index--) {
+            String part = "" + this.digits[index];
+            text.append("0".repeat(9 - part.length()));
+            text.append(part);
+        }
+        return text.toString();
+    }
+
+    String toString(int radix) {
+        if (radix == 10) {
+            return this.toString();
+        }
+        if (radix < 2 || radix > 36) {
+            throw new IllegalArgumentException("radix $radix is out of range");
+        }
+        if (this.sign == 0) {
+            return "0";
+        }
+        List<char> chars = new ArrayList<>();
+        int[] rest = BigInteger.copy(&this.digits);
+        while (rest.length > 0) {
+            long remainder = 0;
+            int[] next = new int[rest.length];
+            for (int index = rest.length - 1; index >= 0; index--) {
+                long current = remainder * BigInteger.BASE + (long) rest[index];
+                next[index] = (int) (current / (long) radix);
+                remainder = current % (long) radix;
+            }
+            chars.add(char.forDigit((int) remainder, radix));
+            rest = BigInteger.trim(&next);
+        }
+        StringBuilder text = new StringBuilder();
+        if (this.sign < 0) {
+            text.append("-");
+        }
+        for (int index = chars.size() - 1; index >= 0; index--) {
+            text.append(chars.get(index));
+        }
+        return text.toString();
+    }
+
+    BigInteger shiftDecimal(int places) {
+        BigInteger result = this.clone();
+        BigInteger ten = BigInteger.ten();
+        for (int index = 0; index < places; index++) {
+            result = result.multiply(&ten);
+        }
+        return result;
+    }
+
+    private static int[] copy(&int[] digits) {
+        int[] out = new int[digits.length];
+        for (int index = 0; index < digits.length; index++) {
+            out[index] = digits[index];
+        }
+        return out;
+    }
+
+    private static int[] toArray(&List<int> parts) {
+        int[] out = new int[parts.size()];
+        for (int index = 0; index < parts.size(); index++) {
+            out[index] = parts.get(index);
+        }
+        return out;
+    }
+
+    private static int[] trim(&int[] digits) {
+        int length = digits.length;
+        while (length > 0 && digits[length - 1] == 0) {
+            length--;
+        }
+        int[] out = new int[length];
+        for (int index = 0; index < length; index++) {
+            out[index] = digits[index];
+        }
+        return out;
+    }
+
+    private static int compareDigits(&int[] a, &int[] b) {
+        if (a.length != b.length) {
+            return a.length < b.length ? -1 : 1;
+        }
+        for (int index = a.length - 1; index >= 0; index--) {
+            if (a[index] != b[index]) {
+                return a[index] < b[index] ? -1 : 1;
+            }
+        }
+        return 0;
+    }
+
+    private static int[] addDigits(&int[] a, &int[] b) {
+        int length = Math.max(a.length, b.length);
+        int[] out = new int[length + 1];
+        long carry = 0;
+        for (int index = 0; index < length; index++) {
+            long sum = carry;
+            if (index < a.length) {
+                sum += (long) a[index];
+            }
+            if (index < b.length) {
+                sum += (long) b[index];
+            }
+            out[index] = (int) (sum % BigInteger.BASE);
+            carry = sum / BigInteger.BASE;
+        }
+        out[length] = (int) carry;
+        return BigInteger.trim(&out);
+    }
+
+    private static int[] subtractDigits(&int[] a, &int[] b) {
+        int[] out = new int[a.length];
+        long borrow = 0;
+        for (int index = 0; index < a.length; index++) {
+            long difference = (long) a[index] - borrow - (index < b.length ? (long) b[index] : 0L);
+            if (difference < 0) {
+                difference += BigInteger.BASE;
+                borrow = 1;
+            } else {
+                borrow = 0;
+            }
+            out[index] = (int) difference;
+        }
+        return BigInteger.trim(&out);
+    }
+
+    private static int[] multiplyDigits(&int[] a, &int[] b) {
+        long[] sums = new long[a.length + b.length];
+        for (int i = 0; i < a.length; i++) {
+            long carry = 0;
+            for (int j = 0; j < b.length; j++) {
+                long current = sums[i + j] + (long) a[i] * (long) b[j] + carry;
+                sums[i + j] = current % BigInteger.BASE;
+                carry = current / BigInteger.BASE;
+            }
+            int at = i + b.length;
+            while (carry != 0) {
+                long current = sums[at] + carry;
+                sums[at] = current % BigInteger.BASE;
+                carry = current / BigInteger.BASE;
+                at++;
+            }
+        }
+        int[] out = new int[sums.length];
+        for (int index = 0; index < sums.length; index++) {
+            out[index] = (int) sums[index];
+        }
+        return BigInteger.trim(&out);
+    }
+
+    private static int[] mulAddSmall(&int[] digits, int factor, int addend) {
+        int[] out = new int[digits.length + 2];
+        long carry = (long) addend;
+        for (int index = 0; index < digits.length; index++) {
+            long current = (long) digits[index] * (long) factor + carry;
+            out[index] = (int) (current % BigInteger.BASE);
+            carry = current / BigInteger.BASE;
+        }
+        out[digits.length] = (int) (carry % BigInteger.BASE);
+        out[digits.length + 1] = (int) (carry / BigInteger.BASE);
+        return BigInteger.trim(&out);
+    }
+}

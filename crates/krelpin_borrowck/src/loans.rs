@@ -2,8 +2,8 @@ use std::collections::{HashMap, HashSet};
 
 use krelpin_ast::ast::ReceiverKind;
 use krelpin_mir::{
-    AggregateKind, BasicBlock, Body, Local, Operand, Place, PlaceElem, Rvalue, StatementKind,
-    TerminatorKind,
+    AggregateKind, BasicBlock, Body, Local, Operand, Place, PlaceBase, PlaceElem, Rvalue,
+    StatementKind, TerminatorKind,
 };
 use krelpin_span::{Span, Symbol};
 use krelpin_typeck::{BorrowSource, Callee, Storage, Ty};
@@ -124,6 +124,36 @@ impl<'a, 'tcx> LoanData<'a, 'tcx> {
         }
     }
 
+    pub(crate) fn reaches_static(&self, state: &Holdings, operand: &Operand) -> bool {
+        if operand_place(operand)
+            .is_some_and(|place| matches!(place.base, PlaceBase::Static { .. }))
+        {
+            return true;
+        }
+        let mut reached = self.operand_loans(state, operand);
+        loop {
+            if reached
+                .iter()
+                .any(|loan| matches!(self.loans[loan].place.base, PlaceBase::Static { .. }))
+            {
+                return true;
+            }
+            let mut next = self.contents(state, &reached);
+            for loan in reached.iter() {
+                if let Some(local) = base_local(&self.loans[loan].place) {
+                    next.union(&state[local.index()]);
+                }
+            }
+            if !reached.union(&next) {
+                return false;
+            }
+        }
+    }
+
+    pub(crate) fn is_static_loan(&self, loan: usize) -> bool {
+        matches!(self.loans[loan].place.base, PlaceBase::Static { .. })
+    }
+
     pub(crate) fn operand_loans(&self, state: &Holdings, operand: &Operand) -> BitSet {
         match operand_place(operand) {
             Some(place) => self.place_loans(state, place),
@@ -148,7 +178,7 @@ impl<'a, 'tcx> LoanData<'a, 'tcx> {
         }
     }
 
-    fn contents(&self, state: &Holdings, held: &BitSet) -> BitSet {
+    pub(crate) fn contents(&self, state: &Holdings, held: &BitSet) -> BitSet {
         self.contents_within(state, held, &mut BitSet::new(self.loans.len()))
     }
 
@@ -343,15 +373,15 @@ enum DeclaredArg {
     DeclaredRef,
 }
 
-struct Passed {
+pub(crate) struct Passed {
     declared: DeclaredArg,
-    storage: Option<Storage>,
+    pub(crate) storage: Option<Storage>,
     held: BitSet,
     contents: BitSet,
 }
 
 impl Passed {
-    fn stored(&self) -> BitSet {
+    pub(crate) fn stored(&self) -> BitSet {
         let mut stored = BitSet::new(self.held.len());
         let Some(storage) = self.storage else {
             return stored;
@@ -403,9 +433,17 @@ impl LoanData<'_, '_> {
             // receiver, or by an argument whose type mentions that parameter.
             let mut params = Vec::new();
             collect_params(&callee.method.ret, &mut params);
+            let declared = |index: usize| {
+                sources.iter().any(|source| match source {
+                    BorrowSource::This | BorrowSource::Class(_) => has_receiver && index == 0,
+                    BorrowSource::Param(param) => *param + usize::from(has_receiver) == index,
+                })
+            };
             for index in 0..args.len() {
                 let carries = if has_receiver && index == 0 {
                     true
+                } else if !declared(index) {
+                    false
                 } else {
                     callee
                         .method
@@ -439,7 +477,13 @@ impl LoanData<'_, '_> {
         }
     }
 
-    fn passed(&self, state: &Holdings, callee: &Callee, args: &[Operand], index: usize) -> Passed {
+    pub(crate) fn passed(
+        &self,
+        state: &Holdings,
+        callee: &Callee,
+        args: &[Operand],
+        index: usize,
+    ) -> Passed {
         let has_receiver = args.len() > callee.method.params.len();
         let declared = match (has_receiver, index) {
             (true, 0) => match callee.method.receiver.unwrap_or(ReceiverKind::RefMut) {

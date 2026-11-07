@@ -2,11 +2,12 @@ use std::collections::{HashSet, VecDeque};
 
 use krelpin_errors::{DiagCtxt, Diagnostic};
 use krelpin_mir::{
-    BasicBlock, Body, BodySource, Local, Place, PlaceBase, PlaceElem, ReturnSource, StatementKind,
-    TerminatorKind, Unwind, place_locals_of, rvalue_locals_of, terminator_input_locals_of,
+    BasicBlock, Body, BodySource, Local, Operand, Place, PlaceBase, PlaceElem, ReturnSource,
+    StatementKind, TerminatorKind, Unwind, place_locals_of, rvalue_locals_of,
+    terminator_input_locals_of,
 };
 use krelpin_span::Span;
-use krelpin_typeck::Ty;
+use krelpin_typeck::{Callee, Ty};
 
 use crate::bitset::BitSet;
 use crate::dataflow::{Forward, Location, solve};
@@ -114,6 +115,9 @@ impl<'a, 'tcx> Checker<'a, 'tcx> {
         match kind {
             TerminatorKind::Call { callee, args, .. } => {
                 let has_receiver = args.len() > callee.method.params.len();
+                if has_receiver && self.loans.reaches_static(held, &args[0]) {
+                    self.check_kept_in_static(callee, args, span, held);
+                }
                 for (index, arg) in args.iter().enumerate().skip(usize::from(has_receiver)) {
                     let param = index - usize::from(has_receiver);
                     let detached = callee
@@ -710,6 +714,14 @@ impl<'a, 'tcx> Checker<'a, 'tcx> {
             .is_some_and(|storage| storage.detached)
     }
 
+    fn has_receiver(&self) -> bool {
+        self.body
+            .args()
+            .next()
+            .and_then(|arg| self.body.local(arg).name)
+            .is_some_and(|name| name.as_str() == "this")
+    }
+
     fn report_forwarded(&mut self, param: Local, method: krelpin_span::Symbol, span: Span) {
         let decl = self.body.local(param);
         let name = decl
@@ -726,11 +738,65 @@ impl<'a, 'tcx> Checker<'a, 'tcx> {
             "the caller's checks don't know that `{}` passes `{name}` on to be kept",
             self.body.name
         ))
-        .with_help(format!(
-            "make `{}` static and write `keeps {name}` after its parameters, so its callers \
-             can't pass anything borrowed",
-            self.body.name
-        ));
+        .with_help(if self.has_receiver() {
+            format!(
+                "make `{}` static and write `keeps {name}` after its parameters, so its callers \
+                 can't pass anything borrowed",
+                self.body.name
+            )
+        } else {
+            format!(
+                "write `keeps {name}` after the parameters of `{}`, so its callers can't pass \
+                 anything borrowed",
+                self.body.name
+            )
+        });
+        self.emit(span, diagnostic);
+    }
+
+    fn check_kept_in_static(
+        &mut self,
+        callee: &Callee,
+        args: &[Operand],
+        span: Span,
+        held: &Holdings,
+    ) {
+        for index in 1..args.len() {
+            let passed = self.loans.passed(held, callee, args, index);
+            let stored = passed.stored();
+            if let Some(loan) = stored.iter().find(|&loan| !self.loans.is_static_loan(loan)) {
+                self.report_kept_in_static(loan, callee.method.name.name, span);
+                return;
+            }
+            if stored.is_empty() && passed.storage.is_none_or(|storage| !storage.whole) {
+                continue;
+            }
+            let forwarded = operand_place(&args[index])
+                .and_then(base_local)
+                .and_then(|local| self.forwarded.source(local))
+                .filter(|&param| !self.is_detached_param(param));
+            if let Some(param) = forwarded {
+                self.report_forwarded(param, callee.method.name.name, span);
+                return;
+            }
+        }
+    }
+
+    fn report_kept_in_static(&mut self, loan: usize, method: krelpin_span::Symbol, span: Span) {
+        let loan = &self.loans.loans[loan];
+        let name = self.tys.describe(&loan.place);
+        let diagnostic = Diagnostic::error(format!(
+            "`{method}` keeps its argument in a static field, but the argument borrows `{name}`"
+        ))
+        .with_span(span)
+        .with_label(format!("`{method}` keeps the argument here"))
+        .with_secondary(loan.span, format!("`{name}` is borrowed here"))
+        .with_note(
+            "a `static` field lives as long as the program, longer than anything it could borrow",
+        )
+        .with_help(
+            "use a `move` lambda, or give the argument its own values instead of references",
+        );
         self.emit(span, diagnostic);
     }
 

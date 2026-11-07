@@ -1,0 +1,13 @@
+import std.util.*;
+class Main {
+    static void main() {
+        List<int> xs = new ArrayList<>();
+        xs.add(4);
+        int total = 0;
+        for (&int value : xs) {
+            total = total + value;
+            total += value;
+        }
+        Console.println(total);
+    }
+}

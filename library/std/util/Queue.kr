@@ -1,0 +1,25 @@
+package std.util;
+
+interface Queue<T> extends Iterable<T> {
+    int size();
+
+    boolean isEmpty() {
+        return this.size() == 0;
+    }
+
+    mut void add(T value);
+
+    mut T? poll();
+
+    (&T)? peek();
+
+    mut T remove() {
+        T? value = this.poll();
+        if (value == null) {
+            throw new IllegalStateException("the queue is empty");
+        }
+        return value;
+    }
+
+    mut void clear();
+}

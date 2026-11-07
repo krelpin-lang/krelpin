@@ -1,0 +1,98 @@
+package std.time;
+
+import std.time.format.TextStyle;
+
+enum Month {
+    JANUARY,
+    FEBRUARY,
+    MARCH,
+    APRIL,
+    MAY,
+    JUNE,
+    JULY,
+    AUGUST,
+    SEPTEMBER,
+    OCTOBER,
+    NOVEMBER,
+    DECEMBER;
+
+    static Month of(int value) {
+        return switch (value) {
+            case 1 -> Month.JANUARY;
+            case 2 -> Month.FEBRUARY;
+            case 3 -> Month.MARCH;
+            case 4 -> Month.APRIL;
+            case 5 -> Month.MAY;
+            case 6 -> Month.JUNE;
+            case 7 -> Month.JULY;
+            case 8 -> Month.AUGUST;
+            case 9 -> Month.SEPTEMBER;
+            case 10 -> Month.OCTOBER;
+            case 11 -> Month.NOVEMBER;
+            case 12 -> Month.DECEMBER;
+            default -> throw new DateTimeException("Invalid value for MonthOfYear: $value");
+        };
+    }
+
+    int value() {
+        return this.ordinal() + 1;
+    }
+
+    Month plus(long months) {
+        return Month.of((int) Math.floorMod((long) this.ordinal() + months % 12L, 12L) + 1);
+    }
+
+    Month minus(long months) {
+        return this.plus(-(months % 12L));
+    }
+
+    int length(boolean leapYear) {
+        return switch (this) {
+            case FEBRUARY -> leapYear ? 29 : 28;
+            case APRIL, JUNE, SEPTEMBER, NOVEMBER -> 30;
+            default -> 31;
+        };
+    }
+
+    int minLength() {
+        return this.length(false);
+    }
+
+    int maxLength() {
+        return this.length(true);
+    }
+
+    int firstDayOfYear(boolean leapYear) {
+        int day = 1;
+        for (int month = 1; month < this.value(); month++) {
+            day += Month.of(month).length(leapYear);
+        }
+        return day;
+    }
+
+    Month firstMonthOfQuarter() {
+        return Month.of(this.ordinal() / 3 * 3 + 1);
+    }
+
+    String displayName(TextStyle style) {
+        String full = switch (this) {
+            case JANUARY -> "January";
+            case FEBRUARY -> "February";
+            case MARCH -> "March";
+            case APRIL -> "April";
+            case MAY -> "May";
+            case JUNE -> "June";
+            case JULY -> "July";
+            case AUGUST -> "August";
+            case SEPTEMBER -> "September";
+            case OCTOBER -> "October";
+            case NOVEMBER -> "November";
+            case DECEMBER -> "December";
+        };
+        return switch (style) {
+            case FULL -> full;
+            case SHORT -> full.substring(0, 3);
+            case NARROW -> full.substring(0, 1);
+        };
+    }
+}

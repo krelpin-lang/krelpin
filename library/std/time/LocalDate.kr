@@ -1,0 +1,335 @@
+package std.time;
+
+import std.time.format.DateTimeFormatter;
+import std.util.ArrayList;
+import std.util.List;
+
+record LocalDate(int year, int monthValue, int dayOfMonth) implements Comparable<LocalDate> {
+    public const int MIN_YEAR = -999999999;
+
+    public const int MAX_YEAR = 999999999;
+
+    public static final LocalDate EPOCH = new LocalDate(1970, 1, 1);
+
+    public static final LocalDate MIN = new LocalDate(LocalDate.MIN_YEAR, 1, 1);
+
+    public static final LocalDate MAX = new LocalDate(LocalDate.MAX_YEAR, 12, 31);
+
+    private const long DAYS_PER_CYCLE = 146097L;
+
+    private const long DAYS_0000_TO_1970 = 719468L;
+
+    LocalDate {
+        LocalDate.check("Year", (long) year, (long) LocalDate.MIN_YEAR, (long) LocalDate.MAX_YEAR);
+        LocalDate.check("MonthOfYear", (long) monthValue, 1L, 12L);
+        LocalDate.check("DayOfMonth", (long) dayOfMonth, 1L, 31L);
+        Month month = Month.of(monthValue);
+        if (dayOfMonth > month.length(LocalDate.isLeap((long) year))) {
+            if (dayOfMonth == 29) {
+                throw new DateTimeException("Invalid date 'February 29' as '$year' is not a leap year");
+            }
+            throw new DateTimeException("Invalid date '$month $dayOfMonth'");
+        }
+    }
+
+    static LocalDate of(int year, int month, int dayOfMonth) {
+        return new LocalDate(year, month, dayOfMonth);
+    }
+
+    static LocalDate of(int year, Month month, int dayOfMonth) {
+        return new LocalDate(year, month.value(), dayOfMonth);
+    }
+
+    static LocalDate ofYearDay(int year, int dayOfYear) {
+        LocalDate.check("DayOfYear", (long) dayOfYear, 1L, 366L);
+        boolean leap = LocalDate.isLeap((long) year);
+        if (dayOfYear == 366 && !leap) {
+            throw new DateTimeException("Invalid date 'DayOfYear 366' as '$year' is not a leap year");
+        }
+        Month month = Month.JANUARY;
+        while (dayOfYear >= month.firstDayOfYear(leap) + month.length(leap)) {
+            month = month.plus(1L);
+        }
+        return new LocalDate(year, month.value(), dayOfYear - month.firstDayOfYear(leap) + 1);
+    }
+
+    static LocalDate ofEpochDay(long epochDay) {
+        long shifted = epochDay + LocalDate.DAYS_0000_TO_1970;
+        long era = Math.floorDiv(shifted, LocalDate.DAYS_PER_CYCLE);
+        long dayOfEra = shifted - era * LocalDate.DAYS_PER_CYCLE;
+        long yearOfEra = (dayOfEra - dayOfEra / 1460L + dayOfEra / 36524L - dayOfEra / 146096L) / 365L;
+        long dayOfYear = dayOfEra - (365L * yearOfEra + yearOfEra / 4L - yearOfEra / 100L);
+        long shiftedMonth = (5L * dayOfYear + 2L) / 153L;
+        long day = dayOfYear - (153L * shiftedMonth + 2L) / 5L + 1L;
+        long month = shiftedMonth < 10L ? shiftedMonth + 3L : shiftedMonth - 9L;
+        long year = yearOfEra + era * 400L + (month <= 2L ? 1L : 0L);
+        LocalDate.check("Year", year, (long) LocalDate.MIN_YEAR, (long) LocalDate.MAX_YEAR);
+        return new LocalDate((int) year, (int) month, (int) day);
+    }
+
+    static LocalDate now() {
+        return LocalDate.now(&ZoneId.systemDefault());
+    }
+
+    static LocalDate now(&ZoneId zone) {
+        return LocalDateTime.now(zone).date();
+    }
+
+    static LocalDate ofInstant(&Instant instant, &ZoneId zone) {
+        return LocalDateTime.ofInstant(instant, zone).date();
+    }
+
+    static LocalDate parse(String text) {
+        return DateTimeFormatter.ISO_LOCAL_DATE.parse(text).toLocalDate();
+    }
+
+    static LocalDate parse(String text, &DateTimeFormatter formatter) {
+        return formatter.parse(text).toLocalDate();
+    }
+
+    static boolean isLeap(long year) {
+        return (year & 3L) == 0L && (year % 100L != 0L || year % 400L == 0L);
+    }
+
+    Month month() {
+        return Month.of(this.monthValue);
+    }
+
+    DayOfWeek dayOfWeek() {
+        return DayOfWeek.of((int) Math.floorMod(this.toEpochDay() + 3L, 7L) + 1);
+    }
+
+    int dayOfYear() {
+        return this.month().firstDayOfYear(this.isLeapYear()) + this.dayOfMonth - 1;
+    }
+
+    boolean isLeapYear() {
+        return LocalDate.isLeap((long) this.year);
+    }
+
+    int lengthOfMonth() {
+        return this.month().length(this.isLeapYear());
+    }
+
+    int lengthOfYear() {
+        return this.isLeapYear() ? 366 : 365;
+    }
+
+    long toEpochDay() {
+        long year = (long) this.year - (this.monthValue <= 2 ? 1L : 0L);
+        long era = Math.floorDiv(year, 400L);
+        long yearOfEra = year - era * 400L;
+        long month = (long) this.monthValue;
+        long dayOfYear = (153L * (month > 2L ? month - 3L : month + 9L) + 2L) / 5L + (long) this.dayOfMonth - 1L;
+        long dayOfEra = yearOfEra * 365L + yearOfEra / 4L - yearOfEra / 100L + dayOfYear;
+        return era * LocalDate.DAYS_PER_CYCLE + dayOfEra - LocalDate.DAYS_0000_TO_1970;
+    }
+
+    LocalDate plusDays(long days) {
+        if (days == 0L) {
+            return this;
+        }
+        return LocalDate.ofEpochDay(Math.addExact(this.toEpochDay(), days));
+    }
+
+    LocalDate plusWeeks(long weeks) {
+        return this.plusDays(Math.multiplyExact(weeks, 7L));
+    }
+
+    LocalDate plusMonths(long months) {
+        if (months == 0L) {
+            return this;
+        }
+        long count = (long) this.year * 12L + (long) (this.monthValue - 1) + months;
+        long year = Math.floorDiv(count, 12L);
+        LocalDate.check("Year", year, (long) LocalDate.MIN_YEAR, (long) LocalDate.MAX_YEAR);
+        int month = (int) Math.floorMod(count, 12L) + 1;
+        return LocalDate.resolve((int) year, month, this.dayOfMonth);
+    }
+
+    LocalDate plusYears(long years) {
+        if (years == 0L) {
+            return this;
+        }
+        long year = Math.addExact((long) this.year, years);
+        LocalDate.check("Year", year, (long) LocalDate.MIN_YEAR, (long) LocalDate.MAX_YEAR);
+        return LocalDate.resolve((int) year, this.monthValue, this.dayOfMonth);
+    }
+
+    LocalDate plus(Period period) {
+        return this.plusMonths(period.toTotalMonths()).plusDays((long) period.days());
+    }
+
+    LocalDate minusDays(long days) {
+        return this.plusDays(-days);
+    }
+
+    LocalDate minusWeeks(long weeks) {
+        return this.plusWeeks(-weeks);
+    }
+
+    LocalDate minusMonths(long months) {
+        return this.plusMonths(-months);
+    }
+
+    LocalDate minusYears(long years) {
+        return this.plusYears(-years);
+    }
+
+    LocalDate minus(Period period) {
+        return this.plus(period.negated());
+    }
+
+    LocalDate withYear(int year) {
+        return LocalDate.resolve(year, this.monthValue, this.dayOfMonth);
+    }
+
+    LocalDate withMonth(int month) {
+        return LocalDate.resolve(this.year, month, this.dayOfMonth);
+    }
+
+    LocalDate withDayOfMonth(int dayOfMonth) {
+        return new LocalDate(this.year, this.monthValue, dayOfMonth);
+    }
+
+    LocalDate withDayOfYear(int dayOfYear) {
+        return LocalDate.ofYearDay(this.year, dayOfYear);
+    }
+
+    LocalDate firstDayOfMonth() {
+        return new LocalDate(this.year, this.monthValue, 1);
+    }
+
+    LocalDate lastDayOfMonth() {
+        return new LocalDate(this.year, this.monthValue, this.lengthOfMonth());
+    }
+
+    LocalDate next(DayOfWeek day) {
+        int ahead = Math.floorMod(day.value() - this.dayOfWeek().value(), 7);
+        return this.plusDays(ahead == 0 ? 7L : (long) ahead);
+    }
+
+    LocalDate nextOrSame(DayOfWeek day) {
+        return this.plusDays((long) Math.floorMod(day.value() - this.dayOfWeek().value(), 7));
+    }
+
+    LocalDate previous(DayOfWeek day) {
+        int behind = Math.floorMod(this.dayOfWeek().value() - day.value(), 7);
+        return this.minusDays(behind == 0 ? 7L : (long) behind);
+    }
+
+    LocalDate previousOrSame(DayOfWeek day) {
+        return this.minusDays((long) Math.floorMod(this.dayOfWeek().value() - day.value(), 7));
+    }
+
+    LocalDateTime atTime(int hour, int minute) {
+        return new LocalDateTime(this, LocalTime.of(hour, minute));
+    }
+
+    LocalDateTime atTime(int hour, int minute, int second) {
+        return new LocalDateTime(this, LocalTime.of(hour, minute, second));
+    }
+
+    LocalDateTime atTime(LocalTime time) {
+        return new LocalDateTime(this, time);
+    }
+
+    LocalDateTime atStartOfDay() {
+        return new LocalDateTime(this, LocalTime.MIDNIGHT);
+    }
+
+    ZonedDateTime atStartOfDay(&ZoneId zone) {
+        return ZonedDateTime.of(this.atStartOfDay(), zone);
+    }
+
+    Period until(LocalDate end) {
+        long months = end.prolepticMonth() - this.prolepticMonth();
+        int days = end.dayOfMonth() - this.dayOfMonth;
+        if (months > 0L && days < 0) {
+            months--;
+            days = (int) (end.toEpochDay() - this.plusMonths(months).toEpochDay());
+        } else if (months < 0L && days > 0) {
+            months++;
+            days -= end.lengthOfMonth();
+        }
+        return Period.of((int) (months / 12L), (int) (months % 12L), days);
+    }
+
+    long daysUntil(LocalDate end) {
+        return end.toEpochDay() - this.toEpochDay();
+    }
+
+    List<LocalDate> datesUntil(LocalDate end) {
+        List<LocalDate> dates = new ArrayList<>();
+        long last = end.toEpochDay();
+        for (long day = this.toEpochDay(); day < last; day++) {
+            dates.add(LocalDate.ofEpochDay(day));
+        }
+        return dates;
+    }
+
+    boolean isBefore(LocalDate other) {
+        return this.compareTo(&other) < 0;
+    }
+
+    boolean isAfter(LocalDate other) {
+        return this.compareTo(&other) > 0;
+    }
+
+    boolean isEqual(LocalDate other) {
+        return this.compareTo(&other) == 0;
+    }
+
+    int compareTo(&LocalDate other) {
+        if (this.year != other.year()) {
+            return this.year < other.year() ? -1 : 1;
+        }
+        if (this.monthValue != other.monthValue()) {
+            return this.monthValue < other.monthValue() ? -1 : 1;
+        }
+        if (this.dayOfMonth != other.dayOfMonth()) {
+            return this.dayOfMonth < other.dayOfMonth() ? -1 : 1;
+        }
+        return 0;
+    }
+
+    String format(&DateTimeFormatter formatter) {
+        return formatter.format(this);
+    }
+
+    String toString() {
+        StringBuilder text = new StringBuilder();
+        int magnitude = Math.abs(this.year);
+        if (magnitude < 1000) {
+            if (this.year < 0) {
+                text.append("-");
+            }
+            text.append("${magnitude + 10000}".substring(1));
+        } else {
+            if (this.year > 9999) {
+                text.append("+");
+            }
+            text.append("${this.year}");
+        }
+        text.append(this.monthValue < 10 ? "-0" : "-");
+        text.append("${this.monthValue}");
+        text.append(this.dayOfMonth < 10 ? "-0" : "-");
+        text.append("${this.dayOfMonth}");
+        return text.toString();
+    }
+
+    private long prolepticMonth() {
+        return (long) this.year * 12L + (long) (this.monthValue - 1);
+    }
+
+    private static LocalDate resolve(int year, int month, int day) {
+        LocalDate.check("MonthOfYear", (long) month, 1L, 12L);
+        return new LocalDate(year, month, Math.min(day, Month.of(month).length(LocalDate.isLeap((long) year))));
+    }
+
+    private static void check(String field, long value, long low, long high) {
+        if (value < low || value > high) {
+            throw new DateTimeException("Invalid value for $field (valid values $low - $high): $value");
+        }
+    }
+}

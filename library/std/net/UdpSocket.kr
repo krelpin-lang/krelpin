@@ -1,7 +1,6 @@
 package std.net;
 
 import std.io.IOException;
-import std.io.OsError;
 
 /**
  * A UDP socket, which sends and receives individual messages without a
@@ -34,7 +33,7 @@ final class UdpSocket {
     static UdpSocket bind(String address) throws IOException {
         UdpSocket socket = new UdpSocket();
         if (!socket.bindRaw(address)) {
-            throw new IOException("couldn't bind to `$address`: ${OsError.message()}");
+            throw new IOException("couldn't bind to `$address`: ${UdpSocket.lastError()}");
         }
         return socket;
     }
@@ -49,7 +48,7 @@ final class UdpSocket {
      */
     mut void send(&byte[] data, String address) throws IOException {
         if (!this.sendRaw(data, address)) {
-            throw new IOException("couldn't send to `$address`: ${OsError.message()}");
+            throw new IOException("couldn't send to `$address`: ${UdpSocket.lastError()}");
         }
     }
 
@@ -84,11 +83,11 @@ final class UdpSocket {
         }
         byte[]? data = this.receiveRaw(max);
         if (data == null) {
-            throw new IOException("couldn't receive: ${OsError.message()}");
+            throw new IOException("couldn't receive: ${UdpSocket.lastError()}");
         }
         String? sender = this.lastSenderRaw();
         if (sender == null) {
-            throw new IOException("couldn't read the sender: ${OsError.message()}");
+            throw new IOException("couldn't read the sender: ${UdpSocket.lastError()}");
         }
         return new Datagram(data, SocketAddr.parse(sender));
     }
@@ -112,7 +111,7 @@ final class UdpSocket {
     mut boolean trySend(&byte[] data, String address) throws IOException {
         int status = this.trySendRaw(data, address);
         if (status < 0) {
-            throw new IOException("couldn't send to `$address`: ${OsError.message()}");
+            throw new IOException("couldn't send to `$address`: ${UdpSocket.lastError()}");
         }
         return status == 1;
     }
@@ -136,14 +135,14 @@ final class UdpSocket {
         }
         byte[]? data = this.tryReceiveRaw(max);
         if (data == null) {
-            if (OsError.occurred()) {
-                throw new IOException("couldn't receive: ${OsError.message()}");
+            if (UdpSocket.lastFailed()) {
+                throw new IOException("couldn't receive: ${UdpSocket.lastError()}");
             }
             return null;
         }
         String? sender = this.lastSenderRaw();
         if (sender == null) {
-            throw new IOException("couldn't read the sender: ${OsError.message()}");
+            throw new IOException("couldn't read the sender: ${UdpSocket.lastError()}");
         }
         return new Datagram(data, SocketAddr.parse(sender));
     }
@@ -157,7 +156,7 @@ final class UdpSocket {
     SocketAddr localAddr() throws IOException {
         String? address = this.localAddrRaw();
         if (address == null) {
-            throw new IOException("couldn't get the local address: ${OsError.message()}");
+            throw new IOException("couldn't get the local address: ${UdpSocket.lastError()}");
         }
         return SocketAddr.parse(address);
     }
@@ -172,7 +171,7 @@ final class UdpSocket {
      */
     mut void setReadTimeout(long millis) throws IOException {
         if (!this.setTimeoutRaw(millis, false)) {
-            throw new IOException("couldn't set the timeout: ${OsError.message()}");
+            throw new IOException("couldn't set the timeout: ${UdpSocket.lastError()}");
         }
     }
 
@@ -190,7 +189,7 @@ final class UdpSocket {
      */
     mut void setNonBlocking(boolean nonBlocking) throws IOException {
         if (!this.setNonBlockingRaw(nonBlocking)) {
-            throw new IOException("couldn't change the blocking mode: ${OsError.message()}");
+            throw new IOException("couldn't change the blocking mode: ${UdpSocket.lastError()}");
         }
     }
 
@@ -211,7 +210,7 @@ final class UdpSocket {
     void register(&mut Poller poller, int token, int interest) throws IOException {
         Interest.check(interest);
         if (!this.registerRaw(poller, token, interest, false)) {
-            throw new IOException("couldn't register with the poller: ${OsError.message()}");
+            throw new IOException("couldn't register with the poller: ${UdpSocket.lastError()}");
         }
     }
 
@@ -231,7 +230,7 @@ final class UdpSocket {
     void reregister(&mut Poller poller, int token, int interest) throws IOException {
         Interest.check(interest);
         if (!this.registerRaw(poller, token, interest, true)) {
-            throw new IOException("couldn't register with the poller: ${OsError.message()}");
+            throw new IOException("couldn't register with the poller: ${UdpSocket.lastError()}");
         }
     }
 
@@ -244,7 +243,7 @@ final class UdpSocket {
      */
     void deregister(&mut Poller poller) throws IOException {
         if (!this.deregisterRaw(poller)) {
-            throw new IOException("couldn't deregister from the poller: ${OsError.message()}");
+            throw new IOException("couldn't deregister from the poller: ${UdpSocket.lastError()}");
         }
     }
 
@@ -280,4 +279,10 @@ final class UdpSocket {
 
     @Intrinsic
     private mut boolean setTimeoutRaw(long millis, boolean writing);
+
+    @Intrinsic
+    private static String lastError();
+
+    @Intrinsic
+    private static boolean lastFailed();
 }

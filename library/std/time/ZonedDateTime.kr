@@ -1,0 +1,295 @@
+package std.time;
+
+import std.time.format.DateTimeFormatter;
+import std.util.List;
+
+record ZonedDateTime(LocalDateTime dateTime, ZoneOffset offset, ZoneId zone) implements Comparable<ZonedDateTime> {
+    ZonedDateTime {
+        if (!zone.rules().isValidOffset(dateTime, offset)) {
+            throw new DateTimeException("ZoneOffset '$offset' is not valid for LocalDateTime '$dateTime' in zone '$zone'");
+        }
+    }
+
+    static ZonedDateTime of(LocalDateTime dateTime, &ZoneId zone) {
+        return ZonedDateTime.ofLocal(dateTime, zone, null);
+    }
+
+    static ZonedDateTime of(LocalDate date, LocalTime time, &ZoneId zone) {
+        return ZonedDateTime.ofLocal(new LocalDateTime(date, time), zone, null);
+    }
+
+    static ZonedDateTime of(int year, int month, int dayOfMonth, int hour, int minute, int second, int nano, &ZoneId zone) {
+        return ZonedDateTime.ofLocal(LocalDateTime.of(year, month, dayOfMonth, hour, minute, second, nano), zone, null);
+    }
+
+    static ZonedDateTime ofLocal(LocalDateTime dateTime, &ZoneId zone, ZoneOffset? preferred) {
+        &ZoneRules rules = zone.rules();
+        List<ZoneOffset> valid = rules.validOffsets(dateTime);
+        if (valid.size() == 1) {
+            return new ZonedDateTime(dateTime, valid.get(0), zone.clone());
+        }
+        if (valid.isEmpty()) {
+            Duration gap = rules.gapAt(dateTime);
+            ZoneOffset after = new ZoneOffset(rules.offsetBefore(dateTime).totalSeconds() + (int) gap.toSeconds());
+            return new ZonedDateTime(dateTime.plus(gap), after, zone.clone());
+        }
+        if (preferred != null) {
+            for (&ZoneOffset offset : &valid) {
+                if (offset.totalSeconds() == preferred.totalSeconds()) {
+                    return new ZonedDateTime(dateTime, preferred, zone.clone());
+                }
+            }
+        }
+        return new ZonedDateTime(dateTime, valid.get(0), zone.clone());
+    }
+
+    static ZonedDateTime ofInstant(&Instant instant, &ZoneId zone) {
+        ZoneOffset offset = zone.rules().offset(instant);
+        return new ZonedDateTime(LocalDateTime.ofEpochSecond(instant.epochSecond(), instant.nano(), offset), offset, zone.clone());
+    }
+
+    static ZonedDateTime now() {
+        return ZonedDateTime.now(&ZoneId.systemDefault());
+    }
+
+    static ZonedDateTime now(&ZoneId zone) {
+        return ZonedDateTime.ofInstant(&Instant.now(), zone);
+    }
+
+    static ZonedDateTime parse(String text) {
+        return DateTimeFormatter.ISO_ZONED_DATE_TIME.parse(text).toZonedDateTime();
+    }
+
+    static ZonedDateTime parse(String text, &DateTimeFormatter formatter) {
+        return formatter.parse(text).toZonedDateTime();
+    }
+
+    LocalDate date() {
+        return this.dateTime.date();
+    }
+
+    LocalTime time() {
+        return this.dateTime.time();
+    }
+
+    int year() {
+        return this.dateTime.year();
+    }
+
+    int monthValue() {
+        return this.dateTime.monthValue();
+    }
+
+    Month month() {
+        return this.dateTime.month();
+    }
+
+    int dayOfMonth() {
+        return this.dateTime.dayOfMonth();
+    }
+
+    int dayOfYear() {
+        return this.dateTime.dayOfYear();
+    }
+
+    DayOfWeek dayOfWeek() {
+        return this.dateTime.dayOfWeek();
+    }
+
+    int hour() {
+        return this.dateTime.hour();
+    }
+
+    int minute() {
+        return this.dateTime.minute();
+    }
+
+    int second() {
+        return this.dateTime.second();
+    }
+
+    int nano() {
+        return this.dateTime.nano();
+    }
+
+    long toEpochSecond() {
+        return this.dateTime.toEpochSecond(this.offset);
+    }
+
+    Instant toInstant() {
+        return this.dateTime.toInstant(this.offset);
+    }
+
+    OffsetDateTime toOffsetDateTime() {
+        return new OffsetDateTime(this.dateTime, this.offset);
+    }
+
+    ZonedDateTime withZoneSameInstant(&ZoneId zone) {
+        return ZonedDateTime.ofInstant(&this.toInstant(), zone);
+    }
+
+    ZonedDateTime withZoneSameLocal(&ZoneId zone) {
+        return ZonedDateTime.ofLocal(this.dateTime, zone, this.offset);
+    }
+
+    ZonedDateTime withEarlierOffsetAtOverlap() {
+        List<ZoneOffset> valid = this.zone.rules().validOffsets(this.dateTime);
+        return new ZonedDateTime(this.dateTime, valid.get(0), this.zone.clone());
+    }
+
+    ZonedDateTime withLaterOffsetAtOverlap() {
+        List<ZoneOffset> valid = this.zone.rules().validOffsets(this.dateTime);
+        return new ZonedDateTime(this.dateTime, valid.get(valid.size() - 1), this.zone.clone());
+    }
+
+    ZonedDateTime plusYears(long years) {
+        return this.local(this.dateTime.plusYears(years));
+    }
+
+    ZonedDateTime plusMonths(long months) {
+        return this.local(this.dateTime.plusMonths(months));
+    }
+
+    ZonedDateTime plusWeeks(long weeks) {
+        return this.local(this.dateTime.plusWeeks(weeks));
+    }
+
+    ZonedDateTime plusDays(long days) {
+        return this.local(this.dateTime.plusDays(days));
+    }
+
+    ZonedDateTime plusHours(long hours) {
+        return this.instant(this.dateTime.plusHours(hours));
+    }
+
+    ZonedDateTime plusMinutes(long minutes) {
+        return this.instant(this.dateTime.plusMinutes(minutes));
+    }
+
+    ZonedDateTime plusSeconds(long seconds) {
+        return this.instant(this.dateTime.plusSeconds(seconds));
+    }
+
+    ZonedDateTime plusNanos(long nanos) {
+        return this.instant(this.dateTime.plusNanos(nanos));
+    }
+
+    ZonedDateTime plus(Duration duration) {
+        return this.instant(this.dateTime.plus(duration));
+    }
+
+    ZonedDateTime plus(Period period) {
+        return this.local(this.dateTime.plus(period));
+    }
+
+    ZonedDateTime minusYears(long years) {
+        return this.plusYears(-years);
+    }
+
+    ZonedDateTime minusMonths(long months) {
+        return this.plusMonths(-months);
+    }
+
+    ZonedDateTime minusWeeks(long weeks) {
+        return this.plusWeeks(-weeks);
+    }
+
+    ZonedDateTime minusDays(long days) {
+        return this.plusDays(-days);
+    }
+
+    ZonedDateTime minusHours(long hours) {
+        return this.plusHours(-hours);
+    }
+
+    ZonedDateTime minusMinutes(long minutes) {
+        return this.plusMinutes(-minutes);
+    }
+
+    ZonedDateTime minusSeconds(long seconds) {
+        return this.plusSeconds(-seconds);
+    }
+
+    ZonedDateTime minusNanos(long nanos) {
+        return this.plusNanos(-nanos);
+    }
+
+    ZonedDateTime minus(Duration duration) {
+        return this.instant(this.dateTime.minus(duration));
+    }
+
+    ZonedDateTime minus(Period period) {
+        return this.local(this.dateTime.minus(period));
+    }
+
+    ZonedDateTime withYear(int year) {
+        return this.local(this.dateTime.withYear(year));
+    }
+
+    ZonedDateTime withMonth(int month) {
+        return this.local(this.dateTime.withMonth(month));
+    }
+
+    ZonedDateTime withDayOfMonth(int dayOfMonth) {
+        return this.local(this.dateTime.withDayOfMonth(dayOfMonth));
+    }
+
+    ZonedDateTime withHour(int hour) {
+        return this.local(this.dateTime.withHour(hour));
+    }
+
+    ZonedDateTime withMinute(int minute) {
+        return this.local(this.dateTime.withMinute(minute));
+    }
+
+    ZonedDateTime withSecond(int second) {
+        return this.local(this.dateTime.withSecond(second));
+    }
+
+    ZonedDateTime withNano(int nano) {
+        return this.local(this.dateTime.withNano(nano));
+    }
+
+    boolean isBefore(&ZonedDateTime other) {
+        return this.toInstant().isBefore(other.toInstant());
+    }
+
+    boolean isAfter(&ZonedDateTime other) {
+        return this.toInstant().isAfter(other.toInstant());
+    }
+
+    boolean isEqual(&ZonedDateTime other) {
+        return this.toInstant().compareTo(&other.toInstant()) == 0;
+    }
+
+    int compareTo(&ZonedDateTime other) {
+        int order = this.toInstant().compareTo(&other.toInstant());
+        if (order != 0) {
+            return order;
+        }
+        order = this.dateTime.compareTo(&other.dateTime());
+        if (order != 0) {
+            return order;
+        }
+        return this.zone.id().compareTo(&other.zone().id());
+    }
+
+    String format(&DateTimeFormatter formatter) {
+        return formatter.format(this);
+    }
+
+    String toString() {
+        if (this.zone.asOffset() != null) {
+            return "${this.dateTime}${this.offset}";
+        }
+        return "${this.dateTime}${this.offset}[${this.zone}]";
+    }
+
+    private ZonedDateTime local(LocalDateTime dateTime) {
+        return ZonedDateTime.ofLocal(dateTime, &this.zone, this.offset);
+    }
+
+    private ZonedDateTime instant(LocalDateTime dateTime) {
+        return ZonedDateTime.ofInstant(&dateTime.toInstant(this.offset), &this.zone);
+    }
+}

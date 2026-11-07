@@ -1,0 +1,32 @@
+import std.math.BigDecimal;
+import std.math.RoundingMode;
+
+class Main {
+    static void main() {
+        BigDecimal price = new BigDecimal("19.99");
+        BigDecimal tax = new BigDecimal("0.18");
+        BigDecimal total = price.add(&price.multiply(&tax));
+        Console.println(&total);
+        Console.println(total.setScale(2, RoundingMode.HALF_UP));
+        Console.println(new BigDecimal("0.1").add(&new BigDecimal("0.2")));
+        Console.println(new BigDecimal("10").divide(&new BigDecimal("4")));
+        Console.println(new BigDecimal("1").divide(&new BigDecimal("3"), 10, RoundingMode.HALF_EVEN));
+        Console.println(new BigDecimal("2.5").setScale(0, RoundingMode.HALF_EVEN) + " " + new BigDecimal("3.5").setScale(0, RoundingMode.HALF_EVEN));
+        Console.println(new BigDecimal("-2.5").setScale(0, RoundingMode.HALF_UP) + " " + new BigDecimal("-2.5").setScale(0, RoundingMode.FLOOR) + " " + new BigDecimal("-2.5").setScale(0, RoundingMode.CEILING));
+        Console.println(new BigDecimal("1.50").equals(&new BigDecimal("1.5")) + " " + new BigDecimal("1.50").compareTo(&new BigDecimal("1.5")));
+        Console.println(new BigDecimal("1.2300").stripTrailingZeros() + " " + new BigDecimal("1.5e3") + " " + new BigDecimal("-0.005"));
+        Console.println(new BigDecimal("7.5").remainder(&new BigDecimal("2")));
+        Console.println(BigDecimal.valueOf(0.1).multiply(&BigDecimal.valueOf(3)));
+        Console.println(new BigDecimal("1.1").pow(3));
+        try {
+            new BigDecimal("1").divide(&new BigDecimal("3"));
+        } catch (ArithmeticException e) {
+            Console.println(e.getMessage());
+        }
+        try {
+            new BigDecimal("1.25").setScale(1);
+        } catch (ArithmeticException e) {
+            Console.println(e.getMessage());
+        }
+    }
+}

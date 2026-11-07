@@ -35,9 +35,10 @@ impl Parser<'_> {
         }
 
         let next = self.look_ahead(end + 1);
-        let is_primitive = end == 2 && is_primitive(self.look_ahead(1));
-        if is_primitive {
+        let primitive_cast = end == 2 && is_primitive(self.look_ahead(1));
+        if primitive_cast {
             starts_operand(next)
+                || (is_primitive(next) && self.look_ahead(end + 2) == TokenKind::Dot)
                 || matches!(
                     next,
                     TokenKind::Minus | TokenKind::PlusPlus | TokenKind::MinusMinus

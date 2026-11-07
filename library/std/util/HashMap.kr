@@ -26,10 +26,10 @@ class HashMap<K extends Hashable<K>, V> implements Map<K, V> {
     int size();
 
     @Intrinsic
-    (&V)? get(&K key);
+    (&V)? get(&K key) borrows this;
 
     @Intrinsic
-    mut (&mut V)? getMut(&K key);
+    mut (&mut V)? getMut(&K key) borrows this;
 
     @Intrinsic
     mut V? put(K key, V value);

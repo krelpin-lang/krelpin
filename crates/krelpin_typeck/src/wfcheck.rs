@@ -60,7 +60,7 @@ impl Tcx<'_> {
             .collect();
         fields.sort_by_key(|field| field.name.span.lo);
         for field in fields {
-            if !self.may_hold_refs(&field.ty) {
+            if !self.holds_declared_refs(&field.ty) {
                 continue;
             }
             self.dcx.emit(
@@ -70,7 +70,7 @@ impl Tcx<'_> {
                 ))
                 .with_span(field.name.span)
                 .with_note("a `static` field lives as long as the program, longer than anything it could borrow")
-                .with_help("keep it in a local or an instance field, or store plain data instead of lambdas"),
+                .with_help("keep it in a local or an instance field, or store owned values instead of references"),
             );
         }
     }
@@ -241,7 +241,8 @@ impl Tcx<'_> {
                         param.name
                     ))
                     .with_span(span)
-                    .with_label(format!("`{arg}` is not a `{bound}`")),
+                    .with_label(format!("`{arg}` is not a `{bound}`"))
+                    .with_notes(self.unmet_conditions(arg, &bound)),
                 );
             }
         }

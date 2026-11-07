@@ -27,6 +27,7 @@ pub(crate) struct FnCtxt<'a, 'tcx> {
     pub(crate) call_expectations: HashMap<Span, Ty>,
     pub(crate) deferrable: std::collections::HashSet<Span>,
     pub(crate) pending_calls: HashMap<Span, crate::call::PendingCall>,
+    pub(crate) pending_chains: HashMap<Span, crate::call::PendingChain>,
     pub(crate) exceptions: ExceptionScope,
     pub(crate) results: TypeckResults,
     /// The `this(...)` or `super(...)` call that starts the constructor
@@ -275,6 +276,7 @@ impl<'a, 'tcx> FnCtxt<'a, 'tcx> {
             call_expectations: HashMap::new(),
             deferrable: std::collections::HashSet::new(),
             pending_calls: HashMap::new(),
+            pending_chains: HashMap::new(),
             exceptions: ExceptionScope::default(),
             results: TypeckResults::default(),
             delegation: None,
@@ -361,6 +363,7 @@ impl<'a, 'tcx> FnCtxt<'a, 'tcx> {
             }
             _ => diagnostic,
         };
+        let diagnostic = diagnostic.with_notes(self.tcx.unmet_conditions(found, expected));
         self.emit(diagnostic);
     }
 }

@@ -1,0 +1,47 @@
+package std.util;
+
+class LinkedHashMap<K extends Hashable<K>, V> implements Map<K, V> {
+    LinkedHashMap() {}
+
+    @Intrinsic
+    int size();
+
+    @Intrinsic
+    (&V)? get(&K key) borrows this;
+
+    @Intrinsic
+    mut (&mut V)? getMut(&K key) borrows this;
+
+    @Intrinsic
+    mut V? put(K key, V value);
+
+    @Intrinsic
+    mut V? remove(&K key);
+
+    @Intrinsic
+    boolean containsKey(&K key);
+
+    @Intrinsic
+    mut void clear();
+
+    @Intrinsic
+    Set<&K> keySet();
+
+    @Intrinsic
+    List<&V> values();
+
+    String toString() {
+        StringBuilder text = new StringBuilder();
+        text.append("{");
+        boolean first = true;
+        for (&K key : this.keySet()) {
+            if (!first) {
+                text.append(", ");
+            }
+            first = false;
+            text.append(key + "=" + this.get(key));
+        }
+        text.append("}");
+        return text.toString();
+    }
+}

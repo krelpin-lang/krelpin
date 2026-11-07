@@ -1,3 +1,5 @@
+use std::collections::HashSet;
+
 use krelpin_mir::BodyId;
 use krelpin_typeck::{LangItem, Subst, Ty};
 
@@ -79,21 +81,46 @@ impl Cx<'_, '_> {
     }
 
     fn static_order(&self) -> Vec<usize> {
+        let deps: Vec<Vec<usize>> = (0..self.statics.len())
+            .map(|id| self.static_deps(id))
+            .collect();
         let mut order = Vec::new();
         let mut state = vec![0u8; self.statics.len()];
         for start in 0..self.statics.len() {
-            self.visit_static(start, &mut state, &mut order);
+            Self::visit_static(&deps, start, &mut state, &mut order);
         }
         order
     }
 
-    fn visit_static(&self, id: usize, state: &mut [u8], order: &mut Vec<usize>) {
+    fn static_deps(&self, id: usize) -> Vec<usize> {
+        let mut deps = self.statics[id].deps.clone();
+        let Some(init) = self.statics[id].init else {
+            return deps;
+        };
+        let mut seen = HashSet::from([init]);
+        let mut stack = vec![init];
+        while let Some(function) = stack.pop() {
+            for &used in self.fn_statics.get(&function).into_iter().flatten() {
+                if used != id && !deps.contains(&used) {
+                    deps.push(used);
+                }
+            }
+            for &callee in self.fn_calls.get(&function).into_iter().flatten() {
+                if self.instance_static(callee).is_none() && seen.insert(callee) {
+                    stack.push(callee);
+                }
+            }
+        }
+        deps
+    }
+
+    fn visit_static(deps: &[Vec<usize>], id: usize, state: &mut [u8], order: &mut Vec<usize>) {
         if state[id] != 0 {
             return;
         }
         state[id] = 1;
-        for &dep in &self.statics[id].deps {
-            self.visit_static(dep, state, order);
+        for &dep in &deps[id] {
+            Self::visit_static(deps, dep, state, order);
         }
         state[id] = 2;
         order.push(id);

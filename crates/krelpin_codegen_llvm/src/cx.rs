@@ -43,6 +43,9 @@ pub(crate) struct Cx<'a, 'tcx> {
     pub statics: Vec<StaticInfo>,
     pub static_ids: HashMap<(DefId, Symbol), usize>,
     pub current_static: Option<usize>,
+    pub current_fn: Option<usize>,
+    pub fn_statics: HashMap<usize, Vec<usize>>,
+    pub fn_calls: HashMap<usize, Vec<usize>>,
     pub glue: HashMap<(char, Ty), String>,
     pub table_shapes: HashMap<(Ty, Ty), String>,
     pub errors: Vec<Diagnostic>,
@@ -96,6 +99,9 @@ impl<'a, 'tcx> Cx<'a, 'tcx> {
             statics: Vec::new(),
             static_ids: HashMap::new(),
             current_static: None,
+            current_fn: None,
+            fn_statics: HashMap::new(),
+            fn_calls: HashMap::new(),
             glue: HashMap::new(),
             table_shapes: HashMap::new(),
             errors: Vec::new(),
@@ -129,14 +135,31 @@ impl<'a, 'tcx> Cx<'a, 'tcx> {
     }
 
     pub(crate) fn instance(&mut self, instance: Instance) -> usize {
-        if let Some(&id) = self.instance_ids.get(&instance) {
-            return id;
+        let id = if let Some(&id) = self.instance_ids.get(&instance) {
+            id
+        } else {
+            let id = self.instances.len();
+            self.instances.push(instance.clone());
+            self.instance_ids.insert(instance, id);
+            self.queue.push_back(id);
+            id
+        };
+        if let Some(current) = self.current_fn {
+            let calls = self.fn_calls.entry(current).or_default();
+            if !calls.contains(&id) {
+                calls.push(id);
+            }
         }
-        let id = self.instances.len();
-        self.instances.push(instance.clone());
-        self.instance_ids.insert(instance, id);
-        self.queue.push_back(id);
         id
+    }
+
+    fn note_static_use(&mut self, id: usize) {
+        if let Some(current) = self.current_fn {
+            let uses = self.fn_statics.entry(current).or_default();
+            if !uses.contains(&id) {
+                uses.push(id);
+            }
+        }
     }
 
     pub(crate) fn fn_name(&self, id: usize) -> String {
@@ -217,6 +240,7 @@ impl<'a, 'tcx> Cx<'a, 'tcx> {
 
     pub(crate) fn static_info(&mut self, owner: DefId, name: Symbol) -> usize {
         if let Some(&id) = self.static_ids.get(&(owner, name)) {
+            self.note_static_use(id);
             if let Some(current) = self.current_static
                 && current != id
                 && !self.statics[current].deps.contains(&id)
@@ -244,6 +268,7 @@ impl<'a, 'tcx> Cx<'a, 'tcx> {
             deps: Vec::new(),
         });
         self.static_ids.insert((owner, name), id);
+        self.note_static_use(id);
         if let Some(current) = self.current_static {
             self.statics[current].deps.push(id);
         }

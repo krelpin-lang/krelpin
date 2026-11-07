@@ -1,0 +1,54 @@
+import std.util.*;
+
+interface Describe {
+    String describe();
+
+    String loud() {
+        return this.describe().toUpperCase();
+    }
+}
+
+record Item(String name) implements Describe {
+    String describe() {
+        return "item " + this.name;
+    }
+}
+
+class Box<T> implements Describe {
+    private T value;
+
+    Box(T value) {
+        this.value = value;
+    }
+
+    String describe() where T extends Describe {
+        return "box of " + this.value.describe();
+    }
+}
+
+class Main {
+    static <T extends Describe> void show(&T value) {
+        Console.println(value.describe());
+    }
+
+    static void main() {
+        Box<Item> box = new Box<>(new Item("pen"));
+        Console.println(box.describe());
+        Main.show(&box);
+        Box<Box<Item>> nested = new Box<>(new Box<>(new Item("cup")));
+        Main.show(&nested);
+        Describe d = new Box<>(new Item("ink"));
+        Console.println(d.loud());
+        List<Describe> all = new ArrayList<>();
+        all.add(new Item("a"));
+        all.add(new Box<>(new Item("b")));
+        for (&Describe x : all) {
+            Console.println(x.describe());
+        }
+        Box<int> plain = new Box<>(3);
+        Object o = plain;
+        Console.println(o instanceof Describe);
+        Object n = new Box<>(new Item("x"));
+        Console.println(n instanceof Describe);
+    }
+}

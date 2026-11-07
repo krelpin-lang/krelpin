@@ -297,20 +297,20 @@ impl LoweringCtxt<'_, '_> {
             ast::StmtKind::Expr(expr) => StmtKind::Expr(self.lower_expr(expr)),
             ast::StmtKind::Block(block) => StmtKind::Block(self.lower_block(block)),
             ast::StmtKind::If { cond, then, els } => StmtKind::If {
-                cond: self.lower_expr(cond),
+                cond: deref_all(self.lower_expr(cond)),
                 then: self.lower_stmt_as_block(then),
                 els: els.as_deref().map(|els| self.lower_stmt_as_block(els)),
             },
             ast::StmtKind::While { cond, body } => StmtKind::Loop {
                 kind: LoopKind::While,
-                cond: Some(self.lower_expr(cond)),
+                cond: Some(deref_all(self.lower_expr(cond))),
                 update: Vec::new(),
                 body: self.lower_stmt_as_block(body),
             },
             ast::StmtKind::DoWhile { body, cond } => StmtKind::Loop {
                 kind: LoopKind::DoWhile,
                 body: self.lower_stmt_as_block(body),
-                cond: Some(self.lower_expr(cond)),
+                cond: Some(deref_all(self.lower_expr(cond))),
                 update: Vec::new(),
             },
             ast::StmtKind::For {
@@ -323,7 +323,7 @@ impl LoweringCtxt<'_, '_> {
                     .iter()
                     .filter_map(|stmt| self.lower_stmt(stmt))
                     .collect();
-                let cond = cond.as_ref().map(|cond| self.lower_expr(cond));
+                let cond = cond.as_ref().map(|cond| deref_all(self.lower_expr(cond)));
                 let update = update.iter().map(|expr| self.lower_expr(expr)).collect();
                 let body = self.lower_stmt_as_block(body);
                 stmts.push(Stmt {
@@ -582,7 +582,7 @@ impl LoweringCtxt<'_, '_> {
                 let operand = self.lower_expr(operand);
                 let operand = match op {
                     UnOp::Neg | UnOp::BitNot => coerce(operand, &ty),
-                    UnOp::Not => operand,
+                    UnOp::Not => deref_all(operand),
                     UnOp::PreInc | UnOp::PreDec | UnOp::PostInc | UnOp::PostDec => {
                         deref_all(operand)
                     }
@@ -633,7 +633,7 @@ impl LoweringCtxt<'_, '_> {
                 }
             }
             ast::ExprKind::Ternary { cond, then, els } => ExprKind::If {
-                cond: Box::new(self.lower_expr(cond)),
+                cond: Box::new(deref_all(self.lower_expr(cond))),
                 then: Box::new(coerce(self.lower_expr(then), &ty)),
                 els: Box::new(coerce(self.lower_expr(els), &ty)),
             },
@@ -780,6 +780,7 @@ impl LoweringCtxt<'_, '_> {
                 (coerce(lhs, ty), coerce(rhs, &amount))
             }
             BinOp::Elvis => (lhs, coerce(rhs, ty)),
+            BinOp::And | BinOp::Or => (deref_all(lhs), deref_all(rhs)),
             _ => (lhs, rhs),
         };
         ExprKind::Binary {
@@ -940,6 +941,34 @@ fn coerce(expr: Expr, target: &Ty) -> Expr {
             },
         };
     }
+    if let (Ty::Nullable(reference), Ty::Nullable(value)) = (target, &expr.ty)
+        && let Ty::Ref {
+            mutable: false,
+            ty: wanted,
+        } = reference.as_ref()
+        && !matches!(value.as_ref(), Ty::Ref { .. })
+        && value.as_ref() == wanted.as_ref()
+    {
+        let slot = expr.ty.clone();
+        let lent = Expr {
+            ty: Ty::Ref {
+                mutable: false,
+                ty: Box::new(slot),
+            },
+            span: expr.span,
+            kind: ExprKind::Borrow {
+                mutable: false,
+                expr: Box::new(expr),
+            },
+        };
+        return Expr {
+            ty: target.clone(),
+            span: lent.span,
+            kind: ExprKind::Cast {
+                expr: Box::new(lent),
+            },
+        };
+    }
     if let Ty::Ref {
         mutable: false,
         ty: inner,
@@ -1004,8 +1033,25 @@ fn deref_all(mut expr: Expr) -> Expr {
     expr
 }
 
-fn copy_through_ref(expr: Expr, target: &Ty) -> Expr {
+fn copy_through_ref(mut expr: Expr, target: &Ty) -> Expr {
     let is_ref = |ty: &Ty| matches!(ty, Ty::Ref { .. });
+    if matches!(target, Ty::Ref { mutable: false, .. }) {
+        while ref_depth(&expr.ty) > ref_depth(target) {
+            let Ty::Ref { ty, .. } = &expr.ty else {
+                break;
+            };
+            let inner = ty.as_ref().clone();
+            expr = Expr {
+                ty: inner,
+                span: expr.span,
+                kind: ExprKind::Deref {
+                    expr: Box::new(expr),
+                    safe: false,
+                },
+            };
+        }
+        return expr;
+    }
     let (inner, safe) = match (&expr.ty, target) {
         // A value is wanted, so read through every level: `&&int` to `int`.
         (Ty::Ref { .. }, target) if !is_ref(target.non_null()) && !target.is_unknown() => {

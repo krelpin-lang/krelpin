@@ -1,0 +1,55 @@
+package std.time;
+
+import std.time.format.TextStyle;
+
+enum DayOfWeek {
+    MONDAY,
+    TUESDAY,
+    WEDNESDAY,
+    THURSDAY,
+    FRIDAY,
+    SATURDAY,
+    SUNDAY;
+
+    static DayOfWeek of(int value) {
+        return switch (value) {
+            case 1 -> DayOfWeek.MONDAY;
+            case 2 -> DayOfWeek.TUESDAY;
+            case 3 -> DayOfWeek.WEDNESDAY;
+            case 4 -> DayOfWeek.THURSDAY;
+            case 5 -> DayOfWeek.FRIDAY;
+            case 6 -> DayOfWeek.SATURDAY;
+            case 7 -> DayOfWeek.SUNDAY;
+            default -> throw new DateTimeException("Invalid value for DayOfWeek: $value");
+        };
+    }
+
+    int value() {
+        return this.ordinal() + 1;
+    }
+
+    DayOfWeek plus(long days) {
+        return DayOfWeek.of((int) Math.floorMod((long) this.ordinal() + days % 7L, 7L) + 1);
+    }
+
+    DayOfWeek minus(long days) {
+        return this.plus(-(days % 7L));
+    }
+
+    String displayName(TextStyle style) {
+        String full = switch (this) {
+            case MONDAY -> "Monday";
+            case TUESDAY -> "Tuesday";
+            case WEDNESDAY -> "Wednesday";
+            case THURSDAY -> "Thursday";
+            case FRIDAY -> "Friday";
+            case SATURDAY -> "Saturday";
+            case SUNDAY -> "Sunday";
+        };
+        return switch (style) {
+            case FULL -> full;
+            case SHORT -> full.substring(0, 3);
+            case NARROW -> full.substring(0, 1);
+        };
+    }
+}

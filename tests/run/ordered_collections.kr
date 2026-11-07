@@ -1,0 +1,68 @@
+import std.util.*;
+
+record Job(String name, int priority) {}
+
+class Main {
+    static void main() {
+        Map<String, int> ages = new LinkedHashMap<>();
+        ages.put("zed", 30);
+        ages.put("amy", 25);
+        ages.put("bob", 41);
+        ages.put("zed", 31);
+        ages.remove(&"amy");
+        ages.put("amy", 26);
+        Console.println(&ages);
+        Console.println(ages.keySet());
+        Set<String> seen = new LinkedHashSet<>();
+        seen.add("c");
+        seen.add("a");
+        seen.add("b");
+        seen.add("a");
+        Console.println(&seen);
+
+        ArrayDeque<int> deque = new ArrayDeque<>();
+        for (int i = 1; i <= 5; i++) {
+            deque.addLast(i);
+        }
+        deque.addFirst(0);
+        deque.push(-1);
+        Console.println(&deque);
+        Console.println(deque.pollLast());
+        Console.println(deque.pollLast());
+        Console.println(deque.pop());
+        Console.println(deque.peekFirst());
+        Console.println(deque.peekLast());
+        int total = 0;
+        for (&int value : deque) {
+            total += value;
+        }
+        Console.println(total);
+        while (!deque.isEmpty()) {
+            Console.println(deque.removeLast());
+        }
+        Console.println(deque.pollFirst());
+
+        Queue<Job> jobs = new ArrayDeque<>();
+        jobs.add(new Job("build", 2));
+        jobs.add(new Job("test", 1));
+        Console.println(jobs.peek());
+        Console.println(jobs.poll());
+        Console.println(jobs.size());
+
+        ArrayDeque<String> words = new ArrayDeque<>();
+        words.addFirst("b");
+        words.addFirst("a");
+        words.addLast("c");
+        ArrayDeque<String> copy = words.clone();
+        Console.println(copy.equals(&words));
+        Console.println(words.contains(&"c"));
+        copy.pollFirst();
+        Console.println(copy.equals(&words));
+        Console.println(&copy);
+        try {
+            new ArrayDeque<int>().removeFirst();
+        } catch (IllegalStateException e) {
+            Console.println(e.getMessage());
+        }
+    }
+}

@@ -1,0 +1,19 @@
+import std.util.*;
+
+record Person(String name, int age) {}
+
+class Main {
+    static void main() {
+        List<Person> people = new ArrayList<>();
+        people.add(new Person("cem", 30));
+        people.add(new Person("ada", 30));
+        people.add(new Person("bob", 25));
+        Comparator<Person> byAge = Comparator.comparing(p -> p.age()).thenComparing(p -> p.name());
+        people.sort(byAge);
+        Console.println(&people);
+        people.sort(Comparator.comparing(p -> p.name()).reversed());
+        Console.println(&people);
+        people.sort(Comparator.comparing(p -> p.age()).thenComparing(p -> p.name()).reversed());
+        Console.println(&people);
+    }
+}

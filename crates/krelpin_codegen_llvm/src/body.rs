@@ -76,6 +76,7 @@ impl<'a, 'tcx> Cx<'a, 'tcx> {
         let closure = self.closure_bodies.get(&(body_id, args.to_vec())).copied();
         let static_id = self.instance_static(id);
         let previous = std::mem::replace(&mut self.current_static, static_id);
+        let previous_fn = self.current_fn.replace(id);
         let name = self.fn_name(id);
         let frame = poll.then(|| {
             let index = self.async_frame(body_id, args);
@@ -189,6 +190,7 @@ impl<'a, 'tcx> Cx<'a, 'tcx> {
             fx.out
         );
         self.current_static = previous;
+        self.current_fn = previous_fn;
         text
     }
 }

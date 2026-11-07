@@ -278,6 +278,7 @@ int32_t kr_process_run(const KrArray *argv, const KrString *directory, const KrA
 KrString *kr_process_captured(bool error);
 int64_t kr_system_millis(void);
 int64_t kr_system_nanos(void);
+int64_t kr_system_epoch_nanos(void);
 
 void kr_bridge_open(void);
 KrString *kr_bridge_receive(void);

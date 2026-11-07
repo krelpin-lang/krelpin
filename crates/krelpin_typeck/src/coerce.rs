@@ -43,6 +43,14 @@ impl Tcx<'_> {
                     *from_mut && (from == to || from.is_unknown() || to.is_unknown())
                 } else {
                     assignable(from, to)
+                        || (matches!(from.as_ref(), Ty::Ref { .. })
+                            && assignable(
+                                from,
+                                &Ty::Ref {
+                                    mutable: false,
+                                    ty: to.clone(),
+                                },
+                            ))
                 }
             }
             (Ty::Ref { ty: inner, .. }, to) if copying && self.is_copy(inner) => {
@@ -82,7 +90,11 @@ impl Tcx<'_> {
         sig.superclass
             .iter()
             .chain(sig.interfaces.iter())
-            .any(|parent| self.is_assignable(env, &parent.subst(&subst), to))
+            .map(|parent| parent.subst(&subst))
+            .any(|parent| {
+                self.implementation_holds(env, def, args, &parent)
+                    && self.is_assignable(env, &parent, to)
+            })
     }
 
     pub fn common_ty(&self, env: &ParamEnv, a: &Ty, b: &Ty) -> Option<Ty> {

@@ -3,7 +3,7 @@ use std::fmt::Write;
 
 use krelpin_ast::ast::ReceiverKind;
 use krelpin_mir::BodyId;
-use krelpin_typeck::{AdtKind, Callee, LangItem, Subst, Ty};
+use krelpin_typeck::{AdtKind, Callee, LangItem, ParamEnv, Subst, Ty};
 
 use crate::cx::Cx;
 use crate::instance::{Instance, Selector, Thunk};
@@ -161,7 +161,9 @@ impl Cx<'_, '_> {
                 name: self.tcx.sig(parent).name.name,
                 args: parent_args,
             };
-            if !out.contains(&iface) {
+            let holds = matches!(key, RtKey::Interface(_))
+                || self.tcx.is_assignable(&ParamEnv::default(), &ty, &iface);
+            if holds && !out.contains(&iface) {
                 out.push(iface);
             }
         }
@@ -205,6 +207,15 @@ impl Cx<'_, '_> {
         }
     }
 
+    fn implements_conditionally(&self, ty: &Ty, selector: &Selector) -> bool {
+        let object = self.lang_ty(LangItem::Object);
+        if selector.owner == object {
+            return true;
+        }
+        self.tcx
+            .is_assignable(&ParamEnv::default(), ty, &selector.owner)
+    }
+
     fn implements_structurally(&self, ty: &Ty, selector: &Selector) -> bool {
         let Ty::Adt { def, args, .. } = &selector.owner else {
             return false;
@@ -226,7 +237,8 @@ impl Cx<'_, '_> {
         let applies = match &key {
             RtKey::Array(_) => selector.owner == object,
             _ => {
-                self.is_subtype(&ty, &selector.owner)
+                (self.is_subtype(&ty, &selector.owner)
+                    && self.implements_conditionally(&ty, &selector))
                     || self.implements_structurally(&ty, &selector)
             }
         };
@@ -448,7 +460,7 @@ impl Cx<'_, '_> {
         if let Some(name) = self.box_types.get(value) {
             return name.clone();
         }
-        let name = format!("%\"box.{}\"", self.display(value));
+        let name = format!("%\"box.{}\"", self.type_key(value));
         self.box_types.insert(value.clone(), name.clone());
         let llty = self.mem_llty(value);
         self.type_defs

@@ -8,12 +8,13 @@ use krelpin_resolve::Res;
 use krelpin_span::def_id::DefId;
 use krelpin_span::{Span, Symbol};
 
+use crate::call::PendingChain;
 use crate::check::{FnCtxt, plural};
 use crate::closure::is_closure;
 use crate::lang_items::LangItem;
 use crate::pat::Coverage;
-use crate::sig::{AdtKind, FieldSig};
-use crate::ty::{Ty, promote, promote_unary};
+use crate::sig::{AdtKind, FieldSig, MethodSig};
+use crate::ty::{Subst, Ty, promote, promote_unary};
 
 enum Receiver {
     None,
@@ -402,6 +403,10 @@ impl FnCtxt<'_, '_> {
         }
 
         let ty = self.check_expr(base);
+        self.receiver_of(base, ty, safe)
+    }
+
+    fn receiver_of(&mut self, base: &Expr, ty: Ty, safe: bool) -> (Receiver, bool) {
         match ty {
             Ty::Nullable(inner) => {
                 if !safe {
@@ -615,8 +620,79 @@ impl FnCtxt<'_, '_> {
         safe: bool,
     ) -> Ty {
         let ty = self.method_call_ty(receiver, name, args, safe);
-        self.finish_closure_args(args);
+        if !self.pending_chains.contains_key(&name.span) {
+            self.finish_closure_args(args);
+        }
         ty
+    }
+
+    pub(crate) fn finish_chain(&mut self, expr: &Expr, chain: PendingChain, expected: &Ty) {
+        if !expected.references_unknown() {
+            self.call_expectations
+                .insert(chain.name.span, expected.clone());
+        }
+        let base_expected = self
+            .receiver_expectation(&chain.receiver, chain.name, chain.args.len(), expected)
+            .unwrap_or(Ty::Unknown);
+        self.finish_pending(&chain.base, &base_expected);
+        let base_ty = self
+            .results
+            .expr_types
+            .get(&chain.base.span)
+            .cloned()
+            .unwrap_or(Ty::Unknown);
+        let (receiver, nullable) = self.receiver_of(&chain.base, base_ty, chain.safe);
+        let ty = self.method_call_rest(receiver, nullable, chain.name, &chain.args);
+        self.finish_closure_args(&chain.args);
+        self.results.expr_types.insert(expr.span, ty);
+    }
+
+    fn chained_receiver(
+        &mut self,
+        base: &Expr,
+        name: Ident,
+        args: &[Expr],
+        safe: bool,
+    ) -> Result<(Receiver, bool), Ty> {
+        let ExprKind::MethodCall {
+            name: base_name, ..
+        } = &base.kind
+        else {
+            return Ok(self.receiver(base, safe));
+        };
+        self.deferrable.insert(base_name.span);
+        let mut ty = self.check_expr(base);
+        self.deferrable.remove(&base_name.span);
+        if self.is_pending(base) {
+            let expected = self.call_expectations.get(&name.span).cloned();
+            let base_expected = expected
+                .and_then(|expected| self.receiver_expectation(&ty, name, args.len(), &expected));
+            match base_expected {
+                Some(base_expected) => self.finish_pending(base, &base_expected),
+                None if self.deferrable.remove(&name.span) => {
+                    let placeholder = self.chain_placeholder(&ty, name, args.len());
+                    self.pending_chains.insert(
+                        name.span,
+                        PendingChain {
+                            base: base.clone(),
+                            receiver: ty,
+                            name,
+                            args: args.to_vec(),
+                            safe,
+                        },
+                    );
+                    return Err(placeholder);
+                }
+                None => self.finish_pending(base, &Ty::Unknown),
+            }
+            ty = self
+                .results
+                .expr_types
+                .get(&base.span)
+                .cloned()
+                .unwrap_or(Ty::Unknown);
+        }
+        Ok(self.receiver_of(base, ty, safe))
     }
 
     fn method_call_ty(
@@ -627,9 +703,22 @@ impl FnCtxt<'_, '_> {
         safe: bool,
     ) -> Ty {
         let (receiver, nullable) = match receiver {
-            Some(base) => self.receiver(base, safe),
+            Some(base) => match self.chained_receiver(base, name, args, safe) {
+                Ok(receiver) => receiver,
+                Err(placeholder) => return placeholder,
+            },
             None => (Receiver::None, false),
         };
+        self.method_call_rest(receiver, nullable, name, args)
+    }
+
+    fn method_call_rest(
+        &mut self,
+        receiver: Receiver,
+        nullable: bool,
+        name: Ident,
+        args: &[Expr],
+    ) -> Ty {
         let unknown = matches!(
             &receiver,
             Receiver::Type(ty) | Receiver::Value(ty) if is_unknown_code(ty)
@@ -710,6 +799,22 @@ impl FnCtxt<'_, '_> {
                     self.no_method(ty, name);
                     return Ty::Unknown;
                 }
+                let (candidates, unmet): (Vec<_>, Vec<_>) = candidates
+                    .into_iter()
+                    .partition(|(method, subst)| self.implementation_reaches(ty, method, subst));
+                if candidates.is_empty() {
+                    let (method, subst) = &unmet[0];
+                    let iface = self.declaring_ty(method.owner, subst);
+                    self.emit(
+                        Diagnostic::error(format!(
+                            "`{}` is only available where `{ty}` is a `{iface}`",
+                            name.name
+                        ))
+                        .with_span(name.span)
+                        .with_notes(self.tcx.unmet_conditions(ty, &iface)),
+                    );
+                    return Ty::Unknown;
+                }
                 let instance: Vec<_> = candidates
                     .into_iter()
                     .filter(|(method, _)| method.receiver.is_some())
@@ -734,6 +839,25 @@ impl FnCtxt<'_, '_> {
             }
             _ => Ty::Unknown,
         }
+    }
+
+    fn implementation_reaches(&self, ty: &Ty, method: &MethodSig, subst: &Subst) -> bool {
+        if !matches!(ty, Ty::Adt { .. }) || self.tcx.sig(method.owner).kind != AdtKind::Interface {
+            return true;
+        }
+        let iface = self.declaring_ty(method.owner, subst);
+        self.tcx.is_assignable(&self.param_env, ty, &iface)
+    }
+
+    fn declaring_ty(&self, owner: DefId, subst: &Subst) -> Ty {
+        let args = self
+            .tcx
+            .sig(owner)
+            .generics
+            .iter()
+            .map(|param| subst.get(&param.name).cloned().unwrap_or(Ty::Unknown))
+            .collect();
+        self.tcx.def_ty(owner, args)
     }
 
     /// The class whose static `member` is named through the type `ty`.
@@ -1168,6 +1292,7 @@ impl FnCtxt<'_, '_> {
             }
             Some(op) => {
                 let value = self.check_expr(rhs);
+                let value = value.strip_refs();
                 let target_value = target.strip_refs();
                 let ok = target_value.is_unknown()
                     || value.is_unknown()

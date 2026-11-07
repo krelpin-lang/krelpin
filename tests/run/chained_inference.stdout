@@ -1,0 +1,3 @@
+[Person[name=bob, age=25], Person[name=ada, age=30], Person[name=cem, age=30]]
+[Person[name=cem, age=30], Person[name=bob, age=25], Person[name=ada, age=30]]
+[Person[name=cem, age=30], Person[name=ada, age=30], Person[name=bob, age=25]]

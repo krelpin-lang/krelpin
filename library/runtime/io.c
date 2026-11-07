@@ -411,6 +411,12 @@ int64_t kr_system_millis(void) {
     return (int64_t)now.tv_sec * 1000 + now.tv_nsec / 1000000;
 }
 
+int64_t kr_system_epoch_nanos(void) {
+    struct timespec now;
+    clock_gettime(CLOCK_REALTIME, &now);
+    return (int64_t)now.tv_sec * 1000000000 + now.tv_nsec;
+}
+
 int64_t kr_system_nanos(void) {
     struct timespec now;
     clock_gettime(CLOCK_MONOTONIC, &now);

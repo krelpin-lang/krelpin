@@ -1,0 +1,968 @@
+package std.regex;
+
+import std.util.ArrayList;
+import std.util.List;
+
+final class Pattern {
+    public const int CASE_INSENSITIVE = 2;
+    public const int MULTILINE = 8;
+    public const int DOTALL = 32;
+
+    private const int CHAR = 0;
+    private const int ANY = 1;
+    private const int CLASS = 2;
+    private const int SPLIT = 3;
+    private const int JUMP = 4;
+    private const int SAVE = 5;
+    private const int MATCH = 6;
+    private const int LINE_START = 7;
+    private const int LINE_END = 8;
+    private const int WORD_EDGE = 9;
+    private const int NOT_WORD_EDGE = 10;
+    private const int TEXT_START = 11;
+    private const int TEXT_END = 12;
+
+    private const int N_CHAR = 0;
+    private const int N_ANY = 1;
+    private const int N_CLASS = 2;
+    private const int N_ASSERT = 3;
+    private const int N_GROUP = 4;
+    private const int N_CONCAT = 5;
+    private const int N_ALTERNATE = 6;
+    private const int N_REPEAT = 7;
+
+    private String source;
+    private int flags;
+    private char[] text;
+    private int at;
+    private int groups;
+    private List<String> names;
+    private List<int> nameGroups;
+    private List<CharClass> classes;
+    private List<int> kinds;
+    private List<int> firsts;
+    private List<int> seconds;
+    private List<int> thirds;
+    private List<List<int>> children;
+    private List<int> ops;
+    private List<int> targets;
+    private List<int> others;
+
+    private Pattern(String regex, int flags) {
+        this.text = regex.chars();
+        this.source = regex;
+        this.flags = flags;
+        this.at = 0;
+        this.groups = 0;
+        this.names = new ArrayList<>();
+        this.nameGroups = new ArrayList<>();
+        this.classes = new ArrayList<>();
+        this.kinds = new ArrayList<>();
+        this.firsts = new ArrayList<>();
+        this.seconds = new ArrayList<>();
+        this.thirds = new ArrayList<>();
+        this.children = new ArrayList<>();
+        this.ops = new ArrayList<>();
+        this.targets = new ArrayList<>();
+        this.others = new ArrayList<>();
+        int root = this.parseAlternation();
+        if (this.at < this.text.length) {
+            throw this.error("unmatched closing ')'");
+        }
+        this.emit(Pattern.SAVE, 0, 0);
+        this.emitNode(root);
+        this.emit(Pattern.SAVE, 1, 0);
+        this.emit(Pattern.MATCH, 0, 0);
+    }
+
+    static Pattern compile(String regex) {
+        return new Pattern(regex, 0);
+    }
+
+    static Pattern compile(String regex, int flags) {
+        return new Pattern(regex, flags);
+    }
+
+    static boolean matches(String regex, &String input) {
+        Pattern pattern = Pattern.compile(regex);
+        Matcher matcher = pattern.matcher(input);
+        return matcher.matches();
+    }
+
+    static String quote(&String text) {
+        StringBuilder quoted = new StringBuilder();
+        for (char c : text.chars()) {
+            if ("\\.[]{}()<>*+-=!?^$|".contains(c)) {
+                quoted.append('\\');
+            }
+            quoted.append(c);
+        }
+        return quoted.toString();
+    }
+
+    String pattern() {
+        return this.source;
+    }
+
+    int flags() {
+        return this.flags;
+    }
+
+    Matcher matcher(&String input) borrows this {
+        return new Matcher(this, input);
+    }
+
+    List<String> split(&String input) {
+        return this.split(input, 0);
+    }
+
+    List<String> split(&String input, int limit) {
+        List<String> parts = new ArrayList<>();
+        Matcher matcher = this.matcher(input);
+        int last = 0;
+        while ((limit <= 0 || parts.size() < limit - 1) && matcher.find()) {
+            if (matcher.end() == 0) {
+                continue;
+            }
+            parts.add(input.substring(last, matcher.start()));
+            last = matcher.end();
+        }
+        parts.add(input.substring(last));
+        if (limit == 0) {
+            while (parts.size() > 1 && parts.get(parts.size() - 1).isEmpty()) {
+                parts.remove(parts.size() - 1);
+            }
+        }
+        return parts;
+    }
+
+    String toString() {
+        return this.source;
+    }
+
+    private boolean has(int flag) {
+        return (this.flags & flag) != 0;
+    }
+
+    private PatternSyntaxException error(String description) {
+        return new PatternSyntaxException(description, this.source, this.at);
+    }
+
+    private boolean more() {
+        return this.at < this.text.length;
+    }
+
+    private char peek() {
+        return this.text[this.at];
+    }
+
+    private mut boolean accept(char c) {
+        if (this.more() && this.peek() == c) {
+            this.at++;
+            return true;
+        }
+        return false;
+    }
+
+    private mut int node(int kind, int first, int second, int third, List<int> kids) {
+        this.kinds.add(kind);
+        this.firsts.add(first);
+        this.seconds.add(second);
+        this.thirds.add(third);
+        this.children.add(kids);
+        return this.kinds.size() - 1;
+    }
+
+    private mut int leaf(int kind, int first) {
+        return this.node(kind, first, 0, 0, new ArrayList<>());
+    }
+
+    private mut int parseAlternation() {
+        List<int> branches = new ArrayList<>();
+        branches.add(this.parseConcat());
+        while (this.accept('|')) {
+            branches.add(this.parseConcat());
+        }
+        if (branches.size() == 1) {
+            return branches.get(0);
+        }
+        return this.node(Pattern.N_ALTERNATE, 0, 0, 0, branches);
+    }
+
+    private mut int parseConcat() {
+        List<int> items = new ArrayList<>();
+        while (this.more() && this.peek() != '|' && this.peek() != ')') {
+            int item = this.parseRepeat();
+            if (item >= 0) {
+                items.add(item);
+            }
+        }
+        return this.node(Pattern.N_CONCAT, 0, 0, 0, items);
+    }
+
+    private mut int parseRepeat() {
+        int atom = this.parseAtom();
+        if (atom < 0) {
+            return atom;
+        }
+        if (this.more()) {
+            int min;
+            int max;
+            char c = this.peek();
+            if (c == '*') {
+                min = 0;
+                max = -1;
+                this.at++;
+            } else if (c == '+') {
+                min = 1;
+                max = -1;
+                this.at++;
+            } else if (c == '?') {
+                min = 0;
+                max = 1;
+                this.at++;
+            } else if (c == '{') {
+                this.at++;
+                min = this.parseNumber();
+                max = min;
+                if (this.accept(',')) {
+                    max = this.more() && this.peek() != '}' ? this.parseNumber() : -1;
+                }
+                if (!this.accept('}')) {
+                    throw this.error("unclosed counted repetition");
+                }
+                if (max >= 0 && max < min) {
+                    throw this.error("illegal repetition range");
+                }
+            } else {
+                return atom;
+            }
+            boolean lazy = this.accept('?');
+            if (this.more() && this.peek() == '+') {
+                throw this.error("possessive quantifiers are not supported");
+            }
+            List<int> kids = new ArrayList<>();
+            kids.add(atom);
+            return this.node(Pattern.N_REPEAT, min, max, lazy ? 1 : 0, kids);
+        }
+        return atom;
+    }
+
+    private mut int parseNumber() {
+        int start = this.at;
+        int value = 0;
+        while (this.more() && this.peek().isDigit() && (int) this.peek() < 128) {
+            value = value * 10 + ((int) this.peek() - (int) '0');
+            this.at++;
+        }
+        if (this.at == start) {
+            throw this.error("expected a number in counted repetition");
+        }
+        return value;
+    }
+
+    private mut int parseAtom() {
+        char c = this.peek();
+        if (c == '(') {
+            this.at++;
+            return this.parseGroup();
+        }
+        if (c == '[') {
+            this.at++;
+            return this.leaf(Pattern.N_CLASS, this.parseClass());
+        }
+        if (c == '.') {
+            this.at++;
+            return this.leaf(Pattern.N_ANY, 0);
+        }
+        if (c == '^') {
+            this.at++;
+            return this.leaf(Pattern.N_ASSERT, Pattern.LINE_START);
+        }
+        if (c == '$') {
+            this.at++;
+            return this.leaf(Pattern.N_ASSERT, Pattern.LINE_END);
+        }
+        if (c == '\\') {
+            this.at++;
+            return this.parseEscape();
+        }
+        if (c == '*' || c == '+' || c == '?' || c == '{') {
+            throw this.error("dangling meta character '$c'");
+        }
+        this.at++;
+        return this.leaf(Pattern.N_CHAR, (int) c);
+    }
+
+    private mut int parseGroup() {
+        int group = -1;
+        if (this.accept('?')) {
+            if (this.accept(':')) {
+                group = -1;
+            } else if (this.more() && this.peek() == '<' && this.at + 1 < this.text.length
+                    && this.text[this.at + 1] != '=' && this.text[this.at + 1] != '!') {
+                this.at++;
+                StringBuilder name = new StringBuilder();
+                while (this.more() && this.peek() != '>') {
+                    name.append(this.peek());
+                    this.at++;
+                }
+                if (!this.accept('>')) {
+                    throw this.error("unclosed group name");
+                }
+                this.groups++;
+                group = this.groups;
+                this.names.add(name.toString());
+                this.nameGroups.add(group);
+            } else if (this.more() && (this.peek() == '=' || this.peek() == '!' || this.peek() == '<')) {
+                throw this.error("lookaround is not supported");
+            } else {
+                while (this.more() && this.peek() != ')' && this.peek() != ':') {
+                    char flag = this.peek();
+                    if (flag == 'i') {
+                        this.flags = this.flags | Pattern.CASE_INSENSITIVE;
+                    } else if (flag == 's') {
+                        this.flags = this.flags | Pattern.DOTALL;
+                    } else if (flag == 'm') {
+                        this.flags = this.flags | Pattern.MULTILINE;
+                    } else {
+                        throw this.error("unknown inline flag '$flag'");
+                    }
+                    this.at++;
+                }
+                if (this.accept(')')) {
+                    return -1;
+                }
+                if (!this.accept(':')) {
+                    throw this.error("unclosed group");
+                }
+            }
+        } else {
+            this.groups++;
+            group = this.groups;
+        }
+        int inner = this.parseAlternation();
+        if (!this.accept(')')) {
+            throw this.error("unclosed group");
+        }
+        List<int> kids = new ArrayList<>();
+        kids.add(inner);
+        return this.node(Pattern.N_GROUP, group, 0, 0, kids);
+    }
+
+    private mut int parseEscape() {
+        if (!this.more()) {
+            throw this.error("trailing backslash");
+        }
+        char c = this.peek();
+        this.at++;
+        if (c == 'b') {
+            return this.leaf(Pattern.N_ASSERT, Pattern.WORD_EDGE);
+        }
+        if (c == 'B') {
+            return this.leaf(Pattern.N_ASSERT, Pattern.NOT_WORD_EDGE);
+        }
+        if (c == 'A') {
+            return this.leaf(Pattern.N_ASSERT, Pattern.TEXT_START);
+        }
+        if (c == 'z' || c == 'Z') {
+            return this.leaf(Pattern.N_ASSERT, Pattern.TEXT_END);
+        }
+        if ("dDwWsS".contains(c)) {
+            CharClass set = new CharClass();
+            Pattern.addShorthand(&mut set, c);
+            this.classes.add(set);
+            return this.leaf(Pattern.N_CLASS, this.classes.size() - 1);
+        }
+        if (c.isDigit()) {
+            throw this.error("back references are not supported");
+        }
+        return this.leaf(Pattern.N_CHAR, this.escapedChar(c));
+    }
+
+    private mut int escapedChar(char c) {
+        if (c == 'n') {
+            return 10;
+        }
+        if (c == 't') {
+            return 9;
+        }
+        if (c == 'r') {
+            return 13;
+        }
+        if (c == 'f') {
+            return 12;
+        }
+        if (c == 'e') {
+            return 27;
+        }
+        if (c == '0') {
+            return 0;
+        }
+        if (c == 'x' || c == 'u') {
+            int digits = c == 'x' ? 2 : 4;
+            int value = 0;
+            for (int index = 0; index < digits; index++) {
+                if (!this.more() || this.peek().digit(16) < 0) {
+                    throw this.error("illegal hexadecimal escape");
+                }
+                value = value * 16 + this.peek().digit(16);
+                this.at++;
+            }
+            return value;
+        }
+        if (c.isLetterOrDigit()) {
+            throw this.error("illegal escape '\\$c'");
+        }
+        return (int) c;
+    }
+
+    private static void addShorthand(&mut CharClass set, char c) {
+        CharClass base = new CharClass();
+        char lower = c.toLowerCase();
+        if (lower == 'd') {
+            base.addDigits();
+        } else if (lower == 'w') {
+            base.addWord();
+        } else {
+            base.addSpace();
+        }
+        if (c == lower) {
+            set.addAll(&base);
+        } else {
+            set.addComplement(&base);
+        }
+    }
+
+    private mut int parseClass() {
+        CharClass set = new CharClass();
+        if (this.accept('^')) {
+            set.negate();
+        }
+        boolean first = true;
+        while (true) {
+            if (!this.more()) {
+                throw this.error("unclosed character class");
+            }
+            char c = this.peek();
+            if (c == ']' && !first) {
+                this.at++;
+                break;
+            }
+            first = false;
+            this.at++;
+            int low;
+            if (c == '\\') {
+                if (!this.more()) {
+                    throw this.error("unclosed character class");
+                }
+                char escaped = this.peek();
+                if ("dDwWsS".contains(escaped)) {
+                    this.at++;
+                    Pattern.addShorthand(&mut set, escaped);
+                    continue;
+                }
+                this.at++;
+                low = this.escapedChar(escaped);
+            } else if (c == '[') {
+                throw this.error("nested character classes are not supported");
+            } else {
+                low = (int) c;
+            }
+            int high = low;
+            if (this.at + 1 < this.text.length && this.peek() == '-' && this.text[this.at + 1] != ']') {
+                this.at++;
+                char end = this.peek();
+                this.at++;
+                if (end == '\\') {
+                    if (!this.more()) {
+                        throw this.error("unclosed character class");
+                    }
+                    char escaped = this.peek();
+                    this.at++;
+                    high = this.escapedChar(escaped);
+                } else {
+                    high = (int) end;
+                }
+                if (high < low) {
+                    throw this.error("illegal character range");
+                }
+            }
+            set.addRange(low, high);
+        }
+        this.classes.add(set);
+        return this.classes.size() - 1;
+    }
+
+    private mut int emit(int op, int target, int other) {
+        this.ops.add(op);
+        this.targets.add(target);
+        this.others.add(other);
+        return this.ops.size() - 1;
+    }
+
+    private mut void emitNode(int node) {
+        int kind = this.kinds.get(node);
+        int first = this.firsts.get(node);
+        if (kind == Pattern.N_CHAR) {
+            int code = first;
+            if (this.has(Pattern.CASE_INSENSITIVE)) {
+                code = (int) ((char) code).toLowerCase();
+            }
+            this.emit(Pattern.CHAR, code, 0);
+        } else if (kind == Pattern.N_ANY) {
+            this.emit(Pattern.ANY, 0, 0);
+        } else if (kind == Pattern.N_CLASS) {
+            this.emit(Pattern.CLASS, first, 0);
+        } else if (kind == Pattern.N_ASSERT) {
+            this.emit(first, 0, 0);
+        } else if (kind == Pattern.N_GROUP) {
+            if (first >= 0) {
+                this.emit(Pattern.SAVE, 2 * first, 0);
+            }
+            this.emitNode(this.children.get(node).get(0));
+            if (first >= 0) {
+                this.emit(Pattern.SAVE, 2 * first + 1, 0);
+            }
+        } else if (kind == Pattern.N_CONCAT) {
+            int count = this.children.get(node).size();
+            for (int index = 0; index < count; index++) {
+                this.emitNode(this.children.get(node).get(index));
+            }
+        } else if (kind == Pattern.N_ALTERNATE) {
+            int count = this.children.get(node).size();
+            List<int> jumps = new ArrayList<>();
+            for (int index = 0; index < count; index++) {
+                int branch = this.children.get(node).get(index);
+                if (index == count - 1) {
+                    this.emitNode(branch);
+                } else {
+                    int split = this.emit(Pattern.SPLIT, this.ops.size() + 1, 0);
+                    this.emitNode(branch);
+                    jumps.add(this.emit(Pattern.JUMP, 0, 0));
+                    this.others.set(split, this.ops.size());
+                }
+            }
+            for (&int jump : jumps) {
+                this.targets.set(jump, this.ops.size());
+            }
+        } else {
+            this.emitRepeat(node);
+        }
+    }
+
+    private mut void emitRepeat(int node) {
+        int min = this.firsts.get(node);
+        int max = this.seconds.get(node);
+        boolean lazy = this.thirds.get(node) == 1;
+        int body = this.children.get(node).get(0);
+        for (int index = 0; index < min; index++) {
+            this.emitNode(body);
+        }
+        if (max < 0) {
+            int split = this.emit(Pattern.SPLIT, 0, 0);
+            this.emitNode(body);
+            this.emit(Pattern.JUMP, split, 0);
+            this.branch(split, split + 1, this.ops.size(), lazy);
+            return;
+        }
+        List<int> splits = new ArrayList<>();
+        for (int index = min; index < max; index++) {
+            splits.add(this.emit(Pattern.SPLIT, 0, 0));
+            this.emitNode(body);
+        }
+        for (&int split : splits) {
+            this.branch(split, split + 1, this.ops.size(), lazy);
+        }
+    }
+
+    private mut void branch(int split, int body, int exit, boolean lazy) {
+        this.targets.set(split, lazy ? exit : body);
+        this.others.set(split, lazy ? body : exit);
+    }
+
+    private int[]? run(&char[] input, int start, boolean wholeInput, &mut boolean[] visited) {
+        int length = input.length;
+        int[] slots = new int[2 * (this.groups + 1)];
+        for (int index = 0; index < slots.length; index++) {
+            slots[index] = -1;
+        }
+        List<int> stack = new ArrayList<>();
+        stack.add(0);
+        stack.add(start);
+        while (!stack.isEmpty()) {
+            int second = stack.remove(stack.size() - 1);
+            int first = stack.remove(stack.size() - 1);
+            if (first < 0) {
+                slots[-first - 1] = second;
+                continue;
+            }
+            int pc = first;
+            int at = second;
+            while (true) {
+                int seen = pc * (length + 1) + at;
+                if (visited[seen]) {
+                    break;
+                }
+                visited[seen] = true;
+                int op = this.ops.get(pc);
+                if (op == Pattern.CHAR) {
+                    if (at >= length || !this.same(input[at], this.targets.get(pc))) {
+                        break;
+                    }
+                    pc++;
+                    at++;
+                } else if (op == Pattern.ANY) {
+                    if (at >= length || (input[at] == '\n' && !this.has(Pattern.DOTALL))) {
+                        break;
+                    }
+                    pc++;
+                    at++;
+                } else if (op == Pattern.CLASS) {
+                    if (at >= length || !this.classes.get(this.targets.get(pc)).matches(input[at], this.has(Pattern.CASE_INSENSITIVE))) {
+                        break;
+                    }
+                    pc++;
+                    at++;
+                } else if (op == Pattern.SPLIT) {
+                    stack.add(this.others.get(pc));
+                    stack.add(at);
+                    pc = this.targets.get(pc);
+                } else if (op == Pattern.JUMP) {
+                    pc = this.targets.get(pc);
+                } else if (op == Pattern.SAVE) {
+                    int slot = this.targets.get(pc);
+                    stack.add(-slot - 1);
+                    stack.add(slots[slot]);
+                    slots[slot] = at;
+                    pc++;
+                } else if (op == Pattern.MATCH) {
+                    if (wholeInput && at != length) {
+                        break;
+                    }
+                    return slots;
+                } else if (op == Pattern.LINE_START) {
+                    if (!(at == 0 || (this.has(Pattern.MULTILINE) && input[at - 1] == '\n'))) {
+                        break;
+                    }
+                    pc++;
+                } else if (op == Pattern.LINE_END) {
+                    if (!(at == length || (this.has(Pattern.MULTILINE) && input[at] == '\n'))) {
+                        break;
+                    }
+                    pc++;
+                } else if (op == Pattern.TEXT_START) {
+                    if (at != 0) {
+                        break;
+                    }
+                    pc++;
+                } else if (op == Pattern.TEXT_END) {
+                    if (at != length) {
+                        break;
+                    }
+                    pc++;
+                } else {
+                    boolean before = at > 0 && Pattern.isWord(input[at - 1]);
+                    boolean after = at < length && Pattern.isWord(input[at]);
+                    if ((before != after) != (op == Pattern.WORD_EDGE)) {
+                        break;
+                    }
+                    pc++;
+                }
+            }
+        }
+        return null;
+    }
+
+    private boolean same(char c, int expected) {
+        if ((int) c == expected) {
+            return true;
+        }
+        return this.has(Pattern.CASE_INSENSITIVE) && (int) c.toLowerCase() == expected;
+    }
+
+    private static boolean isWord(char c) {
+        return (c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z') || (c >= '0' && c <= '9') || c == '_';
+    }
+
+    private int groupNamed(String name) {
+        for (int index = 0; index < this.names.size(); index++) {
+            if (this.names.get(index).equals(&name)) {
+                return this.nameGroups.get(index);
+            }
+        }
+        throw new IllegalArgumentException("no group named `$name`");
+    }
+
+    static final class Matcher borrows src {
+        private &Pattern pattern;
+        private String input;
+        private char[] chars;
+        private int[] slots;
+        private boolean matched;
+        private int next;
+
+        private Matcher(&Pattern pattern, &String input) keeps pattern {
+            this.pattern = pattern;
+            this.input = input.clone();
+            this.chars = input.chars();
+            this.slots = new int[0];
+            this.matched = false;
+            this.next = 0;
+        }
+
+        &Pattern pattern() borrows src {
+            return this.pattern;
+        }
+
+        mut boolean matches() {
+            return this.attempt(0, true, false);
+        }
+
+        mut boolean lookingAt() {
+            return this.attempt(0, false, false);
+        }
+
+        mut boolean find() {
+            if (this.next > this.chars.length) {
+                this.matched = false;
+                return false;
+            }
+            return this.attempt(this.next, false, true);
+        }
+
+        mut boolean find(int start) {
+            if (start < 0 || start > this.chars.length) {
+                throw new IndexOutOfBoundsException("start $start is out of bounds for length ${this.chars.length}");
+            }
+            return this.attempt(start, false, true);
+        }
+
+        mut void reset() {
+            this.matched = false;
+            this.next = 0;
+        }
+
+        int groupCount() {
+            return this.pattern.groups;
+        }
+
+        String group() {
+            String? text = this.group(0);
+            if (text == null) {
+                throw new IllegalStateException("no match found");
+            }
+            return text;
+        }
+
+        String? group(int group) {
+            int start = this.start(group);
+            if (start < 0) {
+                return null;
+            }
+            return this.input.substring(start, this.end(group));
+        }
+
+        String? group(String name) {
+            return this.group(this.pattern.groupNamed(name));
+        }
+
+        int start() {
+            return this.start(0);
+        }
+
+        int end() {
+            return this.end(0);
+        }
+
+        int start(int group) {
+            return this.slot(2 * group, group);
+        }
+
+        int end(int group) {
+            return this.slot(2 * group + 1, group);
+        }
+
+        int start(String name) {
+            return this.start(this.pattern.groupNamed(name));
+        }
+
+        int end(String name) {
+            return this.end(this.pattern.groupNamed(name));
+        }
+
+        mut String replaceAll(String replacement) {
+            return this.replace(&replacement, true);
+        }
+
+        mut String replaceFirst(String replacement) {
+            return this.replace(&replacement, false);
+        }
+
+        mut List<String> results() {
+            List<String> found = new ArrayList<>();
+            this.reset();
+            while (this.find()) {
+                found.add(this.group());
+            }
+            return found;
+        }
+
+        private int slot(int index, int group) {
+            if (!this.matched) {
+                throw new IllegalStateException("no match found");
+            }
+            if (group < 0 || group > this.pattern.groups) {
+                throw new IndexOutOfBoundsException("no group $group");
+            }
+            return this.slots[index];
+        }
+
+        private mut boolean attempt(int from, boolean whole, boolean scan) {
+            int length = this.chars.length;
+            boolean[] visited = new boolean[this.pattern.ops.size() * (length + 1)];
+            int start = from;
+            while (start <= length) {
+                int[]? found = this.pattern.run(&this.chars, start, whole, &mut visited);
+                if (found != null) {
+                    int end = found[1];
+                    this.next = end == found[0] ? end + 1 : end;
+                    this.slots = found;
+                    this.matched = true;
+                    return true;
+                }
+                if (!scan) {
+                    break;
+                }
+                start++;
+            }
+            this.matched = false;
+            this.next = length + 1;
+            return false;
+        }
+
+        private mut String replace(&String replacement, boolean every) {
+            this.reset();
+            StringBuilder out = new StringBuilder();
+            int last = 0;
+            while (this.find()) {
+                out.append(this.input.substring(last, this.start()));
+                this.appendReplacement(&mut out, replacement);
+                last = this.end();
+                if (!every) {
+                    break;
+                }
+            }
+            out.append(this.input.substring(last));
+            return out.toString();
+        }
+
+        private void appendReplacement(&mut StringBuilder out, &String replacement) {
+            char[] chars = replacement.chars();
+            int index = 0;
+            while (index < chars.length) {
+                char c = chars[index];
+                if (c == '\\' && index + 1 < chars.length) {
+                    out.append(chars[index + 1]);
+                    index += 2;
+                } else if (c == '$' && index + 1 < chars.length && chars[index + 1] == '{') {
+                    int close = index + 2;
+                    StringBuilder name = new StringBuilder();
+                    while (close < chars.length && chars[close] != '}') {
+                        name.append(chars[close]);
+                        close++;
+                    }
+                    String? value = this.group(name.toString());
+                    if (value != null) {
+                        out.append(value);
+                    }
+                    index = close + 1;
+                } else if (c == '$' && index + 1 < chars.length && chars[index + 1].isDigit()) {
+                    int group = (int) chars[index + 1] - (int) '0';
+                    String? value = this.group(group);
+                    if (value != null) {
+                        out.append(value);
+                    }
+                    index += 2;
+                } else {
+                    out.append(c);
+                    index++;
+                }
+            }
+        }
+    }
+
+    private static final class CharClass {
+        private List<int> lows;
+        private List<int> highs;
+        private boolean negated;
+
+        CharClass() {
+            this.lows = new ArrayList<>();
+            this.highs = new ArrayList<>();
+            this.negated = false;
+        }
+
+        mut void negate() {
+            this.negated = !this.negated;
+        }
+
+        mut void addRange(int low, int high) {
+            this.lows.add(low);
+            this.highs.add(high);
+        }
+
+        mut void addAll(&CharClass other) {
+            for (int index = 0; index < other.lows.size(); index++) {
+                this.addRange(other.lows.get(index), other.highs.get(index));
+            }
+        }
+
+        mut void addDigits() {
+            this.addRange((int) '0', (int) '9');
+        }
+
+        mut void addWord() {
+            this.addRange((int) '0', (int) '9');
+            this.addRange((int) 'A', (int) 'Z');
+            this.addRange((int) '_', (int) '_');
+            this.addRange((int) 'a', (int) 'z');
+        }
+
+        mut void addSpace() {
+            this.addRange(9, 13);
+            this.addRange((int) ' ', (int) ' ');
+        }
+
+        mut void addComplement(&CharClass sorted) {
+            int next = 0;
+            for (int index = 0; index < sorted.lows.size(); index++) {
+                int low = sorted.lows.get(index);
+                if (low > next) {
+                    this.addRange(next, low - 1);
+                }
+                next = Math.max(next, sorted.highs.get(index) + 1);
+            }
+            if (next <= 1114111) {
+                this.addRange(next, 1114111);
+            }
+        }
+
+        boolean matches(char c, boolean ignoreCase) {
+            boolean found = this.contains((int) c);
+            if (!found && ignoreCase) {
+                found = this.contains((int) c.toLowerCase()) || this.contains((int) c.toUpperCase());
+            }
+            return found != this.negated;
+        }
+
+        private boolean contains(int code) {
+            for (int index = 0; index < this.lows.size(); index++) {
+                if (code >= this.lows.get(index) && code <= this.highs.get(index)) {
+                    return true;
+                }
+            }
+            return false;
+        }
+    }
+}

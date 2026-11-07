@@ -1,0 +1,38 @@
+import std.math.BigInteger;
+
+class Main {
+    static void main() {
+        BigInteger factorial = BigInteger.one();
+        for (int i = 1; i <= 30; i++) {
+            factorial = factorial.multiply(&BigInteger.valueOf(i));
+        }
+        Console.println(factorial);
+        BigInteger a = new BigInteger("123456789012345678901234567890");
+        BigInteger b = new BigInteger("-987654321987654321");
+        Console.println(a.add(&b));
+        Console.println(a.subtract(&b));
+        Console.println(a.multiply(&b));
+        Console.println(a.divide(&b));
+        Console.println(a.remainder(&b));
+        Console.println(b.mod(&BigInteger.valueOf(7)));
+        Console.println(BigInteger.valueOf(2).pow(100));
+        Console.println(BigInteger.valueOf(4).modPow(&BigInteger.valueOf(13), &BigInteger.valueOf(497)));
+        Console.println(new BigInteger("462").gcd(&new BigInteger("1071")));
+        Console.println(new BigInteger("152415787532388367504942236884722755800955129").sqrt());
+        Console.println(new BigInteger("ff", 16) + " " + BigInteger.valueOf(255).toString(2));
+        Console.println(BigInteger.valueOf(long.MIN_VALUE));
+        Console.println(BigInteger.valueOf(-5).compareTo(&BigInteger.valueOf(3)));
+        Console.println(new BigInteger("1000000000").equals(&BigInteger.valueOf(1000000000)));
+        Console.println(new BigInteger("9223372036854775807").longValueExact());
+        try {
+            new BigInteger("9223372036854775808").longValueExact();
+        } catch (ArithmeticException e) {
+            Console.println(e.getMessage());
+        }
+        try {
+            new BigInteger("12x");
+        } catch (NumberFormatException e) {
+            Console.println(e.getMessage());
+        }
+    }
+}

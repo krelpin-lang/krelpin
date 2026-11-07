@@ -516,6 +516,16 @@ final class Math {
         return result;
     }
 
+    static int floorDiv(int value, int divisor) {
+        int quotient = value / divisor;
+        return (value % divisor != 0 && ((value ^ divisor) < 0)) ? quotient - 1 : quotient;
+    }
+
+    static long floorDiv(long value, long divisor) {
+        long quotient = value / divisor;
+        return (value % divisor != 0 && ((value ^ divisor) < 0)) ? quotient - 1 : quotient;
+    }
+
     static int floorMod(int value, int divisor) {
         int rest = value % divisor;
         return rest != 0 && ((rest ^ divisor) < 0) ? rest + divisor : rest;

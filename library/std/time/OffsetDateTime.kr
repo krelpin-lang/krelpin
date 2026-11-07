@@ -1,0 +1,187 @@
+package std.time;
+
+import std.time.format.DateTimeFormatter;
+
+record OffsetDateTime(LocalDateTime dateTime, ZoneOffset offset) implements Comparable<OffsetDateTime> {
+    static OffsetDateTime of(LocalDateTime dateTime, ZoneOffset offset) {
+        return new OffsetDateTime(dateTime, offset);
+    }
+
+    static OffsetDateTime of(LocalDate date, LocalTime time, ZoneOffset offset) {
+        return new OffsetDateTime(new LocalDateTime(date, time), offset);
+    }
+
+    static OffsetDateTime of(int year, int month, int dayOfMonth, int hour, int minute, int second, int nano, ZoneOffset offset) {
+        return new OffsetDateTime(LocalDateTime.of(year, month, dayOfMonth, hour, minute, second, nano), offset);
+    }
+
+    static OffsetDateTime ofInstant(&Instant instant, &ZoneId zone) {
+        ZoneOffset offset = zone.rules().offset(instant);
+        return new OffsetDateTime(LocalDateTime.ofEpochSecond(instant.epochSecond(), instant.nano(), offset), offset);
+    }
+
+    static OffsetDateTime now() {
+        return OffsetDateTime.now(&ZoneId.systemDefault());
+    }
+
+    static OffsetDateTime now(&ZoneId zone) {
+        return OffsetDateTime.ofInstant(&Instant.now(), zone);
+    }
+
+    static OffsetDateTime parse(String text) {
+        return DateTimeFormatter.ISO_OFFSET_DATE_TIME.parse(text).toOffsetDateTime();
+    }
+
+    static OffsetDateTime parse(String text, &DateTimeFormatter formatter) {
+        return formatter.parse(text).toOffsetDateTime();
+    }
+
+    LocalDate date() {
+        return this.dateTime.date();
+    }
+
+    LocalTime time() {
+        return this.dateTime.time();
+    }
+
+    int year() {
+        return this.dateTime.year();
+    }
+
+    int monthValue() {
+        return this.dateTime.monthValue();
+    }
+
+    Month month() {
+        return this.dateTime.month();
+    }
+
+    int dayOfMonth() {
+        return this.dateTime.dayOfMonth();
+    }
+
+    DayOfWeek dayOfWeek() {
+        return this.dateTime.dayOfWeek();
+    }
+
+    int hour() {
+        return this.dateTime.hour();
+    }
+
+    int minute() {
+        return this.dateTime.minute();
+    }
+
+    int second() {
+        return this.dateTime.second();
+    }
+
+    int nano() {
+        return this.dateTime.nano();
+    }
+
+    long toEpochSecond() {
+        return this.dateTime.toEpochSecond(this.offset);
+    }
+
+    Instant toInstant() {
+        return this.dateTime.toInstant(this.offset);
+    }
+
+    ZonedDateTime toZonedDateTime() {
+        return new ZonedDateTime(this.dateTime, this.offset, ZoneId.of(this.offset));
+    }
+
+    ZonedDateTime atZoneSameInstant(&ZoneId zone) {
+        return ZonedDateTime.ofInstant(&this.toInstant(), zone);
+    }
+
+    OffsetDateTime withOffsetSameInstant(ZoneOffset offset) {
+        return new OffsetDateTime(LocalDateTime.ofEpochSecond(this.toEpochSecond(), this.dateTime.nano(), offset), offset);
+    }
+
+    OffsetDateTime withOffsetSameLocal(ZoneOffset offset) {
+        return new OffsetDateTime(this.dateTime, offset);
+    }
+
+    OffsetDateTime plusYears(long years) {
+        return new OffsetDateTime(this.dateTime.plusYears(years), this.offset);
+    }
+
+    OffsetDateTime plusMonths(long months) {
+        return new OffsetDateTime(this.dateTime.plusMonths(months), this.offset);
+    }
+
+    OffsetDateTime plusWeeks(long weeks) {
+        return new OffsetDateTime(this.dateTime.plusWeeks(weeks), this.offset);
+    }
+
+    OffsetDateTime plusDays(long days) {
+        return new OffsetDateTime(this.dateTime.plusDays(days), this.offset);
+    }
+
+    OffsetDateTime plusHours(long hours) {
+        return new OffsetDateTime(this.dateTime.plusHours(hours), this.offset);
+    }
+
+    OffsetDateTime plusMinutes(long minutes) {
+        return new OffsetDateTime(this.dateTime.plusMinutes(minutes), this.offset);
+    }
+
+    OffsetDateTime plusSeconds(long seconds) {
+        return new OffsetDateTime(this.dateTime.plusSeconds(seconds), this.offset);
+    }
+
+    OffsetDateTime plusNanos(long nanos) {
+        return new OffsetDateTime(this.dateTime.plusNanos(nanos), this.offset);
+    }
+
+    OffsetDateTime plus(Duration duration) {
+        return new OffsetDateTime(this.dateTime.plus(duration), this.offset);
+    }
+
+    OffsetDateTime plus(Period period) {
+        return new OffsetDateTime(this.dateTime.plus(period), this.offset);
+    }
+
+    OffsetDateTime minusDays(long days) {
+        return this.plusDays(-days);
+    }
+
+    OffsetDateTime minusHours(long hours) {
+        return this.plusHours(-hours);
+    }
+
+    OffsetDateTime minus(Duration duration) {
+        return new OffsetDateTime(this.dateTime.minus(duration), this.offset);
+    }
+
+    OffsetDateTime minus(Period period) {
+        return new OffsetDateTime(this.dateTime.minus(period), this.offset);
+    }
+
+    boolean isBefore(OffsetDateTime other) {
+        return this.toInstant().isBefore(other.toInstant());
+    }
+
+    boolean isAfter(OffsetDateTime other) {
+        return this.toInstant().isAfter(other.toInstant());
+    }
+
+    boolean isEqual(OffsetDateTime other) {
+        return this.toInstant().compareTo(&other.toInstant()) == 0;
+    }
+
+    int compareTo(&OffsetDateTime other) {
+        int order = this.toInstant().compareTo(&other.toInstant());
+        return order != 0 ? order : this.dateTime.compareTo(&other.dateTime());
+    }
+
+    String format(&DateTimeFormatter formatter) {
+        return formatter.format(this);
+    }
+
+    String toString() {
+        return "${this.dateTime}${this.offset}";
+    }
+}

@@ -1,0 +1,45 @@
+import std.util.ArrayList;
+import std.util.List;
+
+record Day(int value) {}
+
+record Slot(String? zone, Day? day, int index) {}
+
+class Main {
+    static String zoneOf(&Slot slot) {
+        (&String)? zone = slot.zone();
+        return zone == null ? "none" : zone.clone();
+    }
+
+    static String dayOf(&Slot slot) {
+        (&Day)? day = slot.day();
+        return day == null ? "none" : "${day.value()}";
+    }
+
+    static int conditions() {
+        List<boolean> flags = new ArrayList<>();
+        flags.add(true);
+        flags.add(false);
+        int count = 0;
+        for (int i = 0; i < 2; i++) {
+            if (flags.get(i)) {
+                count++;
+            }
+            if (!flags.get(i) && i == 1) {
+                count += 10;
+            }
+            count += flags.get(i) || i == 5 ? 100 : 0;
+            while (flags.get(0) && count < 1000) {
+                count += 1000;
+            }
+        }
+        return count;
+    }
+
+    static void main() {
+        Slot full = new Slot("Europe/Berlin", new Day(4), 1);
+        Slot empty = new Slot(null, null, 2);
+        Console.println("${Main.zoneOf(&full)} ${Main.zoneOf(&empty)} ${Main.dayOf(&full)} ${Main.dayOf(&empty)}");
+        Console.println(Main.conditions());
+    }
+}

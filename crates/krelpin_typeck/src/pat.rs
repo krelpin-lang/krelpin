@@ -410,6 +410,13 @@ impl FnCtxt<'_, '_> {
         let Some(Ty::Adt { def, .. }) = self.type_of_ident(owner) else {
             return PatPath::Error;
         };
+        if let Some(nested) = self.tcx.nested_type(def, name.name) {
+            return PatPath::Type(Ty::Adt {
+                def: nested,
+                name: name.name,
+                args: Vec::new(),
+            });
+        }
         if let Some(index) = self.variant_index(def, name) {
             let args = match self.enum_def(expected) {
                 Some((expected, args)) if expected == def => args,

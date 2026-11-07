@@ -1,0 +1,40 @@
+import std.util.*;
+
+class Main {
+    static void main() {
+        String text = "the cat and the hat and the bat";
+        Map<String, int> counts = new LinkedHashMap<>();
+        for (String word : text.split(" ")) {
+            counts.merge(word, 1, (a, b) -> a + b);
+        }
+        Console.println(&counts);
+        Console.println(counts.getOrDefault(&"the", 0));
+        Console.println(counts.getOrDefault(&"dog", 0));
+        Map<int, List<String>> byLength = new HashMap<>();
+        for (String word : text.split(" ")) {
+            byLength.computeIfAbsent(word.length(), k -> new ArrayList<>()).add(word);
+        }
+        Console.println(&byLength);
+        for (Map.Entry<&String, &int> entry : counts.entrySet()) {
+            Console.println(entry.key() + " -> " + entry.value());
+        }
+        counts.compute("cat", v -> v == null ? 1 : v + 10);
+        Console.println(counts.get(&"cat"));
+        Map<String, int> ages = Map.of("ada", 36, "bob", 41);
+        Console.println(&ages);
+        List<int> nums = List.of(5, 3, 9, 1);
+        Console.println(&nums);
+        Console.println(nums.reduce(0, (sum, x) -> sum + x));
+        Console.println(nums.max());
+        Console.println(nums.min());
+        List<String> words = List.of("pear", "fig", "banana");
+        Console.println(words.max(Comparator.comparing(w -> w.length())));
+        Console.println(words.min((a, b) -> a.compareTo(b)));
+        int[] arr = nums.toArray();
+        Console.println(arr.length + " " + arr[2]);
+        Set<String> tags = Set.of("x", "y", "x");
+        Console.println(&tags);
+        List<int> empty = List.of();
+        Console.println(empty.max());
+    }
+}

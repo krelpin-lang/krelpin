@@ -17,12 +17,45 @@ record Duration(long nanos) implements Comparable<Duration> {
         return new Duration(Math.multiplyExact(seconds, Duration.NANOS_PER_SECOND));
     }
 
+    static Duration ofMinutes(long minutes) {
+        return Duration.ofSeconds(Math.multiplyExact(minutes, 60L));
+    }
+
+    static Duration ofHours(long hours) {
+        return Duration.ofSeconds(Math.multiplyExact(hours, 3600L));
+    }
+
+    static Duration ofDays(long days) {
+        return Duration.ofSeconds(Math.multiplyExact(days, 86400L));
+    }
+
+    static Duration between(Instant start, Instant end) {
+        long seconds = Math.subtractExact(end.epochSecond(), start.epochSecond());
+        return new Duration(Math.addExact(Math.multiplyExact(seconds, Duration.NANOS_PER_SECOND), (long) (end.nano() - start.nano())));
+    }
+
     static Duration zero() {
         return new Duration(0L);
     }
 
     long toMillis() {
         return this.nanos / Duration.NANOS_PER_MILLI;
+    }
+
+    long toNanos() {
+        return this.nanos;
+    }
+
+    long toMinutes() {
+        return this.nanos / Duration.NANOS_PER_SECOND / 60L;
+    }
+
+    long toHours() {
+        return this.nanos / Duration.NANOS_PER_SECOND / 3600L;
+    }
+
+    long toDays() {
+        return this.nanos / Duration.NANOS_PER_SECOND / 86400L;
     }
 
     long toSeconds() {
@@ -47,6 +80,21 @@ record Duration(long nanos) implements Comparable<Duration> {
 
     Duration minus(Duration other) {
         return new Duration(Math.subtractExact(this.nanos, other.nanos()));
+    }
+
+    Duration negated() {
+        return new Duration(Math.multiplyExact(this.nanos, -1L));
+    }
+
+    Duration abs() {
+        return this.nanos < 0L ? this.negated() : this;
+    }
+
+    Duration dividedBy(long divisor) {
+        if (divisor == 0L) {
+            throw new ArithmeticException("can't divide a duration by zero");
+        }
+        return new Duration(this.nanos / divisor);
     }
 
     Duration multipliedBy(long factor) {

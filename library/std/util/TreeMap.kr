@@ -1,0 +1,409 @@
+package std.util;
+
+class TreeMap<K extends Comparable<K>, V> implements Map<K, V> {
+    private List<K> keys;
+    private List<V> vals;
+    private List<int> left;
+    private List<int> right;
+    private List<int> heights;
+    private int root;
+
+    TreeMap() {
+        this.keys = new ArrayList<>();
+        this.vals = new ArrayList<>();
+        this.left = new ArrayList<>();
+        this.right = new ArrayList<>();
+        this.heights = new ArrayList<>();
+        this.root = -1;
+    }
+
+    int size() {
+        return this.keys.size();
+    }
+
+    (&V)? get(&K key) borrows this {
+        int node = this.find(key);
+        if (node < 0) {
+            return null;
+        }
+        return this.vals.get(node);
+    }
+
+    mut (&mut V)? getMut(&K key) borrows this {
+        int node = this.find(key);
+        if (node < 0) {
+            return null;
+        }
+        return this.vals.getMut(node);
+    }
+
+    boolean containsKey(&K key) {
+        return this.find(key) >= 0;
+    }
+
+    mut V? put(K key, V value) {
+        int node = this.find(&key);
+        if (node >= 0) {
+            return this.vals.set(node, value);
+        }
+        int created = this.keys.size();
+        this.keys.add(key);
+        this.vals.add(value);
+        this.left.add(-1);
+        this.right.add(-1);
+        this.heights.add(1);
+        this.root = this.attach(this.root, created);
+        return null;
+    }
+
+    mut V? remove(&K key) {
+        int node = this.find(key);
+        if (node < 0) {
+            return null;
+        }
+        return TreeMap.valueOf(this.detach(node));
+    }
+
+    mut void clear() {
+        this.keys.clear();
+        this.vals.clear();
+        this.left.clear();
+        this.right.clear();
+        this.heights.clear();
+        this.root = -1;
+    }
+
+    Set<&K> keySet() {
+        List<&K> ordered = new ArrayList<>();
+        for (int node : this.inOrder()) {
+            ordered.add(this.keys.get(node));
+        }
+        return new Keys<>(ordered);
+    }
+
+    List<&V> values() {
+        List<&V> ordered = new ArrayList<>();
+        for (int node : this.inOrder()) {
+            ordered.add(this.vals.get(node));
+        }
+        return ordered;
+    }
+
+    (&K)? firstKey() borrows this {
+        if (this.root < 0) {
+            return null;
+        }
+        return this.keys.get(this.leftmost(this.root));
+    }
+
+    (&K)? lastKey() borrows this {
+        if (this.root < 0) {
+            return null;
+        }
+        int node = this.root;
+        while (this.right.get(node) >= 0) {
+            node = this.right.get(node);
+        }
+        return this.keys.get(node);
+    }
+
+    (&K)? floorKey(&K key) borrows this {
+        return this.nearest(key, true, true);
+    }
+
+    (&K)? ceilingKey(&K key) borrows this {
+        return this.nearest(key, false, true);
+    }
+
+    (&K)? lowerKey(&K key) borrows this {
+        return this.nearest(key, true, false);
+    }
+
+    (&K)? higherKey(&K key) borrows this {
+        return this.nearest(key, false, false);
+    }
+
+    mut Map.Entry<K, V>? pollFirstEntry() {
+        if (this.root < 0) {
+            return null;
+        }
+        return this.detach(this.leftmost(this.root));
+    }
+
+    mut Map.Entry<K, V>? pollLastEntry() {
+        if (this.root < 0) {
+            return null;
+        }
+        int node = this.root;
+        while (this.right.get(node) >= 0) {
+            node = this.right.get(node);
+        }
+        return this.detach(node);
+    }
+
+    String toString() {
+        StringBuilder text = new StringBuilder();
+        text.append("{");
+        boolean first = true;
+        for (int node : this.inOrder()) {
+            if (!first) {
+                text.append(", ");
+            }
+            first = false;
+            text.append(this.keys.get(node) + "=" + this.vals.get(node));
+        }
+        text.append("}");
+        return text.toString();
+    }
+
+    private static <K, V> V valueOf(Map.Entry<K, V> entry) {
+        return switch (entry) {
+            case Map.Entry(K key, V value) -> value;
+        };
+    }
+
+    private int find(&K key) {
+        int node = this.root;
+        while (node >= 0) {
+            int order = key.compareTo(this.keys.get(node));
+            if (order == 0) {
+                return node;
+            }
+            node = order < 0 ? this.left.get(node) : this.right.get(node);
+        }
+        return -1;
+    }
+
+    private (&K)? nearest(&K key, boolean below, boolean inclusive) borrows this {
+        int node = this.root;
+        int found = -1;
+        while (node >= 0) {
+            int order = key.compareTo(this.keys.get(node));
+            if (order == 0 && inclusive) {
+                return this.keys.get(node);
+            }
+            if (below) {
+                if (order > 0) {
+                    found = node;
+                    node = this.right.get(node);
+                } else {
+                    node = this.left.get(node);
+                }
+            } else {
+                if (order < 0) {
+                    found = node;
+                    node = this.left.get(node);
+                } else {
+                    node = this.right.get(node);
+                }
+            }
+        }
+        if (found < 0) {
+            return null;
+        }
+        return this.keys.get(found);
+    }
+
+    private int leftmost(int node) {
+        int current = node;
+        while (this.left.get(current) >= 0) {
+            current = this.left.get(current);
+        }
+        return current;
+    }
+
+    private List<int> inOrder() {
+        List<int> order = new ArrayList<>();
+        List<int> stack = new ArrayList<>();
+        int node = this.root;
+        while (node >= 0 || !stack.isEmpty()) {
+            while (node >= 0) {
+                stack.add(node);
+                node = this.left.get(node);
+            }
+            node = stack.remove(stack.size() - 1);
+            order.add(node);
+            node = this.right.get(node);
+        }
+        return order;
+    }
+
+    private int heightOf(int node) {
+        return node < 0 ? 0 : this.heights.get(node);
+    }
+
+    private mut void update(int node) {
+        this.heights.set(node, 1 + Math.max(this.heightOf(this.left.get(node)), this.heightOf(this.right.get(node))));
+    }
+
+    private mut int rotateRight(int node) {
+        int pivot = this.left.get(node);
+        this.left.set(node, this.right.get(pivot));
+        this.right.set(pivot, node);
+        this.update(node);
+        this.update(pivot);
+        return pivot;
+    }
+
+    private mut int rotateLeft(int node) {
+        int pivot = this.right.get(node);
+        this.right.set(node, this.left.get(pivot));
+        this.left.set(pivot, node);
+        this.update(node);
+        this.update(pivot);
+        return pivot;
+    }
+
+    private mut int balance(int node) {
+        this.update(node);
+        int lean = this.heightOf(this.left.get(node)) - this.heightOf(this.right.get(node));
+        if (lean > 1) {
+            int child = this.left.get(node);
+            if (this.heightOf(this.left.get(child)) < this.heightOf(this.right.get(child))) {
+                this.left.set(node, this.rotateLeft(child));
+            }
+            return this.rotateRight(node);
+        }
+        if (lean < -1) {
+            int child = this.right.get(node);
+            if (this.heightOf(this.right.get(child)) < this.heightOf(this.left.get(child))) {
+                this.right.set(node, this.rotateRight(child));
+            }
+            return this.rotateLeft(node);
+        }
+        return node;
+    }
+
+    private mut int attach(int node, int created) {
+        if (node < 0) {
+            return created;
+        }
+        if (this.keys.get(created).compareTo(this.keys.get(node)) < 0) {
+            this.left.set(node, this.attach(this.left.get(node), created));
+        } else {
+            this.right.set(node, this.attach(this.right.get(node), created));
+        }
+        return this.balance(node);
+    }
+
+    private mut int unlinkMin(int node) {
+        int child = this.left.get(node);
+        if (child < 0) {
+            return this.right.get(node);
+        }
+        this.left.set(node, this.unlinkMin(child));
+        return this.balance(node);
+    }
+
+    private mut int unlink(int node, int target) {
+        if (node == target) {
+            int lower = this.left.get(node);
+            int upper = this.right.get(node);
+            if (lower < 0) {
+                return upper;
+            }
+            if (upper < 0) {
+                return lower;
+            }
+            int successor = this.leftmost(upper);
+            this.right.set(successor, this.unlinkMin(upper));
+            this.left.set(successor, lower);
+            return this.balance(successor);
+        }
+        if (this.keys.get(target).compareTo(this.keys.get(node)) < 0) {
+            this.left.set(node, this.unlink(this.left.get(node), target));
+        } else {
+            this.right.set(node, this.unlink(this.right.get(node), target));
+        }
+        return this.balance(node);
+    }
+
+    private mut Map.Entry<K, V> detach(int node) {
+        this.root = this.unlink(this.root, node);
+        int last = this.keys.size() - 1;
+        if (node != last) {
+            this.keys.swap(node, last);
+            this.vals.swap(node, last);
+            this.left.swap(node, last);
+            this.right.swap(node, last);
+            this.heights.swap(node, last);
+            this.relink(last, node);
+        }
+        this.left.remove(last);
+        this.right.remove(last);
+        this.heights.remove(last);
+        V value = this.vals.remove(last);
+        K key = this.keys.remove(last);
+        return new Map.Entry<>(key, value);
+    }
+
+    private mut void relink(int from, int to) {
+        if (this.root == from) {
+            this.root = to;
+            return;
+        }
+        int node = this.root;
+        while (node >= 0) {
+            if (this.left.get(node) == from) {
+                this.left.set(node, to);
+                return;
+            }
+            if (this.right.get(node) == from) {
+                this.right.set(node, to);
+                return;
+            }
+            node = this.keys.get(to).compareTo(this.keys.get(node)) < 0 ? this.left.get(node) : this.right.get(node);
+        }
+    }
+
+    private static final class Keys<K extends Comparable<K>> borrows src implements Set<&K> {
+        private List<&K> ordered;
+
+        Keys(List<&K> ordered) keeps ordered {
+            this.ordered = ordered;
+        }
+
+        int size() {
+            return this.ordered.size();
+        }
+
+        mut boolean add(&K value) {
+            throw new UnsupportedOperationException("the keys of a map can't be added to directly");
+        }
+
+        mut boolean remove(&&K value) {
+            throw new UnsupportedOperationException("remove keys through the map");
+        }
+
+        boolean contains(&&K value) {
+            int low = 0;
+            int high = this.ordered.size() - 1;
+            while (low <= high) {
+                int middle = (low + high) / 2;
+                &K candidate = this.ordered.get(middle);
+                int order = candidate.compareTo(value);
+                if (order == 0) {
+                    return true;
+                }
+                if (order < 0) {
+                    low = middle + 1;
+                } else {
+                    high = middle - 1;
+                }
+            }
+            return false;
+        }
+
+        mut void clear() {
+            throw new UnsupportedOperationException("clear the map instead");
+        }
+
+        Iterator<&K> iterator() {
+            return this.ordered.iterator();
+        }
+
+        String toString() {
+            return this.ordered.toString();
+        }
+    }
+}

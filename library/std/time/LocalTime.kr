@@ -1,0 +1,196 @@
+package std.time;
+
+import std.time.format.DateTimeFormatter;
+
+record LocalTime(int hour, int minute, int second, int nano) implements Comparable<LocalTime> {
+    public static final LocalTime MIDNIGHT = new LocalTime(0, 0, 0, 0);
+
+    public static final LocalTime NOON = new LocalTime(12, 0, 0, 0);
+
+    public static final LocalTime MIN = new LocalTime(0, 0, 0, 0);
+
+    public static final LocalTime MAX = new LocalTime(23, 59, 59, 999999999);
+
+    public const int SECONDS_PER_DAY = 86400;
+
+    public const long NANOS_PER_SECOND = 1000000000L;
+
+    public const long NANOS_PER_DAY = 86400000000000L;
+
+    LocalTime {
+        LocalTime.check("HourOfDay", hour, 23);
+        LocalTime.check("MinuteOfHour", minute, 59);
+        LocalTime.check("SecondOfMinute", second, 59);
+        LocalTime.check("NanoOfSecond", nano, 999999999);
+    }
+
+    static LocalTime of(int hour, int minute) {
+        return new LocalTime(hour, minute, 0, 0);
+    }
+
+    static LocalTime of(int hour, int minute, int second) {
+        return new LocalTime(hour, minute, second, 0);
+    }
+
+    static LocalTime of(int hour, int minute, int second, int nano) {
+        return new LocalTime(hour, minute, second, nano);
+    }
+
+    static LocalTime ofSecondOfDay(long secondOfDay) {
+        if (secondOfDay < 0L || secondOfDay >= (long) LocalTime.SECONDS_PER_DAY) {
+            throw new DateTimeException("Invalid value for SecondOfDay (valid values 0 - 86399): $secondOfDay");
+        }
+        int seconds = (int) secondOfDay;
+        return new LocalTime(seconds / 3600, seconds / 60 % 60, seconds % 60, 0);
+    }
+
+    static LocalTime ofNanoOfDay(long nanoOfDay) {
+        if (nanoOfDay < 0L || nanoOfDay >= LocalTime.NANOS_PER_DAY) {
+            throw new DateTimeException("Invalid value for NanoOfDay (valid values 0 - 86399999999999): $nanoOfDay");
+        }
+        int seconds = (int) (nanoOfDay / LocalTime.NANOS_PER_SECOND);
+        int nano = (int) (nanoOfDay % LocalTime.NANOS_PER_SECOND);
+        return new LocalTime(seconds / 3600, seconds / 60 % 60, seconds % 60, nano);
+    }
+
+    static LocalTime now() {
+        return LocalTime.now(&ZoneId.systemDefault());
+    }
+
+    static LocalTime now(&ZoneId zone) {
+        return LocalDateTime.now(zone).time();
+    }
+
+    static LocalTime parse(String text) {
+        return DateTimeFormatter.ISO_LOCAL_TIME.parse(text).toLocalTime();
+    }
+
+    static LocalTime parse(String text, &DateTimeFormatter formatter) {
+        return formatter.parse(text).toLocalTime();
+    }
+
+    int toSecondOfDay() {
+        return this.hour * 3600 + this.minute * 60 + this.second;
+    }
+
+    long toNanoOfDay() {
+        return (long) this.toSecondOfDay() * LocalTime.NANOS_PER_SECOND + (long) this.nano;
+    }
+
+    LocalTime plusHours(long hours) {
+        return this.plusNanos(hours % 24L * 3600L * LocalTime.NANOS_PER_SECOND);
+    }
+
+    LocalTime plusMinutes(long minutes) {
+        return this.plusNanos(minutes % 1440L * 60L * LocalTime.NANOS_PER_SECOND);
+    }
+
+    LocalTime plusSeconds(long seconds) {
+        return this.plusNanos(seconds % 86400L * LocalTime.NANOS_PER_SECOND);
+    }
+
+    LocalTime plusNanos(long nanos) {
+        if (nanos == 0L) {
+            return this;
+        }
+        long shifted = Math.floorMod(this.toNanoOfDay() + nanos % LocalTime.NANOS_PER_DAY, LocalTime.NANOS_PER_DAY);
+        return LocalTime.ofNanoOfDay(shifted);
+    }
+
+    LocalTime minusHours(long hours) {
+        return this.plusHours(-(hours % 24L));
+    }
+
+    LocalTime minusMinutes(long minutes) {
+        return this.plusMinutes(-(minutes % 1440L));
+    }
+
+    LocalTime minusSeconds(long seconds) {
+        return this.plusSeconds(-(seconds % 86400L));
+    }
+
+    LocalTime minusNanos(long nanos) {
+        return this.plusNanos(-(nanos % LocalTime.NANOS_PER_DAY));
+    }
+
+    LocalTime plus(Duration duration) {
+        return this.plusNanos(duration.nanos() % LocalTime.NANOS_PER_DAY);
+    }
+
+    LocalTime minus(Duration duration) {
+        return this.plusNanos(-(duration.nanos() % LocalTime.NANOS_PER_DAY));
+    }
+
+    LocalTime withHour(int hour) {
+        return new LocalTime(hour, this.minute, this.second, this.nano);
+    }
+
+    LocalTime withMinute(int minute) {
+        return new LocalTime(this.hour, minute, this.second, this.nano);
+    }
+
+    LocalTime withSecond(int second) {
+        return new LocalTime(this.hour, this.minute, second, this.nano);
+    }
+
+    LocalTime withNano(int nano) {
+        return new LocalTime(this.hour, this.minute, this.second, nano);
+    }
+
+    LocalTime truncatedToSeconds() {
+        return new LocalTime(this.hour, this.minute, this.second, 0);
+    }
+
+    LocalTime truncatedToMinutes() {
+        return new LocalTime(this.hour, this.minute, 0, 0);
+    }
+
+    LocalDateTime atDate(LocalDate date) {
+        return new LocalDateTime(date, this);
+    }
+
+    boolean isBefore(LocalTime other) {
+        return this.compareTo(&other) < 0;
+    }
+
+    boolean isAfter(LocalTime other) {
+        return this.compareTo(&other) > 0;
+    }
+
+    int compareTo(&LocalTime other) {
+        return this.toNanoOfDay().compareTo(&other.toNanoOfDay());
+    }
+
+    String format(&DateTimeFormatter formatter) {
+        return formatter.format(this);
+    }
+
+    String toString() {
+        StringBuilder text = new StringBuilder();
+        text.append(this.hour < 10 ? "0" : "");
+        text.append("${this.hour}");
+        text.append(this.minute < 10 ? ":0" : ":");
+        text.append("${this.minute}");
+        if (this.second > 0 || this.nano > 0) {
+            text.append(this.second < 10 ? ":0" : ":");
+            text.append("${this.second}");
+            if (this.nano > 0) {
+                text.append(".");
+                if (this.nano % 1000000 == 0) {
+                    text.append("${this.nano / 1000000 + 1000}".substring(1));
+                } else if (this.nano % 1000 == 0) {
+                    text.append("${this.nano / 1000 + 1000000}".substring(1));
+                } else {
+                    text.append("${this.nano + 1000000000}".substring(1));
+                }
+            }
+        }
+        return text.toString();
+    }
+
+    private static void check(String field, int value, int high) {
+        if (value < 0 || value > high) {
+            throw new DateTimeException("Invalid value for $field (valid values 0 - $high): $value");
+        }
+    }
+}

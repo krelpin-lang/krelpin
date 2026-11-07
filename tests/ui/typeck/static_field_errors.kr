@@ -4,10 +4,13 @@ import std.sync.Mutex;
 import std.util.ArrayList;
 import std.util.List;
 
+record View(&String text) {}
+
 class Main {
+    static Mutex<List<&String>> WORDS = new Mutex<>(new ArrayList<>());
+    static Mutex<List<View>> VIEWS = new Mutex<>(new ArrayList<>());
     static Mutex<List<Runnable>> TASKS = new Mutex<>(new ArrayList<>());
     static Runnable HOOK = () -> Console.println("hook");
-    static Mutex<List<String>> NAMES = new Mutex<>(new ArrayList<>());
     static int LIMIT = 10;
 
     static void main() {

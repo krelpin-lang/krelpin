@@ -100,6 +100,12 @@ impl Diagnostic {
         self.with_child(Level::Note, message)
     }
 
+    pub fn with_notes(self, messages: impl IntoIterator<Item = String>) -> Diagnostic {
+        messages
+            .into_iter()
+            .fold(self, |diagnostic, message| diagnostic.with_note(message))
+    }
+
     pub fn with_help(self, message: impl Into<String>) -> Diagnostic {
         self.with_child(Level::Help, message)
     }

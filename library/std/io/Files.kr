@@ -211,13 +211,13 @@ final class Files {
 
     static void copy(String from, String to) throws IOException {
         if (!copyFile(from, to)) {
-            throw new IOException("couldn't copy `$from` to `$to`: ${OsError.message()}");
+            throw new IOException("couldn't copy `$from` to `$to`: ${Files.lastError()}");
         }
     }
 
     static void move(String from, String to) throws IOException {
         if (!renameFile(from, to)) {
-            throw new IOException("couldn't move `$from` to `$to`: ${OsError.message()}");
+            throw new IOException("couldn't move `$from` to `$to`: ${Files.lastError()}");
         }
     }
 
@@ -259,7 +259,7 @@ final class Files {
     }
 
     private static IOException failure(String action, String path) {
-        return new IOException("couldn't $action `$path`: ${OsError.message()}");
+        return new IOException("couldn't $action `$path`: ${Files.lastError()}");
     }
 
     @Intrinsic
@@ -297,4 +297,7 @@ final class Files {
 
     @Intrinsic
     private static boolean writeBytesRaw(String path, &byte[] bytes, boolean append);
+
+    @Intrinsic
+    private static String lastError();
 }

@@ -1,0 +1,51 @@
+package std.util;
+
+interface Deque<T> extends Queue<T> {
+    mut void addFirst(T value);
+
+    mut void addLast(T value);
+
+    mut T? pollFirst();
+
+    mut T? pollLast();
+
+    (&T)? peekFirst();
+
+    (&T)? peekLast();
+
+    mut T removeFirst() {
+        T? value = this.pollFirst();
+        if (value == null) {
+            throw new IllegalStateException("the deque is empty");
+        }
+        return value;
+    }
+
+    mut T removeLast() {
+        T? value = this.pollLast();
+        if (value == null) {
+            throw new IllegalStateException("the deque is empty");
+        }
+        return value;
+    }
+
+    mut void add(T value) {
+        this.addLast(value);
+    }
+
+    mut T? poll() {
+        return this.pollFirst();
+    }
+
+    (&T)? peek() {
+        return this.peekFirst();
+    }
+
+    mut void push(T value) {
+        this.addFirst(value);
+    }
+
+    mut T pop() {
+        return this.removeFirst();
+    }
+}

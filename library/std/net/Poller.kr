@@ -1,7 +1,6 @@
 package std.net;
 
 import std.io.IOException;
-import std.io.OsError;
 import std.util.ArrayList;
 import std.util.List;
 
@@ -73,7 +72,7 @@ final class Poller {
     static Poller create() throws IOException {
         Poller poller = new Poller();
         if (!poller.createRaw()) {
-            throw new IOException("couldn't create a poller: ${OsError.message()}");
+            throw new IOException("couldn't create a poller: ${Poller.lastError()}");
         }
         return poller;
     }
@@ -93,7 +92,7 @@ final class Poller {
     mut List<Event> poll(long timeoutMillis) throws IOException {
         int count = this.pollRaw(timeoutMillis);
         if (count < 0) {
-            throw new IOException("couldn't poll: ${OsError.message()}");
+            throw new IOException("couldn't poll: ${Poller.lastError()}");
         }
         List<Event> events = new ArrayList<>();
         for (int i = 0; i < count; i++) {
@@ -120,4 +119,7 @@ final class Poller {
 
     @Intrinsic
     private int flagsRaw(int index);
+
+    @Intrinsic
+    private static String lastError();
 }

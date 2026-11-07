@@ -1,6 +1,8 @@
 package std.util;
 
 import std.function.BiConsumer;
+import std.function.BiFunction;
+import std.function.Function;
 
 /**
  * An object that maps keys to values, in which each key appears at most
@@ -47,7 +49,7 @@ interface Map<K, V> {
      * @return a reference to the value, or {@code null} if there is no entry
      *         for {@code key}
      */
-    (&V)? get(&K key);
+    (&V)? get(&K key) borrows this;
 
     /**
      * Returns the value associated with a key, for modification.
@@ -65,7 +67,7 @@ interface Map<K, V> {
      * @return a mutable reference to the value, or {@code null} if there is
      *         no entry for {@code key}
      */
-    mut (&mut V)? getMut(&K key);
+    mut (&mut V)? getMut(&K key) borrows this;
 
     /**
      * Associates a value with a key, replacing any previous value.
@@ -95,6 +97,110 @@ interface Map<K, V> {
     boolean containsKey(&K key);
 
     /** Removes all entries from this map. */
+    record Entry<K, V>(K key, V value) {}
+
+    static <K extends Hashable<K>, V> Map<K, V> of() {
+        return new LinkedHashMap<>();
+    }
+
+    static <K extends Hashable<K>, V> Map<K, V> of(K k1, V v1) {
+        Map<K, V> map = new LinkedHashMap<>();
+        map.put(k1, v1);
+        return map;
+    }
+
+    static <K extends Hashable<K>, V> Map<K, V> of(K k1, V v1, K k2, V v2) {
+        Map<K, V> map = new LinkedHashMap<>();
+        map.put(k1, v1);
+        map.put(k2, v2);
+        return map;
+    }
+
+    static <K extends Hashable<K>, V> Map<K, V> of(K k1, V v1, K k2, V v2, K k3, V v3) {
+        Map<K, V> map = new LinkedHashMap<>();
+        map.put(k1, v1);
+        map.put(k2, v2);
+        map.put(k3, v3);
+        return map;
+    }
+
+    static <K extends Hashable<K>, V> Map<K, V> of(K k1, V v1, K k2, V v2, K k3, V v3, K k4, V v4) {
+        Map<K, V> map = new LinkedHashMap<>();
+        map.put(k1, v1);
+        map.put(k2, v2);
+        map.put(k3, v3);
+        map.put(k4, v4);
+        return map;
+    }
+
+    static <K extends Hashable<K>, V> Map<K, V> of(K k1, V v1, K k2, V v2, K k3, V v3, K k4, V v4, K k5, V v5) {
+        Map<K, V> map = new LinkedHashMap<>();
+        map.put(k1, v1);
+        map.put(k2, v2);
+        map.put(k3, v3);
+        map.put(k4, v4);
+        map.put(k5, v5);
+        return map;
+    }
+
+    static <K, V> Entry<K, V> entry(K key, V value) {
+        return new Entry<>(key, value);
+    }
+
+    V getOrDefault(&K key, V fallback) where V extends Cloneable<V> {
+        (&V)? value = this.get(key);
+        if (value == null) {
+            return fallback;
+        }
+        return value.clone();
+    }
+
+    mut &mut V computeIfAbsent(K key, Function<K, V> make) borrows this where K extends Cloneable<K> {
+        if (!this.containsKey(&key)) {
+            V value = make.apply(key.clone());
+            this.put(key.clone(), value);
+        }
+        (&mut V)? slot = this.getMut(&key);
+        if (slot == null) {
+            throw new IllegalStateException("the map lost the key it just stored");
+        }
+        return slot;
+    }
+
+    mut void merge(K key, V value, BiFunction<&V, V, V> combine) {
+        (&mut V)? slot = this.getMut(&key);
+        if (slot == null) {
+            this.put(key, value);
+            return;
+        }
+        &mut V target = slot;
+        V merged = combine.apply(target, value);
+        target = merged;
+    }
+
+    mut void compute(K key, Function<(&V)?, V> remap) {
+        (&mut V)? slot = this.getMut(&key);
+        if (slot == null) {
+            V created = remap.apply(null);
+            this.put(key, created);
+            return;
+        }
+        &mut V target = slot;
+        V updated = remap.apply(target);
+        target = updated;
+    }
+
+    List<Entry<&K, &V>> entrySet() {
+        List<Entry<&K, &V>> entries = new ArrayList<>();
+        for (&K key : this.keySet()) {
+            (&V)? value = this.get(key);
+            if (value != null) {
+                entries.add(new Entry<>(key, value));
+            }
+        }
+        return entries;
+    }
+
     mut boolean putIfAbsent(K key, V value) {
         if (this.containsKey(&key)) {
             return false;

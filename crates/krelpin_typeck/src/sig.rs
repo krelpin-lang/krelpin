@@ -66,6 +66,7 @@ pub struct FieldSig {
     pub vis: Visibility,
     pub storage: FieldStorage,
     pub owner: DefId,
+    pub stateless: bool,
 }
 
 #[derive(Clone, Debug)]
@@ -194,7 +195,7 @@ impl<'a> Tcx<'a> {
         self.is_lang_ty(ty, LangItem::String)
     }
 
-    fn def_ty(&self, def: DefId, args: Vec<Ty>) -> Ty {
+    pub(crate) fn def_ty(&self, def: DefId, args: Vec<Ty>) -> Ty {
         Ty::Adt {
             def,
             name: self.items.def(def).name.name,
@@ -289,6 +290,14 @@ impl<'a> Tcx<'a> {
                 copy
             }
         }
+    }
+
+    pub(crate) fn nested_type(&self, owner: DefId, name: Symbol) -> Option<DefId> {
+        self.items
+            .defs
+            .iter()
+            .find(|def| def.parent == Some(owner) && def.name.name == name)
+            .map(|def| def.def)
     }
 
     pub fn outermost(&self, mut def: DefId) -> DefId {
@@ -467,6 +476,8 @@ impl<'a> Tcx<'a> {
                         vis,
                         storage: field.storage,
                         owner: def_id,
+                        stateless: matches!(field.storage, FieldStorage::Static(_))
+                            && field.init.as_ref().is_some_and(is_lambda),
                     });
                 }
                 MemberKind::Constructor(ctor) => {
@@ -503,6 +514,7 @@ impl<'a> Tcx<'a> {
                 vis: Visibility::Private(name.span),
                 storage: FieldStorage::Instance,
                 owner: def,
+                stateless: false,
             });
         }
         let has_compact_ctor = record
@@ -544,6 +556,7 @@ impl<'a> Tcx<'a> {
                     vis: Visibility::Public(name.span),
                     storage: FieldStorage::Const(name.span),
                     owner: def,
+                    stateless: false,
                 });
             } else {
                 let ctor = MethodSig {
@@ -761,15 +774,136 @@ impl<'a> Tcx<'a> {
                         .map(|param| param.subst(subst))
                         .eq(params.iter().cloned())
                     && method.ret.subst(subst) == ret
-                    && method.where_bounds.iter().all(|param| {
-                        subst.get(&param.name).is_some_and(|arg| {
-                            param
-                                .bounds
-                                .iter()
-                                .all(|bound| self.satisfies_bound(env, arg, &bound.subst(subst)))
-                        })
-                    })
+                    && self.where_bounds_hold(env, method, subst)
             })
+    }
+
+    fn where_bounds_hold(&self, env: &ParamEnv, method: &MethodSig, subst: &Subst) -> bool {
+        method.where_bounds.iter().all(|param| {
+            subst.get(&param.name).is_some_and(|arg| {
+                param
+                    .bounds
+                    .iter()
+                    .all(|bound| self.satisfies_bound(env, arg, &bound.subst(subst)))
+            })
+        })
+    }
+
+    pub fn implementation_holds(
+        &self,
+        env: &ParamEnv,
+        def: DefId,
+        args: &[Ty],
+        iface: &Ty,
+    ) -> bool {
+        self.implementing_methods(def, args, iface)
+            .iter()
+            .all(|(method, subst)| self.where_bounds_hold(env, method, subst))
+    }
+
+    fn implementing_methods(&self, def: DefId, args: &[Ty], iface: &Ty) -> Vec<(MethodSig, Subst)> {
+        let Ty::Adt {
+            def: iface_def,
+            args: iface_args,
+            ..
+        } = iface
+        else {
+            return Vec::new();
+        };
+        if self.sig(*iface_def).kind != AdtKind::Interface {
+            return Vec::new();
+        }
+        let mut out = Vec::new();
+        for (declared, required) in self.abstract_methods(*iface_def, iface_args) {
+            if !declared.where_bounds.is_empty() {
+                continue;
+            }
+            out.extend(
+                self.methods_named(def, args, required.name)
+                    .into_iter()
+                    .filter(|(method, subst)| {
+                        !method.is_abstract
+                            && method.receiver.is_some()
+                            && !method.where_bounds.is_empty()
+                            && self.sig(method.owner).kind != AdtKind::Interface
+                            && method
+                                .params
+                                .iter()
+                                .map(|param| param.subst(subst))
+                                .eq(required.params.iter().cloned())
+                    }),
+            );
+        }
+        out
+    }
+
+    pub(crate) fn erased_name(&self, ty: &Ty) -> Ty {
+        match ty {
+            Ty::Adt { def, .. } => {
+                let args = self
+                    .sig(*def)
+                    .generics
+                    .iter()
+                    .map(|param| Ty::Param(param.name))
+                    .collect();
+                self.def_ty(*def, args)
+            }
+            _ => ty.clone(),
+        }
+    }
+
+    pub(crate) fn unmet_conditions(&self, ty: &Ty, iface: &Ty) -> Option<String> {
+        let (Ty::Adt { def, .. }, Ty::Adt { def: iface_def, .. }) = (ty.strip_refs(), iface) else {
+            return None;
+        };
+        if !self.is_subclass(*def, *iface_def) {
+            return None;
+        }
+        let conditions = self.implementation_conditions(ty.strip_refs(), iface);
+        if conditions.is_empty() {
+            return None;
+        }
+        Some(format!(
+            "`{}` implements `{iface}` only where {}",
+            self.erased_name(ty.strip_refs()),
+            conditions.join(" and ")
+        ))
+    }
+
+    pub(crate) fn implementation_conditions(&self, ty: &Ty, iface: &Ty) -> Vec<String> {
+        let Ty::Adt { def, .. } = ty else {
+            return Vec::new();
+        };
+        let mut conditions = Vec::new();
+        let erased = self.erased_name(ty);
+        let Ty::Adt { args: own, .. } = &erased else {
+            return Vec::new();
+        };
+        let Some(iface_args) = (match iface {
+            Ty::Adt { def: iface_def, .. } => self.upcast(*def, own, *iface_def),
+            _ => None,
+        }) else {
+            return Vec::new();
+        };
+        let iface = match iface {
+            Ty::Adt { def, name, .. } => Ty::Adt {
+                def: *def,
+                name: *name,
+                args: iface_args,
+            },
+            _ => return Vec::new(),
+        };
+        for (method, _) in self.implementing_methods(*def, own, &iface) {
+            for param in &method.where_bounds {
+                let bounds: Vec<String> =
+                    param.bounds.iter().map(|bound| bound.to_string()).collect();
+                let condition = format!("`{} extends {}`", param.name, bounds.join(" & "));
+                if !conditions.contains(&condition) {
+                    conditions.push(condition);
+                }
+            }
+        }
+        conditions
     }
 
     pub(crate) fn def_ty_of(&self, item: LangItem, arg: &Ty) -> Ty {
@@ -1079,5 +1213,13 @@ fn synthesized_method(
         storage: Vec::new(),
         member: None,
         output: None,
+    }
+}
+
+fn is_lambda(expr: &ast::Expr) -> bool {
+    match &expr.kind {
+        ast::ExprKind::Lambda { .. } => true,
+        ast::ExprKind::Cast { expr, .. } => is_lambda(expr),
+        _ => false,
     }
 }

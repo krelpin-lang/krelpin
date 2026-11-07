@@ -1,35 +1,109 @@
 package std.time;
 
-record Instant(long nanos) implements Comparable<Instant> {
+import std.time.format.DateTimeFormatter;
+
+record Instant(long epochSecond, int nano) implements Comparable<Instant> {
+    public static final Instant EPOCH = new Instant(0L, 0);
+
+    Instant {
+        if (nano < 0 || nano > 999999999) {
+            throw new DateTimeException("Invalid value for NanoOfSecond (valid values 0 - 999999999): $nano");
+        }
+    }
+
     static Instant now() {
-        return new Instant(System.nanoTime());
+        long nanos = System.currentTimeNanos();
+        return new Instant(Math.floorDiv(nanos, Duration.NANOS_PER_SECOND), (int) Math.floorMod(nanos, Duration.NANOS_PER_SECOND));
     }
 
-    Duration elapsed() {
-        return new Duration(System.nanoTime() - this.nanos);
+    static Instant ofEpochSecond(long epochSecond) {
+        return new Instant(epochSecond, 0);
     }
 
-    Duration durationSince(Instant earlier) {
-        return new Duration(this.nanos - earlier.nanos());
+    static Instant ofEpochSecond(long epochSecond, long nanoAdjustment) {
+        long seconds = Math.addExact(epochSecond, Math.floorDiv(nanoAdjustment, Duration.NANOS_PER_SECOND));
+        return new Instant(seconds, (int) Math.floorMod(nanoAdjustment, Duration.NANOS_PER_SECOND));
+    }
+
+    static Instant ofEpochMilli(long epochMilli) {
+        return new Instant(Math.floorDiv(epochMilli, 1000L), (int) Math.floorMod(epochMilli, 1000L) * 1000000);
+    }
+
+    static Instant parse(String text) {
+        return DateTimeFormatter.ISO_INSTANT.parse(text).toInstant();
+    }
+
+    long toEpochMilli() {
+        return Math.addExact(Math.multiplyExact(this.epochSecond, 1000L), (long) (this.nano / 1000000));
     }
 
     Instant plus(Duration duration) {
-        return new Instant(this.nanos + duration.nanos());
+        return this.plusNanos(duration.nanos());
     }
 
     Instant minus(Duration duration) {
-        return new Instant(this.nanos - duration.nanos());
+        return this.plusNanos(-duration.nanos());
+    }
+
+    Instant plusSeconds(long seconds) {
+        return new Instant(Math.addExact(this.epochSecond, seconds), this.nano);
+    }
+
+    Instant plusMillis(long millis) {
+        return this.plusNanos(Math.multiplyExact(millis, Duration.NANOS_PER_MILLI));
+    }
+
+    Instant plusNanos(long nanos) {
+        if (nanos == 0L) {
+            return this;
+        }
+        return Instant.ofEpochSecond(Math.addExact(this.epochSecond, Math.floorDiv(nanos, Duration.NANOS_PER_SECOND)), Math.floorMod(nanos, Duration.NANOS_PER_SECOND) + (long) this.nano);
+    }
+
+    Instant minusSeconds(long seconds) {
+        return this.plusSeconds(-seconds);
+    }
+
+    Instant minusMillis(long millis) {
+        return this.plusMillis(-millis);
+    }
+
+    Instant minusNanos(long nanos) {
+        return this.plusNanos(-nanos);
+    }
+
+    Duration elapsed() {
+        return Duration.between(this, Instant.now());
+    }
+
+    Duration durationSince(Instant earlier) {
+        return Duration.between(earlier, this);
+    }
+
+    ZonedDateTime atZone(&ZoneId zone) {
+        return ZonedDateTime.ofInstant(this, zone);
+    }
+
+    OffsetDateTime atOffset(ZoneOffset offset) {
+        return new OffsetDateTime(LocalDateTime.ofEpochSecond(this.epochSecond, this.nano, offset), offset);
     }
 
     boolean isBefore(Instant other) {
-        return this.nanos < other.nanos();
+        return this.compareTo(&other) < 0;
     }
 
     boolean isAfter(Instant other) {
-        return this.nanos > other.nanos();
+        return this.compareTo(&other) > 0;
     }
 
     int compareTo(&Instant other) {
-        return this.nanos.compareTo(&other.nanos());
+        if (this.epochSecond != other.epochSecond()) {
+            return this.epochSecond < other.epochSecond() ? -1 : 1;
+        }
+        return this.nano.compareTo(&other.nano());
+    }
+
+    String toString() {
+        return DateTimeFormatter.ISO_INSTANT.format(this);
     }
 }

@@ -1,0 +1,5 @@
+package std.function;
+
+interface BiFunction<A, B, R> {
+    mut R apply(A first, B second);
+}

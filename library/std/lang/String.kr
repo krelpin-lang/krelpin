@@ -1,5 +1,6 @@
 package std.lang;
 
+import std.regex.Pattern;
 import std.util.ArrayList;
 import std.util.List;
 
@@ -449,5 +450,19 @@ final class String implements Comparable<String>, Hashable<String>, Cloneable<St
 
     String clone() {
         return this;
+    }
+
+    boolean matches(String regex) {
+        return Pattern.matches(regex, this);
+    }
+
+    String replaceAll(String regex, String replacement) {
+        Pattern pattern = Pattern.compile(regex);
+        return pattern.matcher(this).replaceAll(replacement);
+    }
+
+    String replaceFirst(String regex, String replacement) {
+        Pattern pattern = Pattern.compile(regex);
+        return pattern.matcher(this).replaceFirst(replacement);
     }
 }

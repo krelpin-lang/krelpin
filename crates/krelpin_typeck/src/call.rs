@@ -18,6 +18,14 @@ impl Phase {
     const ALL: [Phase; 2] = [Phase::Fixed, Phase::Variadic];
 }
 
+pub(crate) struct PendingChain {
+    pub(crate) base: Expr,
+    pub(crate) receiver: Ty,
+    pub(crate) name: Ident,
+    pub(crate) args: Vec<Expr>,
+    pub(crate) safe: bool,
+}
+
 pub(crate) struct PendingCall {
     candidate: Candidate,
     probed: Vec<usize>,
@@ -84,16 +92,103 @@ impl FnCtxt<'_, '_> {
     }
 
     pub(crate) fn report_pending_calls(&mut self) {
+        let chains: Vec<Span> = self.pending_chains.keys().copied().collect();
+        for span in chains {
+            if let Some(chain) = self.pending_chains.remove(&span) {
+                let expr = Expr {
+                    kind: ExprKind::MethodCall {
+                        receiver: Some(Box::new(chain.base.clone())),
+                        name: chain.name,
+                        args: chain.args.clone(),
+                        safe: chain.safe,
+                    },
+                    span: chain.name.span,
+                };
+                self.finish_chain(&expr, chain, &Ty::Unknown);
+            }
+        }
         let pending: Vec<PendingCall> = self.pending_calls.drain().map(|(_, call)| call).collect();
         for call in pending {
             self.report_unresolved(&call.candidate, call.name);
         }
     }
 
-    fn finish_pending(&mut self, arg: &Expr, expected: &Ty) {
+    pub(crate) fn is_pending(&self, expr: &Expr) -> bool {
+        let ExprKind::MethodCall { name, .. } = &expr.kind else {
+            return false;
+        };
+        self.pending_calls.contains_key(&name.span) || self.pending_chains.contains_key(&name.span)
+    }
+
+    pub(crate) fn receiver_expectation(
+        &self,
+        receiver: &Ty,
+        name: Ident,
+        arg_count: usize,
+        expected: &Ty,
+    ) -> Option<Ty> {
+        if expected.references_unknown() {
+            return None;
+        }
+        let Ty::Adt { def, .. } = receiver.non_null().strip_refs() else {
+            return None;
+        };
+        let vars: Vec<Symbol> = self
+            .tcx
+            .sig(*def)
+            .generics
+            .iter()
+            .map(|param| param.name)
+            .collect();
+        if vars.is_empty() {
+            return None;
+        }
+        let own: Vec<Ty> = vars.iter().map(|var| Ty::Param(*var)).collect();
+        self.tcx
+            .methods_named(*def, &own, name.name)
+            .iter()
+            .filter(|(method, _)| {
+                method.receiver.is_some()
+                    && method.params.len() == arg_count
+                    && method
+                        .generics
+                        .iter()
+                        .all(|param| !vars.contains(&param.name))
+            })
+            .find_map(|(method, subst)| {
+                let mut inferred = Subst::new();
+                self.infer(&method.ret.subst(subst), expected, &vars, &mut inferred);
+                let args: Option<Vec<Ty>> =
+                    vars.iter().map(|var| inferred.get(var).cloned()).collect();
+                Some(self.tcx.def_ty(*def, args?))
+            })
+    }
+
+    pub(crate) fn chain_placeholder(&self, receiver: &Ty, name: Ident, arg_count: usize) -> Ty {
+        let Ty::Adt { def, args, .. } = receiver.non_null().strip_refs() else {
+            return Ty::Unknown;
+        };
+        self.tcx
+            .methods_named(*def, args, name.name)
+            .iter()
+            .find(|(method, _)| method.receiver.is_some() && method.params.len() == arg_count)
+            .map_or(Ty::Unknown, |(method, subst)| {
+                let mut erased = subst.clone();
+                for param in &method.generics {
+                    erased.insert(param.name, Ty::Unknown);
+                }
+                method.ret.subst(&erased)
+            })
+    }
+
+    pub(crate) fn finish_pending(&mut self, arg: &Expr, expected: &Ty) {
         let ExprKind::MethodCall { name, args, .. } = &arg.kind else {
             return;
         };
+        if let Some(chain) = self.pending_chains.remove(&name.span) {
+            self.finish_chain(arg, chain, expected);
+            return;
+        }
         let Some(pending) = self.pending_calls.remove(&name.span) else {
             return;
         };

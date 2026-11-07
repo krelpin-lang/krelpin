@@ -1,0 +1,1240 @@
+package std.time.format;
+
+import std.time.DateTimeException;
+import std.time.DayOfWeek;
+import std.time.Instant;
+import std.time.LocalDate;
+import std.time.LocalDateTime;
+import std.time.LocalTime;
+import std.time.Month;
+import std.time.OffsetDateTime;
+import std.time.ZoneId;
+import std.time.ZoneOffset;
+import std.time.ZonedDateTime;
+import std.util.ArrayList;
+import std.util.List;
+
+final class DateTimeFormatter {
+    public static final DateTimeFormatter ISO_LOCAL_DATE = new DateTimeFormatter(DateTimeFormatter.isoDate(), "ISO_LOCAL_DATE", null);
+
+    public static final DateTimeFormatter ISO_LOCAL_TIME = new DateTimeFormatter(DateTimeFormatter.isoTime(), "ISO_LOCAL_TIME", null);
+
+    public static final DateTimeFormatter ISO_LOCAL_DATE_TIME = new DateTimeFormatter(DateTimeFormatter.isoDateTime(), "ISO_LOCAL_DATE_TIME", null);
+
+    public static final DateTimeFormatter ISO_OFFSET_DATE = new DateTimeFormatter(DateTimeFormatter.withOffset(DateTimeFormatter.isoDate(), false), "ISO_OFFSET_DATE", null);
+
+    public static final DateTimeFormatter ISO_OFFSET_TIME = new DateTimeFormatter(DateTimeFormatter.withOffset(DateTimeFormatter.isoTime(), false), "ISO_OFFSET_TIME", null);
+
+    public static final DateTimeFormatter ISO_OFFSET_DATE_TIME = new DateTimeFormatter(DateTimeFormatter.withOffset(DateTimeFormatter.isoDateTime(), false), "ISO_OFFSET_DATE_TIME", null);
+
+    public static final DateTimeFormatter ISO_ZONED_DATE_TIME = new DateTimeFormatter(DateTimeFormatter.withRegion(DateTimeFormatter.withOffset(DateTimeFormatter.isoDateTime(), false)), "ISO_ZONED_DATE_TIME", null);
+
+    public static final DateTimeFormatter ISO_DATE = new DateTimeFormatter(DateTimeFormatter.withOffset(DateTimeFormatter.isoDate(), true), "ISO_DATE", null);
+
+    public static final DateTimeFormatter ISO_TIME = new DateTimeFormatter(DateTimeFormatter.withOffset(DateTimeFormatter.isoTime(), true), "ISO_TIME", null);
+
+    public static final DateTimeFormatter ISO_DATE_TIME = new DateTimeFormatter(DateTimeFormatter.isoDateTimeZoned(), "ISO_DATE_TIME", null);
+
+    public static final DateTimeFormatter ISO_ORDINAL_DATE = new DateTimeFormatter(DateTimeFormatter.isoOrdinal(), "ISO_ORDINAL_DATE", null);
+
+    public static final DateTimeFormatter ISO_INSTANT = new DateTimeFormatter(DateTimeFormatter.isoInstant(), "ISO_INSTANT", null);
+
+    public static final DateTimeFormatter BASIC_ISO_DATE = new DateTimeFormatter(DateTimeFormatter.basicDate(), "BASIC_ISO_DATE", null);
+
+    public static final DateTimeFormatter RFC_1123_DATE_TIME = new DateTimeFormatter(DateTimeFormatter.rfc1123(), "RFC_1123_DATE_TIME", null);
+
+    private const int YEAR = 0;
+    private const int MONTH = 1;
+    private const int DAY = 2;
+    private const int DAY_OF_YEAR = 3;
+    private const int HOUR = 4;
+    private const int CLOCK_HOUR = 5;
+    private const int HOUR_OF_AMPM = 6;
+    private const int CLOCK_HOUR_OF_DAY = 7;
+    private const int MINUTE = 8;
+    private const int SECOND = 9;
+    private const int NANO = 10;
+    private const int WEEKDAY = 11;
+    private const int AMPM = 12;
+    private const int FIELDS = 13;
+
+    private const int OFFSET_HH_MM_OPTIONAL = 0;
+    private const int OFFSET_HHMM = 1;
+    private const int OFFSET_HH_COLON_MM = 2;
+    private const int OFFSET_HHMM_SS_OPTIONAL = 3;
+    private const int OFFSET_ID = 4;
+    private const int OFFSET_HHMMSS = 5;
+    private const int OFFSET_HH_COLON_MM_COLON_SS = 6;
+    private const int OFFSET_GMT_SHORT = 7;
+    private const int OFFSET_GMT_FULL = 8;
+
+    private List<Part> parts;
+    private String pattern;
+    private ZoneId? zone;
+
+    private DateTimeFormatter(List<Part> parts, String pattern, ZoneId? zone) {
+        this.parts = parts;
+        this.pattern = pattern;
+        this.zone = zone;
+    }
+
+    static DateTimeFormatter ofPattern(String pattern) {
+        PatternReader reader = new PatternReader(&pattern);
+        List<Part> parts = reader.parts(false);
+        return new DateTimeFormatter(parts, pattern, null);
+    }
+
+    DateTimeFormatter withZone(&ZoneId zone) {
+        return new DateTimeFormatter(DateTimeFormatter.partsFor(&this.pattern), this.pattern.clone(), zone.clone());
+    }
+
+    (&ZoneId)? zone() borrows this {
+        if (this.zone instanceof ZoneId zone) {
+            return &zone;
+        }
+        return null;
+    }
+
+    String format(&LocalDate date) {
+        return this.render(new Moment(date, null, null, null, false, null));
+    }
+
+    String format(&LocalTime time) {
+        return this.render(new Moment(null, time, null, null, false, null));
+    }
+
+    String format(&LocalDateTime dateTime) {
+        return this.render(new Moment(dateTime.date(), dateTime.time(), null, null, false, null));
+    }
+
+    String format(&OffsetDateTime dateTime) {
+        return this.render(new Moment(dateTime.date(), dateTime.time(), dateTime.offset(), null, false, null));
+    }
+
+    String format(&ZonedDateTime dateTime) {
+        if (this.zone instanceof ZoneId target && !target.equals(dateTime.zone())) {
+            return this.format(&dateTime.withZoneSameInstant(&target));
+        }
+        &ZoneId zone = dateTime.zone();
+        String name = zone.rules().name(&dateTime.toInstant());
+        return this.render(new Moment(dateTime.date(), dateTime.time(), dateTime.offset(), zone.id(), zone.asOffset() == null, name));
+    }
+
+    String format(&Instant instant) {
+        if (this.zone instanceof ZoneId target) {
+            return this.format(&instant.atZone(&target));
+        }
+        return this.format(&instant.atOffset(ZoneOffset.UTC));
+    }
+
+    Parsed parse(String text) {
+        char[] chars = text.chars();
+        Parsed parsed = new Parsed(text.clone());
+        int end = this.scan(&this.parts, &chars, 0, &mut parsed);
+        if (end < 0) {
+            int index = -(end + 1);
+            throw new DateTimeParseException("Text '$text' could not be parsed at index $index", text, index);
+        }
+        if (end < chars.length) {
+            throw new DateTimeParseException("Text '$text' could not be parsed, unparsed text found at index $end", text, end);
+        }
+        if (this.zone instanceof ZoneId fallback) {
+            parsed.useZone(&fallback);
+        }
+        return parsed;
+    }
+
+    String toString() {
+        return this.pattern.clone();
+    }
+
+    private String render(Moment moment) {
+        StringBuilder out = new StringBuilder();
+        String? missing = this.emit(&this.parts, &moment, &mut out);
+        if (missing != null) {
+            throw new DateTimeException("Unsupported field: $missing");
+        }
+        return out.toString();
+    }
+
+    private String? emit(&List<Part> parts, &Moment moment, &mut StringBuilder out) {
+        for (&Part part : parts) {
+            String? missing = switch (part) {
+                case Text(String text) -> {
+                    out.append(text.clone());
+                    yield null;
+                }
+                case Value(int field, int width, int maxWidth) -> {
+                    long value = DateTimeFormatter.valueOf(field, moment);
+                    if (value == long.MIN_VALUE) {
+                        yield DateTimeFormatter.fieldName(field);
+                    }
+                    out.append(DateTimeFormatter.pad(value, width));
+                    yield null;
+                }
+                case Year(int width, boolean signed) -> {
+                    (LocalDate)? date = moment.date();
+                    if (date == null) {
+                        yield "YearOfEra";
+                    }
+                    int year = date.year();
+                    if (width == 2) {
+                        out.append(DateTimeFormatter.pad((long) Math.floorMod(year, 100), 2));
+                    } else if (year < 0) {
+                        out.append("-" + DateTimeFormatter.pad((long) -year, width));
+                    } else {
+                        if (signed && width == 4 && year > 9999) {
+                            out.append("+");
+                        }
+                        out.append(DateTimeFormatter.pad((long) year, width));
+                    }
+                    yield null;
+                }
+                case Name(int field, TextStyle style) -> {
+                    (LocalDate)? date = moment.date();
+                    (LocalTime)? time = moment.time();
+                    if (field == DateTimeFormatter.AMPM) {
+                        if (time == null) {
+                            yield "AmPmOfDay";
+                        }
+                        out.append(time.hour() < 12 ? "AM" : "PM");
+                        yield null;
+                    }
+                    if (date == null) {
+                        yield DateTimeFormatter.fieldName(field);
+                    }
+                    if (field == DateTimeFormatter.MONTH) {
+                        out.append(date.month().displayName(style));
+                    } else {
+                        out.append(date.dayOfWeek().displayName(style));
+                    }
+                    yield null;
+                }
+                case Fraction(int minWidth, int maxWidth, boolean point) -> {
+                    (LocalTime)? time = moment.time();
+                    if (time == null) {
+                        yield "NanoOfSecond";
+                    }
+                    String digits = DateTimeFormatter.fraction(time.nano(), minWidth, maxWidth);
+                    if (!digits.isEmpty()) {
+                        if (point) {
+                            out.append(".");
+                        }
+                        out.append(digits);
+                    }
+                    yield null;
+                }
+                case Offset(int style, String zero) -> {
+                    (ZoneOffset)? offset = moment.offset();
+                    if (offset == null) {
+                        yield "OffsetSeconds";
+                    }
+                    out.append(DateTimeFormatter.offsetText(offset.totalSeconds(), style, zero));
+                    yield null;
+                }
+                case Region(boolean regionOnly) -> {
+                    (&String)? zone = moment.zone();
+                    if (zone == null || (regionOnly && !moment.region())) {
+                        yield "ZoneId";
+                    }
+                    out.append(zone.clone());
+                    yield null;
+                }
+                case ZoneName(boolean full) -> {
+                    (&String)? zone = moment.zone();
+                    (&String)? name = moment.zoneName();
+                    if (zone == null || name == null) {
+                        yield "ZoneId";
+                    }
+                    out.append(full ? zone.clone() : name.clone());
+                    yield null;
+                }
+                case Section(List<Part> inner) -> {
+                    StringBuilder nested = new StringBuilder();
+                    if (this.emit(&inner, moment, &mut nested) == null) {
+                        out.append(nested.toString());
+                    }
+                    yield null;
+                }
+            };
+            if (missing != null) {
+                return missing;
+            }
+        }
+        return null;
+    }
+
+    private int scan(&List<Part> parts, &char[] text, int start, &mut Parsed parsed) {
+        int position = start;
+        for (int index = 0; index < parts.size(); index++) {
+            &Part part = parts.get(index);
+            boolean adjacent = index + 1 < parts.size() && DateTimeFormatter.isNumeric(parts.get(index + 1));
+            position = switch (part) {
+                case Text(String literal) -> {
+                    char[] expected = literal.chars();
+                    if (position + expected.length > text.length) {
+                        yield -(position + 1);
+                    }
+                    for (int offset = 0; offset < expected.length; offset++) {
+                        if (text[position + offset] != expected[offset]) {
+                            yield -(position + 1);
+                        }
+                    }
+                    yield position + expected.length;
+                }
+                case Value(int field, int width, int maxWidth) -> {
+                    int limit = adjacent ? width : maxWidth;
+                    int end = DateTimeFormatter.digitsEnd(text, position, limit);
+                    if (end - position < width) {
+                        yield -(position + 1);
+                    }
+                    parsed.set(field, DateTimeFormatter.number(text, position, end));
+                    yield end;
+                }
+                case Year(int width, boolean signed) -> {
+                    int cursor = position;
+                    if (width == 2) {
+                        int end = DateTimeFormatter.digitsEnd(text, cursor, 2);
+                        if (end - cursor != 2) {
+                            yield -(cursor + 1);
+                        }
+                        parsed.set(DateTimeFormatter.YEAR, 2000L + DateTimeFormatter.number(text, cursor, end));
+                        yield end;
+                    }
+                    boolean negative = false;
+                    if (cursor < text.length && (text[cursor] == '-' || text[cursor] == '+')) {
+                        negative = text[cursor] == '-';
+                        cursor++;
+                    }
+                    int end = DateTimeFormatter.digitsEnd(text, cursor, adjacent ? width : 9);
+                    if (end - cursor < width) {
+                        yield -(cursor + 1);
+                    }
+                    long year = DateTimeFormatter.number(text, cursor, end);
+                    parsed.set(DateTimeFormatter.YEAR, negative ? -year : year);
+                    yield end;
+                }
+                case Name(int field, TextStyle style) -> {
+                    int count = field == DateTimeFormatter.MONTH ? 12 : (field == DateTimeFormatter.WEEKDAY ? 7 : 2);
+                    int best = -1;
+                    int bestLength = 0;
+                    for (int candidate = 0; candidate < count; candidate++) {
+                        String name = DateTimeFormatter.nameOf(field, candidate, style);
+                        if (name.length() > bestLength && DateTimeFormatter.matchesAt(text, position, &name)) {
+                            best = candidate;
+                            bestLength = name.length();
+                        }
+                    }
+                    if (best < 0) {
+                        yield -(position + 1);
+                    }
+                    parsed.set(field, field == DateTimeFormatter.AMPM ? (long) best : (long) (best + 1));
+                    yield position + bestLength;
+                }
+                case Fraction(int minWidth, int maxWidth, boolean point) -> {
+                    int cursor = position;
+                    if (point) {
+                        if (cursor >= text.length || text[cursor] != '.') {
+                            if (minWidth > 0) {
+                                yield -(cursor + 1);
+                            }
+                            yield cursor;
+                        }
+                        cursor++;
+                    }
+                    int end = DateTimeFormatter.digitsEnd(text, cursor, maxWidth);
+                    int digits = end - cursor;
+                    if (digits < Math.max(minWidth, 1) && (point || minWidth > 0)) {
+                        yield -(cursor + 1);
+                    }
+                    long value = DateTimeFormatter.number(text, cursor, end);
+                    for (int scale = digits; scale < 9; scale++) {
+                        value *= 10L;
+                    }
+                    parsed.set(DateTimeFormatter.NANO, value);
+                    yield end;
+                }
+                case Offset(int style, String zero) -> {
+                    int end = DateTimeFormatter.scanOffset(text, position, style, &zero, parsed);
+                    yield end;
+                }
+                case Region(boolean regionOnly) -> {
+                    int end = position;
+                    while (end < text.length && DateTimeFormatter.isZoneChar(text[end])) {
+                        end++;
+                    }
+                    if (end == position) {
+                        yield -(position + 1);
+                    }
+                    String id = DateTimeFormatter.slice(text, position, end);
+                    try {
+                        parsed.setZone(ZoneId.of(id));
+                    } catch (DateTimeException error) {
+                        yield -(position + 1);
+                    }
+                    yield end;
+                }
+                case ZoneName(boolean full) -> {
+                    int end = position;
+                    while (end < text.length && DateTimeFormatter.isZoneChar(text[end])) {
+                        end++;
+                    }
+                    String id = DateTimeFormatter.slice(text, position, end);
+                    try {
+                        parsed.setZone(ZoneId.of(id));
+                    } catch (DateTimeException error) {
+                        yield -(position + 1);
+                    }
+                    yield end;
+                }
+                case Section(List<Part> inner) -> {
+                    Parsed saved = parsed.clone();
+                    int end = this.scan(&inner, text, position, parsed);
+                    if (end < 0) {
+                        parsed.restore(&saved);
+                        yield position;
+                    }
+                    yield end;
+                }
+            };
+            if (position < 0) {
+                return position;
+            }
+        }
+        return position;
+    }
+
+    private static boolean isNumeric(&Part part) {
+        return switch (part) {
+            case Value(int field, int width, int maxWidth) -> true;
+            case Year(int width, boolean signed) -> true;
+            case Fraction(int minWidth, int maxWidth, boolean point) -> !point;
+            default -> false;
+        };
+    }
+
+    private static long valueOf(int field, &Moment moment) {
+        (LocalDate)? date = moment.date();
+        (LocalTime)? time = moment.time();
+        if (field == DateTimeFormatter.MONTH || field == DateTimeFormatter.DAY || field == DateTimeFormatter.DAY_OF_YEAR) {
+            if (date == null) {
+                return long.MIN_VALUE;
+            }
+            if (field == DateTimeFormatter.MONTH) {
+                return (long) date.monthValue();
+            }
+            return field == DateTimeFormatter.DAY ? (long) date.dayOfMonth() : (long) date.dayOfYear();
+        }
+        if (time == null) {
+            return long.MIN_VALUE;
+        }
+        int hour = time.hour();
+        return switch (field) {
+            case 4 -> (long) hour;
+            case 5 -> (long) (hour % 12 == 0 ? 12 : hour % 12);
+            case 6 -> (long) (hour % 12);
+            case 7 -> (long) (hour == 0 ? 24 : hour);
+            case 8 -> (long) time.minute();
+            case 9 -> (long) time.second();
+            default -> (long) time.nano();
+        };
+    }
+
+    private static String fieldName(int field) {
+        return switch (field) {
+            case 0 -> "YearOfEra";
+            case 1 -> "MonthOfYear";
+            case 2 -> "DayOfMonth";
+            case 3 -> "DayOfYear";
+            case 4 -> "HourOfDay";
+            case 5 -> "ClockHourOfAmPm";
+            case 6 -> "HourOfAmPm";
+            case 7 -> "ClockHourOfDay";
+            case 8 -> "MinuteOfHour";
+            case 9 -> "SecondOfMinute";
+            case 10 -> "NanoOfSecond";
+            case 11 -> "DayOfWeek";
+            default -> "AmPmOfDay";
+        };
+    }
+
+    private static String nameOf(int field, int index, TextStyle style) {
+        if (field == DateTimeFormatter.MONTH) {
+            return Month.of(index + 1).displayName(style);
+        }
+        if (field == DateTimeFormatter.WEEKDAY) {
+            return DayOfWeek.of(index + 1).displayName(style);
+        }
+        return index == 0 ? "AM" : "PM";
+    }
+
+    private static String pad(long value, int width) {
+        String digits = "$value";
+        if (digits.length() >= width) {
+            return digits;
+        }
+        return "0".repeat(width - digits.length()) + digits;
+    }
+
+    private static String fraction(int nano, int minWidth, int maxWidth) {
+        String digits = "${nano + 1000000000}".substring(1);
+        if (minWidth < 0) {
+            if (nano == 0) {
+                return "";
+            }
+            if (nano % 1000000 == 0) {
+                return digits.substring(0, 3);
+            }
+            return nano % 1000 == 0 ? digits.substring(0, 6) : digits;
+        }
+        int length = Math.min(maxWidth, 9);
+        while (length > minWidth && digits.charAt(length - 1) == '0') {
+            length--;
+        }
+        String kept = digits.substring(0, length);
+        if (maxWidth > 9) {
+            kept = kept + "0".repeat(maxWidth - 9);
+        }
+        return kept;
+    }
+
+    private static String offsetText(int total, int style, &String zero) {
+        if (total == 0 && !zero.isEmpty()) {
+            return zero.clone();
+        }
+        int magnitude = Math.abs(total);
+        int hours = magnitude / 3600;
+        int minutes = magnitude / 60 % 60;
+        int seconds = magnitude % 60;
+        String sign = total < 0 ? "-" : "+";
+        if (style == DateTimeFormatter.OFFSET_GMT_SHORT || style == DateTimeFormatter.OFFSET_GMT_FULL) {
+            if (total == 0) {
+                return "GMT";
+            }
+            StringBuilder text = new StringBuilder();
+            text.append("GMT");
+            text.append(sign);
+            if (style == DateTimeFormatter.OFFSET_GMT_SHORT) {
+                text.append("$hours");
+                if (minutes != 0 || seconds != 0) {
+                    text.append(":" + DateTimeFormatter.pad((long) minutes, 2));
+                }
+            } else {
+                text.append(DateTimeFormatter.pad((long) hours, 2) + ":" + DateTimeFormatter.pad((long) minutes, 2));
+            }
+            if (seconds != 0) {
+                text.append(":" + DateTimeFormatter.pad((long) seconds, 2));
+            }
+            return text.toString();
+        }
+        boolean colon = style == DateTimeFormatter.OFFSET_HH_COLON_MM || style == DateTimeFormatter.OFFSET_ID || style == DateTimeFormatter.OFFSET_HH_COLON_MM_COLON_SS;
+        String separator = colon ? ":" : "";
+        StringBuilder text = new StringBuilder();
+        text.append(sign);
+        text.append(DateTimeFormatter.pad((long) hours, 2));
+        boolean showMinutes = style != DateTimeFormatter.OFFSET_HH_MM_OPTIONAL || minutes != 0 || seconds != 0;
+        if (showMinutes) {
+            text.append(separator + DateTimeFormatter.pad((long) minutes, 2));
+        }
+        boolean showSeconds = style == DateTimeFormatter.OFFSET_HHMMSS || style == DateTimeFormatter.OFFSET_HH_COLON_MM_COLON_SS || ((style == DateTimeFormatter.OFFSET_HHMM_SS_OPTIONAL || style == DateTimeFormatter.OFFSET_ID) && seconds != 0);
+        if (showSeconds) {
+            text.append(separator + DateTimeFormatter.pad((long) seconds, 2));
+        }
+        return text.toString();
+    }
+
+    private static int scanOffset(&char[] text, int start, int style, &String zero, &mut Parsed parsed) {
+        int position = start;
+        if (style == DateTimeFormatter.OFFSET_GMT_SHORT || style == DateTimeFormatter.OFFSET_GMT_FULL) {
+            if (!DateTimeFormatter.matchesAt(text, position, &"GMT")) {
+                return -(position + 1);
+            }
+            position += 3;
+            if (position >= text.length || (text[position] != '+' && text[position] != '-')) {
+                parsed.setOffset(0);
+                return position;
+            }
+            int sign = text[position] == '-' ? -1 : 1;
+            position++;
+            int end = DateTimeFormatter.digitsEnd(text, position, 2);
+            if (end == position) {
+                return -(position + 1);
+            }
+            int total = (int) DateTimeFormatter.number(text, position, end) * 3600;
+            position = end;
+            for (int unit = 60; unit >= 1 && position < text.length && text[position] == ':'; unit /= 60) {
+                int digits = DateTimeFormatter.digitsEnd(text, position + 1, 2);
+                if (digits - position - 1 != 2) {
+                    return -(position + 1);
+                }
+                total += (int) DateTimeFormatter.number(text, position + 1, digits) * unit;
+                position = digits;
+                if (unit == 1) {
+                    break;
+                }
+            }
+            parsed.setOffset(sign * total);
+            return position;
+        }
+        if (!zero.isEmpty() && DateTimeFormatter.matchesAt(text, position, zero)) {
+            parsed.setOffset(0);
+            return position + zero.length();
+        }
+        if (position >= text.length || (text[position] != '+' && text[position] != '-')) {
+            return -(position + 1);
+        }
+        int sign = text[position] == '-' ? -1 : 1;
+        position++;
+        boolean colon = style == DateTimeFormatter.OFFSET_HH_COLON_MM || style == DateTimeFormatter.OFFSET_ID || style == DateTimeFormatter.OFFSET_HH_COLON_MM_COLON_SS;
+        int[] values = new int[] { 0, 0, 0 };
+        int required = switch (style) {
+            case 0 -> 1;
+            case 1, 2, 3, 4 -> 2;
+            default -> 3;
+        };
+        int allowed = style == DateTimeFormatter.OFFSET_HH_MM_OPTIONAL || style == DateTimeFormatter.OFFSET_HHMM || style == DateTimeFormatter.OFFSET_HH_COLON_MM ? 2 : 3;
+        for (int unit = 0; unit < allowed; unit++) {
+            int cursor = position;
+            if (unit > 0 && colon) {
+                if (cursor >= text.length || text[cursor] != ':') {
+                    if (unit < required) {
+                        return -(cursor + 1);
+                    }
+                    break;
+                }
+                cursor++;
+            }
+            int end = DateTimeFormatter.digitsEnd(text, cursor, 2);
+            if (end - cursor != 2) {
+                if (unit < required) {
+                    return -(cursor + 1);
+                }
+                break;
+            }
+            values[unit] = (int) DateTimeFormatter.number(text, cursor, end);
+            position = end;
+        }
+        if (values[0] > 18 || values[1] > 59 || values[2] > 59) {
+            return -(start + 1);
+        }
+        parsed.setOffset(sign * (values[0] * 3600 + values[1] * 60 + values[2]));
+        return position;
+    }
+
+    private static int digitsEnd(&char[] text, int start, int limit) {
+        int end = start;
+        while (end < text.length && end - start < limit && text[end] >= '0' && text[end] <= '9') {
+            end++;
+        }
+        return end;
+    }
+
+    private static long number(&char[] text, int start, int end) {
+        long value = 0L;
+        for (int index = start; index < end; index++) {
+            value = value * 10L + (long) ((int) text[index] - (int) '0');
+        }
+        return value;
+    }
+
+    private static boolean matchesAt(&char[] text, int position, &String expected) {
+        if (position + expected.length() > text.length) {
+            return false;
+        }
+        for (int offset = 0; offset < expected.length(); offset++) {
+            char actual = text[position + offset];
+            char wanted = expected.charAt(offset);
+            if (actual != wanted && actual.toLowerCase() != wanted.toLowerCase()) {
+                return false;
+            }
+        }
+        return true;
+    }
+
+    private static boolean isZoneChar(char c) {
+        return (c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z') || (c >= '0' && c <= '9') || c == '/' || c == '_' || c == '-' || c == '+' || c == '~' || c == '.' || c == ':';
+    }
+
+    private static String slice(&char[] text, int start, int end) {
+        StringBuilder out = new StringBuilder();
+        for (int index = start; index < end; index++) {
+            out.append(text[index]);
+        }
+        return out.toString();
+    }
+
+    private static List<Part> partsFor(&String pattern) {
+        if (pattern.equals(&"ISO_LOCAL_DATE")) {
+            return DateTimeFormatter.isoDate();
+        }
+        if (pattern.equals(&"ISO_LOCAL_TIME")) {
+            return DateTimeFormatter.isoTime();
+        }
+        if (pattern.equals(&"ISO_LOCAL_DATE_TIME")) {
+            return DateTimeFormatter.isoDateTime();
+        }
+        if (pattern.equals(&"ISO_OFFSET_DATE")) {
+            return DateTimeFormatter.withOffset(DateTimeFormatter.isoDate(), false);
+        }
+        if (pattern.equals(&"ISO_OFFSET_TIME")) {
+            return DateTimeFormatter.withOffset(DateTimeFormatter.isoTime(), false);
+        }
+        if (pattern.equals(&"ISO_OFFSET_DATE_TIME")) {
+            return DateTimeFormatter.withOffset(DateTimeFormatter.isoDateTime(), false);
+        }
+        if (pattern.equals(&"ISO_ZONED_DATE_TIME")) {
+            return DateTimeFormatter.withRegion(DateTimeFormatter.withOffset(DateTimeFormatter.isoDateTime(), false));
+        }
+        if (pattern.equals(&"ISO_DATE")) {
+            return DateTimeFormatter.withOffset(DateTimeFormatter.isoDate(), true);
+        }
+        if (pattern.equals(&"ISO_TIME")) {
+            return DateTimeFormatter.withOffset(DateTimeFormatter.isoTime(), true);
+        }
+        if (pattern.equals(&"ISO_DATE_TIME")) {
+            return DateTimeFormatter.isoDateTimeZoned();
+        }
+        if (pattern.equals(&"ISO_ORDINAL_DATE")) {
+            return DateTimeFormatter.isoOrdinal();
+        }
+        if (pattern.equals(&"ISO_INSTANT")) {
+            return DateTimeFormatter.isoInstant();
+        }
+        if (pattern.equals(&"BASIC_ISO_DATE")) {
+            return DateTimeFormatter.basicDate();
+        }
+        if (pattern.equals(&"RFC_1123_DATE_TIME")) {
+            return DateTimeFormatter.rfc1123();
+        }
+        PatternReader reader = new PatternReader(pattern);
+        return reader.parts(false);
+    }
+
+    private static List<Part> isoDate() {
+        List<Part> parts = new ArrayList<>();
+        parts.add(Part.Year(4, true));
+        parts.add(Part.Text("-"));
+        parts.add(Part.Value(DateTimeFormatter.MONTH, 2, 2));
+        parts.add(Part.Text("-"));
+        parts.add(Part.Value(DateTimeFormatter.DAY, 2, 2));
+        return parts;
+    }
+
+    private static List<Part> isoTime() {
+        List<Part> seconds = new ArrayList<>();
+        seconds.add(Part.Text(":"));
+        seconds.add(Part.Value(DateTimeFormatter.SECOND, 2, 2));
+        seconds.add(Part.Fraction(0, 9, true));
+        List<Part> parts = new ArrayList<>();
+        parts.add(Part.Value(DateTimeFormatter.HOUR, 2, 2));
+        parts.add(Part.Text(":"));
+        parts.add(Part.Value(DateTimeFormatter.MINUTE, 2, 2));
+        parts.add(Part.Section(seconds));
+        return parts;
+    }
+
+    private static List<Part> isoDateTime() {
+        List<Part> parts = DateTimeFormatter.isoDate();
+        parts.add(Part.Text("T"));
+        parts.addAll(DateTimeFormatter.isoTime());
+        return parts;
+    }
+
+    private static List<Part> withOffset(List<Part> base, boolean optional) {
+        List<Part> parts = base;
+        if (optional) {
+            List<Part> offset = new ArrayList<>();
+            offset.add(Part.Offset(DateTimeFormatter.OFFSET_ID, "Z"));
+            parts.add(Part.Section(offset));
+        } else {
+            parts.add(Part.Offset(DateTimeFormatter.OFFSET_ID, "Z"));
+        }
+        return parts;
+    }
+
+    private static List<Part> regionSuffix() {
+        List<Part> region = new ArrayList<>();
+        region.add(Part.Text("["));
+        region.add(Part.Region(true));
+        region.add(Part.Text("]"));
+        return region;
+    }
+
+    private static List<Part> withRegion(List<Part> base) {
+        List<Part> parts = base;
+        parts.add(Part.Section(DateTimeFormatter.regionSuffix()));
+        return parts;
+    }
+
+    private static List<Part> isoDateTimeZoned() {
+        List<Part> zone = new ArrayList<>();
+        zone.add(Part.Offset(DateTimeFormatter.OFFSET_ID, "Z"));
+        zone.add(Part.Section(DateTimeFormatter.regionSuffix()));
+        List<Part> parts = DateTimeFormatter.isoDateTime();
+        parts.add(Part.Section(zone));
+        return parts;
+    }
+
+    private static List<Part> isoOrdinal() {
+        List<Part> parts = new ArrayList<>();
+        parts.add(Part.Year(4, true));
+        parts.add(Part.Text("-"));
+        parts.add(Part.Value(DateTimeFormatter.DAY_OF_YEAR, 3, 3));
+        return DateTimeFormatter.withOffset(parts, true);
+    }
+
+    private static List<Part> isoInstant() {
+        List<Part> parts = DateTimeFormatter.isoDate();
+        parts.add(Part.Text("T"));
+        parts.add(Part.Value(DateTimeFormatter.HOUR, 2, 2));
+        parts.add(Part.Text(":"));
+        parts.add(Part.Value(DateTimeFormatter.MINUTE, 2, 2));
+        parts.add(Part.Text(":"));
+        parts.add(Part.Value(DateTimeFormatter.SECOND, 2, 2));
+        parts.add(Part.Fraction(-1, 9, true));
+        parts.add(Part.Offset(DateTimeFormatter.OFFSET_ID, "Z"));
+        return parts;
+    }
+
+    private static List<Part> basicDate() {
+        List<Part> offset = new ArrayList<>();
+        offset.add(Part.Offset(DateTimeFormatter.OFFSET_HHMM_SS_OPTIONAL, "Z"));
+        List<Part> parts = new ArrayList<>();
+        parts.add(Part.Year(4, true));
+        parts.add(Part.Value(DateTimeFormatter.MONTH, 2, 2));
+        parts.add(Part.Value(DateTimeFormatter.DAY, 2, 2));
+        parts.add(Part.Section(offset));
+        return parts;
+    }
+
+    private static List<Part> rfc1123() {
+        List<Part> weekday = new ArrayList<>();
+        weekday.add(Part.Name(DateTimeFormatter.WEEKDAY, TextStyle.SHORT));
+        weekday.add(Part.Text(", "));
+        List<Part> seconds = new ArrayList<>();
+        seconds.add(Part.Text(":"));
+        seconds.add(Part.Value(DateTimeFormatter.SECOND, 2, 2));
+        List<Part> parts = new ArrayList<>();
+        parts.add(Part.Section(weekday));
+        parts.add(Part.Value(DateTimeFormatter.DAY, 1, 2));
+        parts.add(Part.Text(" "));
+        parts.add(Part.Name(DateTimeFormatter.MONTH, TextStyle.SHORT));
+        parts.add(Part.Text(" "));
+        parts.add(Part.Year(4, false));
+        parts.add(Part.Text(" "));
+        parts.add(Part.Value(DateTimeFormatter.HOUR, 2, 2));
+        parts.add(Part.Text(":"));
+        parts.add(Part.Value(DateTimeFormatter.MINUTE, 2, 2));
+        parts.add(Part.Section(seconds));
+        parts.add(Part.Text(" "));
+        parts.add(Part.Offset(DateTimeFormatter.OFFSET_HHMM, "GMT"));
+        return parts;
+    }
+
+    private enum Part {
+        Text(String text),
+        Value(int field, int width, int maxWidth),
+        Year(int width, boolean signed),
+        Name(int field, TextStyle style),
+        Fraction(int minWidth, int maxWidth, boolean point),
+        Offset(int style, String zero),
+        Region(boolean regionOnly),
+        ZoneName(boolean full),
+        Section(List<Part> parts)
+    }
+
+    private record Moment(LocalDate? date, LocalTime? time, ZoneOffset? offset, String? zone, boolean region, String? zoneName) {}
+
+    private static final class PatternReader {
+        private &String pattern;
+        private char[] chars;
+        private int position;
+
+        PatternReader(&String pattern) keeps pattern {
+            this.pattern = pattern;
+            this.chars = pattern.chars();
+            this.position = 0;
+        }
+
+        mut List<Part> parts(boolean nested) {
+            List<Part> parts = new ArrayList<>();
+            StringBuilder literal = new StringBuilder();
+            while (this.position < this.chars.length) {
+                char c = this.chars[this.position];
+                if ((c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z')) {
+                    int start = this.position;
+                    while (this.position < this.chars.length && this.chars[this.position] == c) {
+                        this.position++;
+                    }
+                    PatternReader.flush(&mut literal, &mut parts);
+                    parts.add(this.letter(c, this.position - start));
+                } else if (c == '\'') {
+                    this.position++;
+                    if (this.position < this.chars.length && this.chars[this.position] == '\'') {
+                        literal.append('\'');
+                        this.position++;
+                        continue;
+                    }
+                    boolean closed = false;
+                    while (this.position < this.chars.length) {
+                        char quoted = this.chars[this.position];
+                        this.position++;
+                        if (quoted == '\'') {
+                            if (this.position < this.chars.length && this.chars[this.position] == '\'') {
+                                literal.append('\'');
+                                this.position++;
+                                continue;
+                            }
+                            closed = true;
+                            break;
+                        }
+                        literal.append(quoted);
+                    }
+                    if (!closed) {
+                        throw new IllegalArgumentException("Pattern ends with an incomplete string literal: ${this.pattern}");
+                    }
+                } else if (c == '[') {
+                    this.position++;
+                    PatternReader.flush(&mut literal, &mut parts);
+                    parts.add(Part.Section(this.parts(true)));
+                } else if (c == ']') {
+                    if (!nested) {
+                        throw new IllegalArgumentException("Pattern invalid as it contains ] without previous [");
+                    }
+                    this.position++;
+                    PatternReader.flush(&mut literal, &mut parts);
+                    return parts;
+                } else if (c == '{' || c == '}' || c == '#') {
+                    throw new IllegalArgumentException("Pattern includes reserved character: '$c'");
+                } else {
+                    literal.append(c);
+                    this.position++;
+                }
+            }
+            PatternReader.flush(&mut literal, &mut parts);
+            return parts;
+        }
+
+        private static void flush(&mut StringBuilder literal, &mut List<Part> parts) {
+            if (!literal.isEmpty()) {
+                parts.add(Part.Text(literal.toString()));
+                literal.clear();
+            }
+        }
+
+        private Part letter(char c, int count) {
+            return switch (c) {
+                case 'y', 'u' -> Part.Year(count, c == 'u');
+                case 'M', 'L' -> {
+                    if (count > 5) {
+                        this.tooMany(c);
+                    }
+                    yield count <= 2 ? Part.Value(DateTimeFormatter.MONTH, count, 2) : Part.Name(DateTimeFormatter.MONTH, PatternReader.style(count));
+                }
+                case 'd' -> Part.Value(DateTimeFormatter.DAY, this.width(c, count, 2), 2);
+                case 'D' -> {
+                    if (count > 3) {
+                        this.tooMany(c);
+                    }
+                    yield Part.Value(DateTimeFormatter.DAY_OF_YEAR, count, 3);
+                }
+                case 'E' -> {
+                    if (count > 5) {
+                        this.tooMany(c);
+                    }
+                    yield Part.Name(DateTimeFormatter.WEEKDAY, PatternReader.style(count));
+                }
+                case 'a' -> {
+                    if (count > 1) {
+                        this.tooMany(c);
+                    }
+                    yield Part.Name(DateTimeFormatter.AMPM, TextStyle.SHORT);
+                }
+                case 'H' -> Part.Value(DateTimeFormatter.HOUR, this.width(c, count, 2), 2);
+                case 'h' -> Part.Value(DateTimeFormatter.CLOCK_HOUR, this.width(c, count, 2), 2);
+                case 'K' -> Part.Value(DateTimeFormatter.HOUR_OF_AMPM, this.width(c, count, 2), 2);
+                case 'k' -> Part.Value(DateTimeFormatter.CLOCK_HOUR_OF_DAY, this.width(c, count, 2), 2);
+                case 'm' -> Part.Value(DateTimeFormatter.MINUTE, this.width(c, count, 2), 2);
+                case 's' -> Part.Value(DateTimeFormatter.SECOND, this.width(c, count, 2), 2);
+                case 'S' -> Part.Fraction(count, count, false);
+                case 'n' -> Part.Value(DateTimeFormatter.NANO, count, 9);
+                case 'V' -> {
+                    if (count != 2) {
+                        throw new IllegalArgumentException("Pattern letter count must be 2: V");
+                    }
+                    yield Part.Region(false);
+                }
+                case 'z' -> {
+                    if (count > 4) {
+                        this.tooMany(c);
+                    }
+                    yield Part.ZoneName(count == 4);
+                }
+                case 'X', 'x' -> {
+                    if (count > 5) {
+                        this.tooMany(c);
+                    }
+                    String zero = c == 'X' ? "Z" : "";
+                    yield Part.Offset(count - 1, zero);
+                }
+                case 'Z' -> {
+                    if (count > 5) {
+                        this.tooMany(c);
+                    }
+                    if (count == 4) {
+                        yield Part.Offset(DateTimeFormatter.OFFSET_GMT_FULL, "");
+                    }
+                    yield count == 5 ? Part.Offset(DateTimeFormatter.OFFSET_ID, "Z") : Part.Offset(DateTimeFormatter.OFFSET_HHMM, "");
+                }
+                case 'O' -> {
+                    if (count != 1 && count != 4) {
+                        throw new IllegalArgumentException("Pattern letter count must be 1 or 4: O");
+                    }
+                    yield Part.Offset(count == 1 ? DateTimeFormatter.OFFSET_GMT_SHORT : DateTimeFormatter.OFFSET_GMT_FULL, "");
+                }
+                default -> throw new IllegalArgumentException("Unknown pattern letter: $c");
+            };
+        }
+
+        private int width(char c, int count, int limit) {
+            if (count > limit) {
+                this.tooMany(c);
+            }
+            return count;
+        }
+
+        private void tooMany(char c) {
+            throw new IllegalArgumentException("Too many pattern letters: $c");
+        }
+
+        private static TextStyle style(int count) {
+            return switch (count) {
+                case 4 -> TextStyle.FULL;
+                case 5 -> TextStyle.NARROW;
+                default -> TextStyle.SHORT;
+            };
+        }
+    }
+
+    static final class Parsed {
+        private String text;
+        private List<long> fields;
+        private List<boolean> present;
+        private int? offset;
+        private ZoneId? zone;
+
+        private Parsed(String text) {
+            this.text = text;
+            this.fields = new ArrayList<>();
+            this.present = new ArrayList<>();
+            for (int field = 0; field < DateTimeFormatter.FIELDS; field++) {
+                this.fields.add(0L);
+                this.present.add(false);
+            }
+            this.offset = null;
+            this.zone = null;
+        }
+
+        private Parsed(String text, List<long> fields, List<boolean> present, int? offset, ZoneId? zone) {
+            this.text = text;
+            this.fields = fields;
+            this.present = present;
+            this.offset = offset;
+            this.zone = zone;
+        }
+
+        LocalDate toLocalDate() {
+            try {
+                return this.date();
+            } catch (DateTimeParseException error) {
+                throw error;
+            } catch (DateTimeException error) {
+                throw this.failure(&error);
+            }
+        }
+
+        LocalTime toLocalTime() {
+            try {
+                return this.time();
+            } catch (DateTimeParseException error) {
+                throw error;
+            } catch (DateTimeException error) {
+                throw this.failure(&error);
+            }
+        }
+
+        LocalDateTime toLocalDateTime() {
+            try {
+                return new LocalDateTime(this.date(), this.time());
+            } catch (DateTimeParseException error) {
+                throw error;
+            } catch (DateTimeException error) {
+                throw this.failure(&error);
+            }
+        }
+
+        OffsetDateTime toOffsetDateTime() {
+            try {
+                LocalDateTime local = new LocalDateTime(this.date(), this.time());
+                int? seconds = this.offset;
+                if (seconds != null) {
+                    return new OffsetDateTime(local, new ZoneOffset(seconds));
+                }
+                if (this.zone instanceof ZoneId zone) {
+                    return ZonedDateTime.of(local, &zone).toOffsetDateTime();
+                }
+                throw this.missing("OffsetDateTime");
+            } catch (DateTimeParseException error) {
+                throw error;
+            } catch (DateTimeException error) {
+                throw this.failure(&error);
+            }
+        }
+
+        ZonedDateTime toZonedDateTime() {
+            try {
+                LocalDateTime local = new LocalDateTime(this.date(), this.time());
+                int? seconds = this.offset;
+                if (this.zone instanceof ZoneId zone) {
+                    if (seconds != null) {
+                        ZoneOffset offset = new ZoneOffset(seconds);
+                        if (zone.rules().isValidOffset(local, offset)) {
+                            return new ZonedDateTime(local, offset, zone.clone());
+                        }
+                        return ZonedDateTime.ofInstant(&local.toInstant(offset), &zone);
+                    }
+                    return ZonedDateTime.of(local, &zone);
+                }
+                if (seconds != null) {
+                    ZoneOffset offset = new ZoneOffset(seconds);
+                    return new ZonedDateTime(local, offset, ZoneId.of(offset));
+                }
+                throw this.missing("ZonedDateTime");
+            } catch (DateTimeParseException error) {
+                throw error;
+            } catch (DateTimeException error) {
+                throw this.failure(&error);
+            }
+        }
+
+        Instant toInstant() {
+            return this.toOffsetDateTime().toInstant();
+        }
+
+        (&ZoneId)? zone() borrows this {
+            if (this.zone instanceof ZoneId zone) {
+                return &zone;
+            }
+            return null;
+        }
+
+        ZoneOffset? offset() {
+            int? seconds = this.offset;
+            return seconds == null ? null : new ZoneOffset(seconds);
+        }
+
+        Parsed clone() {
+            ZoneId? copy = null;
+            if (this.zone instanceof ZoneId zone) {
+                copy = zone.clone();
+            }
+            return new Parsed(this.text.clone(), this.fields.clone(), this.present.clone(), this.offset, copy);
+        }
+
+        String toString() {
+            return "Parsed[${this.text}]";
+        }
+
+        private mut void set(int field, long value) {
+            this.fields.set(field, value);
+            this.present.set(field, true);
+        }
+
+        private mut void setOffset(int seconds) {
+            this.offset = seconds;
+        }
+
+        private mut void setZone(ZoneId zone) {
+            this.zone = zone;
+        }
+
+        private mut void useZone(&ZoneId zone) {
+            if (this.zone == null && this.offset == null) {
+                this.zone = zone.clone();
+            }
+        }
+
+        private mut void restore(&Parsed saved) {
+            this.fields = saved.fields.clone();
+            this.present = saved.present.clone();
+            this.offset = saved.offset;
+            this.zone = null;
+            if (saved.zone instanceof ZoneId zone) {
+                this.zone = zone.clone();
+            }
+        }
+
+        private LocalDate date() {
+            if (!this.present.get(DateTimeFormatter.YEAR)) {
+                throw this.missing("LocalDate");
+            }
+            int year = this.checked(DateTimeFormatter.YEAR, (long) LocalDate.MIN_YEAR, (long) LocalDate.MAX_YEAR, "Year");
+            LocalDate date;
+            if (this.present.get(DateTimeFormatter.MONTH) && this.present.get(DateTimeFormatter.DAY)) {
+                int month = this.checked(DateTimeFormatter.MONTH, 1L, 12L, "MonthOfYear");
+                int day = this.checked(DateTimeFormatter.DAY, 1L, 31L, "DayOfMonth");
+                date = LocalDate.of(year, month, day);
+            } else if (this.present.get(DateTimeFormatter.DAY_OF_YEAR)) {
+                date = LocalDate.ofYearDay(year, this.checked(DateTimeFormatter.DAY_OF_YEAR, 1L, 366L, "DayOfYear"));
+            } else {
+                throw this.missing("LocalDate");
+            }
+            if (this.present.get(DateTimeFormatter.WEEKDAY)) {
+                DayOfWeek parsed = DayOfWeek.of((int) this.fields.get(DateTimeFormatter.WEEKDAY));
+                if (parsed != date.dayOfWeek()) {
+                    throw new DateTimeException("Conflict found: Field DayOfWeek ${parsed.value()} differs from DayOfWeek ${date.dayOfWeek().value()} derived from $date");
+                }
+            }
+            return date;
+        }
+
+        private LocalTime time() {
+            int hour;
+            if (this.present.get(DateTimeFormatter.HOUR)) {
+                hour = this.checked(DateTimeFormatter.HOUR, 0L, 23L, "HourOfDay");
+            } else if (this.present.get(DateTimeFormatter.CLOCK_HOUR_OF_DAY)) {
+                hour = this.checked(DateTimeFormatter.CLOCK_HOUR_OF_DAY, 1L, 24L, "ClockHourOfDay") % 24;
+            } else if (this.present.get(DateTimeFormatter.CLOCK_HOUR) || this.present.get(DateTimeFormatter.HOUR_OF_AMPM)) {
+                if (!this.present.get(DateTimeFormatter.AMPM)) {
+                    throw this.missing("LocalTime");
+                }
+                int base = this.present.get(DateTimeFormatter.CLOCK_HOUR) ? this.checked(DateTimeFormatter.CLOCK_HOUR, 1L, 12L, "ClockHourOfAmPm") % 12 : this.checked(DateTimeFormatter.HOUR_OF_AMPM, 0L, 11L, "HourOfAmPm");
+                hour = base + (this.fields.get(DateTimeFormatter.AMPM) == 1L ? 12 : 0);
+            } else {
+                throw this.missing("LocalTime");
+            }
+            int minute = this.present.get(DateTimeFormatter.MINUTE) ? this.checked(DateTimeFormatter.MINUTE, 0L, 59L, "MinuteOfHour") : 0;
+            int second = this.present.get(DateTimeFormatter.SECOND) ? this.checked(DateTimeFormatter.SECOND, 0L, 59L, "SecondOfMinute") : 0;
+            int nano = this.present.get(DateTimeFormatter.NANO) ? this.checked(DateTimeFormatter.NANO, 0L, 999999999L, "NanoOfSecond") : 0;
+            return LocalTime.of(hour, minute, second, nano);
+        }
+
+        private int checked(int field, long low, long high, String name) {
+            long value = this.fields.get(field);
+            if (value < low || value > high) {
+                throw new DateTimeException("Invalid value for $name (valid values $low - $high): $value");
+            }
+            return (int) value;
+        }
+
+        private DateTimeParseException missing(String type) {
+            return new DateTimeParseException("Text '${this.text}' could not be parsed: Unable to obtain $type from the parsed fields", this.text.clone(), 0);
+        }
+
+        private DateTimeParseException failure(&DateTimeException error) {
+            String? message = error.getMessage();
+            String reason = message == null ? "invalid value" : message;
+            return new DateTimeParseException("Text '${this.text}' could not be parsed: $reason", this.text.clone(), 0);
+        }
+    }
+}

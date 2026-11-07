@@ -1,0 +1,46 @@
+import std.regex.Pattern;
+import std.regex.Pattern.Matcher;
+import std.regex.PatternSyntaxException;
+import std.util.List;
+
+class Main {
+    static void main() {
+        Pattern date = Pattern.compile("(\\d{4})-(\\d{2})-(\\d{2})");
+        Matcher m = date.matcher("due 2026-11-07, paid 2026-12-01");
+        while (m.find()) {
+            Console.println(m.group() + " year=" + m.group(1) + " at " + m.start());
+        }
+        Console.println(Pattern.matches("[a-z]+@[a-z]+\\.com", &"ada@mail.com"));
+        Console.println(Pattern.matches("[a-z]+@[a-z]+\\.com", &"ada@mail.org"));
+        Pattern named = Pattern.compile("(?<key>\\w+)=(?<value>[^;]*)");
+        Matcher kv = named.matcher("a=1;bee=two;c=");
+        while (kv.find()) {
+            Console.println(kv.group("key") + " -> [" + kv.group("value") + "]");
+        }
+        Console.println(Pattern.compile("\\s*,\\s*").split(&"a , b,c ,  d"));
+        Matcher swap = Pattern.compile("(\\w+) (\\w+)").matcher("hello world foo bar");
+        Console.println(swap.replaceAll("$2 $1"));
+        Console.println(Pattern.compile("a+?").matcher("aaa").results());
+        Console.println(Pattern.compile("a+").matcher("caaat").results());
+        Console.println(Pattern.compile("(?i)hello").matcher("Say HeLLo").find());
+        Console.println(Pattern.compile("^\\w+$", Pattern.MULTILINE).matcher("one\ntwo\nthree").results());
+        Console.println(Pattern.compile("\\bcat\\b").matcher("cat concat cat.").results());
+        Console.println(Pattern.compile("(a|ab)(c|bcd)(d*)").matcher("abcd").matches());
+        Console.println(Pattern.compile("(x+x+)+y").matcher("xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx").find());
+        Console.println(Pattern.compile("colou?r").matcher("color colour").results());
+        Console.println(Pattern.compile("[^aeiou\\s]+").matcher("strength in rhythm").results());
+        Console.println(Pattern.compile("a{2,3}").matcher("aaaaaaa").results());
+        Console.println(Pattern.compile("x*").matcher("axb").replaceAll("-"));
+        Console.println(Pattern.quote(&"1+1=2?"));
+        try {
+            Pattern.compile("(abc");
+        } catch (PatternSyntaxException e) {
+            Console.println(e.getDescription() + " @" + e.getIndex());
+        }
+        try {
+            Pattern.compile("a**");
+        } catch (PatternSyntaxException e) {
+            Console.println(e.getDescription());
+        }
+    }
+}

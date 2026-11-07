@@ -1,0 +1,22 @@
+package std.time.format;
+
+import std.time.DateTimeException;
+
+class DateTimeParseException extends DateTimeException {
+    private String parsedString;
+    private int errorIndex;
+
+    DateTimeParseException(String message, String parsedString, int errorIndex) {
+        super(message);
+        this.parsedString = parsedString;
+        this.errorIndex = errorIndex;
+    }
+
+    String getParsedString() {
+        return this.parsedString;
+    }
+
+    int getErrorIndex() {
+        return this.errorIndex;
+    }
+}

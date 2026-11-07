@@ -1,0 +1,26 @@
+package std.regex;
+
+class PatternSyntaxException extends IllegalArgumentException {
+    private String description;
+    private String pattern;
+    private int index;
+
+    PatternSyntaxException(String description, String pattern, int index) {
+        super("$description near index $index\n$pattern");
+        this.description = description;
+        this.pattern = pattern;
+        this.index = index;
+    }
+
+    String getDescription() {
+        return this.description;
+    }
+
+    String getPattern() {
+        return this.pattern;
+    }
+
+    int getIndex() {
+        return this.index;
+    }
+}

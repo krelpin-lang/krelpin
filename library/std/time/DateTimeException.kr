@@ -1,0 +1,7 @@
+package std.time;
+
+class DateTimeException extends RuntimeException {
+    DateTimeException(String message) {
+        super(message);
+    }
+}

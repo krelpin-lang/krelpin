@@ -1,0 +1,154 @@
+package std.time;
+
+record Period(int years, int months, int days) {
+    public static final Period ZERO = new Period(0, 0, 0);
+
+    static Period of(int years, int months, int days) {
+        return new Period(years, months, days);
+    }
+
+    static Period ofYears(int years) {
+        return new Period(years, 0, 0);
+    }
+
+    static Period ofMonths(int months) {
+        return new Period(0, months, 0);
+    }
+
+    static Period ofWeeks(int weeks) {
+        return new Period(0, 0, Math.multiplyExact(weeks, 7));
+    }
+
+    static Period ofDays(int days) {
+        return new Period(0, 0, days);
+    }
+
+    static Period between(LocalDate start, LocalDate end) {
+        return start.until(end);
+    }
+
+    static Period parse(String text) {
+        String rest = text;
+        boolean negative = false;
+        if (rest.startsWith("-") || rest.startsWith("+")) {
+            negative = rest.startsWith("-");
+            rest = rest.substring(1);
+        }
+        if (!rest.startsWith("P") && !rest.startsWith("p")) {
+            throw new DateTimeException("Text cannot be parsed to a Period: $text");
+        }
+        rest = rest.substring(1);
+        int years = 0;
+        int months = 0;
+        int days = 0;
+        boolean any = false;
+        int position = 0;
+        int order = 0;
+        while (position < rest.length()) {
+            int start = position;
+            if (rest.charAt(position) == '-' || rest.charAt(position) == '+') {
+                position++;
+            }
+            while (position < rest.length() && rest.charAt(position) >= '0' && rest.charAt(position) <= '9') {
+                position++;
+            }
+            if (position == start || position >= rest.length()) {
+                throw new DateTimeException("Text cannot be parsed to a Period: $text");
+            }
+            int amount = int.parse(rest.substring(start, position).replace("+", ""));
+            if (negative) {
+                amount = -amount;
+            }
+            char unit = rest.charAt(position);
+            position++;
+            int rank = switch (unit) {
+                case 'Y', 'y' -> 1;
+                case 'M', 'm' -> 2;
+                case 'W', 'w' -> 3;
+                case 'D', 'd' -> 4;
+                default -> 0;
+            };
+            if (rank <= order) {
+                throw new DateTimeException("Text cannot be parsed to a Period: $text");
+            }
+            order = rank;
+            any = true;
+            if (rank == 1) {
+                years = amount;
+            } else if (rank == 2) {
+                months = amount;
+            } else if (rank == 3) {
+                days = Math.addExact(days, Math.multiplyExact(amount, 7));
+            } else {
+                days = Math.addExact(days, amount);
+            }
+        }
+        if (!any) {
+            throw new DateTimeException("Text cannot be parsed to a Period: $text");
+        }
+        return new Period(years, months, days);
+    }
+
+    boolean isZero() {
+        return this.years == 0 && this.months == 0 && this.days == 0;
+    }
+
+    boolean isNegative() {
+        return this.years < 0 || this.months < 0 || this.days < 0;
+    }
+
+    long toTotalMonths() {
+        return (long) this.years * 12L + (long) this.months;
+    }
+
+    Period plus(Period other) {
+        return new Period(Math.addExact(this.years, other.years()), Math.addExact(this.months, other.months()), Math.addExact(this.days, other.days()));
+    }
+
+    Period minus(Period other) {
+        return new Period(Math.subtractExact(this.years, other.years()), Math.subtractExact(this.months, other.months()), Math.subtractExact(this.days, other.days()));
+    }
+
+    Period plusYears(int years) {
+        return new Period(Math.addExact(this.years, years), this.months, this.days);
+    }
+
+    Period plusMonths(int months) {
+        return new Period(this.years, Math.addExact(this.months, months), this.days);
+    }
+
+    Period plusDays(int days) {
+        return new Period(this.years, this.months, Math.addExact(this.days, days));
+    }
+
+    Period multipliedBy(int factor) {
+        return new Period(Math.multiplyExact(this.years, factor), Math.multiplyExact(this.months, factor), Math.multiplyExact(this.days, factor));
+    }
+
+    Period negated() {
+        return this.multipliedBy(-1);
+    }
+
+    Period normalized() {
+        long total = this.toTotalMonths();
+        return new Period((int) (total / 12L), (int) (total % 12L), this.days);
+    }
+
+    String toString() {
+        if (this.isZero()) {
+            return "P0D";
+        }
+        StringBuilder text = new StringBuilder();
+        text.append("P");
+        if (this.years != 0) {
+            text.append("${this.years}Y");
+        }
+        if (this.months != 0) {
+            text.append("${this.months}M");
+        }
+        if (this.days != 0) {
+            text.append("${this.days}D");
+        }
+        return text.toString();
+    }
+}

@@ -153,17 +153,21 @@ impl FnCx<'_, '_, '_> {
         if items.is(owner, LangItem::System) {
             return self.system_builtin(name, builtin);
         }
-        if items.is(owner, LangItem::Files) {
-            return self.files_builtin(name, builtin);
-        }
-        if items.is(owner, LangItem::OsError) {
-            let (function, ret_ll) = match name {
-                "message" => ("kr_io_last_error", "ptr"),
-                "occurred" => ("kr_io_failed", "i1"),
-                _ => return false,
+        if builtin.receiver.is_none()
+            && builtin.params.is_empty()
+            && matches!(name, "lastError" | "lastFailed")
+        {
+            let ret_ll = if name == "lastError" { "ptr" } else { "i1" };
+            let function = if name == "lastError" {
+                "kr_io_last_error"
+            } else {
+                "kr_io_failed"
             };
             self.runtime_call(function, ret_ll, builtin, &[]);
             return true;
+        }
+        if items.is(owner, LangItem::Files) {
+            return self.files_builtin(name, builtin);
         }
         if items.is(owner, LangItem::Command) {
             return self.process_builtin(name, builtin);
@@ -186,7 +190,7 @@ impl FnCx<'_, '_, '_> {
         if items.is(owner, LangItem::ArrayList) {
             return self.list_builtin(name, builtin);
         }
-        if items.is(owner, LangItem::HashMap) || items.is(owner, LangItem::HashSet) {
+        if items.is_table(owner) {
             return self.table_builtin(owner, name, builtin);
         }
         false
@@ -1241,6 +1245,9 @@ impl FnCx<'_, '_, '_> {
             }
             "currentTimeMillis" => self.runtime_call("kr_system_millis", "i64", builtin, &[]),
             "nanoTime" => self.runtime_call("kr_system_nanos", "i64", builtin, &[]),
+            "currentTimeNanos" => {
+                self.runtime_call("kr_system_epoch_nanos", "i64", builtin, &[])
+            }
             "osName" => self.runtime_call("kr_system_os_name", "ptr", builtin, &[]),
             _ => return false,
         }
@@ -1894,7 +1901,7 @@ impl FnCx<'_, '_, '_> {
         let Ty::Adt { args, .. } = &ty else {
             return false;
         };
-        let is_map = self.cx.tcx.lang_items.is(owner, LangItem::HashMap);
+        let is_map = self.cx.tcx.lang_items.is_map_table(owner);
         let key = args[0].clone();
         let value = if is_map { args[1].clone() } else { Ty::Void };
         let shape = self.cx.table_shape(&key, &value);
@@ -2059,10 +2066,12 @@ impl FnCx<'_, '_, '_> {
                     mutable: false,
                     ty: Box::new(projected.clone()),
                 };
-                let item = if name == "keySet" {
-                    LangItem::HashSet
-                } else {
+                let item = if name != "keySet" {
                     LangItem::ArrayList
+                } else if self.cx.tcx.lang_items.is(owner, LangItem::LinkedHashMap) {
+                    LangItem::LinkedHashSet
+                } else {
+                    LangItem::HashSet
                 };
                 let collection_def = self.cx.lang(item);
                 let collection_ty = Ty::Adt {

@@ -36,7 +36,7 @@ error: `detach` keeps `task` after `relay` ends, but `task` may borrow from the 
    |         ^^^^^^^^^^^^^^^^^^ `detach` keeps `task` here
    |
    = note: the caller's checks don't know that `relay` passes `task` on to be kept
-   = help: make `relay` static and write `keeps task` after its parameters, so its callers can't pass anything borrowed
+   = help: write `keeps task` after the parameters of `relay`, so its callers can't pass anything borrowed
 
 error: `detach` keeps `task` after `relayLater` ends, but `task` may borrow from the caller
   --> tests/ui/borrowck/async.kr:52:9
@@ -48,7 +48,7 @@ error: `detach` keeps `task` after `relayLater` ends, but `task` may borrow from
    |         ^^^^^^^^^^^^^^^^^^^ `detach` keeps `task` here
    |
    = note: the caller's checks don't know that `relayLater` passes `task` on to be kept
-   = help: make `relayLater` static and write `keeps task` after its parameters, so its callers can't pass anything borrowed
+   = help: write `keeps task` after the parameters of `relayLater`, so its callers can't pass anything borrowed
 
 error: `relayKept` keeps its argument after this method ends, but the argument borrows `text`
   --> tests/ui/borrowck/async.kr:61:9

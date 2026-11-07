@@ -1,0 +1,121 @@
+package std.util;
+
+class TreeSet<T extends Comparable<T>> implements Set<T> {
+    private TreeMap<T, boolean> map;
+
+    TreeSet() {
+        this.map = new TreeMap<>();
+    }
+
+    int size() {
+        return this.map.size();
+    }
+
+    mut boolean add(T value) {
+        if (this.map.containsKey(&value)) {
+            return false;
+        }
+        this.map.put(value, true);
+        return true;
+    }
+
+    mut boolean remove(&T value) {
+        return this.map.remove(value) != null;
+    }
+
+    boolean contains(&T value) {
+        return this.map.containsKey(value);
+    }
+
+    mut void clear() {
+        this.map.clear();
+    }
+
+    (&T)? first() borrows this {
+        return this.map.firstKey();
+    }
+
+    (&T)? last() borrows this {
+        return this.map.lastKey();
+    }
+
+    (&T)? floor(&T value) borrows this {
+        return this.map.floorKey(value);
+    }
+
+    (&T)? ceiling(&T value) borrows this {
+        return this.map.ceilingKey(value);
+    }
+
+    (&T)? lower(&T value) borrows this {
+        return this.map.lowerKey(value);
+    }
+
+    (&T)? higher(&T value) borrows this {
+        return this.map.higherKey(value);
+    }
+
+    mut T? pollFirst() {
+        Map.Entry<T, boolean>? entry = this.map.pollFirstEntry();
+        if (entry == null) {
+            return null;
+        }
+        return TreeSet.keyOf(entry);
+    }
+
+    mut T? pollLast() {
+        Map.Entry<T, boolean>? entry = this.map.pollLastEntry();
+        if (entry == null) {
+            return null;
+        }
+        return TreeSet.keyOf(entry);
+    }
+
+    Iterator<T> iterator() {
+        return new Values<>(this);
+    }
+
+    String toString() {
+        StringBuilder text = new StringBuilder();
+        text.append("[");
+        boolean first = true;
+        for (&T value : this) {
+            if (!first) {
+                text.append(", ");
+            }
+            first = false;
+            text.append("" + value);
+        }
+        text.append("]");
+        return text.toString();
+    }
+
+    private static <T> T keyOf(Map.Entry<T, boolean> entry) {
+        return switch (entry) {
+            case Map.Entry(T key, boolean present) -> key;
+        };
+    }
+
+    private static final class Values<T extends Comparable<T>> borrows src implements Iterator<T> {
+        private &TreeSet<T> set;
+        private (&T)? next;
+
+        Values(&TreeSet<T> set) keeps set {
+            this.set = set;
+            this.next = set.first();
+        }
+
+        boolean hasNext() {
+            return this.next != null;
+        }
+
+        mut &T next() borrows src {
+            (&T)? current = this.next;
+            if (current == null) {
+                throw new IllegalStateException("the iterator has no more elements");
+            }
+            this.next = this.set.higher(current);
+            return current;
+        }
+    }
+}

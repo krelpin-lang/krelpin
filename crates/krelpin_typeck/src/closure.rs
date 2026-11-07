@@ -35,18 +35,24 @@ impl Tcx<'_> {
     }
 
     pub fn may_hold_refs(&self, ty: &Ty) -> bool {
-        self.may_hold_refs_inner(ty, &mut Vec::new())
+        self.may_hold_refs_inner(ty, true, &mut Vec::new())
     }
 
-    fn may_hold_refs_inner(&self, ty: &Ty, visiting: &mut Vec<DefId>) -> bool {
+    pub fn holds_declared_refs(&self, ty: &Ty) -> bool {
+        self.may_hold_refs_inner(ty, false, &mut Vec::new())
+    }
+
+    fn may_hold_refs_inner(&self, ty: &Ty, lambdas: bool, visiting: &mut Vec<DefId>) -> bool {
         match ty {
             Ty::Ref { .. } | Ty::Param(_) => true,
             Ty::Primitive(_) | Ty::Null | Ty::Void | Ty::Unknown => false,
-            Ty::Nullable(inner) | Ty::Array(inner) => self.may_hold_refs_inner(inner, visiting),
+            Ty::Nullable(inner) | Ty::Array(inner) => {
+                self.may_hold_refs_inner(inner, lambdas, visiting)
+            }
             Ty::Adt { def, args, .. } => {
                 if args
                     .iter()
-                    .any(|arg| self.may_hold_refs_inner(arg, visiting))
+                    .any(|arg| self.may_hold_refs_inner(arg, lambdas, visiting))
                 {
                     return true;
                 }
@@ -58,7 +64,7 @@ impl Tcx<'_> {
                     return true;
                 }
                 if sig.kind == AdtKind::Interface {
-                    return self.fn_receiver(ty).is_some();
+                    return lambdas && self.fn_receiver(ty).is_some();
                 }
                 let subst = self.subst_for(*def, args);
                 visiting.push(*def);
@@ -74,7 +80,7 @@ impl Tcx<'_> {
                             .map(|field| field.ty.subst(&subst)),
                     )
                     .chain(sig.superclass.iter().map(|ty| ty.subst(&subst)))
-                    .any(|field| self.may_hold_refs_inner(&field, visiting));
+                    .any(|field| self.may_hold_refs_inner(&field, lambdas, visiting));
                 visiting.pop();
                 holds
             }

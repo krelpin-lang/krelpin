@@ -1,0 +1,46 @@
+import std.util.*;
+
+class Main {
+    static void main() {
+        TreeMap<int, int> tree = new TreeMap<>();
+        Map<int, int> model = new HashMap<>();
+        Random random = new Random(42);
+        int mismatches = 0;
+        for (int step = 0; step < 20000; step++) {
+            int key = random.nextInt(300);
+            int action = random.nextInt(3);
+            if (action == 0) {
+                (&int)? a = tree.get(&key);
+                (&int)? b = model.get(&key);
+                if ((a == null) != (b == null) || (a != null && b != null && a != b)) {
+                    mismatches++;
+                }
+            } else if (action == 1) {
+                tree.put(key, step);
+                model.put(key, step);
+            } else {
+                int? a = tree.remove(&key);
+                int? b = model.remove(&key);
+                if (a != b) {
+                    mismatches++;
+                }
+            }
+            if (tree.size() != model.size()) {
+                mismatches++;
+            }
+        }
+        int previous = -1;
+        int seen = 0;
+        for (&int key : tree.keySet()) {
+            if (key <= previous || !model.containsKey(key)) {
+                mismatches++;
+            }
+            previous = key;
+            seen++;
+        }
+        while (tree.size() > 0) {
+            tree.pollFirstEntry();
+        }
+        Console.println("mismatches=" + mismatches + " seen=" + seen + " size=" + model.size() + " empty=" + tree.size());
+    }
+}

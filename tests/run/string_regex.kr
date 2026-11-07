@@ -1,0 +1,8 @@
+class Main {
+    static void main() {
+        Console.println("2026-11-07".matches("\\d{4}-\\d{2}-\\d{2}"));
+        Console.println("a1b22c333".replaceAll("\\d+", "#"));
+        Console.println("  lots   of   space ".trim().replaceAll("\\s+", " "));
+        Console.println("x-y-z".replaceFirst("-", "+"));
+    }
+}

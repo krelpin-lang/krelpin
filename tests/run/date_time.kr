@@ -1,0 +1,118 @@
+import std.time.DateTimeException;
+import std.time.DayOfWeek;
+import std.time.Duration;
+import std.time.Instant;
+import std.time.LocalDate;
+import std.time.LocalDateTime;
+import std.time.LocalTime;
+import std.time.Month;
+import std.time.OffsetDateTime;
+import std.time.Period;
+import std.time.ZoneId;
+import std.time.ZoneOffset;
+import std.time.ZonedDateTime;
+import std.time.format.DateTimeFormatter;
+import std.time.format.DateTimeParseException;
+import std.time.format.TextStyle;
+
+class Main {
+    static void main() {
+        LocalDate date = LocalDate.of(2024, 2, 29);
+        Console.println("$date ${date.dayOfWeek()} ${date.dayOfYear()} ${date.isLeapYear()} ${date.lengthOfMonth()} ${date.toEpochDay()}");
+        Console.println("${date.plusYears(1L)} ${date.plusMonths(1L)} ${date.minusDays(60L)} ${date.plusWeeks(2L)} ${LocalDate.ofEpochDay(0L)} ${LocalDate.ofEpochDay(-1L)}");
+        Console.println("${LocalDate.ofYearDay(2023, 365)} ${LocalDate.of(1, 1, 1).toEpochDay()} ${LocalDate.of(-1, 12, 31)} ${LocalDate.of(12345, 6, 7)}");
+        Console.println("${date.until(LocalDate.of(2025, 3, 1))} ${LocalDate.of(2025, 3, 31).until(date)} ${date.daysUntil(LocalDate.of(2025, 1, 1))}");
+        Console.println("${date.next(DayOfWeek.MONDAY)} ${date.previousOrSame(DayOfWeek.THURSDAY)} ${date.lastDayOfMonth()} ${date.month().displayName(TextStyle.FULL)}");
+        Console.println("${date.isBefore(LocalDate.of(2024, 3, 1))} ${date == LocalDate.parse("2024-02-29")} ${date.compareTo(&LocalDate.EPOCH)}");
+        try {
+            LocalDate.of(2023, 2, 29);
+        } catch (DateTimeException error) {
+            Console.println(error.getMessage());
+        }
+        try {
+            LocalDate.of(2023, 4, 31);
+        } catch (DateTimeException error) {
+            Console.println(error.getMessage());
+        }
+        try {
+            LocalDate.of(2023, 13, 1);
+        } catch (DateTimeException error) {
+            Console.println(error.getMessage());
+        }
+
+        LocalTime time = LocalTime.of(23, 59, 30, 500000000);
+        Console.println("$time ${LocalTime.of(9, 5)} ${LocalTime.of(9, 5, 7)} ${LocalTime.of(1, 2, 3, 4000)} ${time.plusSeconds(45L)} ${time.minusHours(25L)} ${LocalTime.parse("10:15:30.25")}");
+        LocalDateTime moment = LocalDateTime.of(2026, 11, 7, 14, 30, 5);
+        Console.println("$moment ${moment.plusHours(10L)} ${moment.minusMinutes(1500L)} ${moment.plus(Duration.ofMillis(1500L))} ${LocalDateTime.parse("2026-01-02T03:04")}");
+        Console.println("${moment.toEpochSecond(ZoneOffset.UTC)} ${LocalDateTime.ofEpochSecond(1700000000L, 0, ZoneOffset.ofHours(3))}");
+
+        Period period = Period.of(1, 14, 3);
+        Console.println("$period ${period.normalized()} ${Period.ZERO} ${Period.parse("P2Y3M1W")} ${Period.ofWeeks(2)} ${LocalDate.of(2024, 1, 31).plus(Period.ofMonths(1))}");
+
+        ZoneOffset offset = ZoneOffset.of("+05:30");
+        Console.println("$offset ${ZoneOffset.ofHours(-8)} ${ZoneOffset.UTC} ${ZoneOffset.ofHoursMinutesSeconds(1, 2, 3)} ${offset.totalSeconds()}");
+
+        Instant instant = Instant.ofEpochSecond(1700000000L, 123000000L);
+        Console.println("$instant ${Instant.EPOCH} ${Instant.ofEpochMilli(-1L)} ${instant.toEpochMilli()} ${Instant.parse("2023-11-14T22:13:20.123Z") == instant}");
+        Console.println("${Instant.parse("2023-11-15T01:13:20+03:00").epochSecond()} ${Duration.between(Instant.EPOCH, instant).toDays()}");
+
+        ZoneId berlin = ZoneId.of("Europe/Berlin");
+        ZoneId newYork = ZoneId.of("America/New_York");
+        ZoneId istanbul = ZoneId.of("Europe/Istanbul");
+        ZonedDateTime summer = ZonedDateTime.of(LocalDateTime.of(2026, 7, 1, 12, 0), &berlin);
+        ZonedDateTime winter = ZonedDateTime.of(LocalDateTime.of(2026, 1, 1, 12, 0), &berlin);
+        Console.println("$summer $winter ${summer.withZoneSameInstant(&newYork)} ${summer.withZoneSameInstant(&istanbul)}");
+        ZonedDateTime gap = ZonedDateTime.of(LocalDateTime.of(2026, 3, 29, 2, 30), &berlin);
+        ZonedDateTime overlap = ZonedDateTime.of(LocalDateTime.of(2026, 10, 25, 2, 30), &berlin);
+        Console.println("$gap $overlap ${overlap.withLaterOffsetAtOverlap()} ${overlap.plusHours(1L)} ${gap.minusDays(1L)}");
+        ZonedDateTime far = ZonedDateTime.of(LocalDateTime.of(2090, 7, 1, 12, 0), &newYork);
+        Console.println("$far ${ZonedDateTime.of(LocalDateTime.of(2090, 12, 1, 12, 0), &newYork)} ${berlin.rules().isDaylightSavings(&summer.toInstant())}");
+        Console.println("${ZonedDateTime.parse("2026-07-01T12:00+02:00[Europe/Berlin]") == summer} ${ZonedDateTime.parse("2026-07-01T12:00Z")} ${ZoneId.of("UTC+3")} ${ZoneId.of("GMT")}");
+        Instant? next = berlin.rules().nextTransition(&winter.toInstant());
+        Console.println("${next} ${berlin.rules().nextTransition(&Instant.parse("2090-01-01T00:00:00Z"))}");
+        OffsetDateTime offsetTime = OffsetDateTime.of(moment, offset);
+        Console.println("$offsetTime ${offsetTime.toInstant()} ${offsetTime.withOffsetSameInstant(ZoneOffset.UTC)} ${OffsetDateTime.parse("2026-11-07T14:30:05.5-02:00")}");
+
+        DateTimeFormatter pattern = DateTimeFormatter.ofPattern("EEEE, d MMMM uuuu HH:mm:ss.SSS");
+        Console.println(LocalDateTime.of(2026, 11, 7, 9, 5, 3, 120000000).format(&pattern));
+        Console.println(summer.format(&DateTimeFormatter.ofPattern("yyyy-MM-dd hh:mm a z VV XXX xx Z O")));
+        Console.println(winter.format(&DateTimeFormatter.ofPattern("EEE dd.MM.yy 'at' H'h' [mm'm'] X ZZZZ")));
+        Console.println("${summer.format(&DateTimeFormatter.ISO_ZONED_DATE_TIME)} ${summer.format(&DateTimeFormatter.ISO_OFFSET_DATE_TIME)} ${summer.format(&DateTimeFormatter.RFC_1123_DATE_TIME)} ${summer.format(&DateTimeFormatter.BASIC_ISO_DATE)}");
+        Console.println("${date.format(&DateTimeFormatter.ISO_ORDINAL_DATE)} ${LocalTime.of(10, 15).format(&DateTimeFormatter.ISO_LOCAL_TIME)} ${LocalTime.of(10, 15, 0, 500000000).format(&DateTimeFormatter.ISO_TIME)}");
+        DateTimeFormatter utcClock = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm z").withZone(&newYork);
+        Console.println("${utcClock.format(&instant)} ${DateTimeFormatter.ISO_INSTANT.format(&Instant.ofEpochSecond(0L, 1000L))}");
+
+        DateTimeFormatter us = DateTimeFormatter.ofPattern("MM/dd/yyyy h:mm a");
+        Console.println("${LocalDateTime.parse("11/07/2026 2:30 PM", &us)} ${LocalDate.parse("20261107", &DateTimeFormatter.BASIC_ISO_DATE)} ${LocalDate.parse("7 Nov 2026", &DateTimeFormatter.ofPattern("d MMM yyyy"))}");
+        Console.println("${ZonedDateTime.parse("Sat, 7 Nov 2026 14:30:00 GMT", &DateTimeFormatter.RFC_1123_DATE_TIME)} ${LocalDate.parse("2026-311", &DateTimeFormatter.ISO_ORDINAL_DATE)}");
+        String[] bad = new String[] { "2026-13-01", "2026-02-30", "2026/01/01", "2026-01-01x", "Mon, 7 Nov 2026 14:30:00 GMT" };
+        for (int index = 0; index < 5; index++) {
+            try {
+                if (index == 4) {
+                    ZonedDateTime.parse(bad[index].clone(), &DateTimeFormatter.RFC_1123_DATE_TIME);
+                } else {
+                    LocalDate.parse(bad[index].clone());
+                }
+            } catch (DateTimeParseException error) {
+                Console.println("${error.getMessage()} @${error.getErrorIndex()}");
+            }
+        }
+        try {
+            DateTimeFormatter.ofPattern("yyyy-qq");
+        } catch (IllegalArgumentException error) {
+            Console.println(error.getMessage());
+        }
+        try {
+            date.format(&DateTimeFormatter.ISO_LOCAL_DATE_TIME);
+        } catch (DateTimeException error) {
+            Console.println(error.getMessage());
+        }
+        try {
+            ZoneId.of("Mars/Olympus");
+        } catch (DateTimeException error) {
+            Console.println(error.getMessage());
+        }
+        Console.println("${Month.FEBRUARY.length(true)} ${Month.DECEMBER.plus(2L)} ${DayOfWeek.SUNDAY.plus(1L)} ${DayOfWeek.MONDAY.minus(1L)} ${Month.AUGUST.firstMonthOfQuarter()}");
+        Console.println("${ZoneId.availableZoneIds().contains(&"Europe/Istanbul")} ${ZoneId.systemDefault().id().isEmpty()} ${LocalDate.now().year() >= 2026}");
+    }
+}

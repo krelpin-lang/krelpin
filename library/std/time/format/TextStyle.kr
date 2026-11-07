@@ -1,0 +1,7 @@
+package std.time.format;
+
+enum TextStyle {
+    FULL,
+    SHORT,
+    NARROW
+}

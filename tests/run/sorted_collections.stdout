@@ -1,0 +1,17 @@
+{ada=99, bob=30, dan=60, eve=50, kim=40, mia=0, zoe=20}
+ada zoe
+bob dan
+null null
+40
+null
+{ada=99, bob=30, dan=60, eve=50, mia=0, zoe=20}
+ada bob dan eve mia zoe 
+true
+Entry[key=ada, value=99]
+[30, 60, 50, 0, 20]
+true 497
+[1, 5, 9]
+1 9 9
+1
+true 2
+[apple, pear]

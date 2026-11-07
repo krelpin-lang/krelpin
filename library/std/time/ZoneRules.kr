@@ -1,0 +1,475 @@
+package std.time;
+
+import std.util.ArrayList;
+import std.util.List;
+
+final class ZoneRules {
+    private List<long> transitions;
+    private List<int> offsets;
+    private List<boolean> daylight;
+    private List<String> names;
+    private Posix? tail;
+
+    private ZoneRules(List<long> transitions, List<int> offsets, List<boolean> daylight, List<String> names, Posix? tail) {
+        this.transitions = transitions;
+        this.offsets = offsets;
+        this.daylight = daylight;
+        this.names = names;
+        this.tail = tail;
+    }
+
+    static ZoneRules of(ZoneOffset offset) {
+        List<int> offsets = new ArrayList<>();
+        offsets.add(offset.totalSeconds());
+        List<boolean> daylight = new ArrayList<>();
+        daylight.add(false);
+        List<String> names = new ArrayList<>();
+        names.add(offset.totalSeconds() == 0 ? "UTC" : offset.id());
+        return new ZoneRules(new ArrayList<>(), offsets, daylight, names, null);
+    }
+
+    static ZoneRules ofPosix(String rule) {
+        Posix tail = ZoneRules.parsePosix(&rule);
+        List<int> offsets = new ArrayList<>();
+        offsets.add(tail.standard());
+        List<boolean> daylight = new ArrayList<>();
+        daylight.add(false);
+        List<String> names = new ArrayList<>();
+        names.add(tail.standardName().clone());
+        return new ZoneRules(new ArrayList<>(), offsets, daylight, names, tail);
+    }
+
+    static ZoneRules ofTzif(&byte[] data) {
+        if (data.length < 44 || ZoneRules.u8(data, 0) != 84 || ZoneRules.u8(data, 1) != 90 || ZoneRules.u8(data, 2) != 105 || ZoneRules.u8(data, 3) != 102) {
+            throw new DateTimeException("the zone data is not in TZif format");
+        }
+        int version = ZoneRules.u8(data, 4);
+        int start = 0;
+        int width = 4;
+        if (version >= 50) {
+            start = 44 + ZoneRules.blockSize(data, 0, 4);
+            width = 8;
+            if (data.length < start + 44) {
+                throw new DateTimeException("the zone data is truncated");
+            }
+        }
+        int typeCount = ZoneRules.be32(data, start + 36);
+        int timeCount = ZoneRules.be32(data, start + 32);
+        int charCount = ZoneRules.be32(data, start + 40);
+        if (typeCount <= 0 || timeCount < 0 || data.length < start + 44 + ZoneRules.blockSize(data, start, width)) {
+            throw new DateTimeException("the zone data is truncated");
+        }
+        int times = start + 44;
+        int indices = times + timeCount * width;
+        int types = indices + timeCount;
+        int chars = types + typeCount * 6;
+        List<int> typeOffsets = new ArrayList<>();
+        List<boolean> typeDaylight = new ArrayList<>();
+        List<String> typeNames = new ArrayList<>();
+        for (int type = 0; type < typeCount; type++) {
+            int entry = types + type * 6;
+            typeOffsets.add(ZoneRules.be32(data, entry));
+            typeDaylight.add(ZoneRules.u8(data, entry + 4) != 0);
+            typeNames.add(ZoneRules.text(data, chars + ZoneRules.u8(data, entry + 5), chars + charCount));
+        }
+        List<long> transitions = new ArrayList<>();
+        List<int> offsets = new ArrayList<>();
+        List<boolean> daylight = new ArrayList<>();
+        List<String> names = new ArrayList<>();
+        offsets.add(typeOffsets.get(0));
+        daylight.add(typeDaylight.get(0));
+        names.add(typeNames.get(0).clone());
+        for (int index = 0; index < timeCount; index++) {
+            long at = width == 8 ? ZoneRules.be64(data, times + index * 8) : (long) ZoneRules.be32(data, times + index * 4);
+            int type = ZoneRules.u8(data, indices + index);
+            if (type >= typeCount) {
+                throw new DateTimeException("the zone data refers to a missing local time type");
+            }
+            transitions.add(at);
+            offsets.add(typeOffsets.get(type));
+            daylight.add(typeDaylight.get(type));
+            names.add(typeNames.get(type).clone());
+        }
+        Posix? tail = null;
+        if (width == 8) {
+            int footer = start + 44 + ZoneRules.blockSize(data, start, 8);
+            if (footer < data.length && ZoneRules.u8(data, footer) == 10) {
+                String rule = ZoneRules.line(data, footer + 1);
+                if (!rule.isEmpty()) {
+                    tail = ZoneRules.parsePosix(&rule);
+                }
+            }
+        }
+        return new ZoneRules(transitions, offsets, daylight, names, tail);
+    }
+
+    boolean isFixedOffset() {
+        return this.transitions.isEmpty() && this.tail == null;
+    }
+
+    ZoneOffset offset(&Instant instant) {
+        return new ZoneOffset(this.offsetAt(instant.epochSecond()));
+    }
+
+    boolean isDaylightSavings(&Instant instant) {
+        long at = instant.epochSecond();
+        int index = this.indexAt(at);
+        if (this.tail instanceof Posix rule && index == this.transitions.size()) {
+            return rule.inDaylight(at);
+        }
+        return this.daylight.get(index);
+    }
+
+    String name(&Instant instant) {
+        long at = instant.epochSecond();
+        int index = this.indexAt(at);
+        if (this.tail instanceof Posix rule && index == this.transitions.size()) {
+            return rule.inDaylight(at) ? rule.daylightName().clone() : rule.standardName().clone();
+        }
+        return this.names.get(index).clone();
+    }
+
+    List<ZoneOffset> validOffsets(LocalDateTime local) {
+        long seconds = local.toEpochSecond(ZoneOffset.UTC);
+        List<ZoneOffset> valid = new ArrayList<>();
+        int before = this.offsetAt(seconds - 64800L);
+        int after = this.offsetAt(seconds + 64800L);
+        int middle = this.offsetAt(seconds);
+        int[] candidates = new int[] { before, middle, after };
+        for (int index = 0; index < 3; index++) {
+            int candidate = candidates[index];
+            boolean seen = false;
+            for (&ZoneOffset offset : &valid) {
+                seen = seen || offset.totalSeconds() == candidate;
+            }
+            if (!seen && this.offsetAt(seconds - (long) candidate) == candidate) {
+                valid.add(new ZoneOffset(candidate));
+            }
+        }
+        valid.sort();
+        return valid;
+    }
+
+    boolean isValidOffset(LocalDateTime local, ZoneOffset offset) {
+        long seconds = local.toEpochSecond(ZoneOffset.UTC);
+        return this.offsetAt(seconds - (long) offset.totalSeconds()) == offset.totalSeconds();
+    }
+
+    Duration gapAt(LocalDateTime local) {
+        long seconds = local.toEpochSecond(ZoneOffset.UTC);
+        int before = this.offsetAt(seconds - 64800L);
+        int after = this.offsetAt(seconds + 64800L);
+        return Duration.ofSeconds((long) (after - before));
+    }
+
+    ZoneOffset offsetBefore(LocalDateTime local) {
+        return new ZoneOffset(this.offsetAt(local.toEpochSecond(ZoneOffset.UTC) - 64800L));
+    }
+
+    Instant? nextTransition(&Instant instant) {
+        long at = instant.epochSecond();
+        int current = this.offsetAt(at);
+        boolean dst = this.isDaylightSavings(instant);
+        int index = this.indexAt(at);
+        for (int next = index; next < this.transitions.size(); next++) {
+            long changeAt = this.transitions.get(next);
+            if (changeAt > at && (this.offsets.get(next + 1) != current || this.daylight.get(next + 1) != dst)) {
+                return Instant.ofEpochSecond(changeAt);
+            }
+        }
+        if (this.tail instanceof Posix rule && rule.observesDst()) {
+            int year = LocalDateTime.ofEpochSecond(at, 0, new ZoneOffset(rule.standard())).year();
+            long best = long.MAX_VALUE;
+            for (int candidate = year; candidate <= year + 1; candidate++) {
+                long begin = rule.startAt(candidate);
+                long finish = rule.endAt(candidate);
+                if (begin > at && begin < best) {
+                    best = begin;
+                }
+                if (finish > at && finish < best) {
+                    best = finish;
+                }
+            }
+            return best == long.MAX_VALUE ? null : Instant.ofEpochSecond(best);
+        }
+        return null;
+    }
+
+    boolean equals(&ZoneRules other) {
+        return this.transitions == other.transitions && this.offsets == other.offsets && this.daylight == other.daylight && this.names == other.names && this.tail == other.tail;
+    }
+
+    int hashCode() {
+        return this.transitions.hashCode() * 31 + this.offsets.hashCode();
+    }
+
+    ZoneRules clone() {
+        Posix? tail = null;
+        if (this.tail instanceof Posix rule) {
+            tail = rule.clone();
+        }
+        return new ZoneRules(this.transitions.clone(), this.offsets.clone(), this.daylight.clone(), this.names.clone(), tail);
+    }
+
+    String toString() {
+        if (this.isFixedOffset()) {
+            return "ZoneRules[fixed=${new ZoneOffset(this.offsets.get(0))}]";
+        }
+        return "ZoneRules[transitions=${this.transitions.size()}]";
+    }
+
+    private int indexAt(long at) {
+        int low = 0;
+        int high = this.transitions.size();
+        while (low < high) {
+            int middle = (low + high) / 2;
+            if (this.transitions.get(middle) <= at) {
+                low = middle + 1;
+            } else {
+                high = middle;
+            }
+        }
+        return low;
+    }
+
+    private int offsetAt(long at) {
+        int index = this.indexAt(at);
+        if (this.tail instanceof Posix rule && index == this.transitions.size()) {
+            return rule.offsetAt(at);
+        }
+        return this.offsets.get(index);
+    }
+
+    private static int u8(&byte[] data, int index) {
+        return data[index] & 0xFF;
+    }
+
+    private static int be32(&byte[] data, int index) {
+        return (ZoneRules.u8(data, index) << 24) | (ZoneRules.u8(data, index + 1) << 16) | (ZoneRules.u8(data, index + 2) << 8) | ZoneRules.u8(data, index + 3);
+    }
+
+    private static long be64(&byte[] data, int index) {
+        return ((long) ZoneRules.be32(data, index) << 32) | ((long) ZoneRules.be32(data, index + 4) & 0xFFFFFFFFL);
+    }
+
+    private static int blockSize(&byte[] data, int start, int width) {
+        int utCount = ZoneRules.be32(data, start + 20);
+        int standardCount = ZoneRules.be32(data, start + 24);
+        int leapCount = ZoneRules.be32(data, start + 28);
+        int timeCount = ZoneRules.be32(data, start + 32);
+        int typeCount = ZoneRules.be32(data, start + 36);
+        int charCount = ZoneRules.be32(data, start + 40);
+        return timeCount * width + timeCount + typeCount * 6 + charCount + leapCount * (width + 4) + standardCount + utCount;
+    }
+
+    private static String text(&byte[] data, int from, int limit) {
+        StringBuilder text = new StringBuilder();
+        for (int index = from; index < limit && index < data.length && data[index] != (byte) 0; index++) {
+            text.append((char) ZoneRules.u8(data, index));
+        }
+        return text.toString();
+    }
+
+    private static String line(&byte[] data, int from) {
+        StringBuilder text = new StringBuilder();
+        for (int index = from; index < data.length && ZoneRules.u8(data, index) != 10; index++) {
+            text.append((char) ZoneRules.u8(data, index));
+        }
+        return text.toString();
+    }
+
+    private static Posix parsePosix(&String rule) {
+        PosixReader reader = new PosixReader(rule);
+        String standardName = reader.name();
+        int standard = -reader.offset();
+        if (reader.atEnd()) {
+            return new Posix(standard, standard, standardName, "", false, new Change('M', 3, 2, 0, 7200), new Change('M', 11, 1, 0, 7200));
+        }
+        String daylightName = reader.name();
+        int daylight = standard + 3600;
+        if (!reader.atEnd() && reader.peek() != ',') {
+            daylight = -reader.offset();
+        }
+        Change start = new Change('M', 3, 2, 0, 7200);
+        Change end = new Change('M', 11, 1, 0, 7200);
+        if (!reader.atEnd()) {
+            reader.expect(',');
+            start = reader.change();
+            reader.expect(',');
+            end = reader.change();
+        }
+        if (!reader.atEnd()) {
+            throw new DateTimeException("invalid POSIX time zone rule `${reader.source()}`");
+        }
+        return new Posix(standard, daylight, standardName, daylightName, true, start, end);
+    }
+
+    private record Change(char kind, int month, int week, int day, int time) {
+        long localSecond(int year) {
+            boolean leap = LocalDate.isLeap((long) year);
+            long epochDay;
+            if (this.kind == 'J') {
+                int dayOfYear = leap && this.day >= 60 ? this.day + 1 : this.day;
+                epochDay = LocalDate.ofYearDay(year, dayOfYear).toEpochDay();
+            } else if (this.kind == 'N') {
+                epochDay = LocalDate.ofYearDay(year, Math.min(this.day + 1, leap ? 366 : 365)).toEpochDay();
+            } else {
+                LocalDate first = LocalDate.of(year, this.month, 1);
+                int firstDay = first.dayOfWeek().value() % 7;
+                int dayOfMonth = 1 + Math.floorMod(this.day - firstDay, 7) + (this.week - 1) * 7;
+                while (dayOfMonth > first.lengthOfMonth()) {
+                    dayOfMonth -= 7;
+                }
+                epochDay = first.toEpochDay() + (long) (dayOfMonth - 1);
+            }
+            return epochDay * 86400L + (long) this.time;
+        }
+    }
+
+    private record Posix(int standard, int daylight, String standardName, String daylightName, boolean observesDst, Change start, Change end) {
+        long startAt(int year) {
+            return this.start.localSecond(year) - (long) this.standard;
+        }
+
+        long endAt(int year) {
+            return this.end.localSecond(year) - (long) this.daylight;
+        }
+
+        boolean inDaylight(long at) {
+            if (!this.observesDst) {
+                return false;
+            }
+            int year = LocalDateTime.ofEpochSecond(at, 0, new ZoneOffset(this.standard)).year();
+            long begin = this.startAt(year);
+            long finish = this.endAt(year);
+            if (begin < finish) {
+                return at >= begin && at < finish;
+            }
+            return !(at >= finish && at < begin);
+        }
+
+        int offsetAt(long at) {
+            return this.inDaylight(at) ? this.daylight : this.standard;
+        }
+    }
+
+    private static final class PosixReader {
+        private &String source;
+        private int position;
+
+        PosixReader(&String source) keeps source {
+            this.source = source;
+            this.position = 0;
+        }
+
+        &String source() borrows this {
+            return this.source;
+        }
+
+        boolean atEnd() {
+            return this.position >= this.source.length();
+        }
+
+        char peek() {
+            return this.source.charAt(this.position);
+        }
+
+        mut void expect(char c) {
+            if (this.atEnd() || this.peek() != c) {
+                this.fail();
+            }
+            this.position++;
+        }
+
+        mut String name() {
+            StringBuilder text = new StringBuilder();
+            if (!this.atEnd() && this.peek() == '<') {
+                this.position++;
+                while (!this.atEnd() && this.peek() != '>') {
+                    text.append(this.peek());
+                    this.position++;
+                }
+                this.expect('>');
+            } else {
+                while (!this.atEnd() && this.peek().isLetter()) {
+                    text.append(this.peek());
+                    this.position++;
+                }
+            }
+            if (text.length() < 3) {
+                this.fail();
+            }
+            return text.toString();
+        }
+
+        mut int offset() {
+            int sign = 1;
+            if (!this.atEnd() && (this.peek() == '+' || this.peek() == '-')) {
+                sign = this.peek() == '-' ? -1 : 1;
+                this.position++;
+            }
+            int seconds = this.number() * 3600;
+            if (!this.atEnd() && this.peek() == ':') {
+                this.position++;
+                seconds += this.number() * 60;
+                if (!this.atEnd() && this.peek() == ':') {
+                    this.position++;
+                    seconds += this.number();
+                }
+            }
+            return sign * seconds;
+        }
+
+        mut Change change() {
+            Change change;
+            if (!this.atEnd() && this.peek() == 'M') {
+                this.position++;
+                int month = this.number();
+                this.expect('.');
+                int week = this.number();
+                this.expect('.');
+                int day = this.number();
+                if (month < 1 || month > 12 || week < 1 || week > 5 || day > 6) {
+                    this.fail();
+                }
+                change = new Change('M', month, week, day, 7200);
+            } else if (!this.atEnd() && this.peek() == 'J') {
+                this.position++;
+                int day = this.number();
+                if (day < 1 || day > 365) {
+                    this.fail();
+                }
+                change = new Change('J', 0, 0, day, 7200);
+            } else {
+                int day = this.number();
+                if (day > 365) {
+                    this.fail();
+                }
+                change = new Change('N', 0, 0, day, 7200);
+            }
+            if (!this.atEnd() && this.peek() == '/') {
+                this.position++;
+                int time = this.offset();
+                change = new Change(change.kind(), change.month(), change.week(), change.day(), time);
+            }
+            return change;
+        }
+
+        private mut int number() {
+            int start = this.position;
+            int value = 0;
+            while (!this.atEnd() && this.peek() >= '0' && this.peek() <= '9') {
+                value = value * 10 + ((int) this.peek() - (int) '0');
+                this.position++;
+            }
+            if (this.position == start) {
+                this.fail();
+            }
+            return value;
+        }
+
+        private void fail() {
+            throw new DateTimeException("invalid POSIX time zone rule `${this.source}`");
+        }
+    }
+}

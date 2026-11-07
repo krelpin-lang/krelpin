@@ -212,7 +212,16 @@ impl PlaceTys<'_, '_> {
     }
 
     pub(crate) fn immutable_prefix(&self, place: &Place) -> Option<Immutable> {
-        if let PlaceBase::Static { .. } = place.base {
+        if let PlaceBase::Static { owner, name } = place.base {
+            let stateless = self
+                .tcx
+                .sig(owner)
+                .fields
+                .get(&name)
+                .is_some_and(|field| field.stateless);
+            if stateless && place.projection.is_empty() {
+                return None;
+            }
             return Some(Immutable {
                 through: place.clone(),
                 is_static: true,

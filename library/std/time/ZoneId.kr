@@ -1,0 +1,214 @@
+package std.time;
+
+import std.io.Files;
+import std.io.IOException;
+import std.util.ArrayList;
+import std.util.List;
+
+final class ZoneId {
+    private String id;
+    private ZoneRules rules;
+    private boolean fixed;
+
+    private ZoneId(String id, ZoneRules rules, boolean fixed) {
+        this.id = id;
+        this.rules = rules;
+        this.fixed = fixed;
+    }
+
+    static ZoneId of(String id) {
+        if (id.equals(&"Z") || id.startsWith("+") || id.startsWith("-")) {
+            return ZoneId.of(ZoneOffset.of(id));
+        }
+        if (id.equals(&"UTC") || id.equals(&"GMT") || id.equals(&"UT")) {
+            return new ZoneId(id, ZoneRules.of(ZoneOffset.UTC), false);
+        }
+        String[] prefixes = new String[] { "UTC", "GMT", "UT" };
+        for (int index = 0; index < 3; index++) {
+            &String prefix = &prefixes[index];
+            if (id.startsWith(prefix.clone()) && id.length() > prefix.length() && (id.charAt(prefix.length()) == '+' || id.charAt(prefix.length()) == '-')) {
+                ZoneOffset offset = ZoneOffset.of(id.substring(prefix.length()));
+                String normalized = offset.totalSeconds() == 0 ? prefix.clone() : "$prefix${offset.id()}";
+                return new ZoneId(normalized, ZoneRules.of(offset), false);
+            }
+        }
+        if (!ZoneId.isRegionId(&id)) {
+            throw new DateTimeException("Invalid ID for region-based ZoneId, invalid format: $id");
+        }
+        for (String directory : ZoneId.directories()) {
+            String path = "$directory/$id";
+            if (Files.isFile(path.clone())) {
+                try {
+                    byte[] data = Files.readBytes(path);
+                    return new ZoneId(id, ZoneRules.ofTzif(&data), false);
+                } catch (IOException error) {
+                    throw new DateTimeException("Unable to read the rules of time-zone ID: $id");
+                }
+            }
+        }
+        throw new DateTimeException("Unknown time-zone ID: $id");
+    }
+
+    static ZoneId of(ZoneOffset offset) {
+        return new ZoneId(offset.id(), ZoneRules.of(offset), true);
+    }
+
+    static ZoneId ofRules(String id, ZoneRules rules) {
+        return new ZoneId(id, rules, false);
+    }
+
+    static ZoneId systemDefault() {
+        String? variable = System.env("TZ");
+        if (variable != null && !variable.isEmpty()) {
+            String name = variable.startsWith(":") ? variable.substring(1) : variable;
+            try {
+                if (name.startsWith("/")) {
+                    byte[] data = Files.readBytes(name.clone());
+                    return new ZoneId(ZoneId.regionOf(&name), ZoneRules.ofTzif(&data), false);
+                }
+                return ZoneId.of(name.clone());
+            } catch (IOException error) {
+                return ZoneId.of("UTC");
+            } catch (DateTimeException error) {
+                try {
+                    return new ZoneId(name.clone(), ZoneRules.ofPosix(name), false);
+                } catch (DateTimeException ignored) {
+                    return ZoneId.of("UTC");
+                }
+            }
+        }
+        try {
+            String target = Files.canonicalPath("/etc/localtime");
+            String region = ZoneId.regionOf(&target);
+            try {
+                return ZoneId.of(region);
+            } catch (DateTimeException error) {
+                byte[] data = Files.readBytes("/etc/localtime");
+                return new ZoneId(ZoneId.regionOf(&target), ZoneRules.ofTzif(&data), false);
+            }
+        } catch (IOException error) {
+            return ZoneId.of("UTC");
+        } catch (DateTimeException error) {
+            return ZoneId.of("UTC");
+        }
+    }
+
+    static List<String> availableZoneIds() {
+        List<String> found = new ArrayList<>();
+        for (String directory : ZoneId.directories()) {
+            if (Files.isDirectory(directory.clone())) {
+                ZoneId.collect(&directory, "", &mut found);
+                found.sort();
+                return found;
+            }
+        }
+        return found;
+    }
+
+    String id() {
+        return this.id.clone();
+    }
+
+    &ZoneRules rules() borrows this {
+        return &this.rules;
+    }
+
+    ZoneOffset? asOffset() {
+        if (!this.fixed) {
+            return null;
+        }
+        return ZoneOffset.of(this.id.clone());
+    }
+
+    ZoneId normalized() {
+        if (this.rules.isFixedOffset()) {
+            return ZoneId.of(this.rules.offset(&Instant.EPOCH));
+        }
+        return this.clone();
+    }
+
+    boolean equals(&ZoneId other) {
+        return this.id == other.id;
+    }
+
+    int hashCode() {
+        return this.id.hashCode();
+    }
+
+    ZoneId clone() {
+        return new ZoneId(this.id.clone(), this.rules.clone(), this.fixed);
+    }
+
+    String toString() {
+        return this.id.clone();
+    }
+
+    private static List<String> directories() {
+        List<String> directories = new ArrayList<>();
+        String? custom = System.env("TZDIR");
+        if (custom != null && !custom.isEmpty()) {
+            directories.add(custom);
+        }
+        directories.add("/usr/share/zoneinfo");
+        directories.add("/usr/lib/zoneinfo");
+        directories.add("/usr/share/lib/zoneinfo");
+        return directories;
+    }
+
+    private static boolean isRegionId(&String id) {
+        if (id.isEmpty() || id.contains("..") || id.startsWith("/") || id.endsWith("/")) {
+            return false;
+        }
+        char first = id.charAt(0);
+        if (!((first >= 'a' && first <= 'z') || (first >= 'A' && first <= 'Z'))) {
+            return false;
+        }
+        for (char c : id.chars()) {
+            boolean letter = (c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z');
+            boolean digit = c >= '0' && c <= '9';
+            if (!letter && !digit && c != '~' && c != '/' && c != '.' && c != '_' && c != '+' && c != '-') {
+                return false;
+            }
+        }
+        return true;
+    }
+
+    private static String regionOf(&String path) {
+        int marker = path.lastIndexOf("zoneinfo/");
+        if (marker < 0) {
+            return "SystemDefault";
+        }
+        return path.substring(marker + 9);
+    }
+
+    private static void collect(&String root, String prefix, &mut List<String> found) {
+        String directory = prefix.isEmpty() ? root.clone() : "$root/$prefix";
+        String[] names;
+        try {
+            names = Files.list(directory);
+        } catch (IOException error) {
+            return;
+        }
+        for (&String name : &names) {
+            if (name.startsWith(".") || name.equals(&"posix") || name.equals(&"right") || name.equals(&"posixrules") || name.equals(&"localtime") || name.equals(&"Factory")) {
+                continue;
+            }
+            String relative = prefix.isEmpty() ? name.clone() : "$prefix/$name";
+            String path = "$root/$relative";
+            if (Files.isDirectory(path.clone())) {
+                ZoneId.collect(root, relative, found);
+            } else if (ZoneId.isRegionId(&relative) && name.charAt(0) >= 'A' && name.charAt(0) <= 'Z' && ZoneId.isTzif(path)) {
+                found.add(relative);
+            }
+        }
+    }
+
+    private static boolean isTzif(String path) {
+        try {
+            byte[] data = Files.readBytes(path);
+            return data.length >= 44 && data[0] == (byte) 84 && data[1] == (byte) 90 && data[2] == (byte) 105 && data[3] == (byte) 102;
+        } catch (IOException error) {
+            return false;
+        }
+    }
+}

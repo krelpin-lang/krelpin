@@ -1,0 +1,163 @@
+package std.util;
+
+class ArrayDeque<T> implements Deque<T> {
+    private List<T> front;
+    private List<T> back;
+
+    ArrayDeque() {
+        this.front = new ArrayList<>();
+        this.back = new ArrayList<>();
+    }
+
+    int size() {
+        return this.front.size() + this.back.size();
+    }
+
+    &T get(int index) {
+        if (index < 0 || index >= this.size()) {
+            throw new IndexOutOfBoundsException("index " + index + " is out of bounds for size " + this.size());
+        }
+        int split = this.front.size();
+        if (index < split) {
+            return this.front.get(split - 1 - index);
+        }
+        return this.back.get(index - split);
+    }
+
+    mut void addFirst(T value) {
+        this.front.add(value);
+    }
+
+    mut void addLast(T value) {
+        this.back.add(value);
+    }
+
+    mut T? pollFirst() {
+        if (this.front.isEmpty()) {
+            if (this.back.isEmpty()) {
+                return null;
+            }
+            ArrayDeque.moveHalf(&mut this.back, &mut this.front);
+        }
+        return this.front.remove(this.front.size() - 1);
+    }
+
+    mut T? pollLast() {
+        if (this.back.isEmpty()) {
+            if (this.front.isEmpty()) {
+                return null;
+            }
+            ArrayDeque.moveHalf(&mut this.front, &mut this.back);
+        }
+        return this.back.remove(this.back.size() - 1);
+    }
+
+    (&T)? peekFirst() {
+        if (this.isEmpty()) {
+            return null;
+        }
+        return this.get(0);
+    }
+
+    (&T)? peekLast() {
+        if (this.isEmpty()) {
+            return null;
+        }
+        return this.get(this.size() - 1);
+    }
+
+    mut void clear() {
+        this.front.clear();
+        this.back.clear();
+    }
+
+    boolean contains(&T value) where T extends Equatable<T> {
+        for (&T candidate : this) {
+            if (candidate.equals(value)) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    ArrayDeque<T> clone() where T extends Cloneable<T> {
+        ArrayDeque<T> copy = new ArrayDeque<>();
+        for (&T value : this) {
+            copy.addLast(value.clone());
+        }
+        return copy;
+    }
+
+    boolean equals(&ArrayDeque<T> other) where T extends Equatable<T> {
+        if (this.size() != other.size()) {
+            return false;
+        }
+        for (int index = 0; index < this.size(); index++) {
+            if (!this.get(index).equals(other.get(index))) {
+                return false;
+            }
+        }
+        return true;
+    }
+
+    int hashCode() where T extends Hashable<T> {
+        int hash = 1;
+        for (&T value : this) {
+            hash = 31 * hash + value.hashCode();
+        }
+        return hash;
+    }
+
+    Iterator<T> iterator() {
+        return new Values<>(this);
+    }
+
+    String toString() {
+        StringBuilder text = new StringBuilder();
+        text.append("[");
+        for (int index = 0; index < this.size(); index++) {
+            if (index > 0) {
+                text.append(", ");
+            }
+            text.append("" + this.get(index));
+        }
+        text.append("]");
+        return text.toString();
+    }
+
+    private static <T> void moveHalf(&mut List<T> from, &mut List<T> into) {
+        int count = (from.size() + 1) / 2;
+        from.reverse();
+        List<T> moved = new ArrayList<>();
+        for (int index = 0; index < count; index++) {
+            moved.add(from.remove(from.size() - 1));
+        }
+        while (!moved.isEmpty()) {
+            into.add(moved.remove(moved.size() - 1));
+        }
+        from.reverse();
+    }
+
+    private static final class Values<T> borrows src implements Iterator<T> {
+        private &ArrayDeque<T> deque;
+        private int next;
+
+        Values(&ArrayDeque<T> deque) keeps deque {
+            this.deque = deque;
+            this.next = 0;
+        }
+
+        boolean hasNext() {
+            return this.next < this.deque.size();
+        }
+
+        mut &T next() borrows src {
+            int index = this.next;
+            if (index >= this.deque.size()) {
+                throw new IllegalStateException("the iterator has no more elements");
+            }
+            this.next = index + 1;
+            return this.deque.get(index);
+        }
+    }
+}

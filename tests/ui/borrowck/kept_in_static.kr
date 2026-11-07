@@ -1,0 +1,30 @@
+package shop;
+
+import std.sync.Mutex;
+import std.sync.MutexGuard;
+import std.util.ArrayList;
+import std.util.List;
+
+class Main {
+    static final Runnable HOOK = () -> Console.println("hook");
+    static Runnable LATER = Main.make();
+    static Mutex<List<Runnable>> TASKS = new Mutex<>(new ArrayList<>());
+
+    static Runnable make() {
+        return () -> Console.println("made");
+    }
+
+    static void register(Runnable task) {
+        MutexGuard<List<Runnable>> guard = Main.TASKS.lock();
+        guard.getMut().add(task);
+    }
+
+    static void main() {
+        List<String> names = new ArrayList<>();
+        MutexGuard<List<Runnable>> guard = Main.TASKS.lock();
+        guard.getMut().add(() -> Console.println(names.size()));
+        guard.getMut().add(move () -> Console.println("owned"));
+        Main.HOOK.run();
+        Main.LATER.run();
+    }
+}

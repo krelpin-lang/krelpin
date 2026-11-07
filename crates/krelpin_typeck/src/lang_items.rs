@@ -49,7 +49,6 @@ lang_items! {
     StringBuilder: "std.lang.StringBuilder",
     System: "std.lang.System",
     Files: "std.io.Files",
-    OsError: "std.io.OsError",
     Command: "std.process.Command",
     FileReader: "std.io.FileReader",
     FileWriter: "std.io.FileWriter",
@@ -64,6 +63,8 @@ lang_items! {
     ArrayList: "std.util.ArrayList",
     HashMap: "std.util.HashMap",
     HashSet: "std.util.HashSet",
+    LinkedHashMap: "std.util.LinkedHashMap",
+    LinkedHashSet: "std.util.LinkedHashSet",
     Mutex: "std.sync.Mutex",
     MutexGuard: "std.sync.MutexGuard",
     AtomicBool: "std.sync.AtomicBool",
@@ -134,6 +135,16 @@ impl LangItems {
 
     pub fn is(&self, def: DefId, item: LangItem) -> bool {
         self.get(item) == Some(def)
+    }
+
+    pub fn is_map_table(&self, def: DefId) -> bool {
+        self.is(def, LangItem::HashMap) || self.is(def, LangItem::LinkedHashMap)
+    }
+
+    pub fn is_table(&self, def: DefId) -> bool {
+        self.is_map_table(def)
+            || self.is(def, LangItem::HashSet)
+            || self.is(def, LangItem::LinkedHashSet)
     }
 
     pub fn primitive_impl(&self, primitive: PrimitiveTy) -> Option<DefId> {
